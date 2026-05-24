@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: "postgres:17"
+    container_name: theapp-postgres
+    ports:
+      # Expose a different port than 5432 locally to not conflict with other services.
+      - "5433:5432"
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_DB=theapp
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "theapp"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks:
+      - theapp
+
+  # OpenTelemetry Collector - receives traces from the app
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.91.0
+    container_name: theapp-otel-collector
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+    depends_on:
+      - tempo
+    networks:
+      - theapp
+
+  # Grafana Tempo - stores traces
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: theapp-tempo
+    command: ["-config.file=/etc/tempo.yml"]
+    volumes:
+      - ./tempo.yml:/etc/tempo.yml
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200" # Tempo HTTP
+    networks:
+      - theapp
+
+  # Grafana - visualizes traces
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: theapp-grafana
+    ports:
+      - "3000:3000" # Grafana UI
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    depends_on:
+      - tempo
+    networks:
+      - theapp
+
+volumes:
+  tempo-data:
+  grafana-data:
+
+networks:
+  theapp:
+    driver: bridge
