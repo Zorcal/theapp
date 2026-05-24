@@ -3,6 +3,8 @@ module github.com/zorcal/theapp/backend
 go 1.26.3
 
 require (
+	github.com/google/go-cmp v0.7.0
+	github.com/lmittmann/tint v1.1.3
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.43.0
