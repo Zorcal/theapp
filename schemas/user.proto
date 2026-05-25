@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package theapp.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/field_mask.proto";
+
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
+
+// UserService provides operations for managing users.
+service UserService {
+  // Lists users, optionally filtered and paginated.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+}
+
+// User represents a user in the system.
+message User {
+  // Unique identifier for the user. Output only.
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+
+  // Email address of the user.
+  string email = 3;
+
+  // Timestamp when the user was created. Output only.
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Timestamp when the user was last updated. Output only.
+  google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The ETag for the current version of the user. Helps to prevent
+  // simultaneous updates of a user from overwriting each other ("mid-air
+  // collisions").
+  //
+  // If this is provided on update, it must match the server's ETag.
+  string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+}
+
+// Request message for listing users.
+message ListUsersRequest {
+  // Optional filter to apply to the user list.
+  ListUsersFilter filter = 1;
+
+  // Maximum number of users to return.
+  int32 page_size = 2;
+
+  // Token for fetching the next page of results.
+  string page_token = 3;
+
+// Field to order the results by, e.g., "create_time" or "update_time".
+  string order_by = 4;
+}
+
+// Filter for listing users (placeholder for future fields).
+message ListUsersFilter {}
+
+// Response message for listing users.
+message ListUsersResponse {
+  // List of users returned in the response.
+  repeated User users = 1;
+
+  // Total number of users in the system.
+  int32 total_size = 2;
+
+  // Token for fetching the next page of results, if applicable.
+  string next_page_token = 3;
+}

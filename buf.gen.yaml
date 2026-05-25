@@ -1,0 +1,22 @@
+version: v2
+managed:
+  enabled: true
+clean: true
+plugins:
+  # Go plugins
+  - local: scripts/protoc-gen-go
+    out: backend/internal/api/grpc/internal/pb/
+    opt:
+      - paths=source_relative
+  - local: scripts/protoc-gen-go-grpc
+    out: backend/internal/api/grpc/internal/pb/
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+
+  # TypeScript plugins
+  # - local: frontend/node_modules/.bin/protoc-gen-es
+  #   out: frontend/app/gen/pb
+  #   include_imports: true
+  #   opt:
+  #     - target=ts
