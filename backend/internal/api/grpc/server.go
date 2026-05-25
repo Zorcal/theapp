@@ -10,7 +10,8 @@ import (
 
 // ServerConfig contains all the mandatory systems required by the GRPC server.
 type ServerConfig struct {
-	Log *slog.Logger
+	Log      *slog.Logger
+	UserCore UserCore
 }
 
 // NewServer constructs the GRPC server.
@@ -31,7 +32,8 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	)
 
 	pb.RegisterUserServiceServer(srv, &userService{
-		log: cfg.Log,
+		log:      cfg.Log,
+		userCore: cfg.UserCore,
 	})
 
 	return srv
