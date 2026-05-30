@@ -7,12 +7,16 @@ import (
 	"log/slog"
 	"time"
 
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	otellog "go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
@@ -88,6 +92,46 @@ func InitTracing(ctx context.Context, serviceName, serviceVersion string, cfg Co
 	}
 
 	return cleanup, nil
+}
+
+// InitLogging initializes OpenTelemetry logging and returns an slog.Handler
+// that forwards records to the configured OTLP endpoint. Records below
+// minLevel are dropped before export so we don't ship DEBUG chatter to the
+// remote backend in production. When telemetry is disabled the handler is
+// nil — callers should treat that as "skip the OTel branch of any
+// multi-handler" rather than as an error.
+func InitLogging(ctx context.Context, serviceName, serviceVersion string, cfg Config, minLevel slog.Leveler, log *slog.Logger) (slog.Handler, func(), error) {
+	if !cfg.Enabled {
+		return nil, func() {}, nil
+	}
+
+	exporter, err := otlploggrpc.New(
+		ctx,
+		otlploggrpc.WithEndpoint(cfg.Endpoint),
+		otlploggrpc.WithInsecure(),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create OTLP log exporter: %w", err)
+	}
+
+	lp := sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(sdklog.NewBatchProcessor(exporter)),
+		sdklog.WithResource(newResource(ctx, serviceName, serviceVersion)),
+	)
+	otellog.SetLoggerProvider(lp)
+
+	log.InfoContext(ctx, "Using OTLP log exporter", "endpoint", cfg.Endpoint, "min_level", minLevel.Level())
+
+	cleanup := func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := lp.Shutdown(shutdownCtx); err != nil {
+			log.ErrorContext(shutdownCtx, "shutting down OpenTelemetry logger provider", "error", err)
+		}
+	}
+
+	h := &slogLevelHandler{leveler: minLevel, next: otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))}
+	return h, cleanup, nil
 }
 
 // GetTraceID retrieves the trace ID from the current span in the context.
@@ -184,4 +228,32 @@ func newResource(ctx context.Context, serviceName, serviceVersion string) *resou
 		return resource.Default()
 	}
 	return r
+}
+
+// slogLevelHandler wraps an slog.Handler with a minimum-level threshold.
+// otelslog has no level option of its own, and slog-multi asks each branch's
+// Enabled independently — so without this, the OTel branch would ship every
+// record regardless of what level the stdout branch is set to.
+type slogLevelHandler struct {
+	leveler slog.Leveler
+	next    slog.Handler
+}
+
+func (h *slogLevelHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	if level < h.leveler.Level() {
+		return false
+	}
+	return h.next.Enabled(ctx, level)
+}
+
+func (h *slogLevelHandler) Handle(ctx context.Context, r slog.Record) error {
+	return h.next.Handle(ctx, r)
+}
+
+func (h *slogLevelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &slogLevelHandler{leveler: h.leveler, next: h.next.WithAttrs(attrs)}
+}
+
+func (h *slogLevelHandler) WithGroup(name string) slog.Handler {
+	return &slogLevelHandler{leveler: h.leveler, next: h.next.WithGroup(name)}
 }

@@ -16,7 +16,7 @@ services:
     networks:
       - theapp
 
-  # OpenTelemetry Collector - receives traces from the app
+  # OpenTelemetry Collector - receives traces and logs from the app
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
     container_name: theapp-otel-collector
@@ -28,6 +28,19 @@ services:
       - "4318:4318" # OTLP HTTP receiver
     depends_on:
       - tempo
+      - loki
+    networks:
+      - theapp
+
+  # Grafana Loki - stores logs
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: theapp-loki
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100" # Loki HTTP (push + query)
+    volumes:
+      - loki-data:/loki
     networks:
       - theapp
 
@@ -58,12 +71,14 @@ services:
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
     depends_on:
       - tempo
+      - loki
     networks:
       - theapp
 
 volumes:
   tempo-data:
   grafana-data:
+  loki-data:
 
 networks:
   theapp:

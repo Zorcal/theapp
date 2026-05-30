@@ -21,6 +21,9 @@ exporters:
     endpoint: tempo:4317
     tls:
       insecure: true
+  # Loki 3.x ingests OTLP natively at /otlp/v1/logs.
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
 
 service:
   pipelines:
@@ -28,6 +31,10 @@ service:
       receivers: [otlp]
       processors: [resource, batch]
       exporters: [otlp/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlphttp/loki]
 
   extensions: []
   telemetry:
