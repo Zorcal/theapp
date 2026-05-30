@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/zorcal/theapp/backend/internal/telemetry"
@@ -19,6 +20,13 @@ import (
 
 func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		// Skip gRPC infrastructure services (reflection, health). Their
+		// metadata streams produce noisy per-message logs with no insight
+		// into application behavior.
+		if strings.HasPrefix(info.FullMethod, "/grpc.reflection.") {
+			return handler(srv, ss)
+		}
+
 		now := time.Now()
 		ctx := ss.Context()
 

@@ -4,6 +4,7 @@ go 1.26.3
 
 require (
 	github.com/amacneil/dbmate/v2 v2.33.0
+	github.com/ardanlabs/conf/v3 v3.12.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
