@@ -109,11 +109,14 @@ func InitLogging(ctx context.Context, serviceName, serviceVersion string, cfg Co
 		return nil, func() {}, nil
 	}
 
-	exporter, err := otlploggrpc.New(
-		ctx,
+	opts := []otlploggrpc.Option{
 		otlploggrpc.WithEndpoint(cfg.Endpoint),
-		otlploggrpc.WithInsecure(),
-	)
+	}
+	if cfg.Insecure {
+		opts = append(opts, otlploggrpc.WithInsecure())
+	}
+
+	exporter, err := otlploggrpc.New(ctx, opts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create OTLP log exporter: %w", err)
 	}
