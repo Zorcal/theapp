@@ -17,7 +17,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
 	"github.com/pgx-contrib/pgxotel"
-	slogmulti "github.com/samber/slog-multi"
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -230,7 +229,7 @@ func configureSlogHandler(cfg Config, otelHandler slog.Handler) slog.Handler {
 		h = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLvl})
 	}
 	if otelHandler != nil {
-		h = slogmulti.Fanout(h, otelHandler)
+		h = slog.NewMultiHandler(h, otelHandler)
 	}
 	h = slogctx.NewHandler(h)
 	return h
