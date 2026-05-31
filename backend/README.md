@@ -9,6 +9,6 @@ grpcurl -plaintext 127.0.0.1:5051 list
 grpcurl -plaintext -d '{}' 127.0.0.1:5051 theapp.v1.<service>/<rpc>
 ```
 
-For example, `theapp.v1.UserService/ListUsers`.
+For example, `grpcurl -plaintext -d '{}' 127.0.0.1:5051 theapp.v1.UserService/ListUsers`.
 
 Reflection stays off elsewhere to avoid exposing the schema.
