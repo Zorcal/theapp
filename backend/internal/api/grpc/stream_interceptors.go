@@ -88,7 +88,7 @@ func errorStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 			},
 			grpcStatusDetailsLogAttrs(st),
 		)
-		log.LogAttrs(ctx, slog.LevelError, "gRPC Stream Error", attrs...)
+		log.LogAttrs(ctx, codeToLevel(st.Code()), "gRPC Stream Error", attrs...)
 
 		return st.Err()
 	}

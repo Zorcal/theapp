@@ -86,9 +86,31 @@ func errorUnaryInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 			},
 			grpcStatusDetailsLogAttrs(st),
 		)
-		log.LogAttrs(ctx, slog.LevelError, "gRPC Unary Error", attrs...)
+		log.LogAttrs(ctx, codeToLevel(st.Code()), "gRPC Unary Error", attrs...)
 
 		return resp, st.Err()
+	}
+}
+
+// codeToLevel maps a gRPC status code to a log level by where the fault lies:
+// caller-driven problems are logged at Warn, and expected benign outcomes at
+// Info so they don't pollute the error signal. Everything else falls through to
+// Error so unexpected system states surface in alerting. This deliberately
+// includes Unavailable and ResourceExhausted: from our own server these signal
+// a downed dependency or genuine resource exhaustion rather than a caller
+// mistake. Any unmapped code also pages rather than going silent.
+func codeToLevel(code codes.Code) slog.Level {
+	switch code {
+	case codes.NotFound, codes.AlreadyExists, codes.Canceled, codes.OK:
+		return slog.LevelInfo
+	case codes.InvalidArgument, codes.FailedPrecondition, codes.PermissionDenied,
+		codes.Unauthenticated, codes.Aborted, codes.OutOfRange,
+		codes.DeadlineExceeded:
+		return slog.LevelWarn
+	default:
+		// Internal, Unknown, DataLoss, Unimplemented, Unavailable,
+		// ResourceExhausted, and any unmapped code.
+		return slog.LevelError
 	}
 }
 
