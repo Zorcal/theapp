@@ -20,7 +20,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
-	"github.com/zorcal/theapp/backend/internal/data/schema"
+	"github.com/zorcal/theapp/backend/internal/data/pgschema"
 	"github.com/zorcal/theapp/backend/internal/telemetry"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
@@ -41,7 +41,7 @@ type Config struct {
 		Endpoint string `conf:"default:127.0.0.1:4317"`
 		Insecure bool   `conf:"default:true"`
 	}
-	DB struct {
+	PGDB struct {
 		User       string `conf:"default:postgres"`
 		Password   string `conf:"default:postgres,mask"`
 		Host       string `conf:"default:127.0.0.1"`
@@ -131,42 +131,42 @@ func run(ctx context.Context, cfg Config) error {
 	}
 	log.InfoContext(ctx, "Starting...", "config", strCfg)
 
-	// Migrate database.
+	// Migrate PostgreSQL database.
 
-	log.InfoContext(ctx, "Migrating database")
+	log.InfoContext(ctx, "Migrating PostgreSQL database")
 
-	dbConnStr := pgdb.ConnStr(cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.SSLEnabled)
+	pgDBConnStr := pgdb.ConnStr(cfg.PGDB.Host, cfg.PGDB.Port, cfg.PGDB.User, cfg.PGDB.Password, cfg.PGDB.Name, cfg.PGDB.SSLEnabled)
 
-	if err := schema.Migrate(ctx, dbConnStr); err != nil {
-		return fmt.Errorf("migrate database: %w", err)
+	if err := pgschema.Migrate(ctx, pgDBConnStr); err != nil {
+		return fmt.Errorf("migrate pg db: %w", err)
 	}
 
 	// Setup database connection pool.
 
-	log.InfoContext(ctx, "Setting up database connection pool")
+	log.InfoContext(ctx, "Setting up PostgreSQL database connection pool")
 
-	poolCfg, err := pgxpool.ParseConfig(dbConnStr)
+	pgPoolCfg, err := pgxpool.ParseConfig(pgDBConnStr)
 	if err != nil {
-		return fmt.Errorf("parse database pool config: %w", err)
+		return fmt.Errorf("parse pg db pool config: %w", err)
 	}
-	poolCfg.MaxConns = cfg.DB.Pool.MaxConns
-	poolCfg.MinConns = cfg.DB.Pool.MinConns
-	poolCfg.MaxConnLifetime = cfg.DB.Pool.MaxConnLifetime
-	poolCfg.MaxConnIdleTime = cfg.DB.Pool.MaxConnIdleTime
-	poolCfg.HealthCheckPeriod = cfg.DB.Pool.HealthCheckPeriod
-	poolCfg.MaxConnLifetimeJitter = cfg.DB.Pool.MaxConnLifetimeJitter
-	poolCfg.ConnConfig.Tracer = &pgxotel.QueryTracer{
-		Name: fmt.Sprintf("%s-postgres", cfg.DB.Name),
+	pgPoolCfg.MaxConns = cfg.PGDB.Pool.MaxConns
+	pgPoolCfg.MinConns = cfg.PGDB.Pool.MinConns
+	pgPoolCfg.MaxConnLifetime = cfg.PGDB.Pool.MaxConnLifetime
+	pgPoolCfg.MaxConnIdleTime = cfg.PGDB.Pool.MaxConnIdleTime
+	pgPoolCfg.HealthCheckPeriod = cfg.PGDB.Pool.HealthCheckPeriod
+	pgPoolCfg.MaxConnLifetimeJitter = cfg.PGDB.Pool.MaxConnLifetimeJitter
+	pgPoolCfg.ConnConfig.Tracer = &pgxotel.QueryTracer{
+		Name: fmt.Sprintf("%s-postgres", cfg.PGDB.Name),
 	}
 
-	pool, err := pgdb.NewPool(ctx, poolCfg)
+	pgPool, err := pgdb.NewPool(ctx, pgPoolCfg)
 	if err != nil {
-		return fmt.Errorf("new database pool: %w", err)
+		return fmt.Errorf("new pg db pool: %w", err)
 	}
-	defer pool.Close()
+	defer pgPool.Close()
 
-	if err := pgdb.StatusCheck(ctx, pool); err != nil {
-		return fmt.Errorf("status check database connection: %w", err)
+	if err := pgdb.StatusCheck(ctx, pgPool); err != nil {
+		return fmt.Errorf("status check pg db connection: %w", err)
 	}
 
 	// Setup cores.

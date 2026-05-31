@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
-	"github.com/zorcal/theapp/backend/internal/data/schema"
+	"github.com/zorcal/theapp/backend/internal/data/pgschema"
 )
 
 // Static database configuration. See docker-compose.yml at repository root.
@@ -44,8 +44,8 @@ func New(t *testing.T, ctx context.Context) *pgxpool.Pool {
 		}
 	})
 
-	if err := schema.Migrate(ctx, connStr(dbName)); err != nil {
-		t.Fatalf("migrate database %s: %s", dbName, err)
+	if err := pgschema.Migrate(ctx, connStr(dbName)); err != nil {
+		t.Fatalf("migrate db %s: %s", dbName, err)
 	}
 
 	poolCfg, err := poolConfig(dbName)
@@ -55,12 +55,12 @@ func New(t *testing.T, ctx context.Context) *pgxpool.Pool {
 
 	pool, err := pgdb.NewPool(ctx, poolCfg)
 	if err != nil {
-		t.Fatalf("create database pool %s: %s", dbName, err)
+		t.Fatalf("create db pool %s: %s", dbName, err)
 	}
 	t.Cleanup(func() { pool.Close() })
 
 	if err := pgdb.StatusCheck(ctx, pool); err != nil {
-		t.Fatalf("status check database: %s", err)
+		t.Fatalf("status check db: %s", err)
 	}
 
 	return pool
@@ -78,7 +78,7 @@ func setupDB(ctx context.Context) (dbName string, teardown func() error, err err
 
 	pool, err := pgdb.NewPool(ctx, poolCfg)
 	if err != nil {
-		return "", teardown, fmt.Errorf("create database manager pool: %w", err)
+		return "", teardown, fmt.Errorf("create db manager pool: %w", err)
 	}
 
 	teardown = func() error {
@@ -87,7 +87,7 @@ func setupDB(ctx context.Context) (dbName string, teardown func() error, err err
 	}
 
 	if err := pgdb.StatusCheck(ctx, pool); err != nil {
-		return "", teardown, fmt.Errorf(`status check database manager: %w
+		return "", teardown, fmt.Errorf(`status check db manager: %w
 
 		Did you remember to run 'docker-compose up -d' at the repository root?
 		`, err)
@@ -96,17 +96,17 @@ func setupDB(ctx context.Context) (dbName string, teardown func() error, err err
 	dbName = randDBName()
 
 	if _, err := pool.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %q", dbName)); err != nil {
-		return "", teardown, fmt.Errorf("drop database %q: %w", dbName, err)
+		return "", teardown, fmt.Errorf("drop db %q: %w", dbName, err)
 	}
 
 	if _, err := pool.Exec(ctx, fmt.Sprintf("CREATE DATABASE %q", dbName)); err != nil {
-		return "", teardown, fmt.Errorf("create database %q: %w", dbName, err)
+		return "", teardown, fmt.Errorf("create db %q: %w", dbName, err)
 	}
 
 	teardown = func() error {
 		if _, err := pool.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %q", dbName)); err != nil {
 			pool.Close()
-			return fmt.Errorf("teardown: drop database %q: %w", dbName, err)
+			return fmt.Errorf("teardown: drop db %q: %w", dbName, err)
 		}
 		pool.Close()
 		return nil
