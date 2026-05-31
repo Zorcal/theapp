@@ -1,0 +1,48 @@
+# Single-binary Mimir for local dev: every component in one process, backed by
+# the local filesystem. Multitenancy is disabled so the Collector can push and
+# Grafana can query without an X-Scope-OrgID header.
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009
+  log_level: warn
+
+# The rings coordinate Mimir's components. In single-binary mode there is only
+# one instance, so an in-memory memberlist and a replication factor of 1 are
+# enough; the defaults assume a cluster and would block waiting for peers.
+distributor:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: memberlist
+
+ingester:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: memberlist
+    replication_factor: 1
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+
+compactor:
+  data_dir: /data/compactor
+  sharding_ring:
+    kvstore:
+      store: memberlist
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+  tsdb:
+    dir: /data/tsdb
+
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/ruler

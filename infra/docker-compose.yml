@@ -29,6 +29,7 @@ services:
     depends_on:
       - tempo
       - loki
+      - mimir
     networks:
       - theapp
 
@@ -41,6 +42,19 @@ services:
       - "3100:3100" # Loki HTTP (push + query)
     volumes:
       - loki-data:/loki
+    networks:
+      - theapp
+
+  # Grafana Mimir - stores metrics
+  mimir:
+    image: grafana/mimir:2.13.0
+    container_name: theapp-mimir
+    command: ["-config.file=/etc/mimir.yml"]
+    volumes:
+      - ./mimir.yml:/etc/mimir.yml
+      - mimir-data:/data
+    ports:
+      - "9009:9009" # Mimir HTTP (OTLP push + Prometheus query)
     networks:
       - theapp
 
@@ -72,6 +86,7 @@ services:
     depends_on:
       - tempo
       - loki
+      - mimir
     networks:
       - theapp
 
@@ -79,6 +94,7 @@ volumes:
   tempo-data:
   grafana-data:
   loki-data:
+  mimir-data:
 
 networks:
   theapp:

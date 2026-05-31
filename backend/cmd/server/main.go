@@ -123,6 +123,12 @@ func run(ctx context.Context, cfg Config) error {
 	}
 	defer cleanupLogging()
 
+	cleanupMetrics, err := telemetry.InitMetrics(ctx, appName, appVersion, telemetryConfig, bootstrapLogger)
+	if err != nil {
+		return fmt.Errorf("init telemetry metrics: %w", err)
+	}
+	defer cleanupMetrics()
+
 	log := configureLogger(cfg, otelSlogHandler)
 
 	strCfg, err := conf.String(&cfg)

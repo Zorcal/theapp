@@ -28,3 +28,11 @@ datasources:
           matcherRegex: '"trace_id":"(\w+)"'
           url: "$${__value.raw}"
           datasourceUid: tempo
+
+  - name: Mimir
+    type: prometheus
+    access: proxy
+    url: http://mimir:9009/prometheus
+    uid: mimir
+    jsonData:
+      httpMethod: POST

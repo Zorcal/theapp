@@ -1,4 +1,5 @@
-// Package telemetry provides OpenTelemetry tracing setup and utilities.
+// Package telemetry provides OpenTelemetry tracing, logging, and metrics setup
+// and utilities.
 package telemetry
 
 import (
@@ -8,15 +9,18 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	otellog "go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
@@ -132,6 +136,53 @@ func InitLogging(ctx context.Context, serviceName, serviceVersion string, cfg Co
 
 	h := &slogLevelHandler{leveler: minLevel, next: otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))}
 	return h, cleanup, nil
+}
+
+// InitMetrics initializes OpenTelemetry metrics, exporting via OTLP to the
+// configured endpoint on a periodic interval, and starts Go runtime
+// instrumentation (GC pauses, goroutine count, memory). When telemetry is
+// disabled it is a no-op. gRPC server metrics need no extra wiring: the
+// otelgrpc stats handler already installed on the server reads whatever
+// MeterProvider is registered globally, so setting it here is what turns those
+// metrics on.
+func InitMetrics(ctx context.Context, serviceName, serviceVersion string, cfg Config, log *slog.Logger) (func(), error) {
+	if !cfg.Enabled {
+		return func() {}, nil
+	}
+
+	opts := []otlpmetricgrpc.Option{
+		otlpmetricgrpc.WithEndpoint(cfg.Endpoint),
+	}
+	if cfg.Insecure {
+		opts = append(opts, otlpmetricgrpc.WithInsecure())
+	}
+
+	exporter, err := otlpmetricgrpc.New(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("create OTLP metric exporter: %w", err)
+	}
+
+	mp := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
+		sdkmetric.WithResource(newResource(ctx, serviceName, serviceVersion)),
+	)
+	otel.SetMeterProvider(mp)
+
+	if err := runtime.Start(runtime.WithMeterProvider(mp)); err != nil {
+		return nil, fmt.Errorf("start runtime metrics: %w", err)
+	}
+
+	log.InfoContext(ctx, "Using OTLP metric exporter", "endpoint", cfg.Endpoint)
+
+	cleanup := func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := mp.Shutdown(shutdownCtx); err != nil {
+			log.ErrorContext(shutdownCtx, "shutting down OpenTelemetry meter provider", "error", err)
+		}
+	}
+
+	return cleanup, nil
 }
 
 // GetTraceID retrieves the trace ID from the current span in the context.
