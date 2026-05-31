@@ -1,14 +1,16 @@
+// Package grpc provides the gRPC server for the application.
 package grpc
 
 import (
 	"log/slog"
 	"strings"
 
-	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/stats"
+
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 )
 
 // ServerConfig contains all the mandatory systems required by the GRPC server.

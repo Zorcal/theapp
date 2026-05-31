@@ -17,16 +17,16 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	otellog "go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
-	sdklog "go.opentelemetry.io/otel/sdk/log"
-	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	otellog "go.opentelemetry.io/otel/log/global"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -87,11 +87,12 @@ func InitTracing(ctx context.Context, serviceName, serviceVersion string, cfg Co
 
 	tracer = tp.Tracer("github.com/zorcal/theapp/backend")
 
+	//nolint:contextcheck // Cleanup uses its own context so shutdown isn't canceled when the caller's context is
 	cleanup := func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := tp.Shutdown(shutdownCtx); err != nil {
-			log.ErrorContext(shutdownCtx, "shutting down OpenTelemetry tracer provider", "error", err)
+			log.ErrorContext(shutdownCtx, "Shutting down OpenTelemetry tracer provider", "error", err)
 		}
 	}
 
@@ -129,11 +130,12 @@ func InitLogging(ctx context.Context, serviceName, serviceVersion string, cfg Co
 
 	log.InfoContext(ctx, "Using OTLP log exporter", "endpoint", cfg.Endpoint, "min_level", minLevel.Level())
 
+	//nolint:contextcheck // Cleanup uses its own context so shutdown isn't canceled when the caller's context is
 	cleanup := func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := lp.Shutdown(shutdownCtx); err != nil {
-			log.ErrorContext(shutdownCtx, "shutting down OpenTelemetry logger provider", "error", err)
+			log.ErrorContext(shutdownCtx, "Shutting down OpenTelemetry logger provider", "error", err)
 		}
 	}
 
@@ -177,11 +179,12 @@ func InitMetrics(ctx context.Context, serviceName, serviceVersion string, cfg Co
 
 	log.InfoContext(ctx, "Using OTLP metric exporter", "endpoint", cfg.Endpoint)
 
+	//nolint:contextcheck // Cleanup uses its own context so shutdown isn't canceled when the caller's context is
 	cleanup := func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := mp.Shutdown(shutdownCtx); err != nil {
-			log.ErrorContext(shutdownCtx, "shutting down OpenTelemetry meter provider", "error", err)
+			log.ErrorContext(shutdownCtx, "Shutting down OpenTelemetry meter provider", "error", err)
 		}
 	}
 

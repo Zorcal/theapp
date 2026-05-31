@@ -1,0 +1,210 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - clickhouselint
+    - containedctx
+    - contextcheck
+    - depguard
+    - durationcheck
+    - embeddedstructfieldcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - fatcontext
+    - forbidigo
+    - forcetypeassert
+    - gocheckcompilerdirectives
+    - gochecksumtype
+    - gocritic
+    - godoclint
+    - godot
+    - goprintffuncname
+    - gosec
+    - govet
+    - importas
+    - ineffassign
+    - intrange
+    - iotamixing
+    - ireturn
+    - makezero
+    - mirror
+    - misspell
+    - modernize
+    - musttag
+    - nakedret
+    - nilnesserr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - perfsprint
+    - prealloc
+    - predeclared
+    - protogetter
+    - reassign
+    - recvcheck
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - tagalign
+    - tagliatelle
+    - testableexamples
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+  settings:
+    depguard:
+      rules:
+        mdl:
+          files:
+            - "**/backend/internal/core/mdl/**"
+          deny:
+            - pkg: github.com/zorcal/theapp/backend/internal
+              desc: mdl is a pure model leaf; it must not import any internal business package
+        pgstores:
+          list-mode: lax
+          files:
+            - "**/backend/internal/core/pgstores/**"
+          # Deny the whole core subtree, then re-allow pgstores itself: this
+          # blocks mdl and every core (current or future) without listing them.
+          allow:
+            - github.com/zorcal/theapp/backend/internal/core/pgstores
+          deny:
+            - pkg: github.com/zorcal/theapp/backend/internal/core
+              desc: pgstores is a leaf; it must not import mdl or any core
+        pkg:
+          files:
+            - "**/backend/pkg/**"
+          deny:
+            - pkg: github.com/zorcal/theapp/backend/internal
+              desc: pkg holds reusable code; it must not import app-private internal packages
+            - pkg: github.com/zorcal/theapp/backend/cmd
+              desc: pkg holds reusable code; it must not import cmd entrypoints
+        pkg-isolation:
+          # Production pkg code must be self-contained: no pkg package may depend
+          # on another. Test files are exempt so a black-box _test package can
+          # import the package it tests.
+          files:
+            - "**/backend/pkg/**"
+            - "!**/*_test.go"
+          deny:
+            - pkg: github.com/zorcal/theapp/backend/pkg
+              desc: pkg packages must be independent; one pkg package must not import another
+    exhaustive:
+      default-signifies-exhaustive: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    misspell:
+      locale: US
+    nakedret:
+      max-func-lines: 0
+    sloglint:
+      context: "all"
+      msg-style: capitalized
+      key-naming-case: snake
+      forbidden-keys:
+        - time
+        - level
+        - msg
+        - source
+    staticcheck:
+      http-status-code-whitelist: []
+      checks: ["all"]
+    tagliatelle:
+      case:
+        rules:
+          json: camel
+          env: upperSnake
+          envconfig: upperSnake
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      # List of functions to exclude from checking, where each entry is a single function to exclude.
+      # See https://github.com/kisielk/errcheck#excluding-functions for details.
+      exclude-functions:
+        - fmt.Fprint
+        - (*net/http.Server).Close
+        - (*github.com/jackc/pgx/v5/pgxpool.Pool).Query
+        - (*github.com/jackc/pgx/v5.Conn).Close
+        - (net/http.ResponseWriter).Write
+      verbose: true
+    gosec:
+      excludes:
+        - G104 # Handled by errcheck
+    ireturn:
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - generic
+        # Allow api type to return ogen interfaces
+        # Allow OpenTelemetry interfaces
+        - "go.opentelemetry.io/otel/trace.*"
+        # Allow pgx interfaces
+        - "github.com/jackc/pgx/v5.*"
+        # Allow go-cmp options
+        - "github.com/google/go-cmp/cmp.Option"
+  exclusions:
+    rules:
+      - path: main\.go
+        linters:
+          - contextcheck
+      - path: _test\.go
+        linters:
+          - errcheck
+          - bodyclose
+          - unparam
+      - path: _test\.go
+        linters:
+          - gosec
+        text: G101
+      - path: internal/telemetry/telemetry\.go
+        linters:
+          - spancheck # Telemetry utility functions intentionally return spans for caller to manage
+      - path: pkg/slogctx/context\.go
+        linters:
+          - sloglint # Mirrors stdlib log/slog argsToAttr; the "!BADKEY" sentinel must stay verbatim
+formatters:
+  enable:
+    - gci
+    - gofumpt
+    - golines
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/zorcal/theapp/backend)
+        - blank
+        - dot
+        - alias
+        - localmodule
+    gofumpt:
+      extra-rules: true
+    golines:
+      max-len: 200
+      tab-len: 4
+      shorten-comments: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  fix: true

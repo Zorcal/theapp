@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
-	"github.com/zorcal/theapp/backend/internal/core/mdl"
-	"github.com/zorcal/theapp/backend/internal/testingx"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
 func TestUserService_listUsers(t *testing.T) {
@@ -132,7 +133,7 @@ func TestUserService_listUsers(t *testing.T) {
 			want: &pb.ListUsersResponse{
 				Users:         []*pb.User{pbJohnDoe, pbMaryDoe},
 				TotalSize:     5,
-				NextPageToken: "eyJvIjoyLCJvYiI6W3siRmllbGQiOiJlbWFpbCIsIkRpcmVjdGlvbiI6IkRFU0MifSx7IkZpZWxkIjoidXBkYXRlZF9hdCIsIkRpcmVjdGlvbiI6IkFTQyJ9XX0=",
+				NextPageToken: "eyJvIjoyLCJvYiI6ImVtYWlsIGRlc2MsdXBkYXRlZF9hdCJ9",
 			},
 		},
 		{
@@ -178,7 +179,7 @@ func TestUserService_listUsers(t *testing.T) {
 				t.Fatalf("ListUsers() error = %q, want no error", err)
 			}
 
-			testingx.AssertDiff(t, got.Users, tt.want.Users, diffOpts)
+			testingx.AssertDiff(t, got.GetUsers(), tt.want.GetUsers(), diffOpts)
 
 			if got.GetTotalSize() != tt.want.GetTotalSize() {
 				t.Errorf("ListUsers() total_size = %d, want %d", got.GetTotalSize(), tt.want.GetTotalSize())

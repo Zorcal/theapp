@@ -18,7 +18,7 @@ type User struct {
 // UserFilter holds the available fields a user query can be filtered on.
 type UserFilter struct{}
 
-// DefaultOrderBy represents the default way we sort users.
+// DefaultUserOrderBy represents the default way we sort users.
 var DefaultUserOrderBy = []OrderBy[UserOrderByField]{
 	{Field: UserOrderByFieldEmail, Direction: DirectionAsc},
 	{Field: UserOrderByFieldUpdatedAt, Direction: DirectionDesc},

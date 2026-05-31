@@ -4,44 +4,40 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
 func TestEncodePageToken(t *testing.T) {
 	tests := []struct {
-		name     string
-		offset   int
-		orderBys []mdl.OrderBy[string]
-		want     string
+		name    string
+		offset  int
+		orderBy string
+		want    string
 	}{
 		{
-			name:   "zero offset, no order_bys",
+			name:   "zero offset, no order_by",
 			offset: 0,
 			want:   "eyJvIjowfQ==",
 		},
 		{
-			name:   "non-zero offset, no order_bys",
+			name:   "non-zero offset, no order_by",
 			offset: 2,
 			want:   "eyJvIjoyfQ==",
 		},
 		{
-			name:   "offset with order_bys",
-			offset: 4,
-			orderBys: []mdl.OrderBy[string]{
-				{Field: "email", Direction: mdl.DirectionDesc},
-				{Field: "updated_at", Direction: mdl.DirectionAsc},
-			},
-			want: "eyJvIjo0LCJvYiI6W3siRmllbGQiOiJlbWFpbCIsIkRpcmVjdGlvbiI6IkRFU0MifSx7IkZpZWxkIjoidXBkYXRlZF9hdCIsIkRpcmVjdGlvbiI6IkFTQyJ9XX0=",
+			name:    "offset with order_by",
+			offset:  4,
+			orderBy: "email desc,updated_at",
+			want:    "eyJvIjo0LCJvYiI6ImVtYWlsIGRlc2MsdXBkYXRlZF9hdCJ9",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := EncodePageToken(tt.offset, tt.orderBys)
+			got, err := EncodePageToken(tt.offset, tt.orderBy)
 			if err != nil {
-				t.Fatalf("EncodePageToken(%d, %+v) error = %q, want no error", tt.offset, tt.orderBys, err)
+				t.Fatalf("EncodePageToken(%d, %q) error = %q, want no error", tt.offset, tt.orderBy, err)
 			}
 			if got != tt.want {
-				t.Errorf("EncodePageToken(%d, %+v) = %q, want %q", tt.offset, tt.orderBys, got, tt.want)
+				t.Errorf("EncodePageToken(%d, %q) = %q, want %q", tt.offset, tt.orderBy, got, tt.want)
 			}
 		})
 	}
@@ -51,38 +47,35 @@ func TestDecodePageToken(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
-		want PageToken[string]
+		want PageToken
 	}{
 		{
 			name: "empty",
 			in:   "",
-			want: PageToken[string]{},
+			want: PageToken{},
 		},
 		{
-			name: "zero offset, no order_bys",
+			name: "zero offset, no order_by",
 			in:   "eyJvIjowfQ==",
-			want: PageToken[string]{Offset: 0},
+			want: PageToken{Offset: 0},
 		},
 		{
-			name: "non-zero offset, no order_bys",
+			name: "non-zero offset, no order_by",
 			in:   "eyJvIjoyfQ==",
-			want: PageToken[string]{Offset: 2},
+			want: PageToken{Offset: 2},
 		},
 		{
-			name: "offset with order_bys",
-			in:   "eyJvIjo0LCJvYiI6W3siRmllbGQiOiJlbWFpbCIsIkRpcmVjdGlvbiI6IkRFU0MifSx7IkZpZWxkIjoidXBkYXRlZF9hdCIsIkRpcmVjdGlvbiI6IkFTQyJ9XX0=",
-			want: PageToken[string]{
-				Offset: 4,
-				OrderBys: []mdl.OrderBy[string]{
-					{Field: "email", Direction: mdl.DirectionDesc},
-					{Field: "updated_at", Direction: mdl.DirectionAsc},
-				},
+			name: "offset with order_by",
+			in:   "eyJvIjo0LCJvYiI6ImVtYWlsIGRlc2MsdXBkYXRlZF9hdCJ9",
+			want: PageToken{
+				Offset:  4,
+				OrderBy: "email desc,updated_at",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DecodePageToken[string](tt.in)
+			got, err := DecodePageToken(tt.in)
 			if err != nil {
 				t.Fatalf("DecodePageToken(%q) error = %q, want no error", tt.in, err)
 			}
@@ -113,7 +106,7 @@ func TestDecodePageToken_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DecodePageToken[string](tt.in)
+			got, err := DecodePageToken(tt.in)
 			if err == nil {
 				t.Fatalf("DecodePageToken(%q) = %+v, want error", tt.in, got)
 			}

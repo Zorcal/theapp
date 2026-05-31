@@ -6,6 +6,8 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	for _, name := range []string{"first", "second"} {

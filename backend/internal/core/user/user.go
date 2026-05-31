@@ -1,4 +1,4 @@
-// Package user provides the core business logic for the use domain.
+// Package user provides the core business logic for the user domain.
 package user
 
 import (
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 

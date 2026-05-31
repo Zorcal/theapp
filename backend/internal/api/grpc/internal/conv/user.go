@@ -3,10 +3,11 @@ package conv
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func UsersToPb(usr []mdl.User) []*pb.User {

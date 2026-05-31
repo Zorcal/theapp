@@ -1,4 +1,4 @@
-// Package schema contains the database schema, migrations and seeding data.
+// Package pgschema contains the database schema, migrations and seeding data.
 package pgschema
 
 import (
@@ -53,7 +53,9 @@ func Version() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("read migration %s: %w", name, err)
 		}
-		fmt.Fprintf(h, "%s\x00%s\x00", name, b)
+		if _, err := fmt.Fprintf(h, "%s\x00%s\x00", name, b); err != nil {
+			return "", fmt.Errorf("write to hash: %w", err)
+		}
 	}
 	return hex.EncodeToString(h.Sum(nil))[:16], nil
 }

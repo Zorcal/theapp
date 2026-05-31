@@ -9,12 +9,13 @@ import (
 	"slices"
 	"time"
 
-	"github.com/zorcal/theapp/backend/internal/telemetry"
-	"github.com/zorcal/theapp/backend/pkg/slogctx"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/zorcal/theapp/backend/internal/telemetry"
+	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
 
 func loggingUnaryInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
@@ -26,12 +27,12 @@ func loggingUnaryInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 			ctx = slogctx.Attach(ctx, "trace_id", traceID)
 		}
 
-		log.InfoContext(ctx, fmt.Sprintf("gRPC Unary Request - %s", info.FullMethod),
+		log.InfoContext(ctx, "gRPC Unary Request - "+info.FullMethod,
 			"method", info.FullMethod,
 			"request", req)
 
 		defer func() {
-			log.InfoContext(ctx, fmt.Sprintf("gRPC Unary Response - %s", info.FullMethod),
+			log.InfoContext(ctx, "gRPC Unary Response - "+info.FullMethod,
 				"method", info.FullMethod,
 				"duration_ms", time.Since(now).Milliseconds(),
 				"response", resp)

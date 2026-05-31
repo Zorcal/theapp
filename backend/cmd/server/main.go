@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
 	"github.com/pgx-contrib/pgxotel"
+
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -32,6 +33,7 @@ var appVersion = "dev"
 
 type Config struct {
 	conf.Version
+
 	Net struct {
 		Address string `conf:"default:127.0.0.1:5051"`
 	}
@@ -162,7 +164,7 @@ func run(ctx context.Context, cfg Config) error {
 	pgPoolCfg.HealthCheckPeriod = cfg.PGDB.Pool.HealthCheckPeriod
 	pgPoolCfg.MaxConnLifetimeJitter = cfg.PGDB.Pool.MaxConnLifetimeJitter
 	pgPoolCfg.ConnConfig.Tracer = &pgxotel.QueryTracer{
-		Name: fmt.Sprintf("%s-postgres", cfg.PGDB.Name),
+		Name: cfg.PGDB.Name + "-postgres",
 	}
 
 	pgPool, err := pgdb.NewPool(ctx, pgPoolCfg)
@@ -190,7 +192,8 @@ func run(ctx context.Context, cfg Config) error {
 		Reflection: cfg.IsLocalEnvironment(),
 	})
 
-	lis, err := net.Listen("tcp", cfg.Net.Address)
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", cfg.Net.Address)
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}

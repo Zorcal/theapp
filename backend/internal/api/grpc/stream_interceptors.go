@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zorcal/theapp/backend/internal/telemetry"
-	"github.com/zorcal/theapp/backend/pkg/slogctx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/zorcal/theapp/backend/internal/telemetry"
+	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
 
 func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
@@ -34,11 +35,11 @@ func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 			ctx = slogctx.Attach(ctx, "trace_id", traceID)
 		}
 
-		log.InfoContext(ctx, fmt.Sprintf("gRPC Stream Start - %s", info.FullMethod),
+		log.InfoContext(ctx, "gRPC Stream Start - "+info.FullMethod,
 			"method", info.FullMethod)
 
 		defer func() {
-			log.InfoContext(ctx, fmt.Sprintf("gRPC Stream End - %s", info.FullMethod),
+			log.InfoContext(ctx, "gRPC Stream End - "+info.FullMethod,
 				"method", info.FullMethod,
 				"duration_ms", time.Since(now).Milliseconds())
 		}()
@@ -101,6 +102,7 @@ func errorStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 // other methods delegate to the embedded stream. Nested wraps compose.
 type ctxOverrideStream struct {
 	grpc.ServerStream
+
 	ctx context.Context //nolint:containedctx // the whole point of this type.
 }
 
@@ -118,6 +120,7 @@ func (s *ctxOverrideStream) Context() context.Context {
 // where the request and response are logged on each call.
 type loggingStream struct {
 	grpc.ServerStream
+
 	log    *slog.Logger
 	method string
 }
