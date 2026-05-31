@@ -34,11 +34,11 @@ func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 			ctx = slogctx.Attach(ctx, "trace_id", traceID)
 		}
 
-		log.InfoContext(ctx, "gRPC Stream Start",
+		log.InfoContext(ctx, fmt.Sprintf("gRPC Stream Start - %s", info.FullMethod),
 			"method", info.FullMethod)
 
 		defer func() {
-			log.InfoContext(ctx, "gRPC Stream End",
+			log.InfoContext(ctx, fmt.Sprintf("gRPC Stream End - %s", info.FullMethod),
 				"method", info.FullMethod,
 				"duration_ms", time.Since(now).Milliseconds())
 		}()

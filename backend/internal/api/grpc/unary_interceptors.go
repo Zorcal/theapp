@@ -26,12 +26,12 @@ func loggingUnaryInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 			ctx = slogctx.Attach(ctx, "trace_id", traceID)
 		}
 
-		log.InfoContext(ctx, "gRPC Unary Request",
+		log.InfoContext(ctx, fmt.Sprintf("gRPC Unary Request - %s", info.FullMethod),
 			"method", info.FullMethod,
 			"request", req)
 
 		defer func() {
-			log.InfoContext(ctx, "gRPC Unary Response",
+			log.InfoContext(ctx, fmt.Sprintf("gRPC Unary Response - %s", info.FullMethod),
 				"method", info.FullMethod,
 				"duration_ms", time.Since(now).Milliseconds(),
 				"response", resp)

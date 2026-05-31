@@ -49,8 +49,7 @@ func DecodeJSON[T any](t *testing.T, r io.Reader) T {
 	return v
 }
 
-// AssertDiff compares got and want using cmp.Diff and fails the test if they
-// differ.
+// AssertDiff compares got and want using cmp.Diff and fails the test if they differ.
 func AssertDiff[T any](t *testing.T, got, want T, opts ...cmp.Option) {
 	t.Helper()
 	if diff := cmp.Diff(got, want, opts...); diff != "" {
