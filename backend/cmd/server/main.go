@@ -14,10 +14,14 @@ import (
 	"time"
 
 	"github.com/ardanlabs/conf/v3"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
+	"github.com/pgx-contrib/pgxotel"
 	slogmulti "github.com/samber/slog-multi"
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
 	"github.com/zorcal/theapp/backend/internal/core/user"
+	"github.com/zorcal/theapp/backend/internal/data/pgdb"
+	"github.com/zorcal/theapp/backend/internal/data/schema"
 	"github.com/zorcal/theapp/backend/internal/telemetry"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
@@ -37,6 +41,34 @@ type Config struct {
 		Enabled  bool   `conf:"default:true"`
 		Endpoint string `conf:"default:127.0.0.1:4317"`
 		Insecure bool   `conf:"default:true"`
+	}
+	DB struct {
+		User       string `conf:"default:postgres"`
+		Password   string `conf:"default:postgres,mask"`
+		Host       string `conf:"default:127.0.0.1"`
+		Port       int    `conf:"default:5433"`
+		Name       string `conf:"default:theapp"`
+		SSLEnabled bool   `conf:"default:false"`
+		Pool       struct {
+			// MaxConns is bounded by Postgres max_connections (default 100)
+			// shared across all app instances plus migrations and admin
+			// clients. pgx's own default of 4 bottlenecks a concurrent gRPC
+			// server, so we raise it to 10: enough concurrency while leaving
+			// ample headroom under the cap.
+			MaxConns int32 `conf:"default:10"`
+			// MinConns 0 lets the pool drain to nothing when idle; raise it in
+			// production to avoid connection-setup latency on the first
+			// requests after a quiet period. Matches pgx's default.
+			MinConns          int32         `conf:"default:0"`
+			MaxConnLifetime   time.Duration `conf:"default:1h"`
+			MaxConnIdleTime   time.Duration `conf:"default:30m"`
+			HealthCheckPeriod time.Duration `conf:"default:60s"`
+			// MaxConnLifetimeJitter spreads out connection recycling. Without
+			// it, connections opened together at startup all reach
+			// MaxConnLifetime at once and reconnect in a herd; 5m staggers
+			// them. pgx defaults this to 0 (no jitter).
+			MaxConnLifetimeJitter time.Duration `conf:"default:5m"`
+		}
 	}
 }
 
@@ -63,12 +95,14 @@ func main() {
 	}
 
 	if err := run(ctx, cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Run error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 func run(ctx context.Context, cfg Config) error {
+	// Setup open telemetry.
+
 	// Bootstrap logger is stdout-only; telemetry init can't log through
 	// itself before its own pipeline is up.
 	bootstrapLogger := configureLogger(cfg, nil)
@@ -97,6 +131,44 @@ func run(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("generate config for output: %w", err)
 	}
 	log.InfoContext(ctx, "Starting...", "config", strCfg)
+
+	// Migrate database.
+
+	log.InfoContext(ctx, "Migrating database")
+
+	dbConnStr := pgdb.ConnStr(cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.SSLEnabled)
+
+	if err := schema.Migrate(ctx, dbConnStr); err != nil {
+		return fmt.Errorf("migrate database: %w", err)
+	}
+
+	// Setup database connection pool.
+
+	log.InfoContext(ctx, "Setting up database connection pool")
+
+	poolCfg, err := pgxpool.ParseConfig(dbConnStr)
+	if err != nil {
+		return fmt.Errorf("parse database pool config: %w", err)
+	}
+	poolCfg.MaxConns = cfg.DB.Pool.MaxConns
+	poolCfg.MinConns = cfg.DB.Pool.MinConns
+	poolCfg.MaxConnLifetime = cfg.DB.Pool.MaxConnLifetime
+	poolCfg.MaxConnIdleTime = cfg.DB.Pool.MaxConnIdleTime
+	poolCfg.HealthCheckPeriod = cfg.DB.Pool.HealthCheckPeriod
+	poolCfg.MaxConnLifetimeJitter = cfg.DB.Pool.MaxConnLifetimeJitter
+	poolCfg.ConnConfig.Tracer = &pgxotel.QueryTracer{
+		Name: fmt.Sprintf("%s-postgres", cfg.DB.Name),
+	}
+
+	pool, err := pgdb.NewPool(ctx, poolCfg)
+	if err != nil {
+		return fmt.Errorf("new database pool: %w", err)
+	}
+	defer pool.Close()
+
+	if err := pgdb.StatusCheck(ctx, pool); err != nil {
+		return fmt.Errorf("status check database connection: %w", err)
+	}
 
 	// Setup cores.
 
