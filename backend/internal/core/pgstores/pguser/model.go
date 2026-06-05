@@ -19,3 +19,6 @@ type User struct {
 type NewUser struct {
 	Email string `db:"email"`
 }
+
+// Filter specifies how users should be filtered.
+type UserFilter struct{}
