@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -27,7 +28,7 @@ func New(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	// The schema is built once into a template database and each call hands out a fast low-level clone of that
 	// template, so tests do not pay the migration cost individually.
 
-	admin := adminPool(t, ctx)
+	admin := sharedAdminPool(t, ctx)
 
 	tmpl, err := templateName()
 	if err != nil {
@@ -42,7 +43,7 @@ func New(t *testing.T, ctx context.Context) *pgxpool.Pool {
 		t.Fatalf("clone template %q into %q: %v", tmpl, dbName, err)
 	}
 	// Registered before the pool's Close below so cleanups run in the right order: the test pool closes first (no
-	// connections left), then the database is dropped, then the admin pool closes last.
+	// connections left), then the database is dropped.
 	t.Cleanup(func() {
 		if _, err := admin.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %q", dbName)); err != nil {
 			t.Errorf("drop db %q: %v", dbName, err)
@@ -61,7 +62,7 @@ func New(t *testing.T, ctx context.Context) *pgxpool.Pool {
 func NewWithoutTemplate(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 
-	admin := adminPool(t, ctx)
+	admin := sharedAdminPool(t, ctx)
 
 	dbName := randDBName()
 	if err := buildDatabase(ctx, admin, dbName); err != nil {
@@ -76,36 +77,53 @@ func NewWithoutTemplate(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	return openPool(t, ctx, dbName)
 }
 
-// adminPool opens a pool to the postgres maintenance database, used to create and drop test databases. It registers the
-// pool's Close as a cleanup.
-func adminPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
+// sharedAdminPool returns the process-wide admin pool, initializing it on the first call.
+//
+// A single pool is shared across all tests in the binary rather than opening one per test. This matters when many
+// tests run in parallel: Go's default parallelism is GOMAXPROCS across packages, so per-test admin pools would
+// consume GOMAXPROCS × MaxConns connections just for lifecycle DDL. The shared pool needs enough capacity to
+// serve concurrent CREATE/DROP DATABASE calls from all parallel tests.
+var (
+	adminOnce sync.Once
+	adminPool *pgxpool.Pool
+	adminErr  error
+)
+
+func sharedAdminPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 
-	poolCfg, err := poolConfig("postgres")
-	if err != nil {
-		t.Fatalf("create admin pool config: %v", err)
-	}
-	pool, err := pgdb.NewPool(ctx, poolCfg)
-	if err != nil {
-		t.Fatalf("create admin pool: %v", err)
-	}
-	t.Cleanup(pool.Close)
+	adminOnce.Do(func() {
+		poolCfg, err := poolConfig("postgres", 10)
+		if err != nil {
+			adminErr = fmt.Errorf("create admin pool config: %w", err)
+			return
+		}
+		pool, err := pgdb.NewPool(ctx, poolCfg)
+		if err != nil {
+			adminErr = fmt.Errorf("create admin pool: %w", err)
+			return
+		}
+		if err := pgdb.StatusCheck(ctx, pool); err != nil {
+			adminErr = fmt.Errorf(`status check admin pool: %w
 
-	if err := pgdb.StatusCheck(ctx, pool); err != nil {
-		t.Fatalf(`status check admin pool: %v
+Did you remember to run 'docker-compose up -d' at the repository root?`, err)
+			return
+		}
+		adminPool = pool
+	})
 
-		Did you remember to run 'docker-compose up -d' at the repository root?
-		`, err)
+	if adminErr != nil {
+		t.Fatalf("admin pool: %v", adminErr)
 	}
 
-	return pool
+	return adminPool
 }
 
 // openPool opens a pool to dbName, status-checks it, and registers its Close as a cleanup.
 func openPool(t *testing.T, ctx context.Context, dbName string) *pgxpool.Pool {
 	t.Helper()
 
-	poolCfg, err := poolConfig(dbName)
+	poolCfg, err := poolConfig(dbName, 1)
 	if err != nil {
 		t.Fatalf("create pool config: %v", err)
 	}
@@ -233,19 +251,15 @@ func randDBName() string {
 	return string(b)
 }
 
-func poolConfig(dbName string) (*pgxpool.Config, error) {
+// poolConfig returns a pool config for dbName capped at maxConns connections.
+// Keep maxConns small: per-test pools need only 1 (sequential store methods never hold more than one connection);
+// the shared admin pool uses 10 to handle concurrent CREATE/DROP DATABASE from parallel tests.
+func poolConfig(dbName string, maxConns int32) (*pgxpool.Config, error) {
 	cfg, err := pgxpool.ParseConfig(connStr(dbName))
 	if err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
-
-	// Each test gets its own pool (admin + test-DB), so keep MaxConns small to
-	// avoid exhausting the Postgres instance's max_connections when many tests
-	// run in parallel. 2 is enough: store methods are sequential within a test,
-	// and a single extra slot covers any incidental concurrency. If a future
-	// test needs more concurrent connections, increase it locally for that test.
-	cfg.MaxConns = 2
-
+	cfg.MaxConns = maxConns
 	return cfg, nil
 }
 

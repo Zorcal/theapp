@@ -73,4 +73,3 @@ func (s *Store) GetThing(ctx context.Context, id uuid.UUID) (Thing, error) {
 - Use a `seedX` helper (e.g. `seedUser`) for any data inserted as test setup — it makes clear what is precondition vs. what is under test. The helper should return the inserted model so tests can use it in assertions without re-querying.
 - DB-generated fields (UUIDs, serials) should be excluded from struct diffs via `cmpopts.IgnoreFields` and asserted non-zero separately.
 - Use `cmpopts.EquateApproxTime(time.Minute)` for timestamp comparisons — set `want` to `time.Now()` and let the margin absorb DB round-trip skew.
-- Each test opens two pools (admin + test-DB), each capped at `MaxConns=2` in `pgtest`. This is enough for sequential store methods. If a test needs concurrent DB access (e.g. goroutines racing against each other), increase `MaxConns` on the pool returned by `pgtest.New` for that specific test — do not change the default.
