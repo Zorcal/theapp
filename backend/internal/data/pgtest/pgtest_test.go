@@ -17,12 +17,12 @@ func TestNew(t *testing.T) {
 			pool := New(t, ctx)
 
 			var exists bool
-			const sql = `SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'theapp')`
+			const sql = `SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'useraccess')`
 			if err := pool.QueryRow(ctx, sql).Scan(&exists); err != nil {
 				t.Fatalf("query schema: %v", err)
 			}
 			if !exists {
-				t.Fatal("theapp schema not found in cloned database")
+				t.Fatal("useraccess schema not found in cloned database")
 			}
 		})
 	}
@@ -34,11 +34,11 @@ func TestNewWithoutTemplate(t *testing.T) {
 	pool := NewWithoutTemplate(t, ctx)
 
 	var exists bool
-	const sql = `SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'theapp')`
+	const sql = `SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'useraccess')`
 	if err := pool.QueryRow(ctx, sql).Scan(&exists); err != nil {
 		t.Fatalf("query schema: %v", err)
 	}
 	if !exists {
-		t.Fatal("theapp schema not found in database built from migrations")
+		t.Fatal("useraccess schema not found in database built from migrations")
 	}
 }
