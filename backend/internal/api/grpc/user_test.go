@@ -73,7 +73,7 @@ func TestUserService_listUsers(t *testing.T) {
 		{
 			name: "empty request",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 15, nil
 				},
 			},
@@ -86,7 +86,7 @@ func TestUserService_listUsers(t *testing.T) {
 		{
 			name: "empty result",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return nil, 0, nil
 				},
 			},
@@ -96,7 +96,7 @@ func TestUserService_listUsers(t *testing.T) {
 		{
 			name: "first page returns next_page_token when more results exist",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe}, 5, nil
 				},
 			},
@@ -110,7 +110,7 @@ func TestUserService_listUsers(t *testing.T) {
 		{
 			name: "single page returns no next_page_token",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 3, nil
 				},
 			},
@@ -123,7 +123,7 @@ func TestUserService_listUsers(t *testing.T) {
 		{
 			name: "order_by carried into next_page_token",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe}, 5, nil
 				},
 			},
@@ -140,7 +140,7 @@ func TestUserService_listUsers(t *testing.T) {
 		{
 			name: "page_token offset is honored",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{smithBrown}, 10, nil
 				},
 			},
@@ -157,7 +157,7 @@ func TestUserService_listUsers(t *testing.T) {
 		{
 			name: "last page exactly fills page size",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 3, nil
 				},
 			},
@@ -223,7 +223,7 @@ func TestUserService_listUsers_error(t *testing.T) {
 		{
 			name: "core error",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return nil, 0, errors.New("boom")
 				},
 			},

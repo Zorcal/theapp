@@ -15,9 +15,6 @@ type User struct {
 	ETag      string
 }
 
-// UserFilter holds the available fields a user query can be filtered on.
-type UserFilter struct{}
-
 // UserOrderByField represents a field that user query results can be ordered by.
 type UserOrderByField string
 

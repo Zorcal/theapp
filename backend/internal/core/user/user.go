@@ -40,7 +40,7 @@ func NewCore() *Core {
 	return &Core{}
 }
 
-func (c *Core) ListUsers(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error) {
+func (c *Core) ListUsers(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error) {
 	if pageOffset > len(users) {
 		return []mdl.User{}, len(users), nil
 	}

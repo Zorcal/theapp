@@ -41,21 +41,15 @@ message User {
 
 // Request message for listing users.
 message ListUsersRequest {
-  // Optional filter to apply to the user list.
-  ListUsersFilter filter = 1;
-
   // Maximum number of users to return.
-  int32 page_size = 2;
+  int32 page_size = 1;
 
   // Token for fetching the next page of results.
-  string page_token = 3;
+  string page_token = 2;
 
 // Field to order the results by, e.g., "create_time" or "update_time".
-  string order_by = 4;
+  string order_by = 3;
 }
-
-// Filter for listing users (placeholder for future fields).
-message ListUsersFilter {}
 
 // Response message for listing users.
 message ListUsersResponse {

@@ -114,14 +114,12 @@ func (x *User) GetEtag() string {
 // Request message for listing users.
 type ListUsersRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Optional filter to apply to the user list.
-	Filter *ListUsersFilter `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
 	// Maximum number of users to return.
-	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Token for fetching the next page of results.
-	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	// Field to order the results by, e.g., "create_time" or "update_time".
-	OrderBy       string `protobuf:"bytes,4,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
+	OrderBy       string `protobuf:"bytes,3,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -156,13 +154,6 @@ func (*ListUsersRequest) Descriptor() ([]byte, []int) {
 	return file_user_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *ListUsersRequest) GetFilter() *ListUsersFilter {
-	if x != nil {
-		return x.Filter
-	}
-	return nil
-}
-
 func (x *ListUsersRequest) GetPageSize() int32 {
 	if x != nil {
 		return x.PageSize
@@ -184,43 +175,6 @@ func (x *ListUsersRequest) GetOrderBy() string {
 	return ""
 }
 
-// Filter for listing users (placeholder for future fields).
-type ListUsersFilter struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListUsersFilter) Reset() {
-	*x = ListUsersFilter{}
-	mi := &file_user_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListUsersFilter) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListUsersFilter) ProtoMessage() {}
-
-func (x *ListUsersFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListUsersFilter.ProtoReflect.Descriptor instead.
-func (*ListUsersFilter) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{2}
-}
-
 // Response message for listing users.
 type ListUsersResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -236,7 +190,7 @@ type ListUsersResponse struct {
 
 func (x *ListUsersResponse) Reset() {
 	*x = ListUsersResponse{}
-	mi := &file_user_proto_msgTypes[3]
+	mi := &file_user_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -248,7 +202,7 @@ func (x *ListUsersResponse) String() string {
 func (*ListUsersResponse) ProtoMessage() {}
 
 func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_user_proto_msgTypes[3]
+	mi := &file_user_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -261,7 +215,7 @@ func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListUsersResponse) Descriptor() ([]byte, []int) {
-	return file_user_proto_rawDescGZIP(), []int{3}
+	return file_user_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ListUsersResponse) GetUsers() []*User {
@@ -298,14 +252,12 @@ const file_user_proto_rawDesc = "" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x1f\n" +
-	"\x04etag\x18\x06 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"\x9d\x01\n" +
-	"\x10ListUsersRequest\x122\n" +
-	"\x06filter\x18\x01 \x01(\v2\x1a.theapp.v1.ListUsersFilterR\x06filter\x12\x1b\n" +
-	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\x04etag\x18\x06 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"i\n" +
+	"\x10ListUsersRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\x03 \x01(\tR\tpageToken\x12\x19\n" +
-	"\border_by\x18\x04 \x01(\tR\aorderBy\"\x11\n" +
-	"\x0fListUsersFilter\"\x81\x01\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\x12\x19\n" +
+	"\border_by\x18\x03 \x01(\tR\aorderBy\"\x81\x01\n" +
 	"\x11ListUsersResponse\x12%\n" +
 	"\x05users\x18\x01 \x03(\v2\x0f.theapp.v1.UserR\x05users\x12\x1d\n" +
 	"\n" +
@@ -328,26 +280,24 @@ func file_user_proto_rawDescGZIP() []byte {
 	return file_user_proto_rawDescData
 }
 
-var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_user_proto_goTypes = []any{
 	(*User)(nil),                  // 0: theapp.v1.User
 	(*ListUsersRequest)(nil),      // 1: theapp.v1.ListUsersRequest
-	(*ListUsersFilter)(nil),       // 2: theapp.v1.ListUsersFilter
-	(*ListUsersResponse)(nil),     // 3: theapp.v1.ListUsersResponse
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
+	(*ListUsersResponse)(nil),     // 2: theapp.v1.ListUsersResponse
+	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
 }
 var file_user_proto_depIdxs = []int32{
-	4, // 0: theapp.v1.User.create_time:type_name -> google.protobuf.Timestamp
-	4, // 1: theapp.v1.User.update_time:type_name -> google.protobuf.Timestamp
-	2, // 2: theapp.v1.ListUsersRequest.filter:type_name -> theapp.v1.ListUsersFilter
-	0, // 3: theapp.v1.ListUsersResponse.users:type_name -> theapp.v1.User
-	1, // 4: theapp.v1.UserService.ListUsers:input_type -> theapp.v1.ListUsersRequest
-	3, // 5: theapp.v1.UserService.ListUsers:output_type -> theapp.v1.ListUsersResponse
-	5, // [5:6] is the sub-list for method output_type
-	4, // [4:5] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	3, // 0: theapp.v1.User.create_time:type_name -> google.protobuf.Timestamp
+	3, // 1: theapp.v1.User.update_time:type_name -> google.protobuf.Timestamp
+	0, // 2: theapp.v1.ListUsersResponse.users:type_name -> theapp.v1.User
+	1, // 3: theapp.v1.UserService.ListUsers:input_type -> theapp.v1.ListUsersRequest
+	2, // 4: theapp.v1.UserService.ListUsers:output_type -> theapp.v1.ListUsersResponse
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_user_proto_init() }
@@ -361,7 +311,7 @@ func file_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_proto_rawDesc), len(file_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

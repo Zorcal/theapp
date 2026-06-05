@@ -25,10 +25,6 @@ func UserToPb(usr mdl.User) *pb.User {
 	}
 }
 
-func UserFilterFromPB(fltr *pb.ListUsersFilter) mdl.UserFilter {
-	return mdl.UserFilter{}
-}
-
 func UserOrderBysFromPb(s string) ([]order.By[mdl.UserOrderByField], error) {
 	fieldMapping := map[string]mdl.UserOrderByField{
 		"email":      mdl.UserOrderByFieldEmail,

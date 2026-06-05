@@ -21,4 +21,5 @@ type NewUser struct {
 }
 
 // Filter specifies how users should be filtered.
-type UserFilter struct{}
+type UserFilter struct {
+}

@@ -25,7 +25,7 @@ type userService struct {
 //go:generate moq -rm -fmt goimports -out user_core_moq_test.go . UserCore:MockedUserCore
 
 type UserCore interface {
-	ListUsers(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
+	ListUsers(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
 }
 
 func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
@@ -53,9 +53,7 @@ func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		return nil, status.Errorf(codes.InvalidArgument, "page_token order_by mismatch")
 	}
 
-	fltr := conv.UserFilterFromPB(req.GetFilter())
-
-	usrs, totalCount, err := s.userCore.ListUsers(ctx, fltr, orderBys, pageSize, pageToken.Offset)
+	usrs, totalCount, err := s.userCore.ListUsers(ctx, orderBys, pageSize, pageToken.Offset)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}

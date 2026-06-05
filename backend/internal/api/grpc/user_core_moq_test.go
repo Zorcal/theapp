@@ -21,7 +21,7 @@ var _ UserCore = &MockedUserCore{}
 //
 //		// make and configure a mocked UserCore
 //		mockedUserCore := &MockedUserCore{
-//			ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
+//			ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
 //				panic("mock out the ListUsers method")
 //			},
 //		}
@@ -32,7 +32,7 @@ var _ UserCore = &MockedUserCore{}
 //	}
 type MockedUserCore struct {
 	// ListUsersFunc mocks the ListUsers method.
-	ListUsersFunc func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
+	ListUsersFunc func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -40,8 +40,6 @@ type MockedUserCore struct {
 		ListUsers []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Fltr is the fltr argument value.
-			Fltr mdl.UserFilter
 			// OrderBys is the orderBys argument value.
 			OrderBys []order.By[mdl.UserOrderByField]
 			// PageSize is the pageSize argument value.
@@ -54,19 +52,17 @@ type MockedUserCore struct {
 }
 
 // ListUsers calls ListUsersFunc.
-func (mock *MockedUserCore) ListUsers(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
+func (mock *MockedUserCore) ListUsers(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
 	if mock.ListUsersFunc == nil {
 		panic("MockedUserCore.ListUsersFunc: method is nil but UserCore.ListUsers was just called")
 	}
 	callInfo := struct {
 		Ctx        context.Context
-		Fltr       mdl.UserFilter
 		OrderBys   []order.By[mdl.UserOrderByField]
 		PageSize   int
 		PageOffset int
 	}{
 		Ctx:        ctx,
-		Fltr:       fltr,
 		OrderBys:   orderBys,
 		PageSize:   pageSize,
 		PageOffset: pageOffset,
@@ -74,7 +70,7 @@ func (mock *MockedUserCore) ListUsers(ctx context.Context, fltr mdl.UserFilter, 
 	mock.lockListUsers.Lock()
 	mock.calls.ListUsers = append(mock.calls.ListUsers, callInfo)
 	mock.lockListUsers.Unlock()
-	return mock.ListUsersFunc(ctx, fltr, orderBys, pageSize, pageOffset)
+	return mock.ListUsersFunc(ctx, orderBys, pageSize, pageOffset)
 }
 
 // ListUsersCalls gets all the calls that were made to ListUsers.
@@ -83,14 +79,12 @@ func (mock *MockedUserCore) ListUsers(ctx context.Context, fltr mdl.UserFilter, 
 //	len(mockedUserCore.ListUsersCalls())
 func (mock *MockedUserCore) ListUsersCalls() []struct {
 	Ctx        context.Context
-	Fltr       mdl.UserFilter
 	OrderBys   []order.By[mdl.UserOrderByField]
 	PageSize   int
 	PageOffset int
 } {
 	var calls []struct {
 		Ctx        context.Context
-		Fltr       mdl.UserFilter
 		OrderBys   []order.By[mdl.UserOrderByField]
 		PageSize   int
 		PageOffset int
