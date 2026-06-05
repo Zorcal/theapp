@@ -22,4 +22,5 @@ type UserOrderByField string
 const (
 	UserOrderByFieldEmail     UserOrderByField = "email"
 	UserOrderByFieldUpdatedAt UserOrderByField = "updated_at"
+	UserOrderByFieldCreatedAt UserOrderByField = "created_at"
 )

@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/zorcal/theapp/backend/internal/core/data/order"
 )
 
 type Store struct {
@@ -18,10 +19,14 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	}
 }
 
-func (s *Store) Users(ctx context.Context, pageSize, pageOffset int) ([]User, error) {
+func (s *Store) QueryUsers(ctx context.Context, orderBys []order.By[OrderByField], pageSize, pageOffset int) ([]User, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (s *Store) UserCount(ctx context.Context, pageSize, pageOffset int) ([]User, error) {
+func (s *Store) UserCount(ctx context.Context) ([]User, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (s *Store) InsertUser(ctx context.Context, cu CreateUser) (User, error) {
+	return User{}, errors.New("not implemented")
 }
