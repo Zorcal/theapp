@@ -1,10 +1,10 @@
-DBMATE_VOLUME=$(shell pwd)/core/data/schema/migrations
+DBMATE_VOLUME=$(shell pwd)/internal/data/pgschema/migrations
 DBMATE_IMAGE=ghcr.io/amacneil/dbmate
 
-.PHONY: new-migration
-new-migration:
+.PHONY: new-pg-migration
+new-pg-migration:
 	@if [ -z "$(name)" ]; then \
-		echo "Error: You must specify a migration name using 'make new-migration name=<migration_name>'"; \
+		echo "Error: You must specify a migration name using 'make new-pg-migration name=<migration_name>'"; \
 		exit 1; \
 	fi
 	docker run --rm -it --network=host \
