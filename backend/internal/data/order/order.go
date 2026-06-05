@@ -4,7 +4,7 @@ package order
 // Direction represents the direction to order data in.
 type Direction string
 
-// All directions.
+// All directions. Values follow standard SQL.
 const (
 	DirectionAsc  Direction = "ASC"
 	DirectionDesc Direction = "DESC"

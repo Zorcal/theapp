@@ -2,6 +2,10 @@ services:
   postgres:
     image: "postgres:17"
     container_name: theapp-postgres
+    # Raised from the default 100 to support many parallel integration tests.
+    # Each test opens two pools (admin + test-DB) capped at 2 connections each,
+    # so 500 comfortably fits 100+ concurrent test goroutines with room to spare.
+    command: ["postgres", "-c", "max_connections=500"]
     ports:
       # Expose a different port than 5432 locally to not conflict with other services.
       - "5433:5432"

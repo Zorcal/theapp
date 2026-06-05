@@ -238,6 +238,14 @@ func poolConfig(dbName string) (*pgxpool.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
+
+	// Each test gets its own pool (admin + test-DB), so keep MaxConns small to
+	// avoid exhausting the Postgres instance's max_connections when many tests
+	// run in parallel. 2 is enough: store methods are sequential within a test,
+	// and a single extra slot covers any incidental concurrency. If a future
+	// test needs more concurrent connections, increase it locally for that test.
+	cfg.MaxConns = 2
+
 	return cfg, nil
 }
 
