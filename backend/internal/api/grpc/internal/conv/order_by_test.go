@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/core/data/order"
 )
 
 func TestParseOrderBy(t *testing.T) {
@@ -14,7 +14,7 @@ func TestParseOrderBy(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
-		want []mdl.OrderBy[string]
+		want []order.By[string]
 	}{
 		{
 			name: "empty",
@@ -24,26 +24,26 @@ func TestParseOrderBy(t *testing.T) {
 		{
 			name: "all fields",
 			in:   "k1,k2 desc,k3 asc",
-			want: []mdl.OrderBy[string]{
-				{Direction: mdl.DirectionAsc, Field: "v1"},
-				{Direction: mdl.DirectionDesc, Field: "v2"},
-				{Direction: mdl.DirectionAsc, Field: "v3"},
+			want: []order.By[string]{
+				{Direction: order.DirectionAsc, Field: "v1"},
+				{Direction: order.DirectionDesc, Field: "v2"},
+				{Direction: order.DirectionAsc, Field: "v3"},
 			},
 		},
 		{
 			name: "subset of fields",
 			in:   "k3 asc,k2 desc",
-			want: []mdl.OrderBy[string]{
-				{Direction: mdl.DirectionAsc, Field: "v3"},
-				{Direction: mdl.DirectionDesc, Field: "v2"},
+			want: []order.By[string]{
+				{Direction: order.DirectionAsc, Field: "v3"},
+				{Direction: order.DirectionDesc, Field: "v2"},
 			},
 		},
 		{
 			name: "ignores redundant space",
 			in:   "   k3   asc    ,   k2     desc    ",
-			want: []mdl.OrderBy[string]{
-				{Direction: mdl.DirectionAsc, Field: "v3"},
-				{Direction: mdl.DirectionDesc, Field: "v2"},
+			want: []order.By[string]{
+				{Direction: order.DirectionAsc, Field: "v3"},
+				{Direction: order.DirectionDesc, Field: "v2"},
 			},
 		},
 	}

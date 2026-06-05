@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/zorcal/theapp/backend/internal/core/data/order"
 )
 
 // User represents a user in the system.
@@ -19,9 +20,9 @@ type User struct {
 type UserFilter struct{}
 
 // DefaultUserOrderBy represents the default way we sort users.
-var DefaultUserOrderBy = []OrderBy[UserOrderByField]{
-	{Field: UserOrderByFieldEmail, Direction: DirectionAsc},
-	{Field: UserOrderByFieldUpdatedAt, Direction: DirectionDesc},
+var DefaultUserOrderBy = []order.By[UserOrderByField]{
+	{Field: UserOrderByFieldEmail, Direction: order.DirectionAsc},
+	{Field: UserOrderByFieldUpdatedAt, Direction: order.DirectionDesc},
 }
 
 // UserOrderByField represents a field that user query results can be ordered by.

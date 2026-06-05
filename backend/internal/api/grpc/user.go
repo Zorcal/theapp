@@ -10,6 +10,7 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/core/data/order"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/pkg/mustconv"
 )
@@ -24,7 +25,7 @@ type userService struct {
 //go:generate moq -rm -fmt goimports -out user_core_moq_test.go . UserCore:MockedUserCore
 
 type UserCore interface {
-	ListUsers(ctx context.Context, fltr mdl.UserFilter, orderBys []mdl.OrderBy[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
+	ListUsers(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
 }
 
 func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {

@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/zorcal/theapp/backend/internal/core/data/order"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
@@ -20,7 +21,7 @@ var _ UserCore = &MockedUserCore{}
 //
 //		// make and configure a mocked UserCore
 //		mockedUserCore := &MockedUserCore{
-//			ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []mdl.OrderBy[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
+//			ListUsersFunc: func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
 //				panic("mock out the ListUsers method")
 //			},
 //		}
@@ -31,7 +32,7 @@ var _ UserCore = &MockedUserCore{}
 //	}
 type MockedUserCore struct {
 	// ListUsersFunc mocks the ListUsers method.
-	ListUsersFunc func(ctx context.Context, fltr mdl.UserFilter, orderBys []mdl.OrderBy[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
+	ListUsersFunc func(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -42,7 +43,7 @@ type MockedUserCore struct {
 			// Fltr is the fltr argument value.
 			Fltr mdl.UserFilter
 			// OrderBys is the orderBys argument value.
-			OrderBys []mdl.OrderBy[mdl.UserOrderByField]
+			OrderBys []order.By[mdl.UserOrderByField]
 			// PageSize is the pageSize argument value.
 			PageSize int
 			// PageOffset is the pageOffset argument value.
@@ -53,14 +54,14 @@ type MockedUserCore struct {
 }
 
 // ListUsers calls ListUsersFunc.
-func (mock *MockedUserCore) ListUsers(ctx context.Context, fltr mdl.UserFilter, orderBys []mdl.OrderBy[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
+func (mock *MockedUserCore) ListUsers(ctx context.Context, fltr mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
 	if mock.ListUsersFunc == nil {
 		panic("MockedUserCore.ListUsersFunc: method is nil but UserCore.ListUsers was just called")
 	}
 	callInfo := struct {
 		Ctx        context.Context
 		Fltr       mdl.UserFilter
-		OrderBys   []mdl.OrderBy[mdl.UserOrderByField]
+		OrderBys   []order.By[mdl.UserOrderByField]
 		PageSize   int
 		PageOffset int
 	}{
@@ -83,14 +84,14 @@ func (mock *MockedUserCore) ListUsers(ctx context.Context, fltr mdl.UserFilter, 
 func (mock *MockedUserCore) ListUsersCalls() []struct {
 	Ctx        context.Context
 	Fltr       mdl.UserFilter
-	OrderBys   []mdl.OrderBy[mdl.UserOrderByField]
+	OrderBys   []order.By[mdl.UserOrderByField]
 	PageSize   int
 	PageOffset int
 } {
 	var calls []struct {
 		Ctx        context.Context
 		Fltr       mdl.UserFilter
-		OrderBys   []mdl.OrderBy[mdl.UserOrderByField]
+		OrderBys   []order.By[mdl.UserOrderByField]
 		PageSize   int
 		PageOffset int
 	}

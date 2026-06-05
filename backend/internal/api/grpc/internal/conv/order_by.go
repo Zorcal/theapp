@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/core/data/order"
 )
 
 // parseOrderBy parses the raw `orderBy` string into a structured order by representation. Assumes `orderBy` has the
@@ -14,7 +14,7 @@ import (
 //
 // `fieldMapping` maps fields in the raw `orderBy` value to custom field types. An empty `fieldMapping` results in an
 // empty result.
-func parseOrderBy[T ~string](orderBy string, fieldMapping map[string]T) ([]mdl.OrderBy[T], error) {
+func parseOrderBy[T ~string](orderBy string, fieldMapping map[string]T) ([]order.By[T], error) {
 	if orderBy == "" {
 		return nil, nil
 	}
@@ -23,7 +23,7 @@ func parseOrderBy[T ~string](orderBy string, fieldMapping map[string]T) ([]mdl.O
 		return nil, nil
 	}
 
-	out := make([]mdl.OrderBy[T], 0, 3)
+	out := make([]order.By[T], 0, 3)
 	for s := range strings.SplitSeq(orderBy, ",") {
 		parts := strings.Fields(s)
 		if len(parts) == 0 || len(parts) > 2 {
@@ -35,7 +35,7 @@ func parseOrderBy[T ~string](orderBy string, fieldMapping map[string]T) ([]mdl.O
 			return nil, fmt.Errorf("invalid field %s", parts[0])
 		}
 
-		dir := mdl.DirectionAsc
+		dir := order.DirectionAsc
 		if len(parts) == 2 {
 			var err error
 			dir, err = parseDirection(parts[1])
@@ -44,7 +44,7 @@ func parseOrderBy[T ~string](orderBy string, fieldMapping map[string]T) ([]mdl.O
 			}
 		}
 
-		out = append(out, mdl.OrderBy[T]{
+		out = append(out, order.By[T]{
 			Direction: dir,
 			Field:     field,
 		})
@@ -54,13 +54,13 @@ func parseOrderBy[T ~string](orderBy string, fieldMapping map[string]T) ([]mdl.O
 	return out, nil
 }
 
-func parseDirection(s string) (mdl.Direction, error) {
+func parseDirection(s string) (order.Direction, error) {
 	switch strings.ToLower(s) {
 	case "asc":
-		return mdl.DirectionAsc, nil
+		return order.DirectionAsc, nil
 	case "desc":
-		return mdl.DirectionDesc, nil
+		return order.DirectionDesc, nil
 	default:
-		return mdl.Direction(""), errors.New("invalid direction")
+		return order.Direction(""), errors.New("invalid direction")
 	}
 }

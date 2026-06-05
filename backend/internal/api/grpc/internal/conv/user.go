@@ -6,6 +6,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/core/data/order"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
@@ -28,7 +29,7 @@ func UserFilterFromPB(fltr *pb.ListUsersFilter) mdl.UserFilter {
 	return mdl.UserFilter{}
 }
 
-func UserOrderBysFromPb(s string) ([]mdl.OrderBy[mdl.UserOrderByField], error) {
+func UserOrderBysFromPb(s string) ([]order.By[mdl.UserOrderByField], error) {
 	fieldMapping := map[string]mdl.UserOrderByField{
 		"email":      mdl.UserOrderByFieldEmail,
 		"updated_at": mdl.UserOrderByFieldUpdatedAt,
