@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zorcal/theapp/backend/internal/core/data/order"
+	"github.com/zorcal/theapp/backend/internal/data/order"
 )
 
 // parseOrderBy parses the raw `orderBy` string into a structured order by representation. Assumes `orderBy` has the

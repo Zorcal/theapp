@@ -6,8 +6,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
-	"github.com/zorcal/theapp/backend/internal/core/data/order"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/data/order"
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 

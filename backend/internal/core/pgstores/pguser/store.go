@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/zorcal/theapp/backend/internal/core/data/order"
+	"github.com/zorcal/theapp/backend/internal/data/order"
 )
 
 type Store struct {

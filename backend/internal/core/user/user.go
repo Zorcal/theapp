@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/zorcal/theapp/backend/internal/core/data/order"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/data/order"
 )
 
 var users = []mdl.User{

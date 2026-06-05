@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/zorcal/theapp/backend/internal/core/data/order"
+	"github.com/zorcal/theapp/backend/internal/data/order"
 )
 
 func TestParseOrderBy(t *testing.T) {
