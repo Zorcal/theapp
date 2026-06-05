@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -55,5 +56,20 @@ func AssertDiff[T any](t *testing.T, got, want T, opts ...cmp.Option) {
 	t.Helper()
 	if diff := cmp.Diff(got, want, opts...); diff != "" {
 		t.Errorf("diff mismatch (-got +want):\n%s", diff)
+	}
+}
+
+// AssertErrContains checks that err contains all of the given substrings and
+// reports any that are missing in a single failure message.
+func AssertErrContains(t *testing.T, err error, contains ...string) {
+	t.Helper()
+	var missing []string
+	for _, s := range contains {
+		if !strings.Contains(err.Error(), s) {
+			missing = append(missing, s)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("error = %q, want to contain %v", err, missing)
 	}
 }

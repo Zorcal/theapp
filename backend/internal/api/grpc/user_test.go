@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -17,7 +18,122 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
-func TestUserService_listUsers(t *testing.T) {
+func TestUserService_CreateUser(t *testing.T) {
+	diffOpts := defaultDiffOpts()
+
+	now := time.Now()
+	usr := mdl.User{
+		ID:        uuid.New(),
+		Email:     "alice@test.com",
+		CreatedAt: now,
+		ETag:      uuid.NewString(),
+	}
+	wantPb := &pb.User{
+		Id:         usr.ID.String(),
+		Email:      usr.Email,
+		CreateTime: timestamppb.New(usr.CreatedAt),
+		Etag:       usr.ETag,
+	}
+
+	tests := []struct {
+		name     string
+		userCore UserCore
+		in       *pb.CreateUserRequest
+		want     *pb.User
+	}{
+		{
+			name: "returns created user",
+			userCore: &MockedUserCore{
+				CreateUserFunc: func(_ context.Context, _ mdl.CreateUser) (mdl.User, error) {
+					return usr, nil
+				},
+			},
+			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com"}},
+			want: wantPb,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:      testingx.NewLogger(t),
+				UserCore: tt.userCore,
+			})
+
+			got, err := srvTest.userServiceClient.CreateUser(t.Context(), tt.in)
+			if err != nil {
+				t.Fatalf("CreateUser() error = %q, want no error", err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want, diffOpts)
+		})
+	}
+}
+
+func TestUserService_CreateUser_error(t *testing.T) {
+	invalidArgWithViolation := func(field, desc string) *status.Status {
+		st, err := status.New(codes.InvalidArgument, codes.InvalidArgument.String()).WithDetails(
+			&errdetails.BadRequest{FieldViolations: []*errdetails.BadRequest_FieldViolation{
+				{Field: field, Description: desc},
+			}},
+		)
+		if err != nil {
+			t.Fatalf("invalidArgWithViolation(%q, %q) build status error = %v", field, desc, err)
+		}
+		return st
+	}
+
+	tests := []struct {
+		name     string
+		userCore UserCore
+		in       *pb.CreateUserRequest
+		want     *status.Status
+	}{
+		{
+			name:     "missing user field",
+			userCore: &MockedUserCore{},
+			in:       &pb.CreateUserRequest{},
+			want:     invalidArgWithViolation("user", "required"),
+		},
+		{
+			name:     "empty email",
+			userCore: &MockedUserCore{},
+			in:       &pb.CreateUserRequest{User: &pb.User{}},
+			want:     invalidArgWithViolation("user.email", "required"),
+		},
+		{
+			name: "core error",
+			userCore: &MockedUserCore{
+				CreateUserFunc: func(_ context.Context, _ mdl.CreateUser) (mdl.User, error) {
+					return mdl.User{}, errors.New("boom")
+				},
+			},
+			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com"}},
+			want: status.New(codes.Internal, "Internal"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:      testingx.NewLogger(t),
+				UserCore: tt.userCore,
+			})
+
+			_, err := srvTest.userServiceClient.CreateUser(t.Context(), tt.in)
+			if err == nil {
+				t.Fatal("CreateUser() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("CreateUser() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestUserService_ListUsers(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
 	now := time.Now()
@@ -193,7 +309,7 @@ func TestUserService_listUsers(t *testing.T) {
 	}
 }
 
-func TestUserService_listUsers_error(t *testing.T) {
+func TestUserService_ListUsers_error(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
 	tests := []struct {

@@ -21,6 +21,9 @@ var _ UserCore = &MockedUserCore{}
 //
 //		// make and configure a mocked UserCore
 //		mockedUserCore := &MockedUserCore{
+//			CreateUserFunc: func(ctx context.Context, cu mdl.CreateUser) (mdl.User, error) {
+//				panic("mock out the CreateUser method")
+//			},
 //			ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
 //				panic("mock out the ListUsers method")
 //			},
@@ -31,11 +34,21 @@ var _ UserCore = &MockedUserCore{}
 //
 //	}
 type MockedUserCore struct {
+	// CreateUserFunc mocks the CreateUser method.
+	CreateUserFunc func(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
+
 	// ListUsersFunc mocks the ListUsers method.
 	ListUsersFunc func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// CreateUser holds details about calls to the CreateUser method.
+		CreateUser []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Cu is the cu argument value.
+			Cu mdl.CreateUser
+		}
 		// ListUsers holds details about calls to the ListUsers method.
 		ListUsers []struct {
 			// Ctx is the ctx argument value.
@@ -48,7 +61,44 @@ type MockedUserCore struct {
 			PageOffset int
 		}
 	}
-	lockListUsers sync.RWMutex
+	lockCreateUser sync.RWMutex
+	lockListUsers  sync.RWMutex
+}
+
+// CreateUser calls CreateUserFunc.
+func (mock *MockedUserCore) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error) {
+	if mock.CreateUserFunc == nil {
+		panic("MockedUserCore.CreateUserFunc: method is nil but UserCore.CreateUser was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		Cu  mdl.CreateUser
+	}{
+		Ctx: ctx,
+		Cu:  cu,
+	}
+	mock.lockCreateUser.Lock()
+	mock.calls.CreateUser = append(mock.calls.CreateUser, callInfo)
+	mock.lockCreateUser.Unlock()
+	return mock.CreateUserFunc(ctx, cu)
+}
+
+// CreateUserCalls gets all the calls that were made to CreateUser.
+// Check the length with:
+//
+//	len(mockedUserCore.CreateUserCalls())
+func (mock *MockedUserCore) CreateUserCalls() []struct {
+	Ctx context.Context
+	Cu  mdl.CreateUser
+} {
+	var calls []struct {
+		Ctx context.Context
+		Cu  mdl.CreateUser
+	}
+	mock.lockCreateUser.RLock()
+	calls = mock.calls.CreateUser
+	mock.lockCreateUser.RUnlock()
+	return calls
 }
 
 // ListUsers calls ListUsersFunc.

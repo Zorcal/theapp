@@ -11,6 +11,10 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
+func CreateUserFromPb(u *pb.User) mdl.CreateUser {
+	return mdl.CreateUser{Email: u.GetEmail()}
+}
+
 func UsersToPb(usr []mdl.User) []*pb.User {
 	return slicesx.Map(usr, UserToPb)
 }

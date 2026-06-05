@@ -19,6 +19,7 @@ import (
 	"github.com/pgx-contrib/pgxotel"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgschema"
@@ -177,9 +178,13 @@ func run(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("status check pg db connection: %w", err)
 	}
 
+	// Setup pg stores.
+
+	pgUserStore := pguser.NewStore(pgPool)
+
 	// Setup cores.
 
-	userCore := user.NewCore()
+	userCore := user.NewCore(pgUserStore)
 
 	// Setup gRPC server.
 

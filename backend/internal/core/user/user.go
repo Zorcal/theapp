@@ -3,47 +3,60 @@ package user
 
 import (
 	"context"
-	"time"
-
-	"github.com/google/uuid"
+	"fmt"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/order"
 )
 
-var users = []mdl.User{
-	{
-		ID:        uuid.New(),
-		Email:     "john.doe@test.com",
-		CreatedAt: time.Now().AddDate(0, 0, -15),
-		ETag:      uuid.NewString(),
-	},
-	{
-		ID:        uuid.New(),
-		Email:     "mary.doe@test.com",
-		CreatedAt: time.Now().AddDate(0, 0, -12),
-		UpdatedAt: new(time.Now().AddDate(0, 0, -3)),
-		ETag:      uuid.NewString(),
-	},
-	{
-		ID:        uuid.New(),
-		Email:     "smith.brown@test.com",
-		CreatedAt: time.Now().AddDate(0, 0, -10),
-		UpdatedAt: new(time.Now().AddDate(0, 0, -1)),
-		ETag:      uuid.NewString(),
-	},
+//go:generate moq -rm -fmt goimports -out storer_moq_test.go . Storer:MockedStorer
+
+// Storer defines the database operations the Core requires.
+type Storer interface {
+	QueryUsers(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize, pageOffset int) ([]pguser.User, error)
+	UserCount(ctx context.Context) (int, error)
+	InsertUser(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
 }
 
-type Core struct{}
-
-func NewCore() *Core {
-	return &Core{}
+// Core holds the business logic for the user domain.
+type Core struct {
+	storer Storer
 }
 
-func (c *Core) ListUsers(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error) {
-	if pageOffset > len(users) {
-		return []mdl.User{}, len(users), nil
+// NewCore constructs a Core backed by the provided Storer.
+func NewCore(storer Storer) *Core {
+	return &Core{storer: storer}
+}
+
+// CreateUser creates a new user and returns the created user.
+func (c *Core) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error) {
+	pgCreateUser := createUserToPG(cu)
+
+	pgUser, err := c.storer.InsertUser(ctx, pgCreateUser)
+	if err != nil {
+		return mdl.User{}, fmt.Errorf("insert user: %w", err)
 	}
 
-	return users[pageOffset:min(pageOffset+pageSize, len(users))], len(users), nil
+	return userFromPG(pgUser), nil
+}
+
+// ListUsers returns a page of users ordered by orderBys, along with the total count of users in the system.
+func (c *Core) ListUsers(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+	pgOrderBys, err := orderBysToPG(orderBys)
+	if err != nil {
+		return nil, 0, fmt.Errorf("convert order bys: %w", err)
+	}
+
+	pgUsers, err := c.storer.QueryUsers(ctx, pgOrderBys, pageSize, pageOffset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("query users: %w", err)
+	}
+
+	count, err := c.storer.UserCount(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("user count: %w", err)
+	}
+
+	return usersFromPG(pgUsers), count, nil
 }

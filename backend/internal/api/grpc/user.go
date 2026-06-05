@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -26,6 +27,46 @@ type userService struct {
 
 type UserCore interface {
 	ListUsers(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
+	CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
+}
+
+func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.User, error) {
+	if err := validateCreateUserRequest(req); err != nil {
+		return nil, fmt.Errorf("validate create user request: %w", err)
+	}
+
+	cu := conv.CreateUserFromPb(req.GetUser())
+
+	usr, err := s.userCore.CreateUser(ctx, cu)
+	if err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
+	}
+
+	return conv.UserToPb(usr), nil
+}
+
+func validateCreateUserRequest(req *pb.CreateUserRequest) error {
+	var violations []*errdetails.BadRequest_FieldViolation
+
+	if req.GetUser() == nil {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field:       "user",
+			Description: "required",
+		})
+		return invalidArgumentStatus(violations)
+	}
+
+	if req.GetUser().GetEmail() == "" {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field:       "user.email",
+			Description: "required",
+		})
+	}
+
+	if len(violations) > 0 {
+		return invalidArgumentStatus(violations)
+	}
+	return nil
 }
 
 func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
@@ -75,3 +116,4 @@ func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		NextPageToken: nextPageToken,
 	}, nil
 }
+
