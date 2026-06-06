@@ -42,6 +42,33 @@ pguser.User     →  mdl.User            (userFromPG)
 
 Without dedicated conv functions, type construction scatters and there is no single place to update when a type changes.
 
+## Cross-store transactions
+
+When a core method must write through more than one store atomically, inject a `Transactor` interface and call `RunTx`. Define the interface in the core package so it doesn't import `pgdb`:
+
+```go
+type Transactor interface {
+    RunTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+```
+
+Pass the enriched `ctx` from `RunTx` into each store call — stores that use `pgdb.RunBatchTx` internally will find the transaction already in context and join it rather than opening their own:
+
+```go
+func (c *Core) PlaceOrder(ctx context.Context, co mdl.CreateOrder) error {
+    return c.tx.RunTx(ctx, func(ctx context.Context) error {
+        if err := c.orders.InsertOrder(ctx, co); err != nil {
+            return err
+        }
+        return c.inventory.DecrementStock(ctx, co.ProductID, co.Quantity)
+    })
+}
+```
+
+Wire up `pgdb.NewTransactor(pool)` at the composition root (`main.go`). `*pgdb.Transactor` satisfies the interface structurally.
+
+Nesting is safe: if `RunTx` is called with a context that already carries a transaction, it reuses it and leaves commit/rollback to the outer caller.
+
 ## Testing
 
 Each core domain package uses two complementary layers of tests:
