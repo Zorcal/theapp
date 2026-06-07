@@ -46,6 +46,32 @@ func createUserQuery(cu CreateUser) pgdb.TypedQuery[User] {
 	}
 }
 
+func updateUserQuery(uu UpdateUser) pgdb.TypedQuery[User] {
+	params := pgx.NamedArgs{"external_id": uu.ExternalID}
+	var setClauses []string
+
+	if uu.Fields.Name {
+		setClauses = append(setClauses, "name = @name")
+		params["name"] = uu.Name
+	}
+
+	setClauses = append(setClauses, "updated_at = NOW()", "etag = gen_random_uuid()")
+
+	sql := fmt.Sprintf(`
+		UPDATE useraccess.users
+		SET %s
+		WHERE external_id = @external_id
+		RETURNING external_id, email, name, created_at, updated_at, etag`,
+		strings.Join(setClauses, ", "))
+
+	return pgdb.TypedQuery[User]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[User],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func usersQuery(orderBys []order.By[OrderByField], pageSize, pageOffset int) pgdb.TypedQuery[User] {
 	params := pgx.NamedArgs{
 		"page_size":   pageSize,

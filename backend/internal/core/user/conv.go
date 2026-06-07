@@ -9,6 +9,16 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
+func updateUserToPG(uu mdl.UpdateUser) pguser.UpdateUser {
+	return pguser.UpdateUser{
+		ExternalID: uu.ID,
+		Fields: pguser.UserUpdateFields{
+			Name: uu.Fields.Name,
+		},
+		Name: uu.Name,
+	}
+}
+
 func createUserToPG(cu mdl.CreateUser) pguser.CreateUser {
 	return pguser.CreateUser{
 		Email: cu.Email,

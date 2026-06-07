@@ -31,3 +31,16 @@ type CreateUser struct {
 	Email string `db:"email"`
 	Name  string `db:"name"`
 }
+
+// UpdateUser holds the fields to update on a user in the database.
+// Fields controls which fields are applied; fields not listed are left unchanged.
+type UpdateUser struct {
+	ExternalID uuid.UUID
+	Fields     UserUpdateFields
+	Name       string
+}
+
+// UserUpdateFields specifies which fields on an UpdateUser should be applied.
+type UserUpdateFields struct {
+	Name bool
+}

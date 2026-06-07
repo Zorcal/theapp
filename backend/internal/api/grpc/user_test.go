@@ -10,6 +10,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
@@ -21,22 +22,7 @@ import (
 func TestUserService_GetUser(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
-	now := time.Now()
-	id := uuid.New()
-	usr := mdl.User{
-		ID:        id,
-		Email:     "alice@test.com",
-		Name:      "Alice Smith",
-		CreatedAt: now,
-		ETag:      uuid.NewString(),
-	}
-	wantPb := &pb.User{
-		Id:         usr.ID.String(),
-		Email:      usr.Email,
-		Name:       usr.Name,
-		CreateTime: timestamppb.New(usr.CreatedAt),
-		Etag:       usr.ETag,
-	}
+	id, etag, now := uuid.New(), uuid.NewString(), time.Now()
 
 	tests := []struct {
 		name     string
@@ -48,11 +34,11 @@ func TestUserService_GetUser(t *testing.T) {
 			name: "returns user",
 			userCore: &MockedUserCore{
 				UserByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.User, error) {
-					return usr, nil
+					return mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: etag}, nil
 				},
 			},
 			in:   &pb.GetUserRequest{Id: id.String()},
-			want: wantPb,
+			want: &pb.User{Id: id.String(), Email: "alice@test.com", Name: "Alice Smith", CreateTime: timestamppb.New(now), Etag: etag},
 		},
 	}
 	for _, tt := range tests {
@@ -131,21 +117,7 @@ func TestUserService_GetUser_error(t *testing.T) {
 func TestUserService_CreateUser(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
-	now := time.Now()
-	usr := mdl.User{
-		ID:        uuid.New(),
-		Email:     "alice@test.com",
-		Name:      "Alice Smith",
-		CreatedAt: now,
-		ETag:      uuid.NewString(),
-	}
-	wantPb := &pb.User{
-		Id:         usr.ID.String(),
-		Email:      usr.Email,
-		Name:       usr.Name,
-		CreateTime: timestamppb.New(usr.CreatedAt),
-		Etag:       usr.ETag,
-	}
+	id, etag, now := uuid.New(), uuid.NewString(), time.Now()
 
 	tests := []struct {
 		name     string
@@ -157,11 +129,11 @@ func TestUserService_CreateUser(t *testing.T) {
 			name: "returns created user",
 			userCore: &MockedUserCore{
 				CreateUserFunc: func(_ context.Context, _ mdl.CreateUser) (mdl.User, error) {
-					return usr, nil
+					return mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: etag}, nil
 				},
 			},
 			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com", Name: "Alice Smith"}},
-			want: wantPb,
+			want: &pb.User{Id: id.String(), Email: "alice@test.com", Name: "Alice Smith", CreateTime: timestamppb.New(now), Etag: etag},
 		},
 	}
 	for _, tt := range tests {
@@ -247,6 +219,140 @@ func TestUserService_CreateUser_error(t *testing.T) {
 			}
 
 			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestUserService_UpdateUser(t *testing.T) {
+	diffOpts := defaultDiffOpts()
+
+	id, etag, now := uuid.New(), uuid.NewString(), time.Now()
+
+	tests := []struct {
+		name     string
+		userCore UserCore
+		in       *pb.UpdateUserRequest
+		want     *pb.User
+	}{
+		{
+			name: "explicit mask with name",
+			userCore: &MockedUserCore{
+				UpdateUserFunc: func(_ context.Context, _ mdl.UpdateUser) (mdl.User, error) {
+					return mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Updated", CreatedAt: now, ETag: etag}, nil
+				},
+			},
+			in: &pb.UpdateUserRequest{
+				User:       &pb.User{Id: id.String(), Name: "Alice Updated"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: &pb.User{Id: id.String(), Email: "alice@test.com", Name: "Alice Updated", CreateTime: timestamppb.New(now), Etag: etag},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:      testingx.NewLogger(t),
+				UserCore: tt.userCore,
+			})
+
+			got, err := srvTest.userServiceClient.UpdateUser(t.Context(), tt.in)
+			if err != nil {
+				t.Fatalf("UpdateUser() error = %q, want no error", err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want, diffOpts)
+		})
+	}
+}
+
+func TestUserService_UpdateUser_error(t *testing.T) {
+	tests := []struct {
+		name     string
+		userCore UserCore
+		in       *pb.UpdateUserRequest
+		want     *status.Status
+	}{
+		{
+			name:     "missing user field",
+			userCore: &MockedUserCore{},
+			in:       &pb.UpdateUserRequest{},
+			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
+		},
+		{
+			name:     "invalid id",
+			userCore: &MockedUserCore{},
+			in:       &pb.UpdateUserRequest{User: &pb.User{Id: "not-a-uuid", Name: "Alice Updated"}},
+			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
+		},
+		{
+			name:     "no mask",
+			userCore: &MockedUserCore{},
+			in:       &pb.UpdateUserRequest{User: &pb.User{Id: uuid.NewString(), Name: "Alice Updated"}},
+			want:     status.New(codes.InvalidArgument, "update_mask is required"),
+		},
+		{
+			name:     "mask has name but name is empty",
+			userCore: &MockedUserCore{},
+			in: &pb.UpdateUserRequest{
+				User:       &pb.User{Id: uuid.NewString()},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
+		},
+		{
+			name:     "non-updatable field in update_mask",
+			userCore: &MockedUserCore{},
+			in: &pb.UpdateUserRequest{
+				User:       &pb.User{Id: uuid.NewString(), Name: "Alice Updated"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"email"}},
+			},
+			want: status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
+		},
+		{
+			name: "not found",
+			userCore: &MockedUserCore{
+				UpdateUserFunc: func(_ context.Context, _ mdl.UpdateUser) (mdl.User, error) {
+					return mdl.User{}, mdl.ErrNotFound
+				},
+			},
+			in: &pb.UpdateUserRequest{
+				User:       &pb.User{Id: uuid.NewString(), Name: "Alice Updated"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.NotFound, "user \""+uuid.Nil.String()+"\" not found"),
+		},
+		{
+			name: "core error",
+			userCore: &MockedUserCore{
+				UpdateUserFunc: func(_ context.Context, _ mdl.UpdateUser) (mdl.User, error) {
+					return mdl.User{}, errors.New("boom")
+				},
+			},
+			in: &pb.UpdateUserRequest{
+				User:       &pb.User{Id: uuid.NewString(), Name: "Alice Updated"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.Internal, "Internal"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:      testingx.NewLogger(t),
+				UserCore: tt.userCore,
+			})
+
+			_, err := srvTest.userServiceClient.UpdateUser(t.Context(), tt.in)
+			if err == nil {
+				t.Fatal("UpdateUser() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("UpdateUser() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Code(), tt.want.Code(), defaultDiffOpts())
 		})
 	}
 }

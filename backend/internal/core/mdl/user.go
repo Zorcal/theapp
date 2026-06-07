@@ -22,6 +22,20 @@ type CreateUser struct {
 	Name  string
 }
 
+// UpdateUser holds the fields to update on a user.
+// ID identifies the user to update and is not itself updated.
+// Fields controls which fields are applied; fields not listed are left unchanged.
+type UpdateUser struct {
+	ID     uuid.UUID
+	Fields UserUpdateFields
+	Name   string
+}
+
+// UserUpdateFields specifies which fields on an UpdateUser should be applied.
+type UserUpdateFields struct {
+	Name bool
+}
+
 // UserOrderByField represents a field that user query results can be ordered by.
 type UserOrderByField string
 

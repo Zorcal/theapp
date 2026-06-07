@@ -26,6 +26,10 @@ func TestCore_flow(t *testing.T) {
 		cmpopts.IgnoreFields(mdl.User{}, "ID", "ETag"),
 		cmpopts.EquateApproxTime(time.Minute),
 	}
+	updateDiffOpts := cmp.Options{
+		cmpopts.IgnoreFields(mdl.User{}, "ID", "ETag", "UpdatedAt"),
+		cmpopts.EquateApproxTime(time.Minute),
+	}
 
 	// CreateUser
 	usr, err := core.CreateUser(ctx, mdl.CreateUser{Email: "alice@test.com", Name: "Alice Smith"})
@@ -42,14 +46,24 @@ func TestCore_flow(t *testing.T) {
 		t.Error("CreateUser() ETag is empty, want non-empty")
 	}
 
-	// UserByID — returns the created user
+	// UpdateUser — name is changed, updated_at is set
+	updated, err := core.UpdateUser(ctx, mdl.UpdateUser{ID: usr.ID, Name: "Alice Jones", Fields: mdl.UserUpdateFields{Name: true}})
+	if err != nil {
+		t.Fatalf("UpdateUser() error = %v", err)
+	}
+	testingx.AssertDiff(t, updated, mdl.User{Email: "alice@test.com", Name: "Alice Jones", CreatedAt: time.Now()}, updateDiffOpts...)
+	if updated.UpdatedAt == nil {
+		t.Error("UpdateUser() UpdatedAt = nil, want non-nil")
+	}
+
+	// UserByID — returns the updated user
 	got, err := core.UserByID(ctx, usr.ID)
 	if err != nil {
 		t.Fatalf("UserByID(%v) error = %v", usr.ID, err)
 	}
-	testingx.AssertDiff(t, got, usr)
+	testingx.AssertDiff(t, got, updated)
 
-	// Users — created user appears in results
+	// Users — updated user appears in results
 	usrs, count, err := core.Users(ctx, nil, 10, 0)
 	if err != nil {
 		t.Fatalf("Users() error = %v", err)
@@ -62,25 +76,11 @@ func TestCore_flow(t *testing.T) {
 		t.Fatalf("Users() len = %d, want 1", len(usrs))
 	}
 
-	testingx.AssertDiff(t, usrs[0], usr)
+	testingx.AssertDiff(t, usrs[0], updated)
 }
 
 func TestCore_UserByID(t *testing.T) {
-	now := time.Now()
-	pgUsr := pguser.User{
-		ExternalID: uuid.New(),
-		Email:      "alice@test.com",
-		Name:       "Alice Smith",
-		CreatedAt:  now,
-		ETag:       uuid.New(),
-	}
-	want := mdl.User{
-		ID:        pgUsr.ExternalID,
-		Email:     pgUsr.Email,
-		Name:      pgUsr.Name,
-		CreatedAt: pgUsr.CreatedAt,
-		ETag:      pgUsr.ETag.String(),
-	}
+	id, etag, now := uuid.New(), uuid.New(), time.Now()
 
 	tests := []struct {
 		name   string
@@ -92,11 +92,11 @@ func TestCore_UserByID(t *testing.T) {
 			name: "returns converted user",
 			storer: &MockedStorer{
 				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pgUsr, nil
+					return pguser.User{ExternalID: id, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: etag}, nil
 				},
 			},
-			in:   pgUsr.ExternalID,
-			want: want,
+			in:   id,
+			want: mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: etag.String()},
 		},
 	}
 	for _, tt := range tests {
@@ -140,22 +140,69 @@ func TestCore_UserByID_error(t *testing.T) {
 	})
 }
 
+func TestCore_UpdateUser(t *testing.T) {
+	id, etag, now := uuid.New(), uuid.New(), time.Now()
+
+	tests := []struct {
+		name   string
+		storer *MockedStorer
+		in     mdl.UpdateUser
+		want   mdl.User
+	}{
+		{
+			name: "returns converted user",
+			storer: &MockedStorer{
+				UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
+					return pguser.User{ExternalID: id, Email: "alice@test.com", Name: "Alice Updated", CreatedAt: now, ETag: etag}, nil
+				},
+			},
+			in:   mdl.UpdateUser{ID: id, Name: "Alice Updated", Fields: mdl.UserUpdateFields{Name: true}},
+			want: mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Updated", CreatedAt: now, ETag: etag.String()},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.storer)
+
+			got, err := core.UpdateUser(t.Context(), tt.in)
+			if err != nil {
+				t.Fatalf("UpdateUser(%v) error = %v", tt.in, err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want)
+		})
+	}
+}
+
+func TestCore_UpdateUser_error(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
+		core := NewCore(&MockedStorer{
+			UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
+				return pguser.User{}, sql.ErrNoRows
+			},
+		})
+		_, err := core.UpdateUser(t.Context(), mdl.UpdateUser{ID: uuid.New(), Name: "Alice Updated", Fields: mdl.UserUpdateFields{Name: true}})
+		if !errors.Is(err, mdl.ErrNotFound) {
+			t.Errorf("UpdateUser() error = %v, want mdl.ErrNotFound", err)
+		}
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		core := NewCore(&MockedStorer{
+			UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
+				return pguser.User{}, errors.New("db down")
+			},
+		})
+		_, err := core.UpdateUser(t.Context(), mdl.UpdateUser{ID: uuid.New(), Name: "Alice Updated", Fields: mdl.UserUpdateFields{Name: true}})
+		if err == nil {
+			t.Fatal("UpdateUser() error = nil, want error")
+		}
+		testingx.AssertErrContains(t, err, "update user", "db down")
+	})
+}
+
 func TestCore_CreateUser(t *testing.T) {
-	now := time.Now()
-	pgUsr := pguser.User{
-		ExternalID: uuid.New(),
-		Email:      "alice@test.com",
-		Name:       "Alice Smith",
-		CreatedAt:  now,
-		ETag:       uuid.New(),
-	}
-	want := mdl.User{
-		ID:        pgUsr.ExternalID,
-		Email:     pgUsr.Email,
-		Name:      pgUsr.Name,
-		CreatedAt: pgUsr.CreatedAt,
-		ETag:      pgUsr.ETag.String(),
-	}
+	id, etag, now := uuid.New(), uuid.New(), time.Now()
 
 	tests := []struct {
 		name   string
@@ -167,11 +214,11 @@ func TestCore_CreateUser(t *testing.T) {
 			name: "returns converted user",
 			storer: &MockedStorer{
 				CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
-					return pgUsr, nil
+					return pguser.User{ExternalID: id, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: etag}, nil
 				},
 			},
 			in:   mdl.CreateUser{Email: "alice@test.com", Name: "Alice Smith"},
-			want: want,
+			want: mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: etag.String()},
 		},
 	}
 	for _, tt := range tests {
@@ -223,38 +270,8 @@ func TestCore_CreateUser_error(t *testing.T) {
 func TestCore_Users(t *testing.T) {
 	now := time.Now()
 	updatedAt := now.Add(-time.Hour)
-
-	pgAlice := pguser.User{
-		ExternalID: uuid.New(),
-		Email:      "alice@test.com",
-		Name:       "Alice Smith",
-		CreatedAt:  now,
-		ETag:       uuid.New(),
-	}
-	pgBob := pguser.User{
-		ExternalID: uuid.New(),
-		Email:      "bob@test.com",
-		Name:       "Bob Jones",
-		CreatedAt:  now,
-		UpdatedAt:  &updatedAt,
-		ETag:       uuid.New(),
-	}
-
-	mdlAlice := mdl.User{
-		ID:        pgAlice.ExternalID,
-		Email:     pgAlice.Email,
-		Name:      pgAlice.Name,
-		CreatedAt: pgAlice.CreatedAt,
-		ETag:      pgAlice.ETag.String(),
-	}
-	mdlBob := mdl.User{
-		ID:        pgBob.ExternalID,
-		Email:     pgBob.Email,
-		Name:      pgBob.Name,
-		CreatedAt: pgBob.CreatedAt,
-		UpdatedAt: pgBob.UpdatedAt,
-		ETag:      pgBob.ETag.String(),
-	}
+	aliceID, aliceETag := uuid.New(), uuid.New()
+	bobID, bobETag := uuid.New(), uuid.New()
 
 	tests := []struct {
 		name      string
@@ -267,14 +284,20 @@ func TestCore_Users(t *testing.T) {
 			name: "returns converted users and total count",
 			storer: &MockedStorer{
 				UsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
-					return []pguser.User{pgAlice, pgBob}, nil
+					return []pguser.User{
+						{ExternalID: aliceID, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: aliceETag},
+						{ExternalID: bobID, Email: "bob@test.com", Name: "Bob Jones", CreatedAt: now, UpdatedAt: &updatedAt, ETag: bobETag},
+					}, nil
 				},
 				UserCountFunc: func(_ context.Context) (int, error) {
 					return 42, nil
 				},
 			},
-			orderBys:  []order.By[mdl.UserOrderByField]{order.NewBy(mdl.UserOrderByFieldEmail, order.DirectionAsc)},
-			wantUsers: []mdl.User{mdlAlice, mdlBob},
+			orderBys: []order.By[mdl.UserOrderByField]{order.NewBy(mdl.UserOrderByFieldEmail, order.DirectionAsc)},
+			wantUsers: []mdl.User{
+				{ID: aliceID, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: aliceETag.String()},
+				{ID: bobID, Email: "bob@test.com", Name: "Bob Jones", CreatedAt: now, UpdatedAt: &updatedAt, ETag: bobETag.String()},
+			},
 			wantCount: 42,
 		},
 	}
@@ -307,7 +330,7 @@ func TestCore_Users_error(t *testing.T) {
 			name:        "unknown order by field",
 			storer:      &MockedStorer{},
 			orderBys:    []order.By[mdl.UserOrderByField]{order.NewBy(mdl.UserOrderByField("unknown"), order.DirectionAsc)},
-			wantErrStrs: []string{"convert order bys", "unknown"},
+			wantErrStrs: []string{"unknown"},
 		},
 		{
 			name: "query users error",

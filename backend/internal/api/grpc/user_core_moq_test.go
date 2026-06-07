@@ -25,6 +25,9 @@ var _ UserCore = &MockedUserCore{}
 //			CreateUserFunc: func(ctx context.Context, cu mdl.CreateUser) (mdl.User, error) {
 //				panic("mock out the CreateUser method")
 //			},
+//			UpdateUserFunc: func(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error) {
+//				panic("mock out the UpdateUser method")
+//			},
 //			UserByIDFunc: func(ctx context.Context, id uuid.UUID) (mdl.User, error) {
 //				panic("mock out the UserByID method")
 //			},
@@ -41,6 +44,9 @@ type MockedUserCore struct {
 	// CreateUserFunc mocks the CreateUser method.
 	CreateUserFunc func(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
 
+	// UpdateUserFunc mocks the UpdateUser method.
+	UpdateUserFunc func(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error)
+
 	// UserByIDFunc mocks the UserByID method.
 	UserByIDFunc func(ctx context.Context, id uuid.UUID) (mdl.User, error)
 
@@ -55,6 +61,13 @@ type MockedUserCore struct {
 			Ctx context.Context
 			// Cu is the cu argument value.
 			Cu mdl.CreateUser
+		}
+		// UpdateUser holds details about calls to the UpdateUser method.
+		UpdateUser []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Uu is the uu argument value.
+			Uu mdl.UpdateUser
 		}
 		// UserByID holds details about calls to the UserByID method.
 		UserByID []struct {
@@ -76,6 +89,7 @@ type MockedUserCore struct {
 		}
 	}
 	lockCreateUser sync.RWMutex
+	lockUpdateUser sync.RWMutex
 	lockUserByID   sync.RWMutex
 	lockUsers      sync.RWMutex
 }
@@ -113,6 +127,42 @@ func (mock *MockedUserCore) CreateUserCalls() []struct {
 	mock.lockCreateUser.RLock()
 	calls = mock.calls.CreateUser
 	mock.lockCreateUser.RUnlock()
+	return calls
+}
+
+// UpdateUser calls UpdateUserFunc.
+func (mock *MockedUserCore) UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error) {
+	if mock.UpdateUserFunc == nil {
+		panic("MockedUserCore.UpdateUserFunc: method is nil but UserCore.UpdateUser was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		Uu  mdl.UpdateUser
+	}{
+		Ctx: ctx,
+		Uu:  uu,
+	}
+	mock.lockUpdateUser.Lock()
+	mock.calls.UpdateUser = append(mock.calls.UpdateUser, callInfo)
+	mock.lockUpdateUser.Unlock()
+	return mock.UpdateUserFunc(ctx, uu)
+}
+
+// UpdateUserCalls gets all the calls that were made to UpdateUser.
+// Check the length with:
+//
+//	len(mockedUserCore.UpdateUserCalls())
+func (mock *MockedUserCore) UpdateUserCalls() []struct {
+	Ctx context.Context
+	Uu  mdl.UpdateUser
+} {
+	var calls []struct {
+		Ctx context.Context
+		Uu  mdl.UpdateUser
+	}
+	mock.lockUpdateUser.RLock()
+	calls = mock.calls.UpdateUser
+	mock.lockUpdateUser.RUnlock()
 	return calls
 }
 

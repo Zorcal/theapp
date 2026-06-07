@@ -21,6 +21,9 @@ service UserService {
 
   // Creates a new user.
   rpc CreateUser(CreateUserRequest) returns (User);
+
+  // Updates a user.
+  rpc UpdateUser(UpdateUserRequest) returns (User);
 }
 
 // User represents a user in the system.
@@ -52,6 +55,15 @@ message User {
 message GetUserRequest {
   // The ID of the user to retrieve.
   string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Request message for updating a user.
+message UpdateUserRequest {
+  // The user to update. The user's `id` identifies which user to update.
+  User user = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The list of fields to update. When omitted, all populated fields are updated.
+  google.protobuf.FieldMask update_mask = 2;
 }
 
 // Request message for creating a user.

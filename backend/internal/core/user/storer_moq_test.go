@@ -25,6 +25,9 @@ var _ Storer = &MockedStorer{}
 //			CreateUserFunc: func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
 //				panic("mock out the CreateUser method")
 //			},
+//			UpdateUserFunc: func(ctx context.Context, uu pguser.UpdateUser) (pguser.User, error) {
+//				panic("mock out the UpdateUser method")
+//			},
 //			UserByExternalIDFunc: func(ctx context.Context, id uuid.UUID) (pguser.User, error) {
 //				panic("mock out the UserByExternalID method")
 //			},
@@ -44,6 +47,9 @@ type MockedStorer struct {
 	// CreateUserFunc mocks the CreateUser method.
 	CreateUserFunc func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
 
+	// UpdateUserFunc mocks the UpdateUser method.
+	UpdateUserFunc func(ctx context.Context, uu pguser.UpdateUser) (pguser.User, error)
+
 	// UserByExternalIDFunc mocks the UserByExternalID method.
 	UserByExternalIDFunc func(ctx context.Context, id uuid.UUID) (pguser.User, error)
 
@@ -61,6 +67,13 @@ type MockedStorer struct {
 			Ctx context.Context
 			// Cu is the cu argument value.
 			Cu pguser.CreateUser
+		}
+		// UpdateUser holds details about calls to the UpdateUser method.
+		UpdateUser []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Uu is the uu argument value.
+			Uu pguser.UpdateUser
 		}
 		// UserByExternalID holds details about calls to the UserByExternalID method.
 		UserByExternalID []struct {
@@ -87,6 +100,7 @@ type MockedStorer struct {
 		}
 	}
 	lockCreateUser       sync.RWMutex
+	lockUpdateUser       sync.RWMutex
 	lockUserByExternalID sync.RWMutex
 	lockUserCount        sync.RWMutex
 	lockUsers            sync.RWMutex
@@ -125,6 +139,42 @@ func (mock *MockedStorer) CreateUserCalls() []struct {
 	mock.lockCreateUser.RLock()
 	calls = mock.calls.CreateUser
 	mock.lockCreateUser.RUnlock()
+	return calls
+}
+
+// UpdateUser calls UpdateUserFunc.
+func (mock *MockedStorer) UpdateUser(ctx context.Context, uu pguser.UpdateUser) (pguser.User, error) {
+	if mock.UpdateUserFunc == nil {
+		panic("MockedStorer.UpdateUserFunc: method is nil but Storer.UpdateUser was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		Uu  pguser.UpdateUser
+	}{
+		Ctx: ctx,
+		Uu:  uu,
+	}
+	mock.lockUpdateUser.Lock()
+	mock.calls.UpdateUser = append(mock.calls.UpdateUser, callInfo)
+	mock.lockUpdateUser.Unlock()
+	return mock.UpdateUserFunc(ctx, uu)
+}
+
+// UpdateUserCalls gets all the calls that were made to UpdateUser.
+// Check the length with:
+//
+//	len(mockedStorer.UpdateUserCalls())
+func (mock *MockedStorer) UpdateUserCalls() []struct {
+	Ctx context.Context
+	Uu  pguser.UpdateUser
+} {
+	var calls []struct {
+		Ctx context.Context
+		Uu  pguser.UpdateUser
+	}
+	mock.lockUpdateUser.RLock()
+	calls = mock.calls.UpdateUser
+	mock.lockUpdateUser.RUnlock()
 	return calls
 }
 

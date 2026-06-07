@@ -2,7 +2,9 @@ package conv
 
 import (
 	"fmt"
+	"slices"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
@@ -10,6 +12,17 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/order"
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
+
+func UpdateUserFromPb(req *pb.UpdateUserRequest, id uuid.UUID) mdl.UpdateUser {
+	paths := req.GetUpdateMask().GetPaths()
+	return mdl.UpdateUser{
+		ID:   id,
+		Name: req.GetUser().GetName(),
+		Fields: mdl.UserUpdateFields{
+			Name: slices.Contains(paths, "name"),
+		},
+	}
+}
 
 func CreateUserFromPb(u *pb.User) mdl.CreateUser {
 	return mdl.CreateUser{Email: u.GetEmail(), Name: u.GetName()}

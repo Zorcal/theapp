@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 
 	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -33,6 +34,9 @@ type UserCore interface {
 	UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error)
 	Users(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
 	CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
+	// UpdateUser updates the name of the user with the given ID and returns the updated user.
+	// Returns [mdl.ErrNotFound] if no user with that ID exists.
+	UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error)
 }
 
 func (s *userService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
@@ -67,6 +71,67 @@ func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 	}
 
 	return conv.UserToPb(usr), nil
+}
+
+func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.User, error) {
+	if req.GetUser() == nil {
+		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "user", Description: "required"},
+		})
+	}
+
+	id, err := uuid.Parse(req.GetUser().GetId())
+	if err != nil {
+		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "user.id", Description: "must be a valid UUID"},
+		})
+	}
+
+	if err := validateUpdateUserRequest(req); err != nil {
+		return nil, fmt.Errorf("validate update user request: %w", err)
+	}
+
+	usr, err := s.userCore.UpdateUser(ctx, conv.UpdateUserFromPb(req, id))
+	if err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "user %q not found", req.GetUser().GetId())
+		}
+		return nil, fmt.Errorf("update user: %w", err)
+	}
+
+	return conv.UserToPb(usr), nil
+}
+
+func validateUpdateUserRequest(req *pb.UpdateUserRequest) error {
+	maskPaths := req.GetUpdateMask().GetPaths()
+
+	if len(maskPaths) == 0 {
+		return status.Error(codes.InvalidArgument, "update_mask is required")
+	}
+
+	var violations []*errdetails.BadRequest_FieldViolation
+
+	updatableFields := []string{"name"}
+	for _, path := range maskPaths {
+		if !slices.Contains(updatableFields, path) {
+			violations = append(violations, &errdetails.BadRequest_FieldViolation{
+				Field:       "update_mask",
+				Description: fmt.Sprintf("field %q is not updatable", path),
+			})
+		}
+	}
+
+	if slices.Contains(maskPaths, "name") && req.GetUser().GetName() == "" {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field:       "user.name",
+			Description: "required",
+		})
+	}
+
+	if len(violations) > 0 {
+		return invalidArgumentStatus(violations)
+	}
+	return nil
 }
 
 func validateCreateUserRequest(req *pb.CreateUserRequest) error {

@@ -169,6 +169,7 @@ linters:
           - contextcheck
       - path: _test\.go
         linters:
+          - contextcheck
           - errcheck
           - bodyclose
           - unparam

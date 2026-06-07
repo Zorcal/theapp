@@ -81,6 +81,27 @@ func (s *Store) UserCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// UpdateUser updates the user with the given external ID and returns the updated user.
+// Returns [sql.ErrNoRows] if no such user exists.
+func (s *Store) UpdateUser(ctx context.Context, uu UpdateUser) (User, error) {
+	var user User
+
+	updateQ := updateUserQuery(uu)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := updateQ.Queue(ctx, b, &user); err != nil {
+			return fmt.Errorf("update user: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return User{}, err
+	}
+
+	return user, nil
+}
+
 func (s *Store) CreateUser(ctx context.Context, cu CreateUser) (User, error) {
 	var user User
 

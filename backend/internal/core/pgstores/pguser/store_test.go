@@ -21,7 +21,7 @@ func TestStore_UserByExternalID(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := NewStore(pool)
 
-	seeded := seedUser(t, store, "alice@test.com")
+	seeded := seedUser(t, store, "alice@test.com", "Alice Smith")
 
 	got, err := store.UserByExternalID(ctx, seeded.ExternalID)
 	if err != nil {
@@ -50,13 +50,14 @@ func TestStore_CreateUser(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := NewStore(pool)
 
-	got, err := store.CreateUser(ctx, CreateUser{Email: "alice@test.com"})
+	got, err := store.CreateUser(ctx, CreateUser{Email: "alice@test.com", Name: "Alice Smith"})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
 	}
 
 	want := User{
 		Email:     "alice@test.com",
+		Name:      "Alice Smith",
 		CreatedAt: time.Now(),
 		UpdatedAt: nil,
 	}
@@ -91,8 +92,8 @@ func TestStore_UserCount(t *testing.T) {
 		t.Errorf("UserCount() = %d, want 0 on empty database", got)
 	}
 
-	seedUser(t, store, "alice@test.com")
-	seedUser(t, store, "bob@test.com")
+	seedUser(t, store, "alice@test.com", "Alice Smith")
+	seedUser(t, store, "bob@test.com", "Bob Jones")
 
 	got, err = store.UserCount(ctx)
 	if err != nil {
@@ -108,9 +109,9 @@ func TestStore_Users(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := NewStore(pool)
 
-	charlie := seedUser(t, store, "charlie@test.com")
-	alice := seedUser(t, store, "alice@test.com")
-	bob := seedUser(t, store, "bob@test.com")
+	charlie := seedUser(t, store, "charlie@test.com", "Charlie Brown")
+	alice := seedUser(t, store, "alice@test.com", "Alice Smith")
+	bob := seedUser(t, store, "bob@test.com", "Bob Jones")
 
 	diffOpts := cmp.Options{
 		cmpopts.EquateApproxTime(time.Minute),
@@ -178,10 +179,94 @@ func TestStore_Users(t *testing.T) {
 	}
 }
 
-func seedUser(t *testing.T, s *Store, email string) User {
+func TestStore_UpdateUser(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	diffOpts := cmp.Options{
+		cmpopts.IgnoreFields(User{}, "ETag"),
+		cmpopts.EquateApproxTime(time.Minute),
+	}
+
+	tests := []struct {
+		name string
+		seed CreateUser
+		in   func(seeded User) UpdateUser
+		want func(seeded User) User
+	}{
+		{
+			name: "updates name",
+			seed: CreateUser{Email: "alice@test.com", Name: "Alice Smith"},
+			in: func(seeded User) UpdateUser {
+				return UpdateUser{ExternalID: seeded.ExternalID, Name: "Alice Jones", Fields: UserUpdateFields{Name: true}}
+			},
+			want: func(seeded User) User {
+				return User{
+					ExternalID: seeded.ExternalID,
+					Email:      seeded.Email,
+					Name:       "Alice Jones",
+					CreatedAt:  seeded.CreatedAt,
+					UpdatedAt:  &seeded.CreatedAt,
+				}
+			},
+		},
+		{
+			name: "name not in fields leaves name unchanged",
+			seed: CreateUser{Email: "bob@test.com", Name: "Bob Smith"},
+			in: func(seeded User) UpdateUser {
+				return UpdateUser{ExternalID: seeded.ExternalID, Name: "ignored", Fields: UserUpdateFields{Name: false}}
+			},
+			want: func(seeded User) User {
+				return User{
+					ExternalID: seeded.ExternalID,
+					Email:      seeded.Email,
+					Name:       "Bob Smith",
+					CreatedAt:  seeded.CreatedAt,
+					UpdatedAt:  &seeded.CreatedAt,
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			seeded := seedUser(t, store, tt.seed.Email, tt.seed.Name)
+
+			got, err := store.UpdateUser(ctx, tt.in(seeded))
+			if err != nil {
+				t.Fatalf("UpdateUser() error = %v", err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want(seeded), diffOpts...)
+
+			if got.ETag == seeded.ETag {
+				t.Error("UpdateUser() ETag unchanged, want new ETag")
+			}
+			if got.UpdatedAt == nil {
+				t.Error("UpdateUser() UpdatedAt = nil, want non-nil")
+			}
+		})
+	}
+}
+
+func TestStore_UpdateUser_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	t.Run("not found", func(t *testing.T) {
+		id := uuid.New()
+		_, err := store.UpdateUser(ctx, UpdateUser{ExternalID: id, Name: "Alice Jones", Fields: UserUpdateFields{Name: true}})
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UpdateUser(%v) error = %v, want sql.ErrNoRows", id, err)
+		}
+	})
+}
+
+func seedUser(t *testing.T, s *Store, email, name string) User {
 	t.Helper()
 
-	seeded, err := s.CreateUser(t.Context(), CreateUser{Email: email})
+	seeded, err := s.CreateUser(t.Context(), CreateUser{Email: email, Name: name})
 	if err != nil {
 		t.Fatalf("seed user error: %v", err)
 	}

@@ -31,6 +31,14 @@ Edges are imports. `mdl` and `pgstores` are leaves — they import neither each 
 - **Output types** — what the core returns: `User`, `Order`, etc.
 - **Input types** — what callers pass in for mutating operations: `CreateUser`, `UpdateUser`, etc. Name them after the operation. Never reuse an output type as an input; without a dedicated input type, adding a field later forces a signature change at every call site.
 
+## Update pattern
+
+Update input types (e.g. `UpdateUser`) pair with a companion `UserUpdateFields` struct whose boolean fields declare which values should be written. A field absent from `UserUpdateFields` is left unchanged, regardless of its value in the input type.
+
+This is preferred over pointer fields (`*string`) because a pointer cannot distinguish "leave this field alone" from "clear this field to its zero value" — they both map to `nil`.
+
+The `pgstores` layer mirrors the same struct, and the dynamic SQL is built from the flags at query time.
+
 ## Conversions
 
 Each core domain package (e.g. `user/`) owns a `conv.go` that covers all type conversions between `mdl` and `pgstores` types. Define one function per direction — never construct a foreign type inline in a core method:
