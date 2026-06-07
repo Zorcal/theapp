@@ -28,6 +28,8 @@ type userService struct {
 //go:generate moq -rm -fmt goimports -out user_core_moq_test.go . UserCore:MockedUserCore
 
 type UserCore interface {
+	// UserByID returns the user with the given ID.
+	// Returns [mdl.ErrNotFound] if no user with that ID exists.
 	UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error)
 	Users(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
 	CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)

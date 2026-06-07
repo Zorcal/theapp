@@ -22,6 +22,8 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	}
 }
 
+// UserByExternalID returns the user with the given external ID.
+// Returns [sql.ErrNoRows] if no such user exists.
 func (s *Store) UserByExternalID(ctx context.Context, id uuid.UUID) (User, error) {
 	var user User
 

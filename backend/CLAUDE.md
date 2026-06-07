@@ -78,6 +78,26 @@ func TestCalculate_error(t *testing.T) {
 }
 ```
 
+## Sentinel errors documention
+
+Document sentinel errors in godoc using a `// Returns [ErrFoo] if ...` line on the function or method:
+
+```go
+// UserByID returns the user with the given ID.
+// Returns [mdl.ErrNotFound] if no user with that ID exists.
+func (c *Core) UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error)
+```
+
+Interface methods must also declare what sentinels they require from implementations:
+
+```go
+type Storer interface {
+    // UserByExternalID returns the user with the given external ID.
+    // Returns [sql.ErrNoRows] if no such user exists.
+    UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error)
+}
+```
+
 ## Schema code generation
 
 Proto schemas live in `schemas/` at the repo root. Generated pb files are committed under

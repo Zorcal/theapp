@@ -18,6 +18,8 @@ import (
 
 // Storer defines the database operations the Core requires.
 type Storer interface {
+	// UserByExternalID returns the user with the given external ID.
+	// Returns [sql.ErrNoRows] if no such user exists.
 	UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error)
 	Users(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize, pageOffset int) ([]pguser.User, error)
 	UserCount(ctx context.Context) (int, error)
@@ -34,7 +36,8 @@ func NewCore(storer Storer) *Core {
 	return &Core{storer: storer}
 }
 
-// UserByID retrieves a user by ID. Returns mdl.ErrNotFound if the user does not exist.
+// UserByID returns the user with the given ID.
+// Returns [mdl.ErrNotFound] if no user with that ID exists.
 func (c *Core) UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error) {
 	pgUser, err := c.storer.UserByExternalID(ctx, id)
 	if err != nil {
