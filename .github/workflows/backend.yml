@@ -48,7 +48,7 @@ jobs:
       postgres:
         image: postgres:17
         ports:
-          - 5433:5432
+          - 5432:5432
         env:
           # https://www.postgresql.org/docs/current/libpq-envars.html
           POSTGRES_USER: ${{ env.POSTGRES_USER }}
@@ -76,7 +76,55 @@ jobs:
         working-directory: ./backend
         env:
           POSTGRES_HOST: ${{ env.POSTGRES_HOST }}
-          POSTGRES_PORT: 5433
+          POSTGRES_PORT: 5432
           POSTGRES_USER: ${{ env.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
         run: go test -race ./...
+
+  verify-pg-schema-dump:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DBMATE_IMAGE: ghcr.io/amacneil/dbmate
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/theapp?sslmode=disable
+      MIGRATIONS_DIR: ${{ github.workspace }}/backend/internal/data/pgschema/migrations
+      SCHEMA_DIR: ${{ github.workspace }}/backend/internal/data/pgschema
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Migrate
+        run: |
+          docker run --rm --network=host \
+            -v "${{ env.MIGRATIONS_DIR }}:/db/migrations" \
+            -e DBMATE_MIGRATIONS_DIR=/db/migrations \
+            -e DATABASE_URL="${{ env.DATABASE_URL }}" \
+            -e DBMATE_NO_DUMP_SCHEMA=true \
+            ${{ env.DBMATE_IMAGE }} up
+
+      - name: Dump schema
+        run: |
+          docker run --rm --network=host \
+            -v "${{ env.MIGRATIONS_DIR }}:/db/migrations" \
+            -v "${{ env.SCHEMA_DIR }}:/db/schema" \
+            -e DBMATE_MIGRATIONS_DIR=/db/migrations \
+            -e DBMATE_SCHEMA_FILE=/db/schema/schema.sql \
+            -e DATABASE_URL="${{ env.DATABASE_URL }}" \
+            ${{ env.DBMATE_IMAGE }} dump
+
+      - name: Check schema is up to date
+        run: git diff --exit-code backend/internal/data/pgschema/schema.sql
