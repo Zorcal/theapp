@@ -2,14 +2,13 @@ package user
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"database/sql"
-
 	"github.com/google/uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"

@@ -86,7 +86,7 @@ func NewWithoutTemplate(t *testing.T, ctx context.Context) *pgxpool.Pool {
 var (
 	adminOnce sync.Once
 	adminPool *pgxpool.Pool
-	adminErr  error
+	errAdmin  error
 )
 
 func sharedAdminPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
@@ -95,16 +95,16 @@ func sharedAdminPool(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	adminOnce.Do(func() {
 		poolCfg, err := poolConfig("postgres", 10)
 		if err != nil {
-			adminErr = fmt.Errorf("create admin pool config: %w", err)
+			errAdmin = fmt.Errorf("create admin pool config: %w", err)
 			return
 		}
 		pool, err := pgdb.NewPool(ctx, poolCfg)
 		if err != nil {
-			adminErr = fmt.Errorf("create admin pool: %w", err)
+			errAdmin = fmt.Errorf("create admin pool: %w", err)
 			return
 		}
 		if err := pgdb.StatusCheck(ctx, pool); err != nil {
-			adminErr = fmt.Errorf(`status check admin pool: %w
+			errAdmin = fmt.Errorf(`status check admin pool: %w
 
 Did you remember to run 'docker-compose up -d' at the repository root?`, err)
 			return
@@ -112,8 +112,8 @@ Did you remember to run 'docker-compose up -d' at the repository root?`, err)
 		adminPool = pool
 	})
 
-	if adminErr != nil {
-		t.Fatalf("admin pool: %v", adminErr)
+	if errAdmin != nil {
+		t.Fatalf("admin pool: %v", errAdmin)
 	}
 
 	return adminPool

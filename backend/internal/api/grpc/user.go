@@ -140,4 +140,3 @@ func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		NextPageToken: nextPageToken,
 	}, nil
 }
-

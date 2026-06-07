@@ -98,6 +98,10 @@ type Storer interface {
 }
 ```
 
+## Linting
+
+Run `golangci-lint run ./...` from `backend/` after finishing a change. Fix all issues before considering the task done.
+
 ## Schema code generation
 
 Proto schemas live in `schemas/` at the repo root. Generated pb files are committed under
