@@ -72,7 +72,7 @@ func updateUserQuery(uu UpdateUser) pgdb.TypedQuery[User] {
 	}
 }
 
-func usersQuery(orderBys []order.By[OrderByField], pageSize, pageOffset int) pgdb.TypedQuery[User] {
+func usersQuery(filter Filter, orderBys []order.By[OrderByField], pageSize, pageOffset int) pgdb.TypedQuery[User] {
 	params := pgx.NamedArgs{
 		"page_size":   pageSize,
 		"page_offset": pageOffset,
@@ -80,8 +80,9 @@ func usersQuery(orderBys []order.By[OrderByField], pageSize, pageOffset int) pgd
 	sql := fmt.Sprintf(`
 		SELECT external_id, email, name, created_at, updated_at, etag
 		FROM useraccess.users
+		%s
 		ORDER BY %s
-		LIMIT @page_size OFFSET @page_offset`, orderByClause(orderBys))
+		LIMIT @page_size OFFSET @page_offset`, whereClause(filter, params), orderByClause(orderBys))
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,
@@ -91,11 +92,17 @@ func usersQuery(orderBys []order.By[OrderByField], pageSize, pageOffset int) pgd
 	}
 }
 
-func userCountQuery() pgdb.TypedQuery[int] {
-	const sql = `SELECT COUNT(*) FROM useraccess.users`
+func userCountQuery(filter Filter) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{}
+	sql := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM useraccess.users
+		%s
+	`, whereClause(filter, params))
 
 	return pgdb.TypedQuery[int]{
-		SQL: sql,
+		SQL:  sql,
+		Args: params,
 		Scan: func(row pgx.CollectableRow) (int, error) {
 			var count int
 			if err := row.Scan(&count); err != nil {
@@ -105,6 +112,24 @@ func userCountQuery() pgdb.TypedQuery[int] {
 		},
 		Expect: pgdb.ExpectOne,
 	}
+}
+
+// whereClause builds an optional WHERE clause from f, adding any required
+// named parameters to params as a side effect.
+func whereClause(f Filter, params pgx.NamedArgs) string {
+	var clauses []string
+	if f.Email != "" {
+		params["email_prefix"] = f.Email + "%"
+		clauses = append(clauses, "email ILIKE @email_prefix")
+	}
+	if f.Name != "" {
+		params["name_prefix"] = f.Name + "%"
+		clauses = append(clauses, "name ILIKE @name_prefix")
+	}
+	if len(clauses) == 0 {
+		return ""
+	}
+	return "WHERE " + strings.Join(clauses, " AND ")
 }
 
 func orderByClause(orderBys []order.By[OrderByField]) string {

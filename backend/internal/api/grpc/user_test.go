@@ -419,7 +419,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "empty request",
 			userCore: &MockedUserCore{
-				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 15, nil
 				},
 			},
@@ -432,7 +432,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "empty result",
 			userCore: &MockedUserCore{
-				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return nil, 0, nil
 				},
 			},
@@ -442,7 +442,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "first page returns next_page_token when more results exist",
 			userCore: &MockedUserCore{
-				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe}, 5, nil
 				},
 			},
@@ -456,7 +456,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "single page returns no next_page_token",
 			userCore: &MockedUserCore{
-				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 3, nil
 				},
 			},
@@ -469,7 +469,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "order_by carried into next_page_token",
 			userCore: &MockedUserCore{
-				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe}, 5, nil
 				},
 			},
@@ -486,7 +486,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "page_token offset is honored",
 			userCore: &MockedUserCore{
-				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{smithBrown}, 10, nil
 				},
 			},
@@ -503,7 +503,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "last page exactly fills page size",
 			userCore: &MockedUserCore{
-				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 3, nil
 				},
 			},
@@ -511,6 +511,23 @@ func TestUserService_ListUsers(t *testing.T) {
 			want: &pb.ListUsersResponse{
 				Users:     []*pb.User{pbJohnDoe, pbMaryDoe, pbSmithBrown},
 				TotalSize: 3,
+			},
+		},
+		{
+			name: "filter carried into next_page_token",
+			userCore: &MockedUserCore{
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+					return []mdl.User{johnDoe, maryDoe}, 5, nil
+				},
+			},
+			in: &pb.ListUsersRequest{
+				PageSize: 2,
+				Filter:   &pb.UserFilter{Email: "john"},
+			},
+			want: &pb.ListUsersResponse{
+				Users:         []*pb.User{pbJohnDoe, pbMaryDoe},
+				TotalSize:     5,
+				NextPageToken: "eyJvIjoyLCJmIjoiQ2dScWIyaHUifQ==",
 			},
 		},
 	}
@@ -567,9 +584,15 @@ func TestUserService_ListUsers_error(t *testing.T) {
 			want:     status.New(codes.InvalidArgument, "page_token order_by mismatch"),
 		},
 		{
+			name:     "filter mismatch with page_token",
+			userCore: &MockedUserCore{},
+			in:       &pb.ListUsersRequest{PageToken: "eyJvIjoyfQ==", Filter: &pb.UserFilter{Email: "x"}},
+			want:     status.New(codes.InvalidArgument, "page_token filter mismatch"),
+		},
+		{
 			name: "core error",
 			userCore: &MockedUserCore{
-				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return nil, 0, errors.New("boom")
 				},
 			},

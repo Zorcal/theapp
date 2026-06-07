@@ -72,6 +72,18 @@ message CreateUserRequest {
   User user = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
+// UserFilter specifies criteria for filtering users in a ListUsers request.
+// This is a typed filter — a deliberate deviation from AIP-160 to avoid the
+// complexity of a free-form filter parser; see schemas/README.md.
+// All fields are optional; omitted fields match all users.
+message UserFilter {
+  // Match users whose email starts with this prefix.
+  string email = 1;
+
+  // Match users whose name starts with this prefix.
+  string name = 2;
+}
+
 // Request message for listing users.
 message ListUsersRequest {
   // Maximum number of users to return.
@@ -80,8 +92,11 @@ message ListUsersRequest {
   // Token for fetching the next page of results.
   string page_token = 2;
 
-// Field to order the results by, e.g., "create_time" or "update_time".
+  // Field to order the results by, e.g., "create_time" or "update_time".
   string order_by = 3;
+
+  // Filter criteria. All fields are optional; omitted fields match all users.
+  UserFilter filter = 4;
 }
 
 // Response message for listing users.

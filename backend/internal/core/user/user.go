@@ -21,8 +21,8 @@ type Storer interface {
 	// UserByExternalID returns the user with the given external ID.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error)
-	Users(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize, pageOffset int) ([]pguser.User, error)
-	UserCount(ctx context.Context) (int, error)
+	Users(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize, pageOffset int) ([]pguser.User, error)
+	UserCount(ctx context.Context, filter pguser.Filter) (int, error)
 	CreateUser(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
 	// UpdateUser updates the user with the given external ID and returns the updated user.
 	// Returns [sql.ErrNoRows] if no such user exists.
@@ -81,19 +81,21 @@ func (c *Core) UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, err
 	return userFromPG(pgUser), nil
 }
 
-// Users returns a page of users ordered by orderBys, along with the total count of users in the system.
-func (c *Core) Users(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+// Users returns a page of users matching filter ordered by orderBys, along with the total count of matching users.
+func (c *Core) Users(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 	pgOrderBys, err := orderBysToPG(orderBys)
 	if err != nil {
 		return nil, 0, fmt.Errorf("convert order bys: %w", err)
 	}
 
-	pgUsers, err := c.storer.Users(ctx, pgOrderBys, pageSize, pageOffset)
+	pgFilter := filterToPG(filter)
+
+	pgUsers, err := c.storer.Users(ctx, pgFilter, pgOrderBys, pageSize, pageOffset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query users: %w", err)
 	}
 
-	count, err := c.storer.UserCount(ctx)
+	count, err := c.storer.UserCount(ctx, pgFilter)
 	if err != nil {
 		return nil, 0, fmt.Errorf("user count: %w", err)
 	}

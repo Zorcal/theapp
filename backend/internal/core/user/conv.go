@@ -54,6 +54,10 @@ func orderByToPG(o order.By[mdl.UserOrderByField]) (order.By[pguser.OrderByField
 	}
 }
 
+func filterToPG(f mdl.UserFilter) pguser.Filter {
+	return pguser.Filter{Email: f.Email, Name: f.Name}
+}
+
 func orderBysToPG(os []order.By[mdl.UserOrderByField]) ([]order.By[pguser.OrderByField], error) {
 	pgOrderBys := make([]order.By[pguser.OrderByField], len(os))
 	for i, o := range os {

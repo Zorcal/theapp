@@ -45,3 +45,10 @@ const (
 	UserOrderByFieldUpdatedAt UserOrderByField = "updated_at"
 	UserOrderByFieldCreatedAt UserOrderByField = "created_at"
 )
+
+// UserFilter holds optional prefix-match criteria for listing users.
+// Empty string fields are ignored.
+type UserFilter struct {
+	Email string
+	Name  string
+}

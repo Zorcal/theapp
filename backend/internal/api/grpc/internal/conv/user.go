@@ -13,7 +13,7 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
-func UpdateUserFromPb(req *pb.UpdateUserRequest, id uuid.UUID) mdl.UpdateUser {
+func UpdateUserFromPB(req *pb.UpdateUserRequest, id uuid.UUID) mdl.UpdateUser {
 	paths := req.GetUpdateMask().GetPaths()
 	return mdl.UpdateUser{
 		ID:   id,
@@ -24,15 +24,15 @@ func UpdateUserFromPb(req *pb.UpdateUserRequest, id uuid.UUID) mdl.UpdateUser {
 	}
 }
 
-func CreateUserFromPb(u *pb.User) mdl.CreateUser {
+func CreateUserFromPB(u *pb.User) mdl.CreateUser {
 	return mdl.CreateUser{Email: u.GetEmail(), Name: u.GetName()}
 }
 
-func UsersToPb(usr []mdl.User) []*pb.User {
-	return slicesx.Map(usr, UserToPb)
+func UsersToPB(usr []mdl.User) []*pb.User {
+	return slicesx.Map(usr, UserToPB)
 }
 
-func UserToPb(usr mdl.User) *pb.User {
+func UserToPB(usr mdl.User) *pb.User {
 	return &pb.User{
 		Id:         usr.ID.String(),
 		Email:      usr.Email,
@@ -43,7 +43,15 @@ func UserToPb(usr mdl.User) *pb.User {
 	}
 }
 
-func UserOrderBysFromPb(s string) ([]order.By[mdl.UserOrderByField], error) {
+// UserFilterFromPB converts a typed UserFilter proto message to a mdl.UserFilter.
+func UserFilterFromPB(f *pb.UserFilter) mdl.UserFilter {
+	return mdl.UserFilter{
+		Email: f.GetEmail(),
+		Name:  f.GetName(),
+	}
+}
+
+func UserOrderBysFromPB(s string) ([]order.By[mdl.UserOrderByField], error) {
 	fieldMapping := map[string]mdl.UserOrderByField{
 		"email":      mdl.UserOrderByFieldEmail,
 		"updated_at": mdl.UserOrderByFieldUpdatedAt,

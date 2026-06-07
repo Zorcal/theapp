@@ -11,6 +11,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
@@ -32,7 +33,7 @@ type UserCore interface {
 	// UserByID returns the user with the given ID.
 	// Returns [mdl.ErrNotFound] if no user with that ID exists.
 	UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error)
-	Users(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
+	Users(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
 	CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
 	// UpdateUser updates the name of the user with the given ID and returns the updated user.
 	// Returns [mdl.ErrNotFound] if no user with that ID exists.
@@ -55,7 +56,7 @@ func (s *userService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 		return nil, fmt.Errorf("get user: %w", err)
 	}
 
-	return conv.UserToPb(usr), nil
+	return conv.UserToPB(usr), nil
 }
 
 func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.User, error) {
@@ -63,14 +64,14 @@ func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 		return nil, fmt.Errorf("validate create user request: %w", err)
 	}
 
-	cu := conv.CreateUserFromPb(req.GetUser())
+	cu := conv.CreateUserFromPB(req.GetUser())
 
 	usr, err := s.userCore.CreateUser(ctx, cu)
 	if err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
-	return conv.UserToPb(usr), nil
+	return conv.UserToPB(usr), nil
 }
 
 func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.User, error) {
@@ -91,7 +92,7 @@ func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 		return nil, fmt.Errorf("validate update user request: %w", err)
 	}
 
-	usr, err := s.userCore.UpdateUser(ctx, conv.UpdateUserFromPb(req, id))
+	usr, err := s.userCore.UpdateUser(ctx, conv.UpdateUserFromPB(req, id))
 	if err != nil {
 		if errors.Is(err, mdl.ErrNotFound) {
 			return nil, status.Errorf(codes.NotFound, "user %q not found", req.GetUser().GetId())
@@ -99,7 +100,7 @@ func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 		return nil, fmt.Errorf("update user: %w", err)
 	}
 
-	return conv.UserToPb(usr), nil
+	return conv.UserToPB(usr), nil
 }
 
 func validateUpdateUserRequest(req *pb.UpdateUserRequest) error {
@@ -171,36 +172,39 @@ func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		pageSize = 50 // sensible default/cap
 	}
 
-	pageToken, err := conv.DecodePageToken(req.GetPageToken())
+	pageToken, err := conv.DecodePageToken[*pb.UserFilter](req.GetPageToken())
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", status.Errorf(codes.InvalidArgument, "invalid page_token"), err)
 	}
 
-	orderBys, err := conv.UserOrderBysFromPb(req.GetOrderBy())
+	orderBys, err := conv.UserOrderBysFromPB(req.GetOrderBy())
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", status.Error(codes.InvalidArgument, "invalid order_by"), err)
 	}
 
-	// Validate caller hasn't changed sorting mid-pagination. The token is an
-	// opaque cursor, so the caller is expected to echo back the exact order_by
-	// it first sent; an exact string match is therefore correct, and we
-	// deliberately do not normalize equivalent-but-different strings (e.g.
-	// differing whitespace or an omitted default direction).
-	if req.GetPageToken() != "" && pageToken.OrderBy != req.GetOrderBy() {
-		return nil, status.Errorf(codes.InvalidArgument, "page_token order_by mismatch")
+	filter := conv.UserFilterFromPB(req.GetFilter())
+
+	// Validate caller hasn't changed sorting or filter criteria mid-pagination.
+	if req.GetPageToken() != "" {
+		if pageToken.OrderBy != req.GetOrderBy() {
+			return nil, status.Errorf(codes.InvalidArgument, "page_token order_by mismatch")
+		}
+		if !proto.Equal(pageToken.Filter, req.GetFilter()) {
+			return nil, status.Errorf(codes.InvalidArgument, "page_token filter mismatch")
+		}
 	}
 
-	usrs, totalCount, err := s.userCore.Users(ctx, orderBys, pageSize, pageToken.Offset)
+	usrs, totalCount, err := s.userCore.Users(ctx, filter, orderBys, pageSize, pageToken.Offset)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
 
-	pbUsrs := conv.UsersToPb(usrs)
+	pbUsrs := conv.UsersToPB(usrs)
 
 	var nextPageToken string
 	nextPageOffset := pageToken.Offset + pageSize
 	if nextPageOffset < totalCount {
-		nextPageToken, err = conv.EncodePageToken(nextPageOffset, req.GetOrderBy())
+		nextPageToken, err = conv.EncodePageToken(nextPageOffset, req.GetOrderBy(), req.GetFilter())
 		if err != nil {
 			return nil, fmt.Errorf("encode next_page_token: %w", err)
 		}

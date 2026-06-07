@@ -43,10 +43,10 @@ func (s *Store) UserByExternalID(ctx context.Context, id uuid.UUID) (User, error
 	return user, nil
 }
 
-func (s *Store) Users(ctx context.Context, orderBys []order.By[OrderByField], pageSize, pageOffset int) ([]User, error) {
+func (s *Store) Users(ctx context.Context, filter Filter, orderBys []order.By[OrderByField], pageSize, pageOffset int) ([]User, error) {
 	var users []User
 
-	usersQ := usersQuery(orderBys, pageSize, pageOffset)
+	usersQ := usersQuery(filter, orderBys, pageSize, pageOffset)
 
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := usersQ.QueueMany(ctx, b, &users); err != nil {
@@ -62,10 +62,10 @@ func (s *Store) Users(ctx context.Context, orderBys []order.By[OrderByField], pa
 	return users, nil
 }
 
-func (s *Store) UserCount(ctx context.Context) (int, error) {
+func (s *Store) UserCount(ctx context.Context, filter Filter) (int, error) {
 	var count int
 
-	countQ := userCountQuery()
+	countQ := userCountQuery(filter)
 
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := countQ.Queue(ctx, b, &count); err != nil {

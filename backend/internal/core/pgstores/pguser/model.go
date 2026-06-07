@@ -44,3 +44,10 @@ type UpdateUser struct {
 type UserUpdateFields struct {
 	Name bool
 }
+
+// Filter holds optional prefix-match criteria for listing users.
+// Empty string fields are ignored.
+type Filter struct {
+	Email string
+	Name  string
+}

@@ -64,7 +64,7 @@ func TestCore_flow(t *testing.T) {
 	testingx.AssertDiff(t, got, updated)
 
 	// Users — updated user appears in results
-	usrs, count, err := core.Users(ctx, nil, 10, 0)
+	usrs, count, err := core.Users(ctx, mdl.UserFilter{}, nil, 10, 0)
 	if err != nil {
 		t.Fatalf("Users() error = %v", err)
 	}
@@ -283,13 +283,13 @@ func TestCore_Users(t *testing.T) {
 		{
 			name: "returns converted users and total count",
 			storer: &MockedStorer{
-				UsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
+				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return []pguser.User{
 						{ExternalID: aliceID, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: aliceETag},
 						{ExternalID: bobID, Email: "bob@test.com", Name: "Bob Jones", CreatedAt: now, UpdatedAt: &updatedAt, ETag: bobETag},
 					}, nil
 				},
-				UserCountFunc: func(_ context.Context) (int, error) {
+				UserCountFunc: func(_ context.Context, _ pguser.Filter) (int, error) {
 					return 42, nil
 				},
 			},
@@ -305,7 +305,7 @@ func TestCore_Users(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.storer)
 
-			gotUsers, gotCount, err := core.Users(t.Context(), tt.orderBys, 10, 0)
+			gotUsers, gotCount, err := core.Users(t.Context(), mdl.UserFilter{}, tt.orderBys, 10, 0)
 			if err != nil {
 				t.Fatalf("Users() error = %v", err)
 			}
@@ -335,10 +335,10 @@ func TestCore_Users_error(t *testing.T) {
 		{
 			name: "query users error",
 			storer: &MockedStorer{
-				UsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
+				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return nil, errors.New("db down")
 				},
-				UserCountFunc: func(_ context.Context) (int, error) {
+				UserCountFunc: func(_ context.Context, _ pguser.Filter) (int, error) {
 					return 0, nil
 				},
 			},
@@ -347,10 +347,10 @@ func TestCore_Users_error(t *testing.T) {
 		{
 			name: "user count error",
 			storer: &MockedStorer{
-				UsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
+				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return nil, nil
 				},
-				UserCountFunc: func(_ context.Context) (int, error) {
+				UserCountFunc: func(_ context.Context, _ pguser.Filter) (int, error) {
 					return 0, errors.New("db down")
 				},
 			},
@@ -361,7 +361,7 @@ func TestCore_Users_error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.storer)
 
-			_, _, err := core.Users(t.Context(), tt.orderBys, 10, 0)
+			_, _, err := core.Users(t.Context(), mdl.UserFilter{}, tt.orderBys, 10, 0)
 			if err == nil {
 				t.Fatalf("Users() error = nil, want error")
 			}

@@ -84,23 +84,44 @@ func TestStore_UserCount(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := NewStore(pool)
 
-	got, err := store.UserCount(ctx)
-	if err != nil {
-		t.Fatalf("UserCount() error = %v", err)
-	}
-	if got != 0 {
-		t.Errorf("UserCount() = %d, want 0 on empty database", got)
-	}
-
 	seedUser(t, store, "alice@test.com", "Alice Smith")
 	seedUser(t, store, "bob@test.com", "Bob Jones")
 
-	got, err = store.UserCount(ctx)
-	if err != nil {
-		t.Fatalf("UserCount() error = %v", err)
+	tests := []struct {
+		name   string
+		filter Filter
+		want   int
+	}{
+		{
+			name: "no filter counts all",
+			want: 2,
+		},
+		{
+			name:   "email prefix filter",
+			filter: Filter{Email: "alice"},
+			want:   1,
+		},
+		{
+			name:   "name prefix filter",
+			filter: Filter{Name: "Bob"},
+			want:   1,
+		},
+		{
+			name:   "filter with no matches",
+			filter: Filter{Email: "nobody"},
+			want:   0,
+		},
 	}
-	if want := 2; got != want {
-		t.Errorf("UserCount() = %d, want %d", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := store.UserCount(ctx, tt.filter)
+			if err != nil {
+				t.Fatalf("UserCount() error = %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("UserCount(%+v) = %d, want %d", tt.filter, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -119,6 +140,7 @@ func TestStore_Users(t *testing.T) {
 
 	tests := []struct {
 		name       string
+		filter     Filter
 		orderBys   []order.By[OrderByField]
 		pageSize   int
 		pageOffset int
@@ -126,7 +148,6 @@ func TestStore_Users(t *testing.T) {
 	}{
 		{
 			name:       "no order defaults to insert order",
-			orderBys:   nil,
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []User{charlie, alice, bob},
@@ -161,15 +182,42 @@ func TestStore_Users(t *testing.T) {
 		},
 		{
 			name:       "offset past end returns empty",
-			orderBys:   nil,
 			pageSize:   10,
 			pageOffset: 10,
+			want:       []User{},
+		},
+		{
+			name:       "filter by email prefix",
+			filter:     Filter{Email: "alice"},
+			pageSize:   10,
+			pageOffset: 0,
+			want:       []User{alice},
+		},
+		{
+			name:       "filter by name prefix",
+			filter:     Filter{Name: "Bob"},
+			pageSize:   10,
+			pageOffset: 0,
+			want:       []User{bob},
+		},
+		{
+			name:       "filter by email and name prefix",
+			filter:     Filter{Email: "c", Name: "Charlie"},
+			pageSize:   10,
+			pageOffset: 0,
+			want:       []User{charlie},
+		},
+		{
+			name:       "filter with no matches returns empty",
+			filter:     Filter{Email: "nobody"},
+			pageSize:   10,
+			pageOffset: 0,
 			want:       []User{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := store.Users(ctx, tt.orderBys, tt.pageSize, tt.pageOffset)
+			got, err := store.Users(ctx, tt.filter, tt.orderBys, tt.pageSize, tt.pageOffset)
 			if err != nil {
 				t.Fatalf("Users() error = %v", err)
 			}

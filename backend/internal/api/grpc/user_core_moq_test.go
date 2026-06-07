@@ -31,7 +31,7 @@ var _ UserCore = &MockedUserCore{}
 //			UserByIDFunc: func(ctx context.Context, id uuid.UUID) (mdl.User, error) {
 //				panic("mock out the UserByID method")
 //			},
-//			UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
+//			UsersFunc: func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
 //				panic("mock out the Users method")
 //			},
 //		}
@@ -51,7 +51,7 @@ type MockedUserCore struct {
 	UserByIDFunc func(ctx context.Context, id uuid.UUID) (mdl.User, error)
 
 	// UsersFunc mocks the Users method.
-	UsersFunc func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
+	UsersFunc func(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -80,6 +80,8 @@ type MockedUserCore struct {
 		Users []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// Filter is the filter argument value.
+			Filter mdl.UserFilter
 			// OrderBys is the orderBys argument value.
 			OrderBys []order.By[mdl.UserOrderByField]
 			// PageSize is the pageSize argument value.
@@ -203,17 +205,19 @@ func (mock *MockedUserCore) UserByIDCalls() []struct {
 }
 
 // Users calls UsersFunc.
-func (mock *MockedUserCore) Users(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
+func (mock *MockedUserCore) Users(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
 	if mock.UsersFunc == nil {
 		panic("MockedUserCore.UsersFunc: method is nil but UserCore.Users was just called")
 	}
 	callInfo := struct {
 		Ctx        context.Context
+		Filter     mdl.UserFilter
 		OrderBys   []order.By[mdl.UserOrderByField]
 		PageSize   int
 		PageOffset int
 	}{
 		Ctx:        ctx,
+		Filter:     filter,
 		OrderBys:   orderBys,
 		PageSize:   pageSize,
 		PageOffset: pageOffset,
@@ -221,7 +225,7 @@ func (mock *MockedUserCore) Users(ctx context.Context, orderBys []order.By[mdl.U
 	mock.lockUsers.Lock()
 	mock.calls.Users = append(mock.calls.Users, callInfo)
 	mock.lockUsers.Unlock()
-	return mock.UsersFunc(ctx, orderBys, pageSize, pageOffset)
+	return mock.UsersFunc(ctx, filter, orderBys, pageSize, pageOffset)
 }
 
 // UsersCalls gets all the calls that were made to Users.
@@ -230,12 +234,14 @@ func (mock *MockedUserCore) Users(ctx context.Context, orderBys []order.By[mdl.U
 //	len(mockedUserCore.UsersCalls())
 func (mock *MockedUserCore) UsersCalls() []struct {
 	Ctx        context.Context
+	Filter     mdl.UserFilter
 	OrderBys   []order.By[mdl.UserOrderByField]
 	PageSize   int
 	PageOffset int
 } {
 	var calls []struct {
 		Ctx        context.Context
+		Filter     mdl.UserFilter
 		OrderBys   []order.By[mdl.UserOrderByField]
 		PageSize   int
 		PageOffset int

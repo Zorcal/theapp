@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/testing/protocmp"
+
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 )
 
 func TestEncodePageToken(t *testing.T) {
@@ -11,6 +14,7 @@ func TestEncodePageToken(t *testing.T) {
 		name    string
 		offset  int
 		orderBy string
+		filter  *pb.UserFilter
 		want    string
 	}{
 		{
@@ -29,15 +33,21 @@ func TestEncodePageToken(t *testing.T) {
 			orderBy: "email desc,updated_at",
 			want:    "eyJvIjo0LCJvYiI6ImVtYWlsIGRlc2MsdXBkYXRlZF9hdCJ9",
 		},
+		{
+			name:   "offset with filter",
+			offset: 2,
+			filter: &pb.UserFilter{Email: "alice"},
+			want:   "eyJvIjoyLCJmIjoiQ2dWaGJHbGpaUT09In0=",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := EncodePageToken(tt.offset, tt.orderBy)
+			got, err := EncodePageToken(tt.offset, tt.orderBy, tt.filter)
 			if err != nil {
-				t.Fatalf("EncodePageToken(%d, %q) error = %q, want no error", tt.offset, tt.orderBy, err)
+				t.Fatalf("EncodePageToken(%d, %q, %v) error = %q, want no error", tt.offset, tt.orderBy, tt.filter, err)
 			}
 			if got != tt.want {
-				t.Errorf("EncodePageToken(%d, %q) = %q, want %q", tt.offset, tt.orderBy, got, tt.want)
+				t.Errorf("EncodePageToken(%d, %q, %v) = %q, want %q", tt.offset, tt.orderBy, tt.filter, got, tt.want)
 			}
 		})
 	}
@@ -47,27 +57,27 @@ func TestDecodePageToken(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
-		want PageToken
+		want PageToken[*pb.UserFilter]
 	}{
 		{
 			name: "empty",
 			in:   "",
-			want: PageToken{},
+			want: PageToken[*pb.UserFilter]{},
 		},
 		{
 			name: "zero offset, no order_by",
 			in:   "eyJvIjowfQ==",
-			want: PageToken{Offset: 0},
+			want: PageToken[*pb.UserFilter]{Offset: 0},
 		},
 		{
 			name: "non-zero offset, no order_by",
 			in:   "eyJvIjoyfQ==",
-			want: PageToken{Offset: 2},
+			want: PageToken[*pb.UserFilter]{Offset: 2},
 		},
 		{
 			name: "offset with order_by",
 			in:   "eyJvIjo0LCJvYiI6ImVtYWlsIGRlc2MsdXBkYXRlZF9hdCJ9",
-			want: PageToken{
+			want: PageToken[*pb.UserFilter]{
 				Offset:  4,
 				OrderBy: "email desc,updated_at",
 			},
@@ -75,11 +85,11 @@ func TestDecodePageToken(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DecodePageToken(tt.in)
+			got, err := DecodePageToken[*pb.UserFilter](tt.in)
 			if err != nil {
 				t.Fatalf("DecodePageToken(%q) error = %q, want no error", tt.in, err)
 			}
-			if diff := cmp.Diff(got, tt.want); diff != "" {
+			if diff := cmp.Diff(got, tt.want, protocmp.Transform()); diff != "" {
 				t.Errorf("DecodePageToken(%q) diff mismatch (-got +want):\n%s", tt.in, diff)
 			}
 		})
@@ -106,7 +116,7 @@ func TestDecodePageToken_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DecodePageToken(tt.in)
+			got, err := DecodePageToken[*pb.UserFilter](tt.in)
 			if err == nil {
 				t.Fatalf("DecodePageToken(%q) = %+v, want error", tt.in, got)
 			}
