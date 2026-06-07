@@ -13,6 +13,9 @@ option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal
 
 // UserService provides operations for managing users.
 service UserService {
+  // Gets a user by ID.
+  rpc GetUser(GetUserRequest) returns (User);
+
   // Lists users, optionally filtered and paginated.
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
 
@@ -40,6 +43,12 @@ message User {
   //
   // If this is provided on update, it must match the server's ETag.
   string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+}
+
+// Request message for getting a user by ID.
+message GetUserRequest {
+  // The ID of the user to retrieve.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
 }
 
 // Request message for creating a user.

@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/order"
 )
@@ -21,14 +22,17 @@ var _ Storer = &MockedStorer{}
 //
 //		// make and configure a mocked Storer
 //		mockedStorer := &MockedStorer{
-//			InsertUserFunc: func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
-//				panic("mock out the InsertUser method")
+//			CreateUserFunc: func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
+//				panic("mock out the CreateUser method")
 //			},
-//			QueryUsersFunc: func(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error) {
-//				panic("mock out the QueryUsers method")
+//			UserByExternalIDFunc: func(ctx context.Context, id uuid.UUID) (pguser.User, error) {
+//				panic("mock out the UserByExternalID method")
 //			},
 //			UserCountFunc: func(ctx context.Context) (int, error) {
 //				panic("mock out the UserCount method")
+//			},
+//			UsersFunc: func(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error) {
+//				panic("mock out the Users method")
 //			},
 //		}
 //
@@ -37,26 +41,41 @@ var _ Storer = &MockedStorer{}
 //
 //	}
 type MockedStorer struct {
-	// InsertUserFunc mocks the InsertUser method.
-	InsertUserFunc func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
+	// CreateUserFunc mocks the CreateUser method.
+	CreateUserFunc func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
 
-	// QueryUsersFunc mocks the QueryUsers method.
-	QueryUsersFunc func(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error)
+	// UserByExternalIDFunc mocks the UserByExternalID method.
+	UserByExternalIDFunc func(ctx context.Context, id uuid.UUID) (pguser.User, error)
 
 	// UserCountFunc mocks the UserCount method.
 	UserCountFunc func(ctx context.Context) (int, error)
 
+	// UsersFunc mocks the Users method.
+	UsersFunc func(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error)
+
 	// calls tracks calls to the methods.
 	calls struct {
-		// InsertUser holds details about calls to the InsertUser method.
-		InsertUser []struct {
+		// CreateUser holds details about calls to the CreateUser method.
+		CreateUser []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Cu is the cu argument value.
 			Cu pguser.CreateUser
 		}
-		// QueryUsers holds details about calls to the QueryUsers method.
-		QueryUsers []struct {
+		// UserByExternalID holds details about calls to the UserByExternalID method.
+		UserByExternalID []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID uuid.UUID
+		}
+		// UserCount holds details about calls to the UserCount method.
+		UserCount []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// Users holds details about calls to the Users method.
+		Users []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// OrderBys is the orderBys argument value.
@@ -66,21 +85,17 @@ type MockedStorer struct {
 			// PageOffset is the pageOffset argument value.
 			PageOffset int
 		}
-		// UserCount holds details about calls to the UserCount method.
-		UserCount []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 	}
-	lockInsertUser sync.RWMutex
-	lockQueryUsers sync.RWMutex
-	lockUserCount  sync.RWMutex
+	lockCreateUser       sync.RWMutex
+	lockUserByExternalID sync.RWMutex
+	lockUserCount        sync.RWMutex
+	lockUsers            sync.RWMutex
 }
 
-// InsertUser calls InsertUserFunc.
-func (mock *MockedStorer) InsertUser(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
-	if mock.InsertUserFunc == nil {
-		panic("MockedStorer.InsertUserFunc: method is nil but Storer.InsertUser was just called")
+// CreateUser calls CreateUserFunc.
+func (mock *MockedStorer) CreateUser(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
+	if mock.CreateUserFunc == nil {
+		panic("MockedStorer.CreateUserFunc: method is nil but Storer.CreateUser was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
@@ -89,17 +104,17 @@ func (mock *MockedStorer) InsertUser(ctx context.Context, cu pguser.CreateUser) 
 		Ctx: ctx,
 		Cu:  cu,
 	}
-	mock.lockInsertUser.Lock()
-	mock.calls.InsertUser = append(mock.calls.InsertUser, callInfo)
-	mock.lockInsertUser.Unlock()
-	return mock.InsertUserFunc(ctx, cu)
+	mock.lockCreateUser.Lock()
+	mock.calls.CreateUser = append(mock.calls.CreateUser, callInfo)
+	mock.lockCreateUser.Unlock()
+	return mock.CreateUserFunc(ctx, cu)
 }
 
-// InsertUserCalls gets all the calls that were made to InsertUser.
+// CreateUserCalls gets all the calls that were made to CreateUser.
 // Check the length with:
 //
-//	len(mockedStorer.InsertUserCalls())
-func (mock *MockedStorer) InsertUserCalls() []struct {
+//	len(mockedStorer.CreateUserCalls())
+func (mock *MockedStorer) CreateUserCalls() []struct {
 	Ctx context.Context
 	Cu  pguser.CreateUser
 } {
@@ -107,53 +122,45 @@ func (mock *MockedStorer) InsertUserCalls() []struct {
 		Ctx context.Context
 		Cu  pguser.CreateUser
 	}
-	mock.lockInsertUser.RLock()
-	calls = mock.calls.InsertUser
-	mock.lockInsertUser.RUnlock()
+	mock.lockCreateUser.RLock()
+	calls = mock.calls.CreateUser
+	mock.lockCreateUser.RUnlock()
 	return calls
 }
 
-// QueryUsers calls QueryUsersFunc.
-func (mock *MockedStorer) QueryUsers(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error) {
-	if mock.QueryUsersFunc == nil {
-		panic("MockedStorer.QueryUsersFunc: method is nil but Storer.QueryUsers was just called")
+// UserByExternalID calls UserByExternalIDFunc.
+func (mock *MockedStorer) UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error) {
+	if mock.UserByExternalIDFunc == nil {
+		panic("MockedStorer.UserByExternalIDFunc: method is nil but Storer.UserByExternalID was just called")
 	}
 	callInfo := struct {
-		Ctx        context.Context
-		OrderBys   []order.By[pguser.OrderByField]
-		PageSize   int
-		PageOffset int
+		Ctx context.Context
+		ID  uuid.UUID
 	}{
-		Ctx:        ctx,
-		OrderBys:   orderBys,
-		PageSize:   pageSize,
-		PageOffset: pageOffset,
+		Ctx: ctx,
+		ID:  id,
 	}
-	mock.lockQueryUsers.Lock()
-	mock.calls.QueryUsers = append(mock.calls.QueryUsers, callInfo)
-	mock.lockQueryUsers.Unlock()
-	return mock.QueryUsersFunc(ctx, orderBys, pageSize, pageOffset)
+	mock.lockUserByExternalID.Lock()
+	mock.calls.UserByExternalID = append(mock.calls.UserByExternalID, callInfo)
+	mock.lockUserByExternalID.Unlock()
+	return mock.UserByExternalIDFunc(ctx, id)
 }
 
-// QueryUsersCalls gets all the calls that were made to QueryUsers.
+// UserByExternalIDCalls gets all the calls that were made to UserByExternalID.
 // Check the length with:
 //
-//	len(mockedStorer.QueryUsersCalls())
-func (mock *MockedStorer) QueryUsersCalls() []struct {
-	Ctx        context.Context
-	OrderBys   []order.By[pguser.OrderByField]
-	PageSize   int
-	PageOffset int
+//	len(mockedStorer.UserByExternalIDCalls())
+func (mock *MockedStorer) UserByExternalIDCalls() []struct {
+	Ctx context.Context
+	ID  uuid.UUID
 } {
 	var calls []struct {
-		Ctx        context.Context
-		OrderBys   []order.By[pguser.OrderByField]
-		PageSize   int
-		PageOffset int
+		Ctx context.Context
+		ID  uuid.UUID
 	}
-	mock.lockQueryUsers.RLock()
-	calls = mock.calls.QueryUsers
-	mock.lockQueryUsers.RUnlock()
+	mock.lockUserByExternalID.RLock()
+	calls = mock.calls.UserByExternalID
+	mock.lockUserByExternalID.RUnlock()
 	return calls
 }
 
@@ -186,5 +193,49 @@ func (mock *MockedStorer) UserCountCalls() []struct {
 	mock.lockUserCount.RLock()
 	calls = mock.calls.UserCount
 	mock.lockUserCount.RUnlock()
+	return calls
+}
+
+// Users calls UsersFunc.
+func (mock *MockedStorer) Users(ctx context.Context, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error) {
+	if mock.UsersFunc == nil {
+		panic("MockedStorer.UsersFunc: method is nil but Storer.Users was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		OrderBys   []order.By[pguser.OrderByField]
+		PageSize   int
+		PageOffset int
+	}{
+		Ctx:        ctx,
+		OrderBys:   orderBys,
+		PageSize:   pageSize,
+		PageOffset: pageOffset,
+	}
+	mock.lockUsers.Lock()
+	mock.calls.Users = append(mock.calls.Users, callInfo)
+	mock.lockUsers.Unlock()
+	return mock.UsersFunc(ctx, orderBys, pageSize, pageOffset)
+}
+
+// UsersCalls gets all the calls that were made to Users.
+// Check the length with:
+//
+//	len(mockedStorer.UsersCalls())
+func (mock *MockedStorer) UsersCalls() []struct {
+	Ctx        context.Context
+	OrderBys   []order.By[pguser.OrderByField]
+	PageSize   int
+	PageOffset int
+} {
+	var calls []struct {
+		Ctx        context.Context
+		OrderBys   []order.By[pguser.OrderByField]
+		PageSize   int
+		PageOffset int
+	}
+	mock.lockUsers.RLock()
+	calls = mock.calls.Users
+	mock.lockUsers.RUnlock()
 	return calls
 }

@@ -2,6 +2,8 @@ package pguser
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,14 +16,43 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
-func TestStore_InsertUser(t *testing.T) {
+func TestStore_UserByExternalID(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	store := NewStore(pool)
 
-	got, err := store.InsertUser(ctx, CreateUser{Email: "alice@test.com"})
+	seeded := seedUser(t, store, "alice@test.com")
+
+	got, err := store.UserByExternalID(ctx, seeded.ExternalID)
 	if err != nil {
-		t.Fatalf("InsertUser() error = %v", err)
+		t.Fatalf("UserByExternalID(%v) error = %v", seeded.ExternalID, err)
+	}
+
+	testingx.AssertDiff(t, got, seeded)
+}
+
+func TestStore_UserByExternalID_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	t.Run("not found", func(t *testing.T) {
+		id := uuid.New()
+		_, err := store.UserByExternalID(ctx, id)
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UserByExternalID(%v) error = %v, want sql.ErrNoRows", id, err)
+		}
+	})
+}
+
+func TestStore_CreateUser(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	got, err := store.CreateUser(ctx, CreateUser{Email: "alice@test.com"})
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
 	}
 
 	want := User{
@@ -37,13 +68,13 @@ func TestStore_InsertUser(t *testing.T) {
 	testingx.AssertDiff(t, got, want, diffOpts...)
 
 	if got.ExternalID == (uuid.UUID{}) {
-		t.Error("InsertUser() ExternalID is zero UUID, want non-zero")
+		t.Error("CreateUser() ExternalID is zero UUID, want non-zero")
 	}
 	if got.ETag == (uuid.UUID{}) {
-		t.Error("InsertUser() ETag is zero UUID, want non-zero")
+		t.Error("CreateUser() ETag is zero UUID, want non-zero")
 	}
 	if got.ExternalID == got.ETag {
-		t.Errorf("InsertUser() ExternalID and ETag are equal (%v), want distinct UUIDs", got.ExternalID)
+		t.Errorf("CreateUser() ExternalID and ETag are equal (%v), want distinct UUIDs", got.ExternalID)
 	}
 }
 
@@ -72,7 +103,7 @@ func TestStore_UserCount(t *testing.T) {
 	}
 }
 
-func TestStore_QueryUsers(t *testing.T) {
+func TestStore_Users(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	store := NewStore(pool)
@@ -137,9 +168,9 @@ func TestStore_QueryUsers(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := store.QueryUsers(ctx, tt.orderBys, tt.pageSize, tt.pageOffset)
+			got, err := store.Users(ctx, tt.orderBys, tt.pageSize, tt.pageOffset)
 			if err != nil {
-				t.Fatalf("QueryUsers() error = %v", err)
+				t.Fatalf("Users() error = %v", err)
 			}
 
 			testingx.AssertDiff(t, got, tt.want, diffOpts...)
@@ -150,7 +181,7 @@ func TestStore_QueryUsers(t *testing.T) {
 func seedUser(t *testing.T, s *Store, email string) User {
 	t.Helper()
 
-	seeded, err := s.InsertUser(t.Context(), CreateUser{Email: email})
+	seeded, err := s.CreateUser(t.Context(), CreateUser{Email: email})
 	if err != nil {
 		t.Fatalf("seed user error: %v", err)
 	}

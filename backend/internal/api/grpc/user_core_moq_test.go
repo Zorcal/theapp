@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/data/order"
 )
@@ -24,8 +25,11 @@ var _ UserCore = &MockedUserCore{}
 //			CreateUserFunc: func(ctx context.Context, cu mdl.CreateUser) (mdl.User, error) {
 //				panic("mock out the CreateUser method")
 //			},
-//			ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
-//				panic("mock out the ListUsers method")
+//			UserByIDFunc: func(ctx context.Context, id uuid.UUID) (mdl.User, error) {
+//				panic("mock out the UserByID method")
+//			},
+//			UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
+//				panic("mock out the Users method")
 //			},
 //		}
 //
@@ -37,8 +41,11 @@ type MockedUserCore struct {
 	// CreateUserFunc mocks the CreateUser method.
 	CreateUserFunc func(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
 
-	// ListUsersFunc mocks the ListUsers method.
-	ListUsersFunc func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
+	// UserByIDFunc mocks the UserByID method.
+	UserByIDFunc func(ctx context.Context, id uuid.UUID) (mdl.User, error)
+
+	// UsersFunc mocks the Users method.
+	UsersFunc func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -49,8 +56,15 @@ type MockedUserCore struct {
 			// Cu is the cu argument value.
 			Cu mdl.CreateUser
 		}
-		// ListUsers holds details about calls to the ListUsers method.
-		ListUsers []struct {
+		// UserByID holds details about calls to the UserByID method.
+		UserByID []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID uuid.UUID
+		}
+		// Users holds details about calls to the Users method.
+		Users []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// OrderBys is the orderBys argument value.
@@ -62,7 +76,8 @@ type MockedUserCore struct {
 		}
 	}
 	lockCreateUser sync.RWMutex
-	lockListUsers  sync.RWMutex
+	lockUserByID   sync.RWMutex
+	lockUsers      sync.RWMutex
 }
 
 // CreateUser calls CreateUserFunc.
@@ -101,10 +116,46 @@ func (mock *MockedUserCore) CreateUserCalls() []struct {
 	return calls
 }
 
-// ListUsers calls ListUsersFunc.
-func (mock *MockedUserCore) ListUsers(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
-	if mock.ListUsersFunc == nil {
-		panic("MockedUserCore.ListUsersFunc: method is nil but UserCore.ListUsers was just called")
+// UserByID calls UserByIDFunc.
+func (mock *MockedUserCore) UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error) {
+	if mock.UserByIDFunc == nil {
+		panic("MockedUserCore.UserByIDFunc: method is nil but UserCore.UserByID was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockUserByID.Lock()
+	mock.calls.UserByID = append(mock.calls.UserByID, callInfo)
+	mock.lockUserByID.Unlock()
+	return mock.UserByIDFunc(ctx, id)
+}
+
+// UserByIDCalls gets all the calls that were made to UserByID.
+// Check the length with:
+//
+//	len(mockedUserCore.UserByIDCalls())
+func (mock *MockedUserCore) UserByIDCalls() []struct {
+	Ctx context.Context
+	ID  uuid.UUID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}
+	mock.lockUserByID.RLock()
+	calls = mock.calls.UserByID
+	mock.lockUserByID.RUnlock()
+	return calls
+}
+
+// Users calls UsersFunc.
+func (mock *MockedUserCore) Users(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize int, pageOffset int) ([]mdl.User, int, error) {
+	if mock.UsersFunc == nil {
+		panic("MockedUserCore.UsersFunc: method is nil but UserCore.Users was just called")
 	}
 	callInfo := struct {
 		Ctx        context.Context
@@ -117,17 +168,17 @@ func (mock *MockedUserCore) ListUsers(ctx context.Context, orderBys []order.By[m
 		PageSize:   pageSize,
 		PageOffset: pageOffset,
 	}
-	mock.lockListUsers.Lock()
-	mock.calls.ListUsers = append(mock.calls.ListUsers, callInfo)
-	mock.lockListUsers.Unlock()
-	return mock.ListUsersFunc(ctx, orderBys, pageSize, pageOffset)
+	mock.lockUsers.Lock()
+	mock.calls.Users = append(mock.calls.Users, callInfo)
+	mock.lockUsers.Unlock()
+	return mock.UsersFunc(ctx, orderBys, pageSize, pageOffset)
 }
 
-// ListUsersCalls gets all the calls that were made to ListUsers.
+// UsersCalls gets all the calls that were made to Users.
 // Check the length with:
 //
-//	len(mockedUserCore.ListUsersCalls())
-func (mock *MockedUserCore) ListUsersCalls() []struct {
+//	len(mockedUserCore.UsersCalls())
+func (mock *MockedUserCore) UsersCalls() []struct {
 	Ctx        context.Context
 	OrderBys   []order.By[mdl.UserOrderByField]
 	PageSize   int
@@ -139,8 +190,8 @@ func (mock *MockedUserCore) ListUsersCalls() []struct {
 		PageSize   int
 		PageOffset int
 	}
-	mock.lockListUsers.RLock()
-	calls = mock.calls.ListUsers
-	mock.lockListUsers.RUnlock()
+	mock.lockUsers.RLock()
+	calls = mock.calls.Users
+	mock.lockUsers.RUnlock()
 	return calls
 }

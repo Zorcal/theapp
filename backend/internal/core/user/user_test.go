@@ -8,6 +8,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"database/sql"
+
 	"github.com/google/uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
@@ -41,20 +43,100 @@ func TestCore_flow(t *testing.T) {
 		t.Error("CreateUser() ETag is empty, want non-empty")
 	}
 
-	// ListUsers — created user appears in results
-	usrs, count, err := core.ListUsers(ctx, nil, 10, 0)
+	// UserByID — returns the created user
+	got, err := core.UserByID(ctx, usr.ID)
 	if err != nil {
-		t.Fatalf("ListUsers() error = %v", err)
+		t.Fatalf("UserByID(%v) error = %v", usr.ID, err)
+	}
+	testingx.AssertDiff(t, got, usr)
+
+	// Users — created user appears in results
+	usrs, count, err := core.Users(ctx, nil, 10, 0)
+	if err != nil {
+		t.Fatalf("Users() error = %v", err)
 	}
 
 	if count != 1 {
-		t.Errorf("ListUsers() count = %d, want 1", count)
+		t.Errorf("Users() count = %d, want 1", count)
 	}
 	if len(usrs) != 1 {
-		t.Fatalf("ListUsers() len = %d, want 1", len(usrs))
+		t.Fatalf("Users() len = %d, want 1", len(usrs))
 	}
 
 	testingx.AssertDiff(t, usrs[0], usr)
+}
+
+func TestCore_UserByID(t *testing.T) {
+	now := time.Now()
+	pgUsr := pguser.User{
+		ExternalID: uuid.New(),
+		Email:      "alice@test.com",
+		CreatedAt:  now,
+		ETag:       uuid.New(),
+	}
+	want := mdl.User{
+		ID:        pgUsr.ExternalID,
+		Email:     pgUsr.Email,
+		CreatedAt: pgUsr.CreatedAt,
+		ETag:      pgUsr.ETag.String(),
+	}
+
+	tests := []struct {
+		name   string
+		storer *MockedStorer
+		in     uuid.UUID
+		want   mdl.User
+	}{
+		{
+			name: "returns converted user",
+			storer: &MockedStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pgUsr, nil
+				},
+			},
+			in:   pgUsr.ExternalID,
+			want: want,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.storer)
+
+			got, err := core.UserByID(t.Context(), tt.in)
+			if err != nil {
+				t.Fatalf("UserByID(%v) error = %v", tt.in, err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want)
+		})
+	}
+}
+
+func TestCore_UserByID_error(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
+		core := NewCore(&MockedStorer{
+			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+				return pguser.User{}, sql.ErrNoRows
+			},
+		})
+		_, err := core.UserByID(t.Context(), uuid.New())
+		if !errors.Is(err, mdl.ErrNotFound) {
+			t.Errorf("UserByID() error = %v, want mdl.ErrNotFound", err)
+		}
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		core := NewCore(&MockedStorer{
+			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+				return pguser.User{}, errors.New("db down")
+			},
+		})
+		_, err := core.UserByID(t.Context(), uuid.New())
+		if err == nil {
+			t.Fatal("UserByID() error = nil, want error")
+		}
+		testingx.AssertErrContains(t, err, "db down")
+	})
 }
 
 func TestCore_CreateUser(t *testing.T) {
@@ -81,7 +163,7 @@ func TestCore_CreateUser(t *testing.T) {
 		{
 			name: "returns converted user",
 			storer: &MockedStorer{
-				InsertUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
+				CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
 					return pgUsr, nil
 				},
 			},
@@ -113,12 +195,12 @@ func TestCore_CreateUser_error(t *testing.T) {
 		{
 			name: "insert user error",
 			storer: &MockedStorer{
-				InsertUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
+				CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
 					return pguser.User{}, errors.New("db down")
 				},
 			},
 			in:          mdl.CreateUser{Email: "alice@test.com"},
-			wantErrStrs: []string{"insert user", "db down"},
+			wantErrStrs: []string{"create user", "db down"},
 		},
 	}
 	for _, tt := range tests {
@@ -135,7 +217,7 @@ func TestCore_CreateUser_error(t *testing.T) {
 	}
 }
 
-func TestCore_ListUsers(t *testing.T) {
+func TestCore_Users(t *testing.T) {
 	now := time.Now()
 	updatedAt := now.Add(-time.Hour)
 
@@ -177,7 +259,7 @@ func TestCore_ListUsers(t *testing.T) {
 		{
 			name: "returns converted users and total count",
 			storer: &MockedStorer{
-				QueryUsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
+				UsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return []pguser.User{pgAlice, pgBob}, nil
 				},
 				UserCountFunc: func(_ context.Context) (int, error) {
@@ -193,21 +275,21 @@ func TestCore_ListUsers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.storer)
 
-			gotUsers, gotCount, err := core.ListUsers(t.Context(), tt.orderBys, 10, 0)
+			gotUsers, gotCount, err := core.Users(t.Context(), tt.orderBys, 10, 0)
 			if err != nil {
-				t.Fatalf("ListUsers() error = %v", err)
+				t.Fatalf("Users() error = %v", err)
 			}
 
 			testingx.AssertDiff(t, gotUsers, tt.wantUsers)
 
 			if gotCount != tt.wantCount {
-				t.Errorf("ListUsers() count = %d, want %d", gotCount, tt.wantCount)
+				t.Errorf("Users() count = %d, want %d", gotCount, tt.wantCount)
 			}
 		})
 	}
 }
 
-func TestCore_ListUsers_error(t *testing.T) {
+func TestCore_Users_error(t *testing.T) {
 	tests := []struct {
 		name        string
 		storer      *MockedStorer
@@ -223,7 +305,7 @@ func TestCore_ListUsers_error(t *testing.T) {
 		{
 			name: "query users error",
 			storer: &MockedStorer{
-				QueryUsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
+				UsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return nil, errors.New("db down")
 				},
 				UserCountFunc: func(_ context.Context) (int, error) {
@@ -235,7 +317,7 @@ func TestCore_ListUsers_error(t *testing.T) {
 		{
 			name: "user count error",
 			storer: &MockedStorer{
-				QueryUsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
+				UsersFunc: func(_ context.Context, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return nil, nil
 				},
 				UserCountFunc: func(_ context.Context) (int, error) {
@@ -249,9 +331,9 @@ func TestCore_ListUsers_error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.storer)
 
-			_, _, err := core.ListUsers(t.Context(), tt.orderBys, 10, 0)
+			_, _, err := core.Users(t.Context(), tt.orderBys, 10, 0)
 			if err == nil {
-				t.Fatalf("ListUsers() error = nil, want error")
+				t.Fatalf("Users() error = nil, want error")
 			}
 
 			testingx.AssertErrContains(t, err, tt.wantErrStrs...)

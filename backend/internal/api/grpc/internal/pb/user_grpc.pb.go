@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	UserService_GetUser_FullMethodName    = "/theapp.v1.UserService/GetUser"
 	UserService_ListUsers_FullMethodName  = "/theapp.v1.UserService/ListUsers"
 	UserService_CreateUser_FullMethodName = "/theapp.v1.UserService/CreateUser"
 )
@@ -29,6 +30,8 @@ const (
 //
 // UserService provides operations for managing users.
 type UserServiceClient interface {
+	// Gets a user by ID.
+	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*User, error)
 	// Lists users, optionally filtered and paginated.
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
 	// Creates a new user.
@@ -41,6 +44,16 @@ type userServiceClient struct {
 
 func NewUserServiceClient(cc grpc.ClientConnInterface) UserServiceClient {
 	return &userServiceClient{cc}
+}
+
+func (c *userServiceClient) GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*User, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(User)
+	err := c.cc.Invoke(ctx, UserService_GetUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *userServiceClient) ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error) {
@@ -69,6 +82,8 @@ func (c *userServiceClient) CreateUser(ctx context.Context, in *CreateUserReques
 //
 // UserService provides operations for managing users.
 type UserServiceServer interface {
+	// Gets a user by ID.
+	GetUser(context.Context, *GetUserRequest) (*User, error)
 	// Lists users, optionally filtered and paginated.
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
 	// Creates a new user.
@@ -82,6 +97,9 @@ type UserServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedUserServiceServer struct{}
 
+func (UnimplementedUserServiceServer) GetUser(context.Context, *GetUserRequest) (*User, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUser not implemented")
+}
 func (UnimplementedUserServiceServer) ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListUsers not implemented")
 }
@@ -106,6 +124,24 @@ func RegisterUserServiceServer(s grpc.ServiceRegistrar, srv UserServiceServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&UserService_ServiceDesc, srv)
+}
+
+func _UserService_GetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetUser(ctx, req.(*GetUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _UserService_ListUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -151,6 +187,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "theapp.v1.UserService",
 	HandlerType: (*UserServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetUser",
+			Handler:    _UserService_GetUser_Handler,
+		},
 		{
 			MethodName: "ListUsers",
 			Handler:    _UserService_ListUsers_Handler,

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zorcal/theapp/backend/internal/data/order"
@@ -21,10 +22,29 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	}
 }
 
-func (s *Store) QueryUsers(ctx context.Context, orderBys []order.By[OrderByField], pageSize, pageOffset int) ([]User, error) {
+func (s *Store) UserByExternalID(ctx context.Context, id uuid.UUID) (User, error) {
+	var user User
+
+	q := userByExternalIDQuery(id)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &user); err != nil {
+			return fmt.Errorf("user by external id: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return User{}, err
+	}
+
+	return user, nil
+}
+
+func (s *Store) Users(ctx context.Context, orderBys []order.By[OrderByField], pageSize, pageOffset int) ([]User, error) {
 	var users []User
 
-	usersQ := queryUsersQuery(orderBys, pageSize, pageOffset)
+	usersQ := usersQuery(orderBys, pageSize, pageOffset)
 
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := usersQ.QueueMany(ctx, b, &users); err != nil {
@@ -59,14 +79,14 @@ func (s *Store) UserCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func (s *Store) InsertUser(ctx context.Context, cu CreateUser) (User, error) {
+func (s *Store) CreateUser(ctx context.Context, cu CreateUser) (User, error) {
 	var user User
 
-	insertQ := insertUserQuery(cu)
+	insertQ := createUserQuery(cu)
 
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := insertQ.Queue(ctx, b, &user); err != nil {
-			return fmt.Errorf("insert user: %w", err)
+			return fmt.Errorf("create user: %w", err)
 		}
 		return nil
 	}

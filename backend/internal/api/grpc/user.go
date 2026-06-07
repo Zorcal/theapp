@@ -2,9 +2,11 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,8 +28,28 @@ type userService struct {
 //go:generate moq -rm -fmt goimports -out user_core_moq_test.go . UserCore:MockedUserCore
 
 type UserCore interface {
-	ListUsers(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
+	UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error)
+	Users(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
 	CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
+}
+
+func (s *userService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
+	id, err := uuid.Parse(req.GetId())
+	if err != nil {
+		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "id", Description: "must be a valid UUID"},
+		})
+	}
+
+	usr, err := s.userCore.UserByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "user %q not found", req.GetId())
+		}
+		return nil, fmt.Errorf("get user: %w", err)
+	}
+
+	return conv.UserToPb(usr), nil
 }
 
 func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.User, error) {
@@ -94,7 +116,7 @@ func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 		return nil, status.Errorf(codes.InvalidArgument, "page_token order_by mismatch")
 	}
 
-	usrs, totalCount, err := s.userCore.ListUsers(ctx, orderBys, pageSize, pageToken.Offset)
+	usrs, totalCount, err := s.userCore.Users(ctx, orderBys, pageSize, pageToken.Offset)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}

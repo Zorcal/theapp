@@ -4,13 +4,31 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/zorcal/theapp/backend/internal/data/order"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
-func insertUserQuery(cu CreateUser) pgdb.TypedQuery[User] {
+func userByExternalIDQuery(id uuid.UUID) pgdb.TypedQuery[User] {
+	params := pgx.NamedArgs{
+		"external_id": id,
+	}
+	const sql = `
+		SELECT external_id, email, created_at, updated_at, etag
+		FROM useraccess.users
+		WHERE external_id = @external_id`
+
+	return pgdb.TypedQuery[User]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[User],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func createUserQuery(cu CreateUser) pgdb.TypedQuery[User] {
 	params := pgx.NamedArgs{
 		"email": cu.Email,
 	}
@@ -27,7 +45,7 @@ func insertUserQuery(cu CreateUser) pgdb.TypedQuery[User] {
 	}
 }
 
-func queryUsersQuery(orderBys []order.By[OrderByField], pageSize, pageOffset int) pgdb.TypedQuery[User] {
+func usersQuery(orderBys []order.By[OrderByField], pageSize, pageOffset int) pgdb.TypedQuery[User] {
 	params := pgx.NamedArgs{
 		"page_size":   pageSize,
 		"page_offset": pageOffset,

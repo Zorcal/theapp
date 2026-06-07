@@ -18,6 +18,114 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
+func TestUserService_GetUser(t *testing.T) {
+	diffOpts := defaultDiffOpts()
+
+	now := time.Now()
+	id := uuid.New()
+	usr := mdl.User{
+		ID:        id,
+		Email:     "alice@test.com",
+		CreatedAt: now,
+		ETag:      uuid.NewString(),
+	}
+	wantPb := &pb.User{
+		Id:         usr.ID.String(),
+		Email:      usr.Email,
+		CreateTime: timestamppb.New(usr.CreatedAt),
+		Etag:       usr.ETag,
+	}
+
+	tests := []struct {
+		name     string
+		userCore UserCore
+		in       *pb.GetUserRequest
+		want     *pb.User
+	}{
+		{
+			name: "returns user",
+			userCore: &MockedUserCore{
+				UserByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.User, error) {
+					return usr, nil
+				},
+			},
+			in:   &pb.GetUserRequest{Id: id.String()},
+			want: wantPb,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:      testingx.NewLogger(t),
+				UserCore: tt.userCore,
+			})
+
+			got, err := srvTest.userServiceClient.GetUser(t.Context(), tt.in)
+			if err != nil {
+				t.Fatalf("GetUser() error = %q, want no error", err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want, diffOpts)
+		})
+	}
+}
+
+func TestUserService_GetUser_error(t *testing.T) {
+	tests := []struct {
+		name     string
+		userCore UserCore
+		in       *pb.GetUserRequest
+		want     *status.Status
+	}{
+		{
+			name:     "invalid id",
+			userCore: &MockedUserCore{},
+			in:       &pb.GetUserRequest{Id: "not-a-uuid"},
+			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
+		},
+		{
+			name: "not found",
+			userCore: &MockedUserCore{
+				UserByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.User, error) {
+					return mdl.User{}, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.GetUserRequest{Id: uuid.NewString()},
+			want: status.New(codes.NotFound, "user \""+uuid.Nil.String()+"\" not found"),
+		},
+		{
+			name: "core error",
+			userCore: &MockedUserCore{
+				UserByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.User, error) {
+					return mdl.User{}, errors.New("boom")
+				},
+			},
+			in:   &pb.GetUserRequest{Id: uuid.NewString()},
+			want: status.New(codes.Internal, "Internal"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:      testingx.NewLogger(t),
+				UserCore: tt.userCore,
+			})
+
+			_, err := srvTest.userServiceClient.GetUser(t.Context(), tt.in)
+			if err == nil {
+				t.Fatal("GetUser() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("GetUser() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Code(), tt.want.Code(), defaultDiffOpts())
+		})
+	}
+}
+
 func TestUserService_CreateUser(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
@@ -189,7 +297,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "empty request",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 15, nil
 				},
 			},
@@ -202,7 +310,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "empty result",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return nil, 0, nil
 				},
 			},
@@ -212,7 +320,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "first page returns next_page_token when more results exist",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe}, 5, nil
 				},
 			},
@@ -226,7 +334,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "single page returns no next_page_token",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 3, nil
 				},
 			},
@@ -239,7 +347,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "order_by carried into next_page_token",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe}, 5, nil
 				},
 			},
@@ -256,7 +364,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "page_token offset is honored",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{smithBrown}, 10, nil
 				},
 			},
@@ -273,7 +381,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		{
 			name: "last page exactly fills page size",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return []mdl.User{johnDoe, maryDoe, smithBrown}, 3, nil
 				},
 			},
@@ -339,7 +447,7 @@ func TestUserService_ListUsers_error(t *testing.T) {
 		{
 			name: "core error",
 			userCore: &MockedUserCore{
-				ListUsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
+				UsersFunc: func(ctx context.Context, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
 					return nil, 0, errors.New("boom")
 				},
 			},
