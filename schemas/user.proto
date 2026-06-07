@@ -37,6 +37,9 @@ message User {
   // Timestamp when the user was last updated. Output only.
   google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Name of the user (first and last name).
+  string name = 7;
+
   // The ETag for the current version of the user. Helps to prevent
   // simultaneous updates of a user from overwriting each other ("mid-air
   // collisions").

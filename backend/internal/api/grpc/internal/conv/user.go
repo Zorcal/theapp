@@ -12,7 +12,7 @@ import (
 )
 
 func CreateUserFromPb(u *pb.User) mdl.CreateUser {
-	return mdl.CreateUser{Email: u.GetEmail()}
+	return mdl.CreateUser{Email: u.GetEmail(), Name: u.GetName()}
 }
 
 func UsersToPb(usr []mdl.User) []*pb.User {
@@ -23,6 +23,7 @@ func UserToPb(usr mdl.User) *pb.User {
 	return &pb.User{
 		Id:         usr.ID.String(),
 		Email:      usr.Email,
+		Name:       usr.Name,
 		UpdateTime: maybeNewTimestamppb(usr.UpdatedAt),
 		CreateTime: timestamppb.New(usr.CreatedAt),
 		Etag:       usr.ETag,

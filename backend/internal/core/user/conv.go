@@ -12,6 +12,7 @@ import (
 func createUserToPG(cu mdl.CreateUser) pguser.CreateUser {
 	return pguser.CreateUser{
 		Email: cu.Email,
+		Name:  cu.Name,
 	}
 }
 
@@ -19,6 +20,7 @@ func userFromPG(u pguser.User) mdl.User {
 	return mdl.User{
 		ID:        u.ExternalID,
 		Email:     u.Email,
+		Name:      u.Name,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 		ETag:      u.ETag.String(),

@@ -10,6 +10,7 @@ import (
 type User struct {
 	ID        uuid.UUID
 	Email     string
+	Name      string
 	CreatedAt time.Time
 	UpdatedAt *time.Time
 	ETag      string
@@ -18,6 +19,7 @@ type User struct {
 // CreateUser holds the fields required to create a new user.
 type CreateUser struct {
 	Email string
+	Name  string
 }
 
 // UserOrderByField represents a field that user query results can be ordered by.

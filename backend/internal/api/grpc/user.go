@@ -87,6 +87,13 @@ func validateCreateUserRequest(req *pb.CreateUserRequest) error {
 		})
 	}
 
+	if req.GetUser().GetName() == "" {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field:       "user.name",
+			Description: "required",
+		})
+	}
+
 	if len(violations) > 0 {
 		return invalidArgumentStatus(violations)
 	}

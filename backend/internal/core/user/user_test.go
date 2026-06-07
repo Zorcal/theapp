@@ -28,12 +28,12 @@ func TestCore_flow(t *testing.T) {
 	}
 
 	// CreateUser
-	usr, err := core.CreateUser(ctx, mdl.CreateUser{Email: "alice@test.com"})
+	usr, err := core.CreateUser(ctx, mdl.CreateUser{Email: "alice@test.com", Name: "Alice Smith"})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
 	}
 
-	testingx.AssertDiff(t, usr, mdl.User{Email: "alice@test.com", CreatedAt: time.Now()}, diffOpts...)
+	testingx.AssertDiff(t, usr, mdl.User{Email: "alice@test.com", Name: "Alice Smith", CreatedAt: time.Now()}, diffOpts...)
 
 	if usr.ID == (uuid.UUID{}) {
 		t.Error("CreateUser() ID is zero UUID, want non-zero")
@@ -70,12 +70,14 @@ func TestCore_UserByID(t *testing.T) {
 	pgUsr := pguser.User{
 		ExternalID: uuid.New(),
 		Email:      "alice@test.com",
+		Name:       "Alice Smith",
 		CreatedAt:  now,
 		ETag:       uuid.New(),
 	}
 	want := mdl.User{
 		ID:        pgUsr.ExternalID,
 		Email:     pgUsr.Email,
+		Name:      pgUsr.Name,
 		CreatedAt: pgUsr.CreatedAt,
 		ETag:      pgUsr.ETag.String(),
 	}
@@ -143,12 +145,14 @@ func TestCore_CreateUser(t *testing.T) {
 	pgUsr := pguser.User{
 		ExternalID: uuid.New(),
 		Email:      "alice@test.com",
+		Name:       "Alice Smith",
 		CreatedAt:  now,
 		ETag:       uuid.New(),
 	}
 	want := mdl.User{
 		ID:        pgUsr.ExternalID,
 		Email:     pgUsr.Email,
+		Name:      pgUsr.Name,
 		CreatedAt: pgUsr.CreatedAt,
 		ETag:      pgUsr.ETag.String(),
 	}
@@ -166,7 +170,7 @@ func TestCore_CreateUser(t *testing.T) {
 					return pgUsr, nil
 				},
 			},
-			in:   mdl.CreateUser{Email: "alice@test.com"},
+			in:   mdl.CreateUser{Email: "alice@test.com", Name: "Alice Smith"},
 			want: want,
 		},
 	}
@@ -198,7 +202,7 @@ func TestCore_CreateUser_error(t *testing.T) {
 					return pguser.User{}, errors.New("db down")
 				},
 			},
-			in:          mdl.CreateUser{Email: "alice@test.com"},
+			in:          mdl.CreateUser{Email: "alice@test.com", Name: "Alice Smith"},
 			wantErrStrs: []string{"create user", "db down"},
 		},
 	}
@@ -223,12 +227,14 @@ func TestCore_Users(t *testing.T) {
 	pgAlice := pguser.User{
 		ExternalID: uuid.New(),
 		Email:      "alice@test.com",
+		Name:       "Alice Smith",
 		CreatedAt:  now,
 		ETag:       uuid.New(),
 	}
 	pgBob := pguser.User{
 		ExternalID: uuid.New(),
 		Email:      "bob@test.com",
+		Name:       "Bob Jones",
 		CreatedAt:  now,
 		UpdatedAt:  &updatedAt,
 		ETag:       uuid.New(),
@@ -237,12 +243,14 @@ func TestCore_Users(t *testing.T) {
 	mdlAlice := mdl.User{
 		ID:        pgAlice.ExternalID,
 		Email:     pgAlice.Email,
+		Name:      pgAlice.Name,
 		CreatedAt: pgAlice.CreatedAt,
 		ETag:      pgAlice.ETag.String(),
 	}
 	mdlBob := mdl.User{
 		ID:        pgBob.ExternalID,
 		Email:     pgBob.Email,
+		Name:      pgBob.Name,
 		CreatedAt: pgBob.CreatedAt,
 		UpdatedAt: pgBob.UpdatedAt,
 		ETag:      pgBob.ETag.String(),

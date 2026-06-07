@@ -26,12 +26,14 @@ func TestUserService_GetUser(t *testing.T) {
 	usr := mdl.User{
 		ID:        id,
 		Email:     "alice@test.com",
+		Name:      "Alice Smith",
 		CreatedAt: now,
 		ETag:      uuid.NewString(),
 	}
 	wantPb := &pb.User{
 		Id:         usr.ID.String(),
 		Email:      usr.Email,
+		Name:       usr.Name,
 		CreateTime: timestamppb.New(usr.CreatedAt),
 		Etag:       usr.ETag,
 	}
@@ -133,12 +135,14 @@ func TestUserService_CreateUser(t *testing.T) {
 	usr := mdl.User{
 		ID:        uuid.New(),
 		Email:     "alice@test.com",
+		Name:      "Alice Smith",
 		CreatedAt: now,
 		ETag:      uuid.NewString(),
 	}
 	wantPb := &pb.User{
 		Id:         usr.ID.String(),
 		Email:      usr.Email,
+		Name:       usr.Name,
 		CreateTime: timestamppb.New(usr.CreatedAt),
 		Etag:       usr.ETag,
 	}
@@ -156,7 +160,7 @@ func TestUserService_CreateUser(t *testing.T) {
 					return usr, nil
 				},
 			},
-			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com"}},
+			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com", Name: "Alice Smith"}},
 			want: wantPb,
 		},
 	}
@@ -205,8 +209,14 @@ func TestUserService_CreateUser_error(t *testing.T) {
 		{
 			name:     "empty email",
 			userCore: &MockedUserCore{},
-			in:       &pb.CreateUserRequest{User: &pb.User{}},
+			in:       &pb.CreateUserRequest{User: &pb.User{Name: "Alice Smith"}},
 			want:     invalidArgWithViolation("user.email", "required"),
+		},
+		{
+			name:     "empty name",
+			userCore: &MockedUserCore{},
+			in:       &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com"}},
+			want:     invalidArgWithViolation("user.name", "required"),
 		},
 		{
 			name: "core error",
@@ -215,7 +225,7 @@ func TestUserService_CreateUser_error(t *testing.T) {
 					return mdl.User{}, errors.New("boom")
 				},
 			},
-			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com"}},
+			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com", Name: "Alice Smith"}},
 			want: status.New(codes.Internal, "Internal"),
 		},
 	}
@@ -249,12 +259,14 @@ func TestUserService_ListUsers(t *testing.T) {
 	johnDoe := mdl.User{
 		ID:        uuid.New(),
 		Email:     "john.doe@test.com",
+		Name:      "John Doe",
 		CreatedAt: now.AddDate(0, 0, -15),
 		ETag:      uuid.NewString(),
 	}
 	maryDoe := mdl.User{
 		ID:        uuid.New(),
 		Email:     "mary.doe@test.com",
+		Name:      "Mary Doe",
 		CreatedAt: now.AddDate(0, 0, -12),
 		UpdatedAt: new(now.AddDate(0, 0, -3)),
 		ETag:      uuid.NewString(),
@@ -262,6 +274,7 @@ func TestUserService_ListUsers(t *testing.T) {
 	smithBrown := mdl.User{
 		ID:        uuid.New(),
 		Email:     "smith.brown@test.com",
+		Name:      "Smith Brown",
 		CreatedAt: now.AddDate(0, 0, -10),
 		UpdatedAt: new(now.AddDate(0, 0, -1)),
 		ETag:      uuid.NewString(),
@@ -270,12 +283,14 @@ func TestUserService_ListUsers(t *testing.T) {
 	pbJohnDoe := &pb.User{
 		Id:         johnDoe.ID.String(),
 		Email:      "john.doe@test.com",
+		Name:       "John Doe",
 		CreateTime: timestamppb.New(now.AddDate(0, 0, -15)),
 		Etag:       johnDoe.ETag,
 	}
 	pbMaryDoe := &pb.User{
 		Id:         maryDoe.ID.String(),
 		Email:      "mary.doe@test.com",
+		Name:       "Mary Doe",
 		CreateTime: timestamppb.New(now.AddDate(0, 0, -12)),
 		UpdateTime: timestamppb.New(now.AddDate(0, 0, -3)),
 		Etag:       maryDoe.ETag,
@@ -283,6 +298,7 @@ func TestUserService_ListUsers(t *testing.T) {
 	pbSmithBrown := &pb.User{
 		Id:         smithBrown.ID.String(),
 		Email:      "smith.brown@test.com",
+		Name:       "Smith Brown",
 		CreateTime: timestamppb.New(now.AddDate(0, 0, -10)),
 		UpdateTime: timestamppb.New(now.AddDate(0, 0, -1)),
 		Etag:       smithBrown.ETag,
