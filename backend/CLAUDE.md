@@ -1,4 +1,4 @@
-# Backend coding conventions
+# Backend development
 
 ## Error wrapping
 
@@ -77,6 +77,12 @@ func TestCalculate_error(t *testing.T) {
     }
 }
 ```
+
+## Schema code generation
+
+Proto schemas live in `schemas/` at the repo root. Generated pb files are committed under
+`internal/api/grpc/internal/pb/`. To regenerate them after editing a `.proto` file, run
+`make generate` from the repo root.
 
 ## Mocking interfaces
 
