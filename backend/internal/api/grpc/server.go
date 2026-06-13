@@ -17,6 +17,9 @@ import (
 type ServerConfig struct {
 	Log      *slog.Logger
 	UserCore UserCore
+	AuthCore AuthCore
+	// JWTKey is the HMAC secret used to validate access tokens.
+	JWTKey []byte
 	// Reflection registers the gRPC reflection service. Enable for local
 	// development so ad-hoc clients (grpcurl, Evans, ...) can discover the
 	// schema; keep it off elsewhere so the schema isn't exposed publicly.
@@ -30,11 +33,13 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithFilter(notGRPCInfrastructure))),
 		grpc.ChainUnaryInterceptor(
 			loggingUnaryInterceptor(cfg.Log),
+			authUnaryInterceptor(cfg.JWTKey),
 			errorUnaryInterceptor(cfg.Log),
 			recoveryUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			loggingStreamInterceptor(cfg.Log),
+			authStreamInterceptor(cfg.JWTKey),
 			errorStreamInterceptor(cfg.Log),
 			recoveryStreamInterceptor(),
 		),
@@ -43,6 +48,11 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	pb.RegisterUserServiceServer(srv, &userService{
 		log:      cfg.Log,
 		userCore: cfg.UserCore,
+	})
+
+	pb.RegisterAuthServiceServer(srv, &authService{
+		log:      cfg.Log,
+		authCore: cfg.AuthCore,
 	})
 
 	if cfg.Reflection {

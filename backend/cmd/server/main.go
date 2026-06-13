@@ -20,6 +20,8 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
 	"github.com/zorcal/theapp/backend/internal/clients/resend"
+	"github.com/zorcal/theapp/backend/internal/core/auth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -78,6 +80,19 @@ type Config struct {
 		Resend struct {
 			APIKey string `conf:"mask"`
 		}
+	}
+	Auth struct {
+		// JWTSecret is the HMAC-SHA256 signing key for access tokens. Must be
+		// changed from the default before deploying outside local environments.
+		JWTSecret string `conf:"default:dev-secret-change-me,mask"`
+		// FromEmail is the sender address used for magic-link emails.
+		FromEmail string `conf:"default:noreply@example.com"`
+		// MagicLinkBaseURL is the frontend URL that receives the token query
+		// parameter, e.g. "https://app.example.com/auth/verify".
+		MagicLinkBaseURL string        `conf:"default:http://localhost:3000/auth/verify"`
+		MagicTTL         time.Duration `conf:"default:15m"`
+		AccessTTL        time.Duration `conf:"default:15m"`
+		RefreshTTL       time.Duration `conf:"default:720h"` // 30 days
 	}
 }
 
@@ -187,19 +202,27 @@ func run(ctx context.Context, cfg Config) error {
 
 	// Setup clients.
 
-	var emailClient email.Sender = email.NewLogSender(log)
+	var emailSender email.Sender = email.NewLogSender(log)
 	if cfg.Client.Resend.APIKey != "" {
-		emailClient = resend.NewEmailClient(cfg.Client.Resend.APIKey)
+		emailSender = resend.NewEmailClient(cfg.Client.Resend.APIKey)
 	}
-	_ = emailClient
 
 	// Setup pg stores.
 
 	pgUserStore := pguser.NewStore(pgPool)
+	pgAuthStore := pgauth.NewStore(pgPool)
 
 	// Setup cores.
 
 	userCore := user.NewCore(pgUserStore)
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, emailSender, auth.Config{
+		JWTKey:     []byte(cfg.Auth.JWTSecret),
+		FromEmail:  cfg.Auth.FromEmail,
+		BaseURL:    cfg.Auth.MagicLinkBaseURL,
+		MagicTTL:   cfg.Auth.MagicTTL,
+		AccessTTL:  cfg.Auth.AccessTTL,
+		RefreshTTL: cfg.Auth.RefreshTTL,
+	})
 
 	// Setup gRPC server.
 
@@ -209,6 +232,8 @@ func run(ctx context.Context, cfg Config) error {
 	srv := grpc.NewServer(grpc.ServerConfig{
 		Log:        log,
 		UserCore:   userCore,
+		AuthCore:   authCore,
+		JWTKey:     []byte(cfg.Auth.JWTSecret),
 		Reflection: cfg.IsLocalEnvironment(),
 	})
 

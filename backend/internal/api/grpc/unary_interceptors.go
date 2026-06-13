@@ -7,16 +7,76 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"slices"
+	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/telemetry"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
+
+// publicMethods lists gRPC methods that do not require a valid JWT. All other
+// methods are authenticated by authUnaryInterceptor.
+var publicMethods = map[string]struct{}{
+	"/theapp.v1.AuthService/RequestMagicLink": {},
+	"/theapp.v1.AuthService/VerifyMagicLink":  {},
+}
+
+// authUnaryInterceptor validates the JWT Bearer token on every method not in
+// publicMethods and attaches the authenticated user ID to the context.
+func authUnaryInterceptor(jwtKey []byte) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if _, public := publicMethods[info.FullMethod]; public {
+			return handler(ctx, req)
+		}
+
+		claims, err := parseBearer(ctx, jwtKey)
+		if err != nil {
+			return nil, fmt.Errorf("parse bearer: %w", err)
+		}
+
+		return handler(contextWithUserID(ctx, claims.UserID), req)
+	}
+}
+
+// parseBearer extracts the Authorization: Bearer header from ctx, validates the
+// JWT against jwtKey, and returns the parsed claims.
+func parseBearer(ctx context.Context, jwtKey []byte) (*mdl.AuthClaims, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "missing metadata")
+	}
+
+	vals := md.Get("authorization")
+	if len(vals) == 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing authorization header")
+	}
+
+	tokenStr, ok := strings.CutPrefix(vals[0], "Bearer ")
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "authorization header must use Bearer scheme")
+	}
+
+	claims := &mdl.AuthClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return jwtKey, nil
+	})
+	if err != nil || !token.Valid {
+		return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
+	}
+
+	return claims, nil
+}
 
 func loggingUnaryInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, retErr error) {

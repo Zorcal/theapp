@@ -11,6 +11,21 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
+func userByEmailQuery(email string) pgdb.TypedQuery[User] {
+	params := pgx.NamedArgs{"email": email}
+	const sql = `
+		SELECT external_id, email, name, created_at, updated_at, etag
+		FROM useraccess.users
+		WHERE email = @email`
+
+	return pgdb.TypedQuery[User]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[User],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func userByExternalIDQuery(id uuid.UUID) pgdb.TypedQuery[User] {
 	params := pgx.NamedArgs{
 		"external_id": id,

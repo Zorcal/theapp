@@ -16,6 +16,34 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
+func TestStore_UserByEmail(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	seeded := seedUser(t, store, "alice@test.com", "Alice Smith")
+
+	got, err := store.UserByEmail(ctx, seeded.Email)
+	if err != nil {
+		t.Fatalf("UserByEmail(%q) error = %v", seeded.Email, err)
+	}
+
+	testingx.AssertDiff(t, got, seeded)
+}
+
+func TestStore_UserByEmail_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	t.Run("not found", func(t *testing.T) {
+		_, err := store.UserByEmail(ctx, "nobody@test.com")
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UserByEmail(nobody) error = %v, want sql.ErrNoRows", err)
+		}
+	})
+}
+
 func TestStore_UserByExternalID(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)

@@ -48,7 +48,7 @@ func TestUserService_GetUser(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			got, err := srvTest.userServiceClient.GetUser(t.Context(), tt.in)
+			got, err := srvTest.userServiceClient.GetUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err != nil {
 				t.Fatalf("GetUser() error = %q, want no error", err)
 			}
@@ -99,7 +99,7 @@ func TestUserService_GetUser_error(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			_, err := srvTest.userServiceClient.GetUser(t.Context(), tt.in)
+			_, err := srvTest.userServiceClient.GetUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("GetUser() error = nil, want error")
 			}
@@ -143,7 +143,7 @@ func TestUserService_CreateUser(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			got, err := srvTest.userServiceClient.CreateUser(t.Context(), tt.in)
+			got, err := srvTest.userServiceClient.CreateUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err != nil {
 				t.Fatalf("CreateUser() error = %q, want no error", err)
 			}
@@ -208,7 +208,7 @@ func TestUserService_CreateUser_error(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			_, err := srvTest.userServiceClient.CreateUser(t.Context(), tt.in)
+			_, err := srvTest.userServiceClient.CreateUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("CreateUser() error = nil, want error")
 			}
@@ -255,7 +255,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			got, err := srvTest.userServiceClient.UpdateUser(t.Context(), tt.in)
+			got, err := srvTest.userServiceClient.UpdateUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err != nil {
 				t.Fatalf("UpdateUser() error = %q, want no error", err)
 			}
@@ -342,7 +342,7 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			_, err := srvTest.userServiceClient.UpdateUser(t.Context(), tt.in)
+			_, err := srvTest.userServiceClient.UpdateUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("UpdateUser() error = nil, want error")
 			}
@@ -538,7 +538,7 @@ func TestUserService_ListUsers(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			got, err := srvTest.userServiceClient.ListUsers(t.Context(), tt.in)
+			got, err := srvTest.userServiceClient.ListUsers(srvTest.authCtx(t, t.Context()), tt.in)
 			if err != nil {
 				t.Fatalf("ListUsers() error = %q, want no error", err)
 			}
@@ -607,7 +607,7 @@ func TestUserService_ListUsers_error(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			_, err := srvTest.userServiceClient.ListUsers(t.Context(), tt.in)
+			_, err := srvTest.userServiceClient.ListUsers(srvTest.authCtx(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("ListUsers() error = nil, want error")
 			}
