@@ -22,6 +22,47 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	}
 }
 
+// GetOrCreateUserByEmail returns the user with the given email, creating one if none exists.
+func (s *Store) GetOrCreateUserByEmail(ctx context.Context, email string) (User, error) {
+	var user User
+
+	q := getOrCreateUserByEmailQuery(email)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &user); err != nil {
+			return fmt.Errorf("get or create user by email: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return User{}, err
+	}
+
+	return user, nil
+}
+
+// UserByEmail returns the user with the given email address.
+// Returns [sql.ErrNoRows] if no such user exists.
+func (s *Store) UserByEmail(ctx context.Context, email string) (User, error) {
+	var user User
+
+	q := userByEmailQuery(email)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &user); err != nil {
+			return fmt.Errorf("user by email: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return User{}, err
+	}
+
+	return user, nil
+}
+
 // UserByExternalID returns the user with the given external ID.
 // Returns [sql.ErrNoRows] if no such user exists.
 func (s *Store) UserByExternalID(ctx context.Context, id uuid.UUID) (User, error) {

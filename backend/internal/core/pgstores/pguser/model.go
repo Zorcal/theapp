@@ -18,6 +18,7 @@ const (
 
 // User represents a user in the database.
 type User struct {
+	ID         int        `db:"id"`
 	ExternalID uuid.UUID  `db:"external_id"`
 	Email      string     `db:"email"`
 	Name       string     `db:"name"`

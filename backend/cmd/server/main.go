@@ -20,6 +20,8 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
 	"github.com/zorcal/theapp/backend/internal/clients/resend"
+	"github.com/zorcal/theapp/backend/internal/core/auth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -54,23 +56,19 @@ type Config struct {
 		Name       string `conf:"default:theapp"`
 		SSLEnabled bool   `conf:"default:false"`
 		Pool       struct {
-			// MaxConns is bounded by Postgres max_connections (default 100)
-			// shared across all app instances plus migrations and admin
-			// clients. pgx's own default of 4 bottlenecks a concurrent gRPC
-			// server, so we raise it to 10: enough concurrency while leaving
-			// ample headroom under the cap.
+			// MaxConns is bounded by Postgres max_connections (default 100) shared across all app instances plus
+			// migrations and admin clients. pgx's own default of 4 bottlenecks a concurrent gRPC server, so we raise it
+			// to 10: enough concurrency while leaving ample headroom under the cap.
 			MaxConns int32 `conf:"default:10"`
-			// MinConns 0 lets the pool drain to nothing when idle; raise it in
-			// production to avoid connection-setup latency on the first
-			// requests after a quiet period. Matches pgx's default.
+			// MinConns 0 lets the pool drain to nothing when idle; raise it in production to avoid connection-setup
+			// latency on the first requests after a quiet period. Matches pgx's default.
 			MinConns          int32         `conf:"default:0"`
 			MaxConnLifetime   time.Duration `conf:"default:1h"`
 			MaxConnIdleTime   time.Duration `conf:"default:30m"`
 			HealthCheckPeriod time.Duration `conf:"default:60s"`
-			// MaxConnLifetimeJitter spreads out connection recycling. Without
-			// it, connections opened together at startup all reach
-			// MaxConnLifetime at once and reconnect in a herd; 5m staggers
-			// them. pgx defaults this to 0 (no jitter).
+			// MaxConnLifetimeJitter spreads out connection recycling. Without it, connections opened together at
+			// startup all reach MaxConnLifetime at once and reconnect in a herd; 5m staggers them. pgx defaults this to
+			// 0 (no jitter).
 			MaxConnLifetimeJitter time.Duration `conf:"default:5m"`
 		}
 	}
@@ -78,6 +76,22 @@ type Config struct {
 		Resend struct {
 			APIKey string `conf:"mask"`
 		}
+	}
+	Auth struct {
+		// JWTSecret is the HMAC-SHA256 signing key for access tokens. Must be changed from the default before deploying
+		// outside local environments.
+		JWTSecret   string `conf:"default:dev-secret-change-me,mask"`
+		JWTIssuer   string `conf:"default:theapp"`
+		JWTAudience string `conf:"default:theapp-api"`
+		// FromEmail is the sender address used for magic-link emails.
+		FromEmail string `conf:"default:noreply@theapp.com"`
+		// MagicLinkBaseURL is the frontend URL that receives the token query parameter, e.g.
+		// "https://theapp.com/auth/verify".
+		MagicLinkBaseURL   string        `conf:"default:http://localhost:3000/auth/verify"`
+		MagicLinkTTL       time.Duration `conf:"default:15m"`
+		MagicLinkRateLimit time.Duration `conf:"default:1m"`
+		AccessTokenTTL     time.Duration `conf:"default:15m"`
+		RefreshTokenTTL    time.Duration `conf:"default:720h"` // 30 days
 	}
 }
 
@@ -110,6 +124,10 @@ func main() {
 }
 
 func run(ctx context.Context, cfg Config) error {
+	if !cfg.IsLocalEnvironment() && cfg.Auth.JWTSecret == "dev-secret-change-me" {
+		return errors.New("Auth.JWTSecret must be changed from the default before running outside local environments")
+	}
+
 	// Setup open telemetry.
 
 	// Bootstrap logger is stdout-only; telemetry init can't log through
@@ -187,19 +205,30 @@ func run(ctx context.Context, cfg Config) error {
 
 	// Setup clients.
 
-	var emailClient email.Sender = email.NewLogSender(log)
+	var emailSender email.Sender = email.NewLogSender(log)
 	if cfg.Client.Resend.APIKey != "" {
-		emailClient = resend.NewEmailClient(cfg.Client.Resend.APIKey)
+		emailSender = resend.NewEmailClient(cfg.Client.Resend.APIKey)
 	}
-	_ = emailClient
 
 	// Setup pg stores.
 
 	pgUserStore := pguser.NewStore(pgPool)
+	pgAuthStore := pgauth.NewStore(pgPool)
 
 	// Setup cores.
 
 	userCore := user.NewCore(pgUserStore)
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, emailSender, pgdb.NewTransactor(pgPool), auth.Config{
+		JWTKey:             []byte(cfg.Auth.JWTSecret),
+		JWTIssuer:          cfg.Auth.JWTIssuer,
+		JWTAudience:        cfg.Auth.JWTAudience,
+		MagicLinkFromEmail: cfg.Auth.FromEmail,
+		MagicLinkBaseURL:   cfg.Auth.MagicLinkBaseURL,
+		MagicLinkTTL:       cfg.Auth.MagicLinkTTL,
+		MagicLinkRateLimit: cfg.Auth.MagicLinkRateLimit,
+		AccessTokenTTL:     cfg.Auth.AccessTokenTTL,
+		RefreshTokenTTL:    cfg.Auth.RefreshTokenTTL,
+	})
 
 	// Setup gRPC server.
 
@@ -207,9 +236,13 @@ func run(ctx context.Context, cfg Config) error {
 	defer log.InfoContext(ctx, "gRPC server stopped")
 
 	srv := grpc.NewServer(grpc.ServerConfig{
-		Log:        log,
-		UserCore:   userCore,
-		Reflection: cfg.IsLocalEnvironment(),
+		Log:         log,
+		UserCore:    userCore,
+		AuthCore:    authCore,
+		JWTKey:      []byte(cfg.Auth.JWTSecret),
+		JWTIssuer:   cfg.Auth.JWTIssuer,
+		JWTAudience: cfg.Auth.JWTAudience,
+		Reflection:  cfg.IsLocalEnvironment(),
 	})
 
 	var lc net.ListenConfig

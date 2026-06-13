@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -117,6 +118,94 @@ func TestTransactor_RunTx(t *testing.T) {
 	if got, want := countTxRows(t, ctx, pool), 1; got != want {
 		t.Errorf("Transactor.RunTx() rows = %d, want %d", got, want)
 	}
+}
+
+func TestRunExec(t *testing.T) {
+	t.Run("commits on success", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		setupTxTable(t, ctx, pool)
+
+		if err := pgdb.RunExec(ctx, pool, "INSERT INTO _pgdb_tx_test (val) VALUES (1)"); err != nil {
+			t.Fatalf("RunExec() error = %v", err)
+		}
+
+		if got, want := countTxRows(t, ctx, pool), 1; got != want {
+			t.Errorf("RunExec() rows = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("joins transaction and rolls back on error", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		setupTxTable(t, ctx, pool)
+
+		sentinel := errors.New("sentinel")
+
+		err := pgdb.RunTx(ctx, pool, func(ctx context.Context) error {
+			if err := pgdb.RunExec(ctx, pool, "INSERT INTO _pgdb_tx_test (val) VALUES (1)"); err != nil {
+				return err
+			}
+			return sentinel
+		})
+		if !errors.Is(err, sentinel) {
+			t.Fatalf("RunTx() error = %v, want %v", err, sentinel)
+		}
+
+		if got, want := countTxRows(t, ctx, pool), 0; got != want {
+			t.Errorf("RunExec in RunTx: rows after rollback = %d, want %d", got, want)
+		}
+	})
+}
+
+func TestRunBatch(t *testing.T) {
+	q := pgdb.TypedQuery[int]{
+		SQL:    "INSERT INTO _pgdb_tx_test (val) VALUES (1) RETURNING val",
+		Scan:   func(row pgx.CollectableRow) (int, error) { var v int; return v, row.Scan(&v) },
+		Expect: pgdb.ExpectOne,
+	}
+
+	t.Run("commits on success", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		setupTxTable(t, ctx, pool)
+
+		var val int
+		if err := pgdb.RunBatch(ctx, pool, func(ctx context.Context, b *pgdb.Batch) error {
+			return q.Queue(ctx, b, &val)
+		}); err != nil {
+			t.Fatalf("RunBatch() error = %v", err)
+		}
+
+		if got, want := countTxRows(t, ctx, pool), 1; got != want {
+			t.Errorf("RunBatch() rows = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("joins transaction and rolls back on error", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		setupTxTable(t, ctx, pool)
+
+		sentinel := errors.New("sentinel")
+
+		err := pgdb.RunTx(ctx, pool, func(ctx context.Context) error {
+			var val int
+			if err := pgdb.RunBatch(ctx, pool, func(ctx context.Context, b *pgdb.Batch) error {
+				return q.Queue(ctx, b, &val)
+			}); err != nil {
+				return err
+			}
+			return sentinel
+		})
+		if !errors.Is(err, sentinel) {
+			t.Fatalf("RunTx() error = %v, want %v", err, sentinel)
+		}
+
+		if got, want := countTxRows(t, ctx, pool), 0; got != want {
+			t.Errorf("RunBatch in RunTx: rows after rollback = %d, want %d", got, want)
+		}
+	})
 }
 
 // setupTxTable creates a scratch table for transaction tests. Each call to

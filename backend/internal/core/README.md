@@ -83,3 +83,5 @@ Each core domain package uses two complementary layers of tests:
 
 - **Unit tests** — mock the `Storer` interface (via moq) and cover the bulk of the logic: conversions, error wrapping, edge cases. Fast, no database required.
 - **Flow tests** — use a real database via `pgtest` and cover the happy path end-to-end through the actual store. One or two per domain is enough; their job is to catch wiring mistakes that mocks cannot, not to duplicate unit test coverage.
+
+Every new (exported) method added to a `core/` package or a `pgstores/` package requires tests. For `pgstores/`, that means integration tests against a real database following the patterns in the existing `store_test.go` files.

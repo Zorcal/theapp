@@ -22,6 +22,20 @@ SET row_security = off;
 CREATE SCHEMA useraccess;
 
 
+--
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_trgm; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -33,6 +47,72 @@ SET default_table_access_method = heap;
 CREATE TABLE public.schema_migrations (
     version character varying NOT NULL
 );
+
+
+--
+-- Name: magic_link_tokens; Type: TABLE; Schema: useraccess; Owner: -
+--
+
+CREATE TABLE useraccess.magic_link_tokens (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    token_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    used_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: magic_link_tokens_id_seq; Type: SEQUENCE; Schema: useraccess; Owner: -
+--
+
+CREATE SEQUENCE useraccess.magic_link_tokens_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: magic_link_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: useraccess; Owner: -
+--
+
+ALTER SEQUENCE useraccess.magic_link_tokens_id_seq OWNED BY useraccess.magic_link_tokens.id;
+
+
+--
+-- Name: refresh_tokens; Type: TABLE; Schema: useraccess; Owner: -
+--
+
+CREATE TABLE useraccess.refresh_tokens (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    token_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: refresh_tokens_id_seq; Type: SEQUENCE; Schema: useraccess; Owner: -
+--
+
+CREATE SEQUENCE useraccess.refresh_tokens_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: refresh_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: useraccess; Owner: -
+--
+
+ALTER SEQUENCE useraccess.refresh_tokens_id_seq OWNED BY useraccess.refresh_tokens.id;
 
 
 --
@@ -71,6 +151,20 @@ ALTER SEQUENCE useraccess.users_id_seq OWNED BY useraccess.users.id;
 
 
 --
+-- Name: magic_link_tokens id; Type: DEFAULT; Schema: useraccess; Owner: -
+--
+
+ALTER TABLE ONLY useraccess.magic_link_tokens ALTER COLUMN id SET DEFAULT nextval('useraccess.magic_link_tokens_id_seq'::regclass);
+
+
+--
+-- Name: refresh_tokens id; Type: DEFAULT; Schema: useraccess; Owner: -
+--
+
+ALTER TABLE ONLY useraccess.refresh_tokens ALTER COLUMN id SET DEFAULT nextval('useraccess.refresh_tokens_id_seq'::regclass);
+
+
+--
 -- Name: users id; Type: DEFAULT; Schema: useraccess; Owner: -
 --
 
@@ -83,6 +177,38 @@ ALTER TABLE ONLY useraccess.users ALTER COLUMN id SET DEFAULT nextval('useracces
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: magic_link_tokens magic_link_tokens_pkey; Type: CONSTRAINT; Schema: useraccess; Owner: -
+--
+
+ALTER TABLE ONLY useraccess.magic_link_tokens
+    ADD CONSTRAINT magic_link_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: magic_link_tokens magic_link_tokens_token_hash_key; Type: CONSTRAINT; Schema: useraccess; Owner: -
+--
+
+ALTER TABLE ONLY useraccess.magic_link_tokens
+    ADD CONSTRAINT magic_link_tokens_token_hash_key UNIQUE (token_hash);
+
+
+--
+-- Name: refresh_tokens refresh_tokens_pkey; Type: CONSTRAINT; Schema: useraccess; Owner: -
+--
+
+ALTER TABLE ONLY useraccess.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: refresh_tokens refresh_tokens_token_hash_key; Type: CONSTRAINT; Schema: useraccess; Owner: -
+--
+
+ALTER TABLE ONLY useraccess.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_token_hash_key UNIQUE (token_hash);
 
 
 --
@@ -118,6 +244,64 @@ ALTER TABLE ONLY useraccess.users
 
 
 --
+-- Name: magic_link_tokens_user_id_created_at_idx; Type: INDEX; Schema: useraccess; Owner: -
+--
+
+CREATE INDEX magic_link_tokens_user_id_created_at_idx ON useraccess.magic_link_tokens USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: refresh_tokens_user_id_idx; Type: INDEX; Schema: useraccess; Owner: -
+--
+
+CREATE INDEX refresh_tokens_user_id_idx ON useraccess.refresh_tokens USING btree (user_id);
+
+
+--
+-- Name: users_created_at_idx; Type: INDEX; Schema: useraccess; Owner: -
+--
+
+CREATE INDEX users_created_at_idx ON useraccess.users USING btree (created_at);
+
+
+--
+-- Name: users_email_trgm_idx; Type: INDEX; Schema: useraccess; Owner: -
+--
+
+CREATE INDEX users_email_trgm_idx ON useraccess.users USING gin (email public.gin_trgm_ops);
+
+
+--
+-- Name: users_name_trgm_idx; Type: INDEX; Schema: useraccess; Owner: -
+--
+
+CREATE INDEX users_name_trgm_idx ON useraccess.users USING gin (name public.gin_trgm_ops);
+
+
+--
+-- Name: users_updated_at_idx; Type: INDEX; Schema: useraccess; Owner: -
+--
+
+CREATE INDEX users_updated_at_idx ON useraccess.users USING btree (updated_at);
+
+
+--
+-- Name: magic_link_tokens magic_link_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: useraccess; Owner: -
+--
+
+ALTER TABLE ONLY useraccess.magic_link_tokens
+    ADD CONSTRAINT magic_link_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES useraccess.users(id);
+
+
+--
+-- Name: refresh_tokens refresh_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: useraccess; Owner: -
+--
+
+ALTER TABLE ONLY useraccess.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES useraccess.users(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
@@ -130,4 +314,7 @@ ALTER TABLE ONLY useraccess.users
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20260605070455'),
-    ('20260605070602');
+    ('20260605070601'),
+    ('20260605070602'),
+    ('20260613000001'),
+    ('20260613000002');

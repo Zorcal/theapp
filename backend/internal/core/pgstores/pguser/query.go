@@ -11,14 +11,45 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
+func userByEmailQuery(email string) pgdb.TypedQuery[User] {
+	params := pgx.NamedArgs{"email": email}
+	const sql = `
+		SELECT id, external_id, email, name, created_at, updated_at, etag
+		FROM useraccess.users
+		WHERE email = @email`
+
+	return pgdb.TypedQuery[User]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[User],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func userByExternalIDQuery(id uuid.UUID) pgdb.TypedQuery[User] {
 	params := pgx.NamedArgs{
 		"external_id": id,
 	}
 	const sql = `
-		SELECT external_id, email, name, created_at, updated_at, etag
+		SELECT id, external_id, email, name, created_at, updated_at, etag
 		FROM useraccess.users
 		WHERE external_id = @external_id`
+
+	return pgdb.TypedQuery[User]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[User],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func getOrCreateUserByEmailQuery(email string) pgdb.TypedQuery[User] {
+	params := pgx.NamedArgs{"email": email}
+	const sql = `
+		INSERT INTO useraccess.users (external_id, email, name, created_at, etag)
+		VALUES (gen_random_uuid(), @email, '', NOW(), gen_random_uuid())
+		ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+		RETURNING id, external_id, email, name, created_at, updated_at, etag`
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,
@@ -36,7 +67,7 @@ func createUserQuery(cu CreateUser) pgdb.TypedQuery[User] {
 	const sql = `
 		INSERT INTO useraccess.users (external_id, email, name, created_at, etag)
 		VALUES (gen_random_uuid(), @email, @name, NOW(), gen_random_uuid())
-		RETURNING external_id, email, name, created_at, updated_at, etag`
+		RETURNING id, external_id, email, name, created_at, updated_at, etag`
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,
@@ -61,7 +92,7 @@ func updateUserQuery(uu UpdateUser) pgdb.TypedQuery[User] {
 		UPDATE useraccess.users
 		SET %s
 		WHERE external_id = @external_id
-		RETURNING external_id, email, name, created_at, updated_at, etag`,
+		RETURNING id, external_id, email, name, created_at, updated_at, etag`,
 		strings.Join(setClauses, ", "))
 
 	return pgdb.TypedQuery[User]{
@@ -78,7 +109,7 @@ func usersQuery(filter Filter, orderBys []order.By[OrderByField], pageSize, page
 		"page_offset": pageOffset,
 	}
 	sql := fmt.Sprintf(`
-		SELECT external_id, email, name, created_at, updated_at, etag
+		SELECT id, external_id, email, name, created_at, updated_at, etag
 		FROM useraccess.users
 		%s
 		ORDER BY %s

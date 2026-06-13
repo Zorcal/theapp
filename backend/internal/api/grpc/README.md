@@ -26,6 +26,10 @@ mdl.User     →  pb.User          (UserToPb)
 
 Without dedicated conv functions, type construction scatters across handlers and there is no single place to update when a type changes.
 
+## Auth in tests
+
+`NewServerTest` always sets `testJWTKey`. Use `srvTest.authCtx(t, ctx)` for calls to protected endpoints and plain `t.Context()` for methods listed in `publicMethods`.
+
 ## Validation
 
 Validate request payloads at the handler level before calling into the core. Return `codes.InvalidArgument` with `errdetails.BadRequest` field violations so callers get actionable field-level feedback.

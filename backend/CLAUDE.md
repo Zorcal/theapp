@@ -22,6 +22,10 @@ Bad chain:
 error while tracking location: unable to fetch order status: DB connection failed
 ```
 
+## Code organisation
+
+Order functions by importance: exported and primary functions first, helpers at the bottom.
+
 ## Testing conventions
 
 ### Table tests

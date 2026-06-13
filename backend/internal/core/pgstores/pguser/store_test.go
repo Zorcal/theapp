@@ -16,6 +16,34 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
+func TestStore_UserByEmail(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	seeded := seedUser(t, store, "alice@test.com", "Alice Smith")
+
+	got, err := store.UserByEmail(ctx, seeded.Email)
+	if err != nil {
+		t.Fatalf("UserByEmail(%q) error = %v", seeded.Email, err)
+	}
+
+	testingx.AssertDiff(t, got, seeded)
+}
+
+func TestStore_UserByEmail_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	t.Run("not found", func(t *testing.T) {
+		_, err := store.UserByEmail(ctx, "nobody@test.com")
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UserByEmail(nobody) error = %v, want sql.ErrNoRows", err)
+		}
+	})
+}
+
 func TestStore_UserByExternalID(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
@@ -50,7 +78,10 @@ func TestStore_CreateUser(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := NewStore(pool)
 
-	got, err := store.CreateUser(ctx, CreateUser{Email: "alice@test.com", Name: "Alice Smith"})
+	got, err := store.CreateUser(ctx, CreateUser{
+		Email: "alice@test.com",
+		Name:  "Alice Smith",
+	})
 	if err != nil {
 		t.Fatalf("CreateUser() error = %v", err)
 	}
@@ -63,11 +94,14 @@ func TestStore_CreateUser(t *testing.T) {
 	}
 
 	diffOpts := cmp.Options{
-		cmpopts.IgnoreFields(User{}, "ExternalID", "ETag"), // Ignore generated fields
+		cmpopts.IgnoreFields(User{}, "ID", "ExternalID", "ETag"), // Ignore generated fields
 		cmpopts.EquateApproxTime(time.Minute),
 	}
 	testingx.AssertDiff(t, got, want, diffOpts...)
 
+	if got.ID == 0 {
+		t.Error("CreateUser() ID = 0, want non-zero")
+	}
 	if got.ExternalID == (uuid.UUID{}) {
 		t.Error("CreateUser() ExternalID is zero UUID, want non-zero")
 	}
@@ -201,8 +235,11 @@ func TestStore_Users(t *testing.T) {
 			want:       []User{bob},
 		},
 		{
-			name:       "filter by email and name prefix",
-			filter:     Filter{Email: "c", Name: "Charlie"},
+			name: "filter by email and name prefix",
+			filter: Filter{
+				Email: "c",
+				Name:  "Charlie",
+			},
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []User{charlie},
@@ -233,7 +270,7 @@ func TestStore_UpdateUser(t *testing.T) {
 	store := NewStore(pool)
 
 	diffOpts := cmp.Options{
-		cmpopts.IgnoreFields(User{}, "ETag"),
+		cmpopts.IgnoreFields(User{}, "ID", "ETag"),
 		cmpopts.EquateApproxTime(time.Minute),
 	}
 
@@ -245,9 +282,16 @@ func TestStore_UpdateUser(t *testing.T) {
 	}{
 		{
 			name: "updates name",
-			seed: CreateUser{Email: "alice@test.com", Name: "Alice Smith"},
+			seed: CreateUser{
+				Email: "alice@test.com",
+				Name:  "Alice Smith",
+			},
 			in: func(seeded User) UpdateUser {
-				return UpdateUser{ExternalID: seeded.ExternalID, Name: "Alice Jones", Fields: UserUpdateFields{Name: true}}
+				return UpdateUser{
+					ExternalID: seeded.ExternalID,
+					Name:       "Alice Jones",
+					Fields:     UserUpdateFields{Name: true},
+				}
 			},
 			want: func(seeded User) User {
 				return User{
@@ -261,9 +305,16 @@ func TestStore_UpdateUser(t *testing.T) {
 		},
 		{
 			name: "name not in fields leaves name unchanged",
-			seed: CreateUser{Email: "bob@test.com", Name: "Bob Smith"},
+			seed: CreateUser{
+				Email: "bob@test.com",
+				Name:  "Bob Smith",
+			},
 			in: func(seeded User) UpdateUser {
-				return UpdateUser{ExternalID: seeded.ExternalID, Name: "ignored", Fields: UserUpdateFields{Name: false}}
+				return UpdateUser{
+					ExternalID: seeded.ExternalID,
+					Name:       "ignored",
+					Fields:     UserUpdateFields{Name: false},
+				}
 			},
 			want: func(seeded User) User {
 				return User{
@@ -304,17 +355,54 @@ func TestStore_UpdateUser_error(t *testing.T) {
 
 	t.Run("not found", func(t *testing.T) {
 		id := uuid.New()
-		_, err := store.UpdateUser(ctx, UpdateUser{ExternalID: id, Name: "Alice Jones", Fields: UserUpdateFields{Name: true}})
+		_, err := store.UpdateUser(ctx, UpdateUser{
+			ExternalID: id,
+			Name:       "Alice Jones",
+			Fields:     UserUpdateFields{Name: true},
+		})
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("UpdateUser(%v) error = %v, want sql.ErrNoRows", id, err)
 		}
 	})
 }
 
+func TestStore_GetOrCreateUserByEmail(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	t.Run("creates user when not found", func(t *testing.T) {
+		got, err := store.GetOrCreateUserByEmail(ctx, "new@test.com")
+		if err != nil {
+			t.Fatalf("GetOrCreateUserByEmail() error = %v", err)
+		}
+
+		diffOpts := cmp.Options{
+			cmpopts.IgnoreFields(User{}, "ID", "ExternalID", "CreatedAt", "UpdatedAt", "ETag"), // Ignore generated fields
+		}
+		want := User{Email: "new@test.com"}
+		testingx.AssertDiff(t, got, want, diffOpts)
+	})
+
+	t.Run("returns existing user without modification", func(t *testing.T) {
+		seeded := seedUser(t, store, "existing@test.com", "Existing User")
+
+		got, err := store.GetOrCreateUserByEmail(ctx, seeded.Email)
+		if err != nil {
+			t.Fatalf("GetOrCreateUserByEmail() error = %v", err)
+		}
+
+		testingx.AssertDiff(t, got, seeded)
+	})
+}
+
 func seedUser(t *testing.T, s *Store, email, name string) User {
 	t.Helper()
 
-	seeded, err := s.CreateUser(t.Context(), CreateUser{Email: email, Name: name})
+	seeded, err := s.CreateUser(t.Context(), CreateUser{
+		Email: email,
+		Name:  name,
+	})
 	if err != nil {
 		t.Fatalf("seed user error: %v", err)
 	}

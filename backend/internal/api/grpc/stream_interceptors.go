@@ -19,6 +19,24 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
 
+// authStreamInterceptor is the streaming counterpart of authUnaryInterceptor.
+func authStreamInterceptor(jwtKey []byte, issuer, audience string) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if _, public := publicMethods[info.FullMethod]; public {
+			return handler(srv, ss)
+		}
+
+		claims, err := parseBearer(ss.Context(), jwtKey, issuer, audience)
+		if err != nil {
+			return fmt.Errorf("parse bearer: %w", err)
+		}
+
+		return handler(srv, newCtxOverrideStream(ss, contextWithUserID(ss.Context(), claims.UserID)))
+	}
+}
+
+// loggingStreamInterceptor logs the method and duration at stream boundaries, and each individual message at DEBUG level.
+// Sensitive pb types implement slog.LogValuer to ensure credentials are redacted, not logged in plaintext.
 func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		// Skip gRPC infrastructure services (reflection, health). Their

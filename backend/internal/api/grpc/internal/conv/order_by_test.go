@@ -24,25 +24,46 @@ func TestParseOrderBy(t *testing.T) {
 			name: "all fields",
 			in:   "k1,k2 desc,k3 asc",
 			want: []order.By[string]{
-				{Direction: order.DirectionAsc, Field: "v1"},
-				{Direction: order.DirectionDesc, Field: "v2"},
-				{Direction: order.DirectionAsc, Field: "v3"},
+				{
+					Direction: order.DirectionAsc,
+					Field:     "v1",
+				},
+				{
+					Direction: order.DirectionDesc,
+					Field:     "v2",
+				},
+				{
+					Direction: order.DirectionAsc,
+					Field:     "v3",
+				},
 			},
 		},
 		{
 			name: "subset of fields",
 			in:   "k3 asc,k2 desc",
 			want: []order.By[string]{
-				{Direction: order.DirectionAsc, Field: "v3"},
-				{Direction: order.DirectionDesc, Field: "v2"},
+				{
+					Direction: order.DirectionAsc,
+					Field:     "v3",
+				},
+				{
+					Direction: order.DirectionDesc,
+					Field:     "v2",
+				},
 			},
 		},
 		{
 			name: "ignores redundant space",
 			in:   "   k3   asc    ,   k2     desc    ",
 			want: []order.By[string]{
-				{Direction: order.DirectionAsc, Field: "v3"},
-				{Direction: order.DirectionDesc, Field: "v2"},
+				{
+					Direction: order.DirectionAsc,
+					Field:     "v3",
+				},
+				{
+					Direction: order.DirectionDesc,
+					Field:     "v2",
+				},
 			},
 		},
 	}

@@ -17,9 +17,13 @@ import (
 type ServerConfig struct {
 	Log      *slog.Logger
 	UserCore UserCore
-	// Reflection registers the gRPC reflection service. Enable for local
-	// development so ad-hoc clients (grpcurl, Evans, ...) can discover the
-	// schema; keep it off elsewhere so the schema isn't exposed publicly.
+	AuthCore AuthCore
+	// JWTKey is the HMAC secret used to validate access tokens.
+	JWTKey      []byte
+	JWTIssuer   string
+	JWTAudience string
+	// Reflection registers the gRPC reflection service. Enable for local development so ad-hoc clients (grpcurl, Evans,
+	// ...) can discover the schema; keep it off elsewhere so the schema isn't exposed publicly.
 	Reflection bool
 }
 
@@ -31,11 +35,13 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 		grpc.ChainUnaryInterceptor(
 			loggingUnaryInterceptor(cfg.Log),
 			errorUnaryInterceptor(cfg.Log),
+			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
 			recoveryUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			loggingStreamInterceptor(cfg.Log),
 			errorStreamInterceptor(cfg.Log),
+			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
 			recoveryStreamInterceptor(),
 		),
 	)
@@ -43,6 +49,10 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	pb.RegisterUserServiceServer(srv, &userService{
 		log:      cfg.Log,
 		userCore: cfg.UserCore,
+	})
+
+	pb.RegisterAuthServiceServer(srv, &authService{
+		authCore: cfg.AuthCore,
 	})
 
 	if cfg.Reflection {

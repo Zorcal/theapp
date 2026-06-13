@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package theapp.v1;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
+
+// AuthService provides passwordless authentication via magic-link emails.
+service AuthService {
+  // RequestMagicLink sends a sign-in link to the given email address.
+  // If no account exists for the address, one is created automatically.
+  // Always returns success to avoid leaking whether the address is registered.
+  rpc RequestMagicLink(RequestMagicLinkRequest) returns (google.protobuf.Empty);
+
+  // VerifyMagicLink exchanges a magic-link token for an access/refresh token pair.
+  rpc VerifyMagicLink(VerifyMagicLinkRequest) returns (TokenPair);
+
+  // RefreshAccessToken rotates the refresh token and issues a new token pair.
+  // The supplied refresh token is revoked upon success.
+  rpc RefreshAccessToken(RefreshAccessTokenRequest) returns (TokenPair);
+
+  // RevokeRefreshToken invalidates a refresh token, ending the session.
+  rpc RevokeRefreshToken(RevokeRefreshTokenRequest) returns (google.protobuf.Empty);
+
+  // RevokeAllSessions revokes all active refresh tokens for the authenticated user, ending all sessions.
+  // Requires a valid access token.
+  rpc RevokeAllSessions(google.protobuf.Empty) returns (google.protobuf.Empty);
+}
+
+// Request message for RequestMagicLink.
+message RequestMagicLinkRequest {
+  // Email address to send the sign-in link to.
+  string email = 1;
+}
+
+// Request message for VerifyMagicLink.
+message VerifyMagicLinkRequest {
+  // The token from the magic-link URL query parameter.
+  string token = 1;
+}
+
+// Request message for RefreshAccessToken.
+message RefreshAccessTokenRequest {
+  // The refresh token issued by a previous VerifyMagicLink or RefreshAccessToken call.
+  string refresh_token = 1;
+}
+
+// Request message for RevokeRefreshToken.
+message RevokeRefreshTokenRequest {
+  // The refresh token to revoke.
+  string refresh_token = 1;
+}
+
+// TokenPair holds a short-lived JWT access token and a long-lived refresh token.
+message TokenPair {
+  // JWT bearer token. Include as: Authorization: Bearer <access_token>.
+  string access_token = 1;
+
+  // Opaque refresh token. Use with RefreshAccessToken to obtain a new pair.
+  string refresh_token = 2;
+
+  // Remaining lifetime of access_token in seconds.
+  int64 expires_in = 3;
+}

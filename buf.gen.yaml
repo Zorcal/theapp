@@ -1,7 +1,9 @@
 version: v2
 managed:
   enabled: true
-clean: true
+# clean: true is intentionally absent — the pb/ output directory contains hand-written
+# files (log_value.go, doc.go) alongside generated ones. Enabling clean would delete them
+# on every run. Orphaned generated files from proto renames are caught at compile time.
 plugins:
   # Go plugins
   - local: scripts/protoc-gen-go

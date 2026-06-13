@@ -34,11 +34,23 @@ func TestUserService_GetUser(t *testing.T) {
 			name: "returns user",
 			userCore: &MockedUserCore{
 				UserByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.User, error) {
-					return mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: etag}, nil
+					return mdl.User{
+						ID:        id,
+						Email:     "alice@test.com",
+						Name:      "Alice Smith",
+						CreatedAt: now,
+						ETag:      etag,
+					}, nil
 				},
 			},
-			in:   &pb.GetUserRequest{Id: id.String()},
-			want: &pb.User{Id: id.String(), Email: "alice@test.com", Name: "Alice Smith", CreateTime: timestamppb.New(now), Etag: etag},
+			in: &pb.GetUserRequest{Id: id.String()},
+			want: &pb.User{
+				Id:         id.String(),
+				Email:      "alice@test.com",
+				Name:       "Alice Smith",
+				CreateTime: timestamppb.New(now),
+				Etag:       etag,
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -48,7 +60,7 @@ func TestUserService_GetUser(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			got, err := srvTest.userServiceClient.GetUser(t.Context(), tt.in)
+			got, err := srvTest.userServiceClient.GetUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err != nil {
 				t.Fatalf("GetUser() error = %q, want no error", err)
 			}
@@ -99,7 +111,7 @@ func TestUserService_GetUser_error(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			_, err := srvTest.userServiceClient.GetUser(t.Context(), tt.in)
+			_, err := srvTest.userServiceClient.GetUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("GetUser() error = nil, want error")
 			}
@@ -129,11 +141,26 @@ func TestUserService_CreateUser(t *testing.T) {
 			name: "returns created user",
 			userCore: &MockedUserCore{
 				CreateUserFunc: func(_ context.Context, _ mdl.CreateUser) (mdl.User, error) {
-					return mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Smith", CreatedAt: now, ETag: etag}, nil
+					return mdl.User{
+						ID:        id,
+						Email:     "alice@test.com",
+						Name:      "Alice Smith",
+						CreatedAt: now,
+						ETag:      etag,
+					}, nil
 				},
 			},
-			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com", Name: "Alice Smith"}},
-			want: &pb.User{Id: id.String(), Email: "alice@test.com", Name: "Alice Smith", CreateTime: timestamppb.New(now), Etag: etag},
+			in: &pb.CreateUserRequest{User: &pb.User{
+				Email: "alice@test.com",
+				Name:  "Alice Smith",
+			}},
+			want: &pb.User{
+				Id:         id.String(),
+				Email:      "alice@test.com",
+				Name:       "Alice Smith",
+				CreateTime: timestamppb.New(now),
+				Etag:       etag,
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -143,7 +170,7 @@ func TestUserService_CreateUser(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			got, err := srvTest.userServiceClient.CreateUser(t.Context(), tt.in)
+			got, err := srvTest.userServiceClient.CreateUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err != nil {
 				t.Fatalf("CreateUser() error = %q, want no error", err)
 			}
@@ -157,7 +184,10 @@ func TestUserService_CreateUser_error(t *testing.T) {
 	invalidArgWithViolation := func(field, desc string) *status.Status {
 		st, err := status.New(codes.InvalidArgument, codes.InvalidArgument.String()).WithDetails(
 			&errdetails.BadRequest{FieldViolations: []*errdetails.BadRequest_FieldViolation{
-				{Field: field, Description: desc},
+				{
+					Field:       field,
+					Description: desc,
+				},
 			}},
 		)
 		if err != nil {
@@ -197,7 +227,10 @@ func TestUserService_CreateUser_error(t *testing.T) {
 					return mdl.User{}, errors.New("boom")
 				},
 			},
-			in:   &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com", Name: "Alice Smith"}},
+			in: &pb.CreateUserRequest{User: &pb.User{
+				Email: "alice@test.com",
+				Name:  "Alice Smith",
+			}},
 			want: status.New(codes.Internal, "Internal"),
 		},
 	}
@@ -208,7 +241,7 @@ func TestUserService_CreateUser_error(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			_, err := srvTest.userServiceClient.CreateUser(t.Context(), tt.in)
+			_, err := srvTest.userServiceClient.CreateUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("CreateUser() error = nil, want error")
 			}
@@ -238,14 +271,29 @@ func TestUserService_UpdateUser(t *testing.T) {
 			name: "explicit mask with name",
 			userCore: &MockedUserCore{
 				UpdateUserFunc: func(_ context.Context, _ mdl.UpdateUser) (mdl.User, error) {
-					return mdl.User{ID: id, Email: "alice@test.com", Name: "Alice Updated", CreatedAt: now, ETag: etag}, nil
+					return mdl.User{
+						ID:        id,
+						Email:     "alice@test.com",
+						Name:      "Alice Updated",
+						CreatedAt: now,
+						ETag:      etag,
+					}, nil
 				},
 			},
 			in: &pb.UpdateUserRequest{
-				User:       &pb.User{Id: id.String(), Name: "Alice Updated"},
+				User: &pb.User{
+					Id:   id.String(),
+					Name: "Alice Updated",
+				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
-			want: &pb.User{Id: id.String(), Email: "alice@test.com", Name: "Alice Updated", CreateTime: timestamppb.New(now), Etag: etag},
+			want: &pb.User{
+				Id:         id.String(),
+				Email:      "alice@test.com",
+				Name:       "Alice Updated",
+				CreateTime: timestamppb.New(now),
+				Etag:       etag,
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -255,7 +303,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			got, err := srvTest.userServiceClient.UpdateUser(t.Context(), tt.in)
+			got, err := srvTest.userServiceClient.UpdateUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err != nil {
 				t.Fatalf("UpdateUser() error = %q, want no error", err)
 			}
@@ -281,14 +329,20 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 		{
 			name:     "invalid id",
 			userCore: &MockedUserCore{},
-			in:       &pb.UpdateUserRequest{User: &pb.User{Id: "not-a-uuid", Name: "Alice Updated"}},
-			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
+			in: &pb.UpdateUserRequest{User: &pb.User{
+				Id:   "not-a-uuid",
+				Name: "Alice Updated",
+			}},
+			want: status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
 		},
 		{
 			name:     "no mask",
 			userCore: &MockedUserCore{},
-			in:       &pb.UpdateUserRequest{User: &pb.User{Id: uuid.NewString(), Name: "Alice Updated"}},
-			want:     status.New(codes.InvalidArgument, "update_mask is required"),
+			in: &pb.UpdateUserRequest{User: &pb.User{
+				Id:   uuid.NewString(),
+				Name: "Alice Updated",
+			}},
+			want: status.New(codes.InvalidArgument, "update_mask is required"),
 		},
 		{
 			name:     "mask has name but name is empty",
@@ -303,7 +357,10 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 			name:     "non-updatable field in update_mask",
 			userCore: &MockedUserCore{},
 			in: &pb.UpdateUserRequest{
-				User:       &pb.User{Id: uuid.NewString(), Name: "Alice Updated"},
+				User: &pb.User{
+					Id:   uuid.NewString(),
+					Name: "Alice Updated",
+				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"email"}},
 			},
 			want: status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
@@ -316,7 +373,10 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 				},
 			},
 			in: &pb.UpdateUserRequest{
-				User:       &pb.User{Id: uuid.NewString(), Name: "Alice Updated"},
+				User: &pb.User{
+					Id:   uuid.NewString(),
+					Name: "Alice Updated",
+				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: status.New(codes.NotFound, "user \""+uuid.Nil.String()+"\" not found"),
@@ -329,7 +389,10 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 				},
 			},
 			in: &pb.UpdateUserRequest{
-				User:       &pb.User{Id: uuid.NewString(), Name: "Alice Updated"},
+				User: &pb.User{
+					Id:   uuid.NewString(),
+					Name: "Alice Updated",
+				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: status.New(codes.Internal, "Internal"),
@@ -342,7 +405,7 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			_, err := srvTest.userServiceClient.UpdateUser(t.Context(), tt.in)
+			_, err := srvTest.userServiceClient.UpdateUser(srvTest.authCtx(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("UpdateUser() error = nil, want error")
 			}
@@ -538,7 +601,7 @@ func TestUserService_ListUsers(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			got, err := srvTest.userServiceClient.ListUsers(t.Context(), tt.in)
+			got, err := srvTest.userServiceClient.ListUsers(srvTest.authCtx(t, t.Context()), tt.in)
 			if err != nil {
 				t.Fatalf("ListUsers() error = %q, want no error", err)
 			}
@@ -607,7 +670,7 @@ func TestUserService_ListUsers_error(t *testing.T) {
 				UserCore: tt.userCore,
 			})
 
-			_, err := srvTest.userServiceClient.ListUsers(t.Context(), tt.in)
+			_, err := srvTest.userServiceClient.ListUsers(srvTest.authCtx(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("ListUsers() error = nil, want error")
 			}
