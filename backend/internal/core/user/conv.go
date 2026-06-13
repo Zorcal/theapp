@@ -9,7 +9,7 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
-func updateUserToPG(uu mdl.UpdateUser) pguser.UpdateUser {
+func updateUserToPg(uu mdl.UpdateUser) pguser.UpdateUser {
 	return pguser.UpdateUser{
 		ExternalID: uu.ID,
 		Fields: pguser.UserUpdateFields{
@@ -19,14 +19,14 @@ func updateUserToPG(uu mdl.UpdateUser) pguser.UpdateUser {
 	}
 }
 
-func createUserToPG(cu mdl.CreateUser) pguser.CreateUser {
+func createUserToPg(cu mdl.CreateUser) pguser.CreateUser {
 	return pguser.CreateUser{
 		Email: cu.Email,
 		Name:  cu.Name,
 	}
 }
 
-func userFromPG(u pguser.User) mdl.User {
+func userFromPg(u pguser.User) mdl.User {
 	return mdl.User{
 		ID:        u.ExternalID,
 		Email:     u.Email,
@@ -37,11 +37,11 @@ func userFromPG(u pguser.User) mdl.User {
 	}
 }
 
-func usersFromPG(us []pguser.User) []mdl.User {
-	return slicesx.Map(us, userFromPG)
+func usersFromPg(us []pguser.User) []mdl.User {
+	return slicesx.Map(us, userFromPg)
 }
 
-func orderByToPG(o order.By[mdl.UserOrderByField]) (order.By[pguser.OrderByField], error) {
+func orderByToPg(o order.By[mdl.UserOrderByField]) (order.By[pguser.OrderByField], error) {
 	switch o.Field {
 	case mdl.UserOrderByFieldEmail:
 		return order.NewBy(pguser.OrderByFieldEmail, o.Direction), nil
@@ -54,14 +54,14 @@ func orderByToPG(o order.By[mdl.UserOrderByField]) (order.By[pguser.OrderByField
 	}
 }
 
-func filterToPG(f mdl.UserFilter) pguser.Filter {
+func filterToPg(f mdl.UserFilter) pguser.Filter {
 	return pguser.Filter{Email: f.Email, Name: f.Name}
 }
 
-func orderBysToPG(os []order.By[mdl.UserOrderByField]) ([]order.By[pguser.OrderByField], error) {
+func orderBysToPg(os []order.By[mdl.UserOrderByField]) ([]order.By[pguser.OrderByField], error) {
 	pgOrderBys := make([]order.By[pguser.OrderByField], len(os))
 	for i, o := range os {
-		pgOrderBy, err := orderByToPG(o)
+		pgOrderBy, err := orderByToPg(o)
 		if err != nil {
 			return nil, err
 		}

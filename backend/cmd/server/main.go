@@ -44,7 +44,7 @@ type Config struct {
 		Endpoint string `conf:"default:127.0.0.1:4317"`
 		Insecure bool   `conf:"default:true"`
 	}
-	PGDB struct {
+	PgDB struct {
 		User       string `conf:"default:postgres"`
 		Password   string `conf:"default:postgres,mask"`
 		Host       string `conf:"default:127.0.0.1"`
@@ -144,7 +144,7 @@ func run(ctx context.Context, cfg Config) error {
 
 	log.InfoContext(ctx, "Migrating PostgreSQL database")
 
-	pgDBConnStr := pgdb.ConnStr(cfg.PGDB.Host, cfg.PGDB.Port, cfg.PGDB.User, cfg.PGDB.Password, cfg.PGDB.Name, cfg.PGDB.SSLEnabled)
+	pgDBConnStr := pgdb.ConnStr(cfg.PgDB.Host, cfg.PgDB.Port, cfg.PgDB.User, cfg.PgDB.Password, cfg.PgDB.Name, cfg.PgDB.SSLEnabled)
 
 	if err := pgschema.Migrate(ctx, pgDBConnStr); err != nil {
 		return fmt.Errorf("migrate pg db: %w", err)
@@ -158,14 +158,14 @@ func run(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("parse pg db pool config: %w", err)
 	}
-	pgPoolCfg.MaxConns = cfg.PGDB.Pool.MaxConns
-	pgPoolCfg.MinConns = cfg.PGDB.Pool.MinConns
-	pgPoolCfg.MaxConnLifetime = cfg.PGDB.Pool.MaxConnLifetime
-	pgPoolCfg.MaxConnIdleTime = cfg.PGDB.Pool.MaxConnIdleTime
-	pgPoolCfg.HealthCheckPeriod = cfg.PGDB.Pool.HealthCheckPeriod
-	pgPoolCfg.MaxConnLifetimeJitter = cfg.PGDB.Pool.MaxConnLifetimeJitter
+	pgPoolCfg.MaxConns = cfg.PgDB.Pool.MaxConns
+	pgPoolCfg.MinConns = cfg.PgDB.Pool.MinConns
+	pgPoolCfg.MaxConnLifetime = cfg.PgDB.Pool.MaxConnLifetime
+	pgPoolCfg.MaxConnIdleTime = cfg.PgDB.Pool.MaxConnIdleTime
+	pgPoolCfg.HealthCheckPeriod = cfg.PgDB.Pool.HealthCheckPeriod
+	pgPoolCfg.MaxConnLifetimeJitter = cfg.PgDB.Pool.MaxConnLifetimeJitter
 	pgPoolCfg.ConnConfig.Tracer = &pgxotel.QueryTracer{
-		Name: cfg.PGDB.Name + "-postgres",
+		Name: cfg.PgDB.Name + "-postgres",
 	}
 
 	pgPool, err := pgdb.NewPool(ctx, pgPoolCfg)

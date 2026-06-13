@@ -50,25 +50,25 @@ func (c *Core) UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error) {
 		return mdl.User{}, fmt.Errorf("user by external id: %w", err)
 	}
 
-	return userFromPG(pgUser), nil
+	return userFromPg(pgUser), nil
 }
 
 // CreateUser creates a new user and returns the created user.
 func (c *Core) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error) {
-	pgCreateUser := createUserToPG(cu)
+	pgCreateUser := createUserToPg(cu)
 
 	pgUser, err := c.storer.CreateUser(ctx, pgCreateUser)
 	if err != nil {
 		return mdl.User{}, fmt.Errorf("create user: %w", err)
 	}
 
-	return userFromPG(pgUser), nil
+	return userFromPg(pgUser), nil
 }
 
 // UpdateUser updates the name of the user with the given ID and returns the updated user.
 // Returns [mdl.ErrNotFound] if no user with that ID exists.
 func (c *Core) UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error) {
-	pgUpdateUser := updateUserToPG(uu)
+	pgUpdateUser := updateUserToPg(uu)
 
 	pgUser, err := c.storer.UpdateUser(ctx, pgUpdateUser)
 	if err != nil {
@@ -78,17 +78,17 @@ func (c *Core) UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, err
 		return mdl.User{}, fmt.Errorf("update user: %w", err)
 	}
 
-	return userFromPG(pgUser), nil
+	return userFromPg(pgUser), nil
 }
 
 // Users returns a page of users matching filter ordered by orderBys, along with the total count of matching users.
 func (c *Core) Users(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) ([]mdl.User, int, error) {
-	pgOrderBys, err := orderBysToPG(orderBys)
+	pgOrderBys, err := orderBysToPg(orderBys)
 	if err != nil {
 		return nil, 0, fmt.Errorf("convert order bys: %w", err)
 	}
 
-	pgFilter := filterToPG(filter)
+	pgFilter := filterToPg(filter)
 
 	pgUsers, err := c.storer.Users(ctx, pgFilter, pgOrderBys, pageSize, pageOffset)
 	if err != nil {
@@ -100,5 +100,5 @@ func (c *Core) Users(ctx context.Context, filter mdl.UserFilter, orderBys []orde
 		return nil, 0, fmt.Errorf("user count: %w", err)
 	}
 
-	return usersFromPG(pgUsers), count, nil
+	return usersFromPg(pgUsers), count, nil
 }
