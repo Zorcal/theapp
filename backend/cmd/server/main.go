@@ -19,10 +19,12 @@ import (
 	"github.com/pgx-contrib/pgxotel"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
+	"github.com/zorcal/theapp/backend/internal/clients/resend"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgschema"
+	"github.com/zorcal/theapp/backend/internal/email"
 	"github.com/zorcal/theapp/backend/internal/telemetry"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
@@ -70,6 +72,11 @@ type Config struct {
 			// MaxConnLifetime at once and reconnect in a herd; 5m staggers
 			// them. pgx defaults this to 0 (no jitter).
 			MaxConnLifetimeJitter time.Duration `conf:"default:5m"`
+		}
+	}
+	Client struct {
+		Resend struct {
+			APIKey string `conf:"mask"`
 		}
 	}
 }
@@ -177,6 +184,14 @@ func run(ctx context.Context, cfg Config) error {
 	if err := pgdb.StatusCheck(ctx, pgPool); err != nil {
 		return fmt.Errorf("status check pg db connection: %w", err)
 	}
+
+	// Setup clients.
+
+	var emailClient email.Sender = email.NewLogSender(log)
+	if cfg.Client.Resend.APIKey != "" {
+		emailClient = resend.NewEmailClient(cfg.Client.Resend.APIKey)
+	}
+	_ = emailClient
 
 	// Setup pg stores.
 
