@@ -3,9 +3,8 @@ package conv
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
 	"github.com/zorcal/theapp/backend/internal/data/order"
+	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
 func TestParseOrderBy(t *testing.T) {
@@ -53,9 +52,7 @@ func TestParseOrderBy(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Parse(%q, %+v) error = %q, want no error", tt.in, fieldMapping, err)
 			}
-			if diff := cmp.Diff(got, tt.want); diff != "" {
-				t.Errorf("Parse(%q, %+v) diff mismatch (-got +want):\n%s", tt.in, fieldMapping, diff)
-			}
+			testingx.AssertDiff(t, got, tt.want)
 		})
 	}
 }

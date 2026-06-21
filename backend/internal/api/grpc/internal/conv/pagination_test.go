@@ -3,10 +3,10 @@ package conv
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
 func TestEncodePageToken(t *testing.T) {
@@ -89,9 +89,7 @@ func TestDecodePageToken(t *testing.T) {
 			if err != nil {
 				t.Fatalf("DecodePageToken(%q) error = %q, want no error", tt.in, err)
 			}
-			if diff := cmp.Diff(got, tt.want, protocmp.Transform()); diff != "" {
-				t.Errorf("DecodePageToken(%q) diff mismatch (-got +want):\n%s", tt.in, diff)
-			}
+			testingx.AssertDiff(t, got, tt.want, protocmp.Transform())
 		})
 	}
 }
