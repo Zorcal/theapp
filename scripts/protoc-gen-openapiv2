@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+root=$(git rev-parse --show-toplevel)
+backend="$root/backend"
+
+# Uses tool defined in go.mod.
+tool="github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2"
+bin="$(cd "$backend" && go tool -n "$tool")"
+exec "${bin}"

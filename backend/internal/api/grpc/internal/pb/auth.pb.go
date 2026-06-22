@@ -7,6 +7,8 @@
 package pb
 
 import (
+	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -275,7 +277,7 @@ var File_auth_proto protoreflect.FileDescriptor
 const file_auth_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"auth.proto\x12\ttheapp.v1\x1a\x1bgoogle/protobuf/empty.proto\"/\n" +
+	"auth.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"/\n" +
 	"\x17RequestMagicLinkRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\".\n" +
 	"\x16VerifyMagicLinkRequest\x12\x14\n" +
@@ -288,13 +290,20 @@ const file_auth_proto_rawDesc = "" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
 	"\n" +
-	"expires_in\x18\x03 \x01(\x03R\texpiresIn2\x94\x03\n" +
-	"\vAuthService\x12N\n" +
-	"\x10RequestMagicLink\x12\".theapp.v1.RequestMagicLinkRequest\x1a\x16.google.protobuf.Empty\x12J\n" +
-	"\x0fVerifyMagicLink\x12!.theapp.v1.VerifyMagicLinkRequest\x1a\x14.theapp.v1.TokenPair\x12P\n" +
-	"\x12RefreshAccessToken\x12$.theapp.v1.RefreshAccessTokenRequest\x1a\x14.theapp.v1.TokenPair\x12R\n" +
-	"\x12RevokeRefreshToken\x12$.theapp.v1.RevokeRefreshTokenRequest\x1a\x16.google.protobuf.Empty\x12C\n" +
-	"\x11RevokeAllSessions\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.EmptyB\xa2\x01\n" +
+	"expires_in\x18\x03 \x01(\x03R\texpiresIn2\xc6\x04\n" +
+	"\vAuthService\x12s\n" +
+	"\x10RequestMagicLink\x12\".theapp.v1.RequestMagicLinkRequest\x1a\x16.google.protobuf.Empty\"#\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/v1/auth/magic-link\x12k\n" +
+	"\x0fVerifyMagicLink\x12!.theapp.v1.VerifyMagicLinkRequest\x1a\x14.theapp.v1.TokenPair\"\x1f\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/verify\x12r\n" +
+	"\x12RefreshAccessToken\x12$.theapp.v1.RefreshAccessTokenRequest\x1a\x14.theapp.v1.TokenPair\" \x92A\x02b\x00\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/auth/refresh\x12s\n" +
+	"\x12RevokeRefreshToken\x12$.theapp.v1.RevokeRefreshTokenRequest\x1a\x16.google.protobuf.Empty\"\x1f\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/revoke\x12l\n" +
+	"\x11RevokeAllSessions\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/v1/auth/sessions/revoke-allB\xc7\x02\x92A\xa1\x01\x12\x15\n" +
+	"\x0ftheapp Auth API2\x02v1Zv\n" +
+	"t\n" +
+	"\n" +
+	"BearerAuth\x12f\b\x02\x12QAccess token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'\x1a\rAuthorization \x02b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\n" +
 	"\rcom.theapp.v1B\tAuthProtoP\x01ZAgithub.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb\xa2\x02\x03TXX\xaa\x02\tTheapp.V1\xca\x02\tTheapp\\V1\xe2\x02\x15Theapp\\V1\\GPBMetadata\xea\x02\n" +
 	"Theapp::V1b\x06proto3"
 

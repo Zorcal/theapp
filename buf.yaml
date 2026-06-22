@@ -17,3 +17,4 @@ modules:
         - FIELD_SAME_DEFAULT
 deps:
   - buf.build/googleapis/googleapis
+  - buf.build/grpc-ecosystem/grpc-gateway

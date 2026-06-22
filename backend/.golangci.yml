@@ -143,6 +143,7 @@ linters:
         - (*net/http.Server).Close
         - (*github.com/jackc/pgx/v5/pgxpool.Pool).Query
         - (*github.com/jackc/pgx/v5.Conn).Close
+        - (*google.golang.org/grpc.ClientConn).Close
         - (net/http.ResponseWriter).Write
       verbose: true
     gosec:

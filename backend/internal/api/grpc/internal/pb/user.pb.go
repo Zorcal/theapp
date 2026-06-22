@@ -7,6 +7,7 @@
 package pb
 
 import (
+	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -467,7 +468,7 @@ var File_user_proto protoreflect.FileDescriptor
 const file_user_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"user.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a google/protobuf/field_mask.proto\"\xf2\x01\n" +
+	"user.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a google/protobuf/field_mask.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xf2\x01\n" +
 	"\x04User\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12@\n" +
@@ -499,14 +500,21 @@ const file_user_proto_rawDesc = "" +
 	"\x05users\x18\x01 \x03(\v2\x0f.theapp.v1.UserR\x05users\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\x86\x02\n" +
-	"\vUserService\x125\n" +
-	"\aGetUser\x12\x19.theapp.v1.GetUserRequest\x1a\x0f.theapp.v1.User\x12F\n" +
-	"\tListUsers\x12\x1b.theapp.v1.ListUsersRequest\x1a\x1c.theapp.v1.ListUsersResponse\x12;\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xe7\x02\n" +
+	"\vUserService\x12M\n" +
+	"\aGetUser\x12\x19.theapp.v1.GetUserRequest\x1a\x0f.theapp.v1.User\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/users/{id}\x12Y\n" +
+	"\tListUsers\x12\x1b.theapp.v1.ListUsersRequest\x1a\x1c.theapp.v1.ListUsersResponse\"\x11\x82\xd3\xe4\x93\x02\v\x12\t/v1/users\x12Q\n" +
 	"\n" +
-	"CreateUser\x12\x1c.theapp.v1.CreateUserRequest\x1a\x0f.theapp.v1.User\x12;\n" +
+	"CreateUser\x12\x1c.theapp.v1.CreateUserRequest\x1a\x0f.theapp.v1.User\"\x14\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/users\x12[\n" +
 	"\n" +
-	"UpdateUser\x12\x1c.theapp.v1.UpdateUserRequest\x1a\x0f.theapp.v1.UserB\xa2\x01\n" +
+	"UpdateUser\x12\x1c.theapp.v1.UpdateUserRequest\x1a\x0f.theapp.v1.User\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/users/{user.id}B\xc7\x02\x92A\xa1\x01\x12\x15\n" +
+	"\x0ftheapp User API2\x02v1Zv\n" +
+	"t\n" +
+	"\n" +
+	"BearerAuth\x12f\b\x02\x12QAccess token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'\x1a\rAuthorization \x02b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\n" +
 	"\rcom.theapp.v1B\tUserProtoP\x01ZAgithub.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb\xa2\x02\x03TXX\xaa\x02\tTheapp.V1\xca\x02\tTheapp\\V1\xe2\x02\x15Theapp\\V1\\GPBMetadata\xea\x02\n" +
 	"Theapp::V1b\x06proto3"
 

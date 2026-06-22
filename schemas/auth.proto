@@ -2,30 +2,93 @@ syntax = "proto3";
 
 package theapp.v1;
 
+import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "theapp Auth API"
+    version: "v1"
+  }
+  security_definitions: {
+    security: {
+      key: "BearerAuth"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "Authorization"
+        description: "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'"
+      }
+    }
+  }
+  security: {
+    security_requirement: {
+      key: "BearerAuth"
+      value: {}
+    }
+  }
+};
 
 // AuthService provides passwordless authentication via magic-link emails.
 service AuthService {
   // RequestMagicLink sends a sign-in link to the given email address.
   // If no account exists for the address, one is created automatically.
   // Always returns success to avoid leaking whether the address is registered.
-  rpc RequestMagicLink(RequestMagicLinkRequest) returns (google.protobuf.Empty);
+  rpc RequestMagicLink(RequestMagicLinkRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/auth/magic-link"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {}
+    };
+  }
 
   // VerifyMagicLink exchanges a magic-link token for an access/refresh token pair.
-  rpc VerifyMagicLink(VerifyMagicLinkRequest) returns (TokenPair);
+  rpc VerifyMagicLink(VerifyMagicLinkRequest) returns (TokenPair) {
+    option (google.api.http) = {
+      post: "/v1/auth/verify"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {}
+    };
+  }
 
   // RefreshAccessToken rotates the refresh token and issues a new token pair.
   // The supplied refresh token is revoked upon success.
-  rpc RefreshAccessToken(RefreshAccessTokenRequest) returns (TokenPair);
+  rpc RefreshAccessToken(RefreshAccessTokenRequest) returns (TokenPair) {
+    option (google.api.http) = {
+      post: "/v1/auth/refresh"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {}
+    };
+  }
 
   // RevokeRefreshToken invalidates a refresh token, ending the session.
-  rpc RevokeRefreshToken(RevokeRefreshTokenRequest) returns (google.protobuf.Empty);
+  rpc RevokeRefreshToken(RevokeRefreshTokenRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/auth/revoke"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      security: {}
+    };
+  }
 
   // RevokeAllSessions revokes all active refresh tokens for the authenticated user, ending all sessions.
   // Requires a valid access token.
-  rpc RevokeAllSessions(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc RevokeAllSessions(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/auth/sessions/revoke-all"
+      body: "*"
+    };
+  }
 }
 
 // Request message for RequestMagicLink.

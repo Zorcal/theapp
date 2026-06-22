@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -19,6 +20,7 @@ import (
 	"github.com/pgx-contrib/pgxotel"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc"
+	"github.com/zorcal/theapp/backend/internal/api/grpc/gateway"
 	"github.com/zorcal/theapp/backend/internal/clients/resend"
 	"github.com/zorcal/theapp/backend/internal/core/auth"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
@@ -39,8 +41,17 @@ var appVersion = "dev"
 type Config struct {
 	conf.Version
 
-	Net struct {
+	GRPC struct {
 		Address string `conf:"default:127.0.0.1:5051"`
+	}
+	Gateway struct {
+		Address           string        `conf:"default:127.0.0.1:5052"`
+		ReadHeaderTimeout time.Duration `conf:"default:10s"`
+		ReadTimeout       time.Duration `conf:"default:30s"`
+		// WriteTimeout must cover the full gRPC round trip — set it shorter than the slowest expected RPC and the
+		// gateway will cut off in-flight responses before they complete.
+		WriteTimeout time.Duration `conf:"default:30s"`
+		IdleTimeout  time.Duration `conf:"default:120s"`
 	}
 	Environment string `conf:"default:local"`
 	Telemetry   struct {
@@ -253,15 +264,50 @@ func run(ctx context.Context, cfg Config) error {
 		Reflection:  cfg.IsLocalEnvironment(),
 	})
 
-	var lc net.ListenConfig
-	lis, err := lc.Listen(ctx, "tcp", cfg.Net.Address)
+	// Setup HTTP gateway server.
+
+	log.InfoContext(ctx, "Setting up HTTP gateway server")
+	defer log.InfoContext(ctx, "HTTP gateway server stopped")
+
+	gatewayHandler, teardownGateway, err := gateway.NewServer(gateway.ServerConfig{
+		Log:      log,
+		GRPCAddr: cfg.GRPC.Address,
+	})
 	if err != nil {
-		return fmt.Errorf("listen: %w", err)
+		return fmt.Errorf("new gateway server: %w", err)
+	}
+	defer teardownGateway()
+
+	httpSrv := &http.Server{
+		Addr:              cfg.Gateway.Address,
+		Handler:           gatewayHandler,
+		ReadHeaderTimeout: cfg.Gateway.ReadHeaderTimeout,
+		ReadTimeout:       cfg.Gateway.ReadTimeout,
+		WriteTimeout:      cfg.Gateway.WriteTimeout,
+		IdleTimeout:       cfg.Gateway.IdleTimeout,
+		ErrorLog:          slog.NewLogLogger(log.Handler(), logLevel(cfg)),
+	}
+
+	// Start servers.
+
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", cfg.GRPC.Address)
+	if err != nil {
+		return fmt.Errorf("listen grpc: %w", err)
+	}
+	httpLis, err := lc.Listen(ctx, "tcp", cfg.Gateway.Address)
+	if err != nil {
+		return fmt.Errorf("listen http: %w", err)
 	}
 
 	serverErrors := make(chan error, 1)
 	go func() {
 		serverErrors <- srv.Serve(lis)
+	}()
+	go func() {
+		if err := httpSrv.Serve(httpLis); !errors.Is(err, http.ErrServerClosed) {
+			serverErrors <- err
+		}
 	}()
 
 	shutdown := make(chan os.Signal, 1)
@@ -272,7 +318,25 @@ func run(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("server error: %w", err)
 
 	case <-shutdown:
-		srv.GracefulStop()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+			log.ErrorContext(ctx, "HTTP gateway shutdown error", "error", err)
+		}
+
+		grpcStopped := make(chan struct{})
+		go func() {
+			srv.GracefulStop()
+			close(grpcStopped)
+		}()
+
+		select {
+		case <-grpcStopped:
+		case <-shutdownCtx.Done():
+			log.ErrorContext(ctx, "gRPC graceful stop timed out, forcing stop")
+			srv.Stop()
+		}
 	}
 
 	return nil

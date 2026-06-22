@@ -15,6 +15,20 @@ plugins:
     opt:
       - paths=source_relative
       - require_unimplemented_servers=false
+  - local: scripts/protoc-gen-grpc-gateway
+    out: backend/internal/api/grpc/internal/pb/
+    opt:
+      - paths=source_relative
+  - local: scripts/protoc-gen-openapiv2
+    out: schemas/openapi/
+    opt:
+      - output_format=json
+  # Second output for Go embed — backend/ is a separate Go module and //go:embed cannot
+  # reach outside its root, so the spec is also written here for use by the gateway server.
+  - local: scripts/protoc-gen-openapiv2
+    out: backend/internal/api/grpc/gateway/openapi/
+    opt:
+      - output_format=json
 
   # TypeScript plugins
   # - local: frontend/node_modules/.bin/protoc-gen-es

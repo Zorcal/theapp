@@ -8,6 +8,7 @@ gRPC transport layer. Handlers receive protobuf requests, delegate to core inter
 - `<domain>.go` (e.g. `user.go`) — one file per domain. Defines the handler struct, the core interface it depends on, and all RPC method implementations for that domain.
 - `internal/conv/` — all conversions between `pb` and `mdl` types.
 - `internal/pb/` — generated protobuf code, do not edit by hand.
+- `gateway/` — HTTP/JSON reverse proxy (grpc-gateway) and OpenAPI spec endpoint.
 
 ## Core interfaces
 
@@ -25,6 +26,12 @@ mdl.User     →  pb.User          (UserToPb)
 ```
 
 Without dedicated conv functions, type construction scatters across handlers and there is no single place to update when a type changes.
+
+## Gateway
+
+The `gateway/` package translates HTTP/JSON requests to gRPC calls using grpc-gateway and serves an OpenAPI spec at `/openapi.json`.
+
+The spec (`gateway/openapi/openapi.swagger.json`) is generated from proto annotations — do not edit it by hand. Regenerate with `make generate` after changing `.proto` files.
 
 ## Auth in tests
 
