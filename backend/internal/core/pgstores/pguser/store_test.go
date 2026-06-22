@@ -114,6 +114,56 @@ func TestStore_CreateUser(t *testing.T) {
 	}
 }
 
+func TestStore_MarkEmailVerified(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	t.Run("sets email_verified_at on first call", func(t *testing.T) {
+		seeded := seedUser(t, store, "alice@test.com", "Alice Smith")
+
+		if seeded.EmailVerifiedAt != nil {
+			t.Fatalf("EmailVerifiedAt = %v, want nil before verification", seeded.EmailVerifiedAt)
+		}
+
+		if err := store.MarkEmailVerified(ctx, seeded.ExternalID); err != nil {
+			t.Fatalf("MarkEmailVerified() error = %v", err)
+		}
+
+		got, err := store.UserByExternalID(ctx, seeded.ExternalID)
+		if err != nil {
+			t.Fatalf("UserByExternalID() error = %v", err)
+		}
+		if got.EmailVerifiedAt == nil {
+			t.Error("EmailVerifiedAt = nil, want non-nil after verification")
+		}
+	})
+
+	t.Run("does not overwrite timestamp on subsequent calls", func(t *testing.T) {
+		seeded := seedUser(t, store, "bob@test.com", "Bob Jones")
+
+		if err := store.MarkEmailVerified(ctx, seeded.ExternalID); err != nil {
+			t.Fatalf("MarkEmailVerified() first call error = %v", err)
+		}
+		first, err := store.UserByExternalID(ctx, seeded.ExternalID)
+		if err != nil {
+			t.Fatalf("UserByExternalID() error = %v", err)
+		}
+
+		if err := store.MarkEmailVerified(ctx, seeded.ExternalID); err != nil {
+			t.Fatalf("MarkEmailVerified() second call error = %v", err)
+		}
+		second, err := store.UserByExternalID(ctx, seeded.ExternalID)
+		if err != nil {
+			t.Fatalf("UserByExternalID() error = %v", err)
+		}
+
+		if !first.EmailVerifiedAt.Equal(*second.EmailVerifiedAt) {
+			t.Errorf("EmailVerifiedAt changed on second call: first = %v, second = %v", first.EmailVerifiedAt, second.EmailVerifiedAt)
+		}
+	})
+}
+
 func TestStore_CreateUser_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)

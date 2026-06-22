@@ -18,13 +18,14 @@ const (
 
 // User represents a user in the database.
 type User struct {
-	ID         int        `db:"id"`
-	ExternalID uuid.UUID  `db:"external_id"`
-	Email      string     `db:"email"`
-	Name       string     `db:"name"`
-	CreatedAt  time.Time  `db:"created_at"`
-	UpdatedAt  *time.Time `db:"updated_at"`
-	ETag       uuid.UUID  `db:"etag"`
+	ID              int        `db:"id"`
+	ExternalID      uuid.UUID  `db:"external_id"`
+	Email           string     `db:"email"`
+	Name            string     `db:"name"`
+	EmailVerifiedAt *time.Time `db:"email_verified_at"`
+	CreatedAt       time.Time  `db:"created_at"`
+	UpdatedAt       *time.Time `db:"updated_at"`
+	ETag            uuid.UUID  `db:"etag"`
 }
 
 // CreateUser holds all fields required to create a new user in the database.

@@ -143,6 +143,23 @@ func (s *Store) UpdateUser(ctx context.Context, uu UpdateUser) (User, error) {
 	return user, nil
 }
 
+// MarkEmailVerified sets email_verified_at to the current time for the user with the given external ID.
+// Returns [sql.ErrNoRows] if no such user exists.
+func (s *Store) MarkEmailVerified(ctx context.Context, externalID uuid.UUID) error {
+	var user User
+
+	q := markEmailVerifiedQuery(externalID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &user); err != nil {
+			return fmt.Errorf("mark email verified: %w", err)
+		}
+		return nil
+	}
+
+	return pgdb.RunBatch(ctx, s.pool, doInBatch)
+}
+
 func (s *Store) CreateUser(ctx context.Context, cu CreateUser) (User, error) {
 	var user User
 

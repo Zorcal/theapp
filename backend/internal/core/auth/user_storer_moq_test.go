@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 )
 
@@ -23,6 +24,9 @@ var _ UserStorer = &MockedUserStorer{}
 //			GetOrCreateUserByEmailFunc: func(ctx context.Context, email string) (pguser.User, error) {
 //				panic("mock out the GetOrCreateUserByEmail method")
 //			},
+//			MarkEmailVerifiedFunc: func(ctx context.Context, externalID uuid.UUID) error {
+//				panic("mock out the MarkEmailVerified method")
+//			},
 //		}
 //
 //		// use mockedUserStorer in code that requires UserStorer
@@ -33,6 +37,9 @@ type MockedUserStorer struct {
 	// GetOrCreateUserByEmailFunc mocks the GetOrCreateUserByEmail method.
 	GetOrCreateUserByEmailFunc func(ctx context.Context, email string) (pguser.User, error)
 
+	// MarkEmailVerifiedFunc mocks the MarkEmailVerified method.
+	MarkEmailVerifiedFunc func(ctx context.Context, externalID uuid.UUID) error
+
 	// calls tracks calls to the methods.
 	calls struct {
 		// GetOrCreateUserByEmail holds details about calls to the GetOrCreateUserByEmail method.
@@ -42,8 +49,16 @@ type MockedUserStorer struct {
 			// Email is the email argument value.
 			Email string
 		}
+		// MarkEmailVerified holds details about calls to the MarkEmailVerified method.
+		MarkEmailVerified []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ExternalID is the externalID argument value.
+			ExternalID uuid.UUID
+		}
 	}
 	lockGetOrCreateUserByEmail sync.RWMutex
+	lockMarkEmailVerified      sync.RWMutex
 }
 
 // GetOrCreateUserByEmail calls GetOrCreateUserByEmailFunc.
@@ -79,5 +94,41 @@ func (mock *MockedUserStorer) GetOrCreateUserByEmailCalls() []struct {
 	mock.lockGetOrCreateUserByEmail.RLock()
 	calls = mock.calls.GetOrCreateUserByEmail
 	mock.lockGetOrCreateUserByEmail.RUnlock()
+	return calls
+}
+
+// MarkEmailVerified calls MarkEmailVerifiedFunc.
+func (mock *MockedUserStorer) MarkEmailVerified(ctx context.Context, externalID uuid.UUID) error {
+	if mock.MarkEmailVerifiedFunc == nil {
+		panic("MockedUserStorer.MarkEmailVerifiedFunc: method is nil but UserStorer.MarkEmailVerified was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		ExternalID uuid.UUID
+	}{
+		Ctx:        ctx,
+		ExternalID: externalID,
+	}
+	mock.lockMarkEmailVerified.Lock()
+	mock.calls.MarkEmailVerified = append(mock.calls.MarkEmailVerified, callInfo)
+	mock.lockMarkEmailVerified.Unlock()
+	return mock.MarkEmailVerifiedFunc(ctx, externalID)
+}
+
+// MarkEmailVerifiedCalls gets all the calls that were made to MarkEmailVerified.
+// Check the length with:
+//
+//	len(mockedUserStorer.MarkEmailVerifiedCalls())
+func (mock *MockedUserStorer) MarkEmailVerifiedCalls() []struct {
+	Ctx        context.Context
+	ExternalID uuid.UUID
+} {
+	var calls []struct {
+		Ctx        context.Context
+		ExternalID uuid.UUID
+	}
+	mock.lockMarkEmailVerified.RLock()
+	calls = mock.calls.MarkEmailVerified
+	mock.lockMarkEmailVerified.RUnlock()
 	return calls
 }

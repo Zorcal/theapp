@@ -8,12 +8,13 @@ import (
 
 // User represents a user in the system.
 type User struct {
-	ID        uuid.UUID
-	Email     string
-	Name      string
-	CreatedAt time.Time
-	UpdatedAt *time.Time
-	ETag      string
+	ID              uuid.UUID
+	Email           string
+	Name            string
+	EmailVerifiedAt *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       *time.Time
+	ETag            string
 }
 
 // CreateUser holds the fields required to create a new user.

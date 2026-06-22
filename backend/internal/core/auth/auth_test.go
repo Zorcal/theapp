@@ -22,6 +22,7 @@ import (
 func TestCore_flow(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
+	userStore := pguser.NewStore(pool)
 
 	var capturedToken string
 	sender := sendEmailFunc(func(_ context.Context, m email.Message) error {
@@ -32,7 +33,7 @@ func TestCore_flow(t *testing.T) {
 
 	core := NewCore(
 		pgauth.NewStore(pool),
-		pguser.NewStore(pool),
+		userStore,
 		sender,
 		pgdb.NewTransactor(pool),
 		testConfig(),
@@ -69,6 +70,15 @@ func TestCore_flow(t *testing.T) {
 	}
 	if pair.RefreshToken == "" {
 		t.Error("VerifyMagicLink() RefreshToken is empty")
+	}
+
+	// VerifyMagicLink marks the email as verified.
+	aliceUser, err := userStore.UserByEmail(ctx, "alice@test.com")
+	if err != nil {
+		t.Fatalf("UserByEmail() error = %v", err)
+	}
+	if aliceUser.EmailVerifiedAt == nil {
+		t.Error("VerifyMagicLink() EmailVerifiedAt = nil, want non-nil")
 	}
 
 	// VerifyMagicLink again — token is consumed, must return ErrTokenInvalid.
@@ -442,7 +452,9 @@ func TestCore_VerifyMagicLink(t *testing.T) {
 
 	core := NewCore(
 		authStorerMock,
-		&MockedUserStorer{},
+		&MockedUserStorer{
+			MarkEmailVerifiedFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+		},
 		noopEmail,
 		noopTransactor{},
 		testConfig(),
@@ -604,7 +616,9 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 
 		core := NewCore(
 			authStorerMock,
-			&MockedUserStorer{},
+			&MockedUserStorer{
+				MarkEmailVerifiedFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+			},
 			noopEmail,
 			noopTransactor{},
 			testConfig(),

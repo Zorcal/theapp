@@ -80,6 +80,9 @@ type UserStorer interface {
 	// GetOrCreateUserByEmail returns the user with the given email, creating one if none exists.
 	// Safe under concurrent calls for the same email.
 	GetOrCreateUserByEmail(ctx context.Context, email string) (pguser.User, error)
+	// MarkEmailVerified marks the email as verified for the user with the given external ID.
+	// Returns [sql.ErrNoRows] if no such user exists.
+	MarkEmailVerified(ctx context.Context, externalID uuid.UUID) error
 }
 
 // Config holds tunables for Core.
@@ -220,6 +223,10 @@ func (c *Core) VerifyMagicLink(ctx context.Context, rawToken string) (mdl.AuthTo
 				return mdl.ErrTokenInvalid
 			}
 			return fmt.Errorf("consume magic link token: %w", err)
+		}
+
+		if err := c.userStorer.MarkEmailVerified(ctx, tok.UserExternalID); err != nil {
+			return fmt.Errorf("mark email verified: %w", err)
 		}
 
 		var err error

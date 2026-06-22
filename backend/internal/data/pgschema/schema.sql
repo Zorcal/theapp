@@ -126,6 +126,7 @@ CREATE TABLE useraccess.users (
     name text NOT NULL,
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone,
+    email_verified_at timestamp with time zone,
     etag uuid NOT NULL
 );
 

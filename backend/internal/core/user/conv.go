@@ -28,12 +28,13 @@ func createUserToPg(cu mdl.CreateUser) pguser.CreateUser {
 
 func userFromPg(u pguser.User) mdl.User {
 	return mdl.User{
-		ID:        u.ExternalID,
-		Email:     u.Email,
-		Name:      u.Name,
-		CreatedAt: u.CreatedAt,
-		UpdatedAt: u.UpdatedAt,
-		ETag:      u.ETag.String(),
+		ID:              u.ExternalID,
+		Email:           u.Email,
+		Name:            u.Name,
+		EmailVerifiedAt: u.EmailVerifiedAt,
+		CreatedAt:       u.CreatedAt,
+		UpdatedAt:       u.UpdatedAt,
+		ETag:            u.ETag.String(),
 	}
 }
 
