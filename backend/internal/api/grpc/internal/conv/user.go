@@ -34,12 +34,13 @@ func UsersToPB(usr []mdl.User) []*pb.User {
 
 func UserToPB(usr mdl.User) *pb.User {
 	return &pb.User{
-		Id:         usr.ID.String(),
-		Email:      usr.Email,
-		Name:       usr.Name,
-		UpdateTime: maybeNewTimestamppb(usr.UpdatedAt),
-		CreateTime: timestamppb.New(usr.CreatedAt),
-		Etag:       usr.ETag,
+		Id:                usr.ID.String(),
+		Email:             usr.Email,
+		Name:              usr.Name,
+		UpdateTime:        maybeNewTimestamppb(usr.UpdatedAt),
+		CreateTime:        timestamppb.New(usr.CreatedAt),
+		EmailVerifiedTime: maybeNewTimestamppb(usr.EmailVerifiedAt),
+		Etag:              usr.ETag,
 	}
 }
 

@@ -84,6 +84,10 @@ message User {
   // Timestamp when the user was last updated. Output only.
   google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Timestamp when the user's email address was verified. Null until the user
+  // completes their first magic-link sign-in. Output only.
+  google.protobuf.Timestamp email_verified_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+
   // Name of the user (first and last name).
   string name = 7;
 

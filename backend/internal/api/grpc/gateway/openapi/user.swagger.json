@@ -205,6 +205,12 @@
               "description": "Timestamp when the user was last updated. Output only.",
               "readOnly": true
             },
+            "emailVerifiedTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the user's email address was verified. Null until the user\ncompletes their first magic-link sign-in. Output only.",
+              "readOnly": true
+            },
             "name": {
               "type": "string",
               "description": "Name of the user (first and last name)."
@@ -314,6 +320,12 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp when the user was last updated. Output only.",
+          "readOnly": true
+        },
+        "emailVerifiedTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user's email address was verified. Null until the user\ncompletes their first magic-link sign-in. Output only.",
           "readOnly": true
         },
         "name": {

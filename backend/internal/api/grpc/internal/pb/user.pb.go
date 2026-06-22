@@ -37,6 +37,9 @@ type User struct {
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Timestamp when the user was last updated. Output only.
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	// Timestamp when the user's email address was verified. Null until the user
+	// completes their first magic-link sign-in. Output only.
+	EmailVerifiedTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=email_verified_time,json=emailVerifiedTime,proto3" json:"email_verified_time,omitempty"`
 	// Name of the user (first and last name).
 	Name string `protobuf:"bytes,7,opt,name=name,proto3" json:"name,omitempty"`
 	// The ETag for the current version of the user. Helps to prevent
@@ -103,6 +106,13 @@ func (x *User) GetCreateTime() *timestamppb.Timestamp {
 func (x *User) GetUpdateTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdateTime
+	}
+	return nil
+}
+
+func (x *User) GetEmailVerifiedTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EmailVerifiedTime
 	}
 	return nil
 }
@@ -468,14 +478,15 @@ var File_user_proto protoreflect.FileDescriptor
 const file_user_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"user.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a google/protobuf/field_mask.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xf2\x01\n" +
+	"user.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a google/protobuf/field_mask.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xc3\x02\n" +
 	"\x04User\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12@\n" +
 	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\x12\x12\n" +
+	"updateTime\x12O\n" +
+	"\x13email_verified_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x11emailVerifiedTime\x12\x12\n" +
 	"\x04name\x18\a \x01(\tR\x04name\x12\x1f\n" +
 	"\x04etag\x18\x06 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"-\n" +
 	"\x0eGetUserRequest\x12\x1b\n" +
@@ -545,24 +556,25 @@ var file_user_proto_goTypes = []any{
 var file_user_proto_depIdxs = []int32{
 	7,  // 0: theapp.v1.User.create_time:type_name -> google.protobuf.Timestamp
 	7,  // 1: theapp.v1.User.update_time:type_name -> google.protobuf.Timestamp
-	0,  // 2: theapp.v1.UpdateUserRequest.user:type_name -> theapp.v1.User
-	8,  // 3: theapp.v1.UpdateUserRequest.update_mask:type_name -> google.protobuf.FieldMask
-	0,  // 4: theapp.v1.CreateUserRequest.user:type_name -> theapp.v1.User
-	4,  // 5: theapp.v1.ListUsersRequest.filter:type_name -> theapp.v1.UserFilter
-	0,  // 6: theapp.v1.ListUsersResponse.users:type_name -> theapp.v1.User
-	1,  // 7: theapp.v1.UserService.GetUser:input_type -> theapp.v1.GetUserRequest
-	5,  // 8: theapp.v1.UserService.ListUsers:input_type -> theapp.v1.ListUsersRequest
-	3,  // 9: theapp.v1.UserService.CreateUser:input_type -> theapp.v1.CreateUserRequest
-	2,  // 10: theapp.v1.UserService.UpdateUser:input_type -> theapp.v1.UpdateUserRequest
-	0,  // 11: theapp.v1.UserService.GetUser:output_type -> theapp.v1.User
-	6,  // 12: theapp.v1.UserService.ListUsers:output_type -> theapp.v1.ListUsersResponse
-	0,  // 13: theapp.v1.UserService.CreateUser:output_type -> theapp.v1.User
-	0,  // 14: theapp.v1.UserService.UpdateUser:output_type -> theapp.v1.User
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	7,  // 2: theapp.v1.User.email_verified_time:type_name -> google.protobuf.Timestamp
+	0,  // 3: theapp.v1.UpdateUserRequest.user:type_name -> theapp.v1.User
+	8,  // 4: theapp.v1.UpdateUserRequest.update_mask:type_name -> google.protobuf.FieldMask
+	0,  // 5: theapp.v1.CreateUserRequest.user:type_name -> theapp.v1.User
+	4,  // 6: theapp.v1.ListUsersRequest.filter:type_name -> theapp.v1.UserFilter
+	0,  // 7: theapp.v1.ListUsersResponse.users:type_name -> theapp.v1.User
+	1,  // 8: theapp.v1.UserService.GetUser:input_type -> theapp.v1.GetUserRequest
+	5,  // 9: theapp.v1.UserService.ListUsers:input_type -> theapp.v1.ListUsersRequest
+	3,  // 10: theapp.v1.UserService.CreateUser:input_type -> theapp.v1.CreateUserRequest
+	2,  // 11: theapp.v1.UserService.UpdateUser:input_type -> theapp.v1.UpdateUserRequest
+	0,  // 12: theapp.v1.UserService.GetUser:output_type -> theapp.v1.User
+	6,  // 13: theapp.v1.UserService.ListUsers:output_type -> theapp.v1.ListUsersResponse
+	0,  // 14: theapp.v1.UserService.CreateUser:output_type -> theapp.v1.User
+	0,  // 15: theapp.v1.UserService.UpdateUser:output_type -> theapp.v1.User
+	12, // [12:16] is the sub-list for method output_type
+	8,  // [8:12] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_user_proto_init() }
