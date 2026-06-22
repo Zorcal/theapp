@@ -59,8 +59,10 @@ func NewServer(cfg ServerConfig) (h http.Handler, teardown func(), retErr error)
 
 	httpMux := http.NewServeMux()
 	httpMux.Handle("/", mux)
-	httpMux.HandleFunc("/openapi/auth.json", openapiHandler("openapi/auth.swagger.json"))
-	httpMux.HandleFunc("/openapi/user.json", openapiHandler("openapi/user.swagger.json"))
+	httpMux.HandleFunc("/v1/openapi/auth.json", openapiHandler("openapi/auth.swagger.json"))
+	httpMux.HandleFunc("/v1/openapi/user.json", openapiHandler("openapi/user.swagger.json"))
+	httpMux.HandleFunc("/docs/auth", swaggerUIHandler("theapp Auth API", "/v1/openapi/auth.json"))
+	httpMux.HandleFunc("/docs/user", swaggerUIHandler("theapp User API", "/v1/openapi/user.json"))
 
 	return loggingMiddleware(cfg.Log, httpMux), teardown, nil
 }

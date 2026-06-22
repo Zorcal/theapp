@@ -34,7 +34,7 @@ func TestNewServer(t *testing.T) {
 		{
 			name:       "auth openapi spec",
 			method:     http.MethodGet,
-			path:       "/openapi/auth.json",
+			path:       "/v1/openapi/auth.json",
 			wantStatus: http.StatusOK,
 			wantHeaders: map[string]string{
 				"Content-Type": "application/json",
@@ -43,7 +43,7 @@ func TestNewServer(t *testing.T) {
 		{
 			name:       "user openapi spec",
 			method:     http.MethodGet,
-			path:       "/openapi/user.json",
+			path:       "/v1/openapi/user.json",
 			wantStatus: http.StatusOK,
 			wantHeaders: map[string]string{
 				"Content-Type": "application/json",
