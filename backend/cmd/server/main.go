@@ -99,6 +99,14 @@ func (c Config) IsLocalEnvironment() bool {
 	return strings.EqualFold(c.Environment, "local")
 }
 
+func (c Config) Validate() error {
+	if !c.IsLocalEnvironment() && c.Auth.JWTSecret == "dev-secret-change-me" {
+		return errors.New("Auth.JWTSecret must be changed from the default before running outside local environments")
+	}
+
+	return nil
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -124,8 +132,8 @@ func main() {
 }
 
 func run(ctx context.Context, cfg Config) error {
-	if !cfg.IsLocalEnvironment() && cfg.Auth.JWTSecret == "dev-secret-change-me" {
-		return errors.New("Auth.JWTSecret must be changed from the default before running outside local environments")
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("validate config: %w", err)
 	}
 
 	// Setup open telemetry.
