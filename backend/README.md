@@ -18,6 +18,42 @@ When a new package has no obvious home, put it directly under `internal/`. Group
 
 Code belongs in `pkg/` only if it has no dependency on this application's domain and would make sense in any Go project.
 
+## Authentication
+
+The API uses passwordless magic-link authentication. There are no passwords — a user proves ownership of their email address once per session.
+
+### Token types
+
+| Token         | Lifetime               | Purpose                                                           |
+|---------------|------------------------|-------------------------------------------------------------------|
+| Access token  | 15 min                 | Bearer token for protected API calls                              |
+| Refresh token | 30 days (from last use)| Rotates to a new token pair; resets the 30-day window on each use |
+
+### Client flow
+
+**Sign in:**
+1. `POST /v1/auth/magic-link` with `{"email": "..."}` — always returns success to avoid leaking whether the address is registered.
+2. User clicks the link in their email; the frontend extracts the `token` query parameter.
+3. `POST /v1/auth/verify` with `{"token": "..."}` — returns an `accessToken`, `refreshToken`, and `expiresIn`.
+
+**Authenticated requests:**
+- Set `Authorization: Bearer <accessToken>` on every call to a protected endpoint.
+
+**Access token expired (after ~15 min):**
+- Call `POST /v1/auth/refresh` with `{"refreshToken": "..."}` to get a new token pair without re-authenticating. The old refresh token is invalidated immediately.
+
+**Forced re-login:**
+- If the user does not refresh within 30 days of their last refresh, the refresh token expires and `POST /v1/auth/refresh` returns 401. The client must restart the magic-link flow.
+- A user who refreshes at least once every 30 days never needs to re-authenticate.
+
+**Sign out:**
+- `POST /v1/auth/revoke` with `{"refreshToken": "..."}` to end the current session.
+- `POST /v1/auth/sessions/revoke-all` (requires access token) to end all active sessions for the authenticated user.
+
+### Local development
+
+The magic-link email is not sent when no Resend API key is configured. Instead the token is printed to the server log — search for it there and pass it directly to `POST /v1/auth/verify`.
+
 ## Local debugging
 
 The gRPC server registers reflection when `THEAPP_ENVIRONMENT=local`, so these commands work without a `buf`-built descriptor set:
