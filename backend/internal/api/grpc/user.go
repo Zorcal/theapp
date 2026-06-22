@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/mail"
 	"slices"
 
 	"github.com/google/uuid"
@@ -18,6 +17,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/data/order"
+	"github.com/zorcal/theapp/backend/internal/email"
 	"github.com/zorcal/theapp/backend/pkg/mustconv"
 )
 
@@ -157,7 +157,7 @@ func validateCreateUserRequest(req *pb.CreateUserRequest) error {
 			Field:       "user.email",
 			Description: "required",
 		})
-	} else if _, err := mail.ParseAddress(req.GetUser().GetEmail()); err != nil {
+	} else if !email.Validate(req.GetUser().GetEmail()) {
 		violations = append(violations, &errdetails.BadRequest_FieldViolation{
 			Field:       "user.email",
 			Description: "must be a valid email address",

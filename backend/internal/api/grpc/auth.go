@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/mail"
 
 	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -15,6 +14,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/email"
 )
 
 type authService struct {
@@ -47,7 +47,7 @@ func (s *authService) RequestMagicLink(ctx context.Context, req *pb.RequestMagic
 			{Field: "email", Description: "required"},
 		})
 	}
-	if _, err := mail.ParseAddress(req.GetEmail()); err != nil {
+	if !email.Validate(req.GetEmail()) {
 		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 			{Field: "email", Description: "invalid format"},
 		})
