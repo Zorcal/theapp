@@ -215,10 +215,29 @@ func TestUserService_CreateUser_error(t *testing.T) {
 			want:     invalidArgWithViolation("user.email", "required"),
 		},
 		{
+			name:     "invalid email format",
+			userCore: &MockedUserCore{},
+			in:       &pb.CreateUserRequest{User: &pb.User{Email: "not-an-email", Name: "Alice Smith"}},
+			want:     invalidArgWithViolation("user.email", "must be a valid email address"),
+		},
+		{
 			name:     "empty name",
 			userCore: &MockedUserCore{},
 			in:       &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com"}},
 			want:     invalidArgWithViolation("user.name", "required"),
+		},
+		{
+			name: "duplicate email",
+			userCore: &MockedUserCore{
+				CreateUserFunc: func(_ context.Context, _ mdl.CreateUser) (mdl.User, error) {
+					return mdl.User{}, mdl.ErrAlreadyExists
+				},
+			},
+			in: &pb.CreateUserRequest{User: &pb.User{
+				Email: "alice@test.com",
+				Name:  "Alice Smith",
+			}},
+			want: invalidArgWithViolation("user.email", "a user with this email already exists"),
 		},
 		{
 			name: "core error",

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/zorcal/theapp/backend/internal/data/order"
+	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
@@ -111,6 +112,23 @@ func TestStore_CreateUser(t *testing.T) {
 	if got.ExternalID == got.ETag {
 		t.Errorf("CreateUser() ExternalID and ETag are equal (%v), want distinct UUIDs", got.ExternalID)
 	}
+}
+
+func TestStore_CreateUser_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := NewStore(pool)
+
+	t.Run("duplicate email returns ErrAlreadyExists", func(t *testing.T) {
+		seedUser(t, store, "alice@test.com", "Alice Smith")
+
+		if _, err := store.CreateUser(ctx, CreateUser{
+			Email: "alice@test.com",
+			Name:  "Alice Duplicate",
+		}); !errors.Is(err, pgdb.ErrAlreadyExists) {
+			t.Errorf("CreateUser() error = %v, want pgdb.ErrAlreadyExists", err)
+		}
+	})
 }
 
 func TestStore_UserCount(t *testing.T) {

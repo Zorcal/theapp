@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/mail"
 	"slices"
 
 	"github.com/google/uuid"
@@ -68,6 +69,11 @@ func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 
 	usr, err := s.userCore.CreateUser(ctx, cu)
 	if err != nil {
+		if errors.Is(err, mdl.ErrAlreadyExists) {
+			return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "user.email", Description: "a user with this email already exists"},
+			})
+		}
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
@@ -150,6 +156,11 @@ func validateCreateUserRequest(req *pb.CreateUserRequest) error {
 		violations = append(violations, &errdetails.BadRequest_FieldViolation{
 			Field:       "user.email",
 			Description: "required",
+		})
+	} else if _, err := mail.ParseAddress(req.GetUser().GetEmail()); err != nil {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field:       "user.email",
+			Description: "must be a valid email address",
 		})
 	}
 

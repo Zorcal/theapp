@@ -41,24 +41,10 @@ func RunBatch(ctx context.Context, p *pgxpool.Pool, queueFunc func(ctx context.C
 		result = p.SendBatch(ctx, b.b)
 	}
 	if err := result.Close(); err != nil {
-		return fmt.Errorf("close batch result: %w", err)
+		return fmt.Errorf("close batch result: %w", translatePgErr(err))
 	}
 
 	return nil
-}
-
-// RunExec executes a single statement, joining the transaction from ctx when one
-// is present, or using the pool directly otherwise.
-func RunExec(ctx context.Context, p *pgxpool.Pool, sql string, args ...any) error {
-	ctx, span := telemetry.StartSpan(ctx, "pgdb.RunExec")
-	defer span.End()
-
-	if tx := txFromCtx(ctx); tx != nil {
-		_, err := tx.Exec(ctx, sql, args...)
-		return err
-	}
-	_, err := p.Exec(ctx, sql, args...)
-	return err
 }
 
 // RunBatchTx creates a new Batch, passes it to queueFunc for query queueing,
@@ -89,11 +75,11 @@ func RunBatchTx(ctx context.Context, p *pgxpool.Pool, queueFunc func(ctx context
 
 	result := tx.SendBatch(ctx, b.b)
 	if err := result.Close(); err != nil {
-		return fmt.Errorf("close batch result: %w", err)
+		return fmt.Errorf("close batch result: %w", translatePgErr(err))
 	}
 
 	if err := tx.Commit(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-		return fmt.Errorf("commit tx: %w", err)
+		return fmt.Errorf("commit tx: %w", translatePgErr(err))
 	}
 
 	return nil

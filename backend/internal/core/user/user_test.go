@@ -14,6 +14,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/order"
+	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
@@ -286,6 +287,31 @@ func TestCore_CreateUser(t *testing.T) {
 				ETag:      etag.String(),
 			},
 		},
+		{
+			name: "normalizes email before storing",
+			storer: &MockedStorer{
+				CreateUserFunc: func(_ context.Context, cu pguser.CreateUser) (pguser.User, error) {
+					return pguser.User{
+						ExternalID: id,
+						Email:      cu.Email,
+						Name:       cu.Name,
+						CreatedAt:  now,
+						ETag:       etag,
+					}, nil
+				},
+			},
+			in: mdl.CreateUser{
+				Email: "  Alice@Test.COM  ",
+				Name:  "Alice Smith",
+			},
+			want: mdl.User{
+				ID:        id,
+				Email:     "alice@test.com",
+				Name:      "Alice Smith",
+				CreatedAt: now,
+				ETag:      etag.String(),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -302,38 +328,35 @@ func TestCore_CreateUser(t *testing.T) {
 }
 
 func TestCore_CreateUser_error(t *testing.T) {
-	tests := []struct {
-		name        string
-		storer      *MockedStorer
-		in          mdl.CreateUser
-		wantErrStrs []string
-	}{
-		{
-			name: "insert user error",
-			storer: &MockedStorer{
-				CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
-					return pguser.User{}, errors.New("db down")
-				},
-			},
-			in: mdl.CreateUser{
-				Email: "alice@test.com",
-				Name:  "Alice Smith",
-			},
-			wantErrStrs: []string{"create user", "db down"},
-		},
+	in := mdl.CreateUser{
+		Email: "alice@test.com",
+		Name:  "Alice Smith",
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.storer)
 
-			_, err := core.CreateUser(t.Context(), tt.in)
-			if err == nil {
-				t.Fatalf("CreateUser() error = nil, want error")
-			}
-
-			testingx.AssertErrContains(t, err, tt.wantErrStrs...)
+	t.Run("duplicate email returns ErrAlreadyExists", func(t *testing.T) {
+		core := NewCore(&MockedStorer{
+			CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
+				return pguser.User{}, pgdb.ErrAlreadyExists
+			},
 		})
-	}
+		_, err := core.CreateUser(t.Context(), in)
+		if !errors.Is(err, mdl.ErrAlreadyExists) {
+			t.Errorf("CreateUser() error = %v, want mdl.ErrAlreadyExists", err)
+		}
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		core := NewCore(&MockedStorer{
+			CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
+				return pguser.User{}, errors.New("db down")
+			},
+		})
+		_, err := core.CreateUser(t.Context(), in)
+		if err == nil {
+			t.Fatalf("CreateUser() error = nil, want error")
+		}
+		testingx.AssertErrContains(t, err, "create user", "db down")
+	})
 }
 
 func TestCore_Users(t *testing.T) {
