@@ -12,15 +12,22 @@ var swaggerUITemplateFile string
 
 var swaggerUITmpl = template.Must(template.New("swagger-ui").Parse(swaggerUITemplateFile))
 
-type swaggerUIData struct {
-	Title   string
-	SpecURL string
+type swaggerUISpec struct {
+	Name string
+	URL  string
 }
 
-func swaggerUIHandler(title, specURL string) http.HandlerFunc {
+type swaggerUIData struct {
+	Title       string
+	Specs       []swaggerUISpec
+	PrimaryName string
+}
+
+func swaggerUIHandler(title, primaryName string, specs []swaggerUISpec) http.HandlerFunc {
 	data := swaggerUIData{
-		Title:   title,
-		SpecURL: specURL,
+		Title:       title,
+		Specs:       specs,
+		PrimaryName: primaryName,
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

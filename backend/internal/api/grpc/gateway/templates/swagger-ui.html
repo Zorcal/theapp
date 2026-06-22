@@ -17,20 +17,15 @@
   <script>
     window.onload = function() {
       SwaggerUIBundle({
-        url: "{{.SpecURL}}",
+        urls: [{{range .Specs}}{"url": "{{.URL}}", "name": "{{.Name}}"},{{end}}],
+        "urls.primaryName": "{{.PrimaryName}}",
         dom_id: "#swagger-ui",
         deepLinking: true,
+        persistAuthorization: true,
         presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
         plugins: [SwaggerUIBundle.plugins.DownloadUrl],
         layout: "StandaloneLayout",
         validatorUrl: null,
-        onComplete: function() {
-          const urlInput = document.querySelector(".download-url-input");
-          if (urlInput) {
-            urlInput.readOnly = true;
-            urlInput.style.backgroundColor = "#f5f5f5";
-          }
-        }
       });
     };
   </script>

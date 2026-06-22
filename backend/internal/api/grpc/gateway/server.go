@@ -57,12 +57,16 @@ func NewServer(cfg ServerConfig) (h http.Handler, teardown func(), retErr error)
 		return nil, nil, fmt.Errorf("register auth service handler: %w", err)
 	}
 
+	allSpecs := []swaggerUISpec{
+		{Name: "Auth API", URL: "/v1/openapi/auth.json"},
+		{Name: "User API", URL: "/v1/openapi/user.json"},
+	}
+
 	httpMux := http.NewServeMux()
 	httpMux.Handle("/", mux)
 	httpMux.HandleFunc("/v1/openapi/auth.json", openapiHandler("openapi/auth.swagger.json"))
 	httpMux.HandleFunc("/v1/openapi/user.json", openapiHandler("openapi/user.swagger.json"))
-	httpMux.HandleFunc("/docs/auth", swaggerUIHandler("theapp Auth API", "/v1/openapi/auth.json"))
-	httpMux.HandleFunc("/docs/user", swaggerUIHandler("theapp User API", "/v1/openapi/user.json"))
+	httpMux.HandleFunc("/docs", swaggerUIHandler("theapp API", "Auth API", allSpecs))
 
 	return loggingMiddleware(cfg.Log, httpMux), teardown, nil
 }
