@@ -27,4 +27,4 @@ Any deviation must be documented on the relevant List RPC with a comment that na
 
 ## Swagger / OpenAPI
 
-`openapi/openapi.swagger.json` is generated from the proto schemas by `protoc-gen-openapiv2`. Do not edit it by hand — run `make generate` to regenerate it after changing any `.proto` file.
+`openapi/*.json` specs is generated from the proto schemas by `protoc-gen-openapiv2`. Do not edit it by hand — run `make generate` to regenerate it after changing any `.proto` file.
