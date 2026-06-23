@@ -15,6 +15,75 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
+// TestAuth_MagicLinkFlow exercises the full authentication lifecycle end-to-end: request link → verify → use tokens →
+// rotate → revoke.
+func TestAuth_MagicLinkFlow(t *testing.T) {
+	srv := NewServerIntegrationTest(t)
+	ctx := t.Context()
+
+	// Request a magic link. The auth core creates the user automatically.
+	if _, err := srv.authServiceClient.RequestMagicLink(ctx, &pb.RequestMagicLinkRequest{
+		Email: "alice@test.com",
+	}); err != nil {
+		t.Fatalf("RequestMagicLink() error = %v", err)
+	}
+
+	// Extract the token from the captured email and verify it.
+	token := srv.emailSender.MagicLinkToken(t)
+	pair, err := srv.authServiceClient.VerifyMagicLink(ctx, &pb.VerifyMagicLinkRequest{
+		Token: token,
+	})
+	if err != nil {
+		t.Fatalf("VerifyMagicLink() error = %v", err)
+	}
+	if pair.GetAccessToken() == "" {
+		t.Error("VerifyMagicLink() access_token = empty, want non-empty")
+	}
+	if pair.GetRefreshToken() == "" {
+		t.Error("VerifyMagicLink() refresh_token = empty, want non-empty")
+	}
+
+	// Access token grants access to protected endpoints.
+	authedCtx := authCtxWithToken(ctx, pair.GetAccessToken())
+	if _, err := srv.userServiceClient.ListUsers(authedCtx, &pb.ListUsersRequest{}); err != nil {
+		t.Fatalf("ListUsers() with valid access token error = %v", err)
+	}
+
+	// Refreshing rotates the refresh token.
+	newPair, err := srv.authServiceClient.RefreshAccessToken(ctx, &pb.RefreshAccessTokenRequest{
+		RefreshToken: pair.GetRefreshToken(),
+	})
+	if err != nil {
+		t.Fatalf("RefreshAccessToken() error = %v", err)
+	}
+	if newPair.GetRefreshToken() == pair.GetRefreshToken() {
+		t.Error("RefreshAccessToken() refresh_token unchanged, want rotated")
+	}
+
+	// Consumed refresh token cannot be reused.
+	_, err = srv.authServiceClient.RefreshAccessToken(ctx, &pb.RefreshAccessTokenRequest{
+		RefreshToken: pair.GetRefreshToken(),
+	})
+	if code := status.Code(err); code != codes.Unauthenticated {
+		t.Errorf("RefreshAccessToken() with consumed token code = %v, want %v", code, codes.Unauthenticated)
+	}
+
+	// Revoking the current refresh token ends the session.
+	if _, err := srv.authServiceClient.RevokeRefreshToken(ctx, &pb.RevokeRefreshTokenRequest{
+		RefreshToken: newPair.GetRefreshToken(),
+	}); err != nil {
+		t.Fatalf("RevokeRefreshToken() error = %v", err)
+	}
+
+	// Revoked token cannot be used to obtain new tokens.
+	_, err = srv.authServiceClient.RefreshAccessToken(ctx, &pb.RefreshAccessTokenRequest{
+		RefreshToken: newPair.GetRefreshToken(),
+	})
+	if code := status.Code(err); code != codes.Unauthenticated {
+		t.Errorf("RefreshAccessToken() with revoked token code = %v, want %v", code, codes.Unauthenticated)
+	}
+}
+
 func TestAuthService_RequestMagicLink(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -306,7 +375,7 @@ func TestAuthService_RevokeAllSessions(t *testing.T) {
 		},
 	})
 
-	if _, err := srvTest.authServiceClient.RevokeAllSessions(srvTest.authCtx(t, t.Context()), nil); err != nil {
+	if _, err := srvTest.authServiceClient.RevokeAllSessions(authCtxForTestUser(t, t.Context()), nil); err != nil {
 		t.Fatalf("RevokeAllSessions() error = %q, want no error", err)
 	}
 }
@@ -315,7 +384,7 @@ func TestAuthService_RevokeAllSessions_error(t *testing.T) {
 	tests := []struct {
 		name     string
 		authCore AuthCore
-		ctxFunc  func(*testing.T, ServerTest) context.Context
+		ctxFunc  func(*testing.T) context.Context
 		want     *status.Status
 	}{
 		{
@@ -330,9 +399,9 @@ func TestAuthService_RevokeAllSessions_error(t *testing.T) {
 					return errors.New("boom")
 				},
 			},
-			ctxFunc: func(t *testing.T, s ServerTest) context.Context {
+			ctxFunc: func(t *testing.T) context.Context {
 				t.Helper()
-				return s.authCtx(t, t.Context())
+				return authCtxForTestUser(t, t.Context())
 			},
 			want: status.New(codes.Internal, "Internal"),
 		},
@@ -346,7 +415,7 @@ func TestAuthService_RevokeAllSessions_error(t *testing.T) {
 
 			ctx := t.Context()
 			if tt.ctxFunc != nil {
-				ctx = tt.ctxFunc(t, srvTest)
+				ctx = tt.ctxFunc(t)
 			}
 
 			_, err := srvTest.authServiceClient.RevokeAllSessions(ctx, nil)
@@ -367,14 +436,14 @@ func TestAuthService_RevokeAllSessions_error(t *testing.T) {
 func TestAuthService_RevokeRefreshToken(t *testing.T) {
 	tests := []struct {
 		name    string
-		ctxFunc func(*testing.T, ServerTest) context.Context
+		ctxFunc func(*testing.T) context.Context
 		in      *pb.RevokeRefreshTokenRequest
 	}{
 		{
 			name: "revokes token",
-			ctxFunc: func(t *testing.T, s ServerTest) context.Context {
+			ctxFunc: func(t *testing.T) context.Context {
 				t.Helper()
-				return s.authCtx(t, t.Context())
+				return authCtxForTestUser(t, t.Context())
 			},
 			in: &pb.RevokeRefreshTokenRequest{RefreshToken: "some-refresh"},
 		},
@@ -394,7 +463,7 @@ func TestAuthService_RevokeRefreshToken(t *testing.T) {
 
 			ctx := t.Context()
 			if tt.ctxFunc != nil {
-				ctx = tt.ctxFunc(t, srvTest)
+				ctx = tt.ctxFunc(t)
 			}
 
 			if _, err := srvTest.authServiceClient.RevokeRefreshToken(ctx, tt.in); err != nil {
@@ -445,7 +514,7 @@ func TestAuthService_RevokeRefreshToken_error(t *testing.T) {
 				AuthCore: tt.authCore,
 			})
 
-			_, err := srvTest.authServiceClient.RevokeRefreshToken(srvTest.authCtx(t, t.Context()), tt.in)
+			_, err := srvTest.authServiceClient.RevokeRefreshToken(authCtxForTestUser(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("RevokeRefreshToken() error = nil, want error")
 			}

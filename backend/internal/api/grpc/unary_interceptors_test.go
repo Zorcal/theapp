@@ -28,20 +28,23 @@ func TestAuthInterceptor_unauthenticated(t *testing.T) {
 		{
 			name: "invalid bearer token",
 			call: func(s ServerTest) error {
-				_, err := s.userServiceClient.GetUser(invalidBearerCtx(t.Context()), &pb.GetUserRequest{Id: "any"})
+				_, err := s.userServiceClient.GetUser(authCtxWithInvalidToken(t.Context()), &pb.GetUserRequest{Id: "any"})
 				return err
 			},
 		},
 		{
 			name: "wrong issuer",
 			call: func(s ServerTest) error {
-				ctx := bearerCtxWithClaims(t, mdl.AuthClaims{
-					RegisteredClaims: jwt.RegisteredClaims{
-						Issuer:    "wrong-issuer",
-						Audience:  jwt.ClaimStrings{testJWTAudience},
-						ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+				ctx := authCtxWithClaims(t, t.Context(),
+					mdl.AuthClaims{
+						RegisteredClaims: jwt.RegisteredClaims{
+							Issuer:    "wrong-issuer",
+							Audience:  jwt.ClaimStrings{testJWTAudience},
+							ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+						},
 					},
-				})
+					testJWTKey,
+				)
 				_, err := s.userServiceClient.GetUser(ctx, &pb.GetUserRequest{Id: "any"})
 				return err
 			},
@@ -49,13 +52,16 @@ func TestAuthInterceptor_unauthenticated(t *testing.T) {
 		{
 			name: "wrong audience",
 			call: func(s ServerTest) error {
-				ctx := bearerCtxWithClaims(t, mdl.AuthClaims{
-					RegisteredClaims: jwt.RegisteredClaims{
-						Issuer:    testJWTIssuer,
-						Audience:  jwt.ClaimStrings{"wrong-audience"},
-						ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+				ctx := authCtxWithClaims(t, t.Context(),
+					mdl.AuthClaims{
+						RegisteredClaims: jwt.RegisteredClaims{
+							Issuer:    testJWTIssuer,
+							Audience:  jwt.ClaimStrings{"wrong-audience"},
+							ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+						},
 					},
-				})
+					testJWTKey,
+				)
 				_, err := s.userServiceClient.GetUser(ctx, &pb.GetUserRequest{Id: "any"})
 				return err
 			},

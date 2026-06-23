@@ -33,9 +33,21 @@ The `gateway/` package translates HTTP/JSON requests to gRPC calls using grpc-ga
 
 The spec (`gateway/openapi/openapi.swagger.json`) is generated from proto annotations — do not edit it by hand. Regenerate with `make generate` after changing `.proto` files.
 
-## Auth in tests
+## Testing
 
-`NewServerTest` always sets `testJWTKey`. Use `srvTest.authCtx(t, ctx)` for calls to protected endpoints and plain `t.Context()` for methods listed in `publicMethods`.
+### Test harnesses
+
+Use `ServerTest` for unit tests: the server runs with mocked cores, so tests exercise only the gRPC handler layer. Because inputs and outputs are fully controlled, this is the right place for exhaustive negative-case coverage — invalid arguments, permission errors, not-found responses, and other error paths.
+
+Use `ServerIntegrationTest` for happy-path and flow tests that must cross layer boundaries — e.g. verifying that requesting a magic link actually delivers a token, or that a rotated refresh token cannot be reused. It wires real cores against a real Postgres database and is slower, so keep integration tests focused on the golden path rather than exhaustive edge cases.
+
+### File conventions
+
+One test file per domain (`auth_test.go`, `user_test.go`, …). When a test exercises multiple domains — for example, logging in and then updating a display name — put it in `integration_test.go` instead.
+
+### Auth helpers
+
+`NewServerTest` always sets `testJWTKey`. Use `authCtxForTestUser(t, t.Context())` for calls to protected endpoints and plain `t.Context()` for methods listed in `publicMethods`.
 
 ## Validation
 
