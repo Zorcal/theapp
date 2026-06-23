@@ -105,8 +105,7 @@ func TestAuthService_RequestMagicLink(t *testing.T) {
 				AuthCore: tt.authCore,
 			})
 
-			_, err := srvTest.authServiceClient.RequestMagicLink(t.Context(), tt.in)
-			if err != nil {
+			if _, err := srvTest.authServiceClient.RequestMagicLink(t.Context(), tt.in); err != nil {
 				t.Fatalf("RequestMagicLink(%q) error = %q, want no error", tt.in.GetEmail(), err)
 			}
 		})
