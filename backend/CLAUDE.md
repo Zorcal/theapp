@@ -1,6 +1,8 @@
 # Backend development
 
-## Error wrapping
+## Error handling
+
+### Wrapping
 
 Wrap errors with `fmt.Errorf` when the added context makes the log line meaningfully easier to debug — when without it a
 reader couldn't tell where in the call stack the error came from or what was being attempted.
@@ -22,9 +24,13 @@ Bad chain:
 error while tracking location: unable to fetch order status: DB connection failed
 ```
 
+### Style
+
+Assign and check an error in the same `if` statement when no other values are needed outside the block. Split into two statements only when the result value is used after the check.
+
 ## Code organisation
 
-Order functions by importance: exported and primary functions first, helpers at the bottom.
+Order functions by importance: exported and primary functions first, helpers at the bottom. Group functions by relevance.
 
 ## Testing conventions
 
