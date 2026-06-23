@@ -12,11 +12,13 @@ backend/
 │   ├── data/        # database infrastructure
 │   └── <pkg>/       # other packages live here directly
 └── pkg/             # general-purpose, app-agnostic packages
+    ├── <pkg>/       # standalone utility packages
+    └── x/           # extensions to standard library packages (e.g. x/slicesx extends slices)
 ```
 
 When a new package has no obvious home, put it directly under `internal/`. Group under a sub-directory only when there is a natural umbrella concept (as with `core/` or `clients/`). Each sub-directory with conventions has its own README.
 
-Code belongs in `pkg/` only if it has no dependency on this application's domain and would make sense in any Go project.
+Code belongs in `pkg/` only if it has no dependency on this application's domain and would make sense in any Go project. Extensions to standard library packages go under `pkg/x/<pkgname>x`.
 
 ## Authentication
 
