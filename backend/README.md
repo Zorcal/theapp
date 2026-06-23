@@ -57,11 +57,13 @@ The API uses passwordless magic-link authentication. There are no passwords — 
 - `POST /v1/auth/revoke` with `{"refreshToken": "..."}` to end the current session.
 - `POST /v1/auth/sessions/revoke-all` (requires access token) to end all active sessions for the authenticated user.
 
-### Local development
+## Local development
+
+### Magic link
 
 The magic-link email is not sent when no Resend API key is configured. Instead the token is printed to the server log — search for it there and pass it directly to `POST /v1/auth/verify`.
 
-## Local debugging
+### Debugging
 
 The HTTP/JSON gateway runs on port 5052 and proxies all gRPC methods. Every endpoint from the gRPC server is available as a REST call — useful for quick manual testing with `curl` or a browser.
 
@@ -77,3 +79,40 @@ grpcurl -plaintext -H "Authorization: Bearer <token>" -d '{}' 127.0.0.1:5051 the
 For example, `grpcurl -plaintext -H "Authorization: Bearer <token>" -d '{}' 127.0.0.1:5051 theapp.v1.UserService/ListUsers`.
 
 Reflection stays off elsewhere to avoid exposing the schema.
+
+### Observability
+
+The local LGTM stack (Loki · Grafana · Tempo · Mimir) runs via `docker compose` in `infra/`. All four components expose HTTP APIs that can be queried directly with `curl` or the WebFetch tool.
+
+**Logs — Loki on port 3100 (LogQL)**
+
+```
+# Tail recent app logs (last 1 h)
+curl -G 'http://localhost:3100/loki/api/v1/query_range' \
+  --data-urlencode 'query={service_name="theapp"}' \
+  --data-urlencode 'since=1h' \
+  --data-urlencode 'limit=100'
+```
+
+**Metrics — Mimir on port 9009 (Prometheus-compatible)**
+
+```
+# Instant query
+curl -G 'http://localhost:9009/prometheus/api/v1/query' \
+  --data-urlencode 'query=up'
+
+# List available metric names
+curl 'http://localhost:9009/prometheus/api/v1/label/__name__/values'
+```
+
+**Traces — Tempo on port 3200**
+
+```
+# Search traces (returns a list of recent trace IDs)
+curl 'http://localhost:3200/api/search?tags=service.name%3Dtheapp&limit=20'
+
+# Fetch a specific trace by ID
+curl 'http://localhost:3200/api/traces/<traceId>'
+```
+
+**Grafana UI — port 3000** (admin / admin) for dashboards and ad-hoc exploration across all three backends.
