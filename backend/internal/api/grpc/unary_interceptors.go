@@ -2,6 +2,8 @@ package grpc
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,14 +13,17 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/telemetry"
+	"github.com/zorcal/theapp/backend/internal/workflows"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
 
@@ -29,6 +34,71 @@ var publicMethods = map[string]struct{}{
 	"/theapp.v1.AuthService/VerifyMagicLink":    {},
 	"/theapp.v1.AuthService/RefreshAccessToken": {},
 	"/theapp.v1.AuthService/RevokeRefreshToken": {},
+}
+
+// idempotencyUnaryInterceptor reads the x-idempotency-key metadata header and attaches a derived DBOS
+// workflow ID to the context so that workflow handlers can deduplicate on it. Must run after
+// authUnaryInterceptor so the authenticated user ID (if any) is available to scope the key. The raw
+// client-supplied key is never used as the workflow ID directly: without scoping it to the caller and
+// request, two different users (or the same user retrying with a different request) that happen to send
+// the same key would collide on the same DBOS workflow, and the second caller would silently receive the
+// first caller's cached response.
+func idempotencyUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			if vals := md.Get("x-idempotency-key"); len(vals) > 0 && vals[0] != "" {
+				payload, err := marshalRequest(req)
+				if err != nil {
+					return nil, fmt.Errorf("marshal request: %w", err)
+				}
+				id, err := scopedWorkflowID(ctx, info.FullMethod, payload, vals[0])
+				if err != nil {
+					return nil, fmt.Errorf("derive workflow id: %w", err)
+				}
+				ctx = workflows.WithWorkflowID(ctx, id)
+			}
+		}
+		return handler(ctx, req)
+	}
+}
+
+// scopedWorkflowID derives a DBOS workflow ID from a caller-supplied idempotency key by hashing it
+// together with the authenticated user ID (empty for unauthenticated callers, e.g. RequestMagicLink),
+// the gRPC method, and the request payload. Binding the request payload means an unauthenticated key can
+// only ever collide with a retry of the exact same request, never with a different caller's request.
+// Requires key to be a valid UUID so keys are bounded in size and shape before reaching DBOS.
+//
+// Only used by unary RPCs. Streaming RPCs don't have a request payload available at this point in the
+// call — see the Idempotency section in README.md.
+func scopedWorkflowID(ctx context.Context, method string, payload []byte, key string) (string, error) {
+	if _, err := uuid.Parse(key); err != nil {
+		return "", status.Error(codes.InvalidArgument, "x-idempotency-key must be a valid UUID")
+	}
+
+	userID, _ := UserIDFromContext(ctx)
+
+	h := sha256.New()
+	h.Write([]byte(userID.String()))
+	h.Write([]byte{0})
+	h.Write([]byte(method))
+	h.Write([]byte{0})
+	h.Write(payload)
+	h.Write([]byte{0})
+	h.Write([]byte(key))
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// marshalRequest deterministically serializes req for use in scopedWorkflowID.
+func marshalRequest(req any) ([]byte, error) {
+	msg, ok := req.(proto.Message)
+	if !ok {
+		return nil, status.Error(codes.Internal, "request does not implement proto.Message")
+	}
+	payload, err := proto.MarshalOptions{Deterministic: true}.Marshal(msg)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "marshal request for idempotency scoping")
+	}
+	return payload, nil
 }
 
 // authUnaryInterceptor validates the JWT Bearer token on every method not in

@@ -46,6 +46,13 @@ func (s *CaptureEmailSender) MagicLinkToken(t *testing.T) string {
 	return ""
 }
 
+// Count returns the number of messages captured so far.
+func (s *CaptureEmailSender) Count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.messages)
+}
+
 func (s *CaptureEmailSender) lastMessage(t *testing.T) email.Message {
 	t.Helper()
 	s.mu.Lock()

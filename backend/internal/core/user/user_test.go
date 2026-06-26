@@ -19,7 +19,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
-func TestCore_flow(t *testing.T) {
+func TestCore_integration(t *testing.T) {
 	ctx := context.Background()
 	core := NewCore(pguser.NewStore(pgtest.New(t, ctx)))
 

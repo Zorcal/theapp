@@ -15,9 +15,10 @@ import (
 
 // ServerConfig contains all the mandatory systems required by the GRPC server.
 type ServerConfig struct {
-	Log      *slog.Logger
-	UserCore UserCore
-	AuthCore AuthCore
+	Log              *slog.Logger
+	UserCore         UserCore
+	AuthCore         AuthCore
+	WorkflowAuthCore WorkflowAuthCore
 	// JWTKey is the HMAC secret used to validate access tokens.
 	JWTKey      []byte
 	JWTIssuer   string
@@ -32,17 +33,23 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	srv := grpc.NewServer(
 		grpc.MaxRecvMsgSize(2*1024*1024), // 2mb
 		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithFilter(notGRPCInfrastructure))),
+		// recovery interceptor must run after error interceptor so a caught panic still gets error's structured log
+		// (trace ID, status-level mapping) instead of unwinding past it, but before any other interceptor so panics
+		// from parsing untrusted input there don't crash the process. logging and error themselves are left
+		// unprotected: they don't parse untrusted input, so a panic there is considered a programming error, not a
+		// runtime risk worth guarding against.
 		grpc.ChainUnaryInterceptor(
 			loggingUnaryInterceptor(cfg.Log),
 			errorUnaryInterceptor(cfg.Log),
-			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
 			recoveryUnaryInterceptor(),
+			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
+			idempotencyUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			loggingStreamInterceptor(cfg.Log),
 			errorStreamInterceptor(cfg.Log),
-			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
 			recoveryStreamInterceptor(),
+			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
 		),
 	)
 
@@ -52,7 +59,8 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	})
 
 	pb.RegisterAuthServiceServer(srv, &authService{
-		authCore: cfg.AuthCore,
+		authCore:         cfg.AuthCore,
+		workflowAuthCore: cfg.WorkflowAuthCore,
 	})
 
 	if cfg.Reflection {

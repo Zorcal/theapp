@@ -19,6 +19,9 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
 
+// Streaming RPCs do not honor x-idempotency-key: there is no safe way to derive a scoped workflow ID for
+// them yet. See the Idempotency section in README.md for why and what's needed to support it.
+
 // authStreamInterceptor is the streaming counterpart of authUnaryInterceptor.
 func authStreamInterceptor(jwtKey []byte, issuer, audience string) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {

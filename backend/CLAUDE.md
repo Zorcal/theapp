@@ -32,6 +32,10 @@ Assign and check an error in the same `if` statement when no other values are ne
 
 Order functions by importance: exported and primary functions first, helpers at the bottom. Group functions by relevance.
 
+## Imports
+
+Avoid import aliases. Only alias an import when two imported packages would otherwise have the same name and both are used in the same file.
+
 ## Testing conventions
 
 ### Table tests
@@ -40,6 +44,7 @@ Order functions by importance: exported and primary functions first, helpers at 
 - The `name` field describes only what differentiates the case — assume the function under test is known.
 - No blank line between the slice declaration and the `for` loop.
 - Never use a `wantErr bool` field. Split success and error cases into separate functions named `TestXyz` and `TestXyz_error`.
+- Each test case struct field on its own line, using named fields.
 
 ### Error reporting
 
@@ -48,6 +53,7 @@ Order functions by importance: exported and primary functions first, helpers at 
 - Print got before want.
 - Use `t.Errorf` when the test can still make further assertions after the failure.
 - Use `t.Fatalf` only when the test cannot meaningfully continue — typically failed setup or an unexpected error that leaves no result to check.
+- Outside table tests, declare `got` and `want` together — `if got, want := f(x), y; got != want { t.Errorf("f(%v) = %v, want %v", x, got, want) }` — and use `want` in the message instead of hardcoding the expected value again.
 
 ```go
 // Good
@@ -117,13 +123,3 @@ Run `golangci-lint run ./...` from `backend/` after finishing a change. Fix all 
 Proto schemas live in `schemas/` at the repo root. Generated pb files are committed under
 `internal/api/grpc/internal/pb/`. To regenerate them after editing a `.proto` file, run
 `make generate` from the repo root.
-
-## Mocking interfaces
-
-Use [moq](https://github.com/matryer/moq) to generate mocks. Place a `go:generate` directive on the file that defines the interface, then run `go generate ./...` to produce the mock:
-
-```go
-//go:generate moq -rm -fmt goimports -out storer_moq_test.go . Storer:MockedStorer
-```
-
-Never write mocks by hand.

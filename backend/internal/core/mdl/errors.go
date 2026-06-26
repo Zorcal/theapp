@@ -13,3 +13,7 @@ var ErrAlreadyExists = errors.New("already exists")
 // consumed, revoked, or not found. A single sentinel avoids leaking which
 // condition applies.
 var ErrTokenInvalid = errors.New("token invalid")
+
+// ErrRateLimited is returned when a request is rejected because the caller
+// issued a prior request too recently.
+var ErrRateLimited = errors.New("rate limited")

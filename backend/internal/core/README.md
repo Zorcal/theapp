@@ -6,14 +6,14 @@ The application's core business logic. Other application-specific code that isn'
 
 - `mdl/` — domain types shared across layers. Includes output types (e.g. `User`) and operation input types (e.g. `CreateUser`, `UpdateUser`). Input types carry exactly the fields the caller supplies — never reuse an output type as an input.
 - `pgstores/` — Postgres access, one package per store (e.g. `pguser`). Each store defines its own types.
-- `<core>/` (e.g. `user/`) — business logic. Operates on `mdl` types and composes one or more `pgstores`.
+- `<pkg>/` (e.g. `user/`) — business logic. Operates on `mdl` types and composes one or more `pgstores`.
 
 ## Dependency graph
 
 ```
-        ┌────────┐
-        │ <core> │
-        └───┬────┘
+        ┌───────┐
+        │ <pkg> │
+        └───┬───┘
             │
      ┌──────┴──────┐
      ▼             ▼
@@ -41,7 +41,7 @@ The `pgstores` layer mirrors the same struct, and the dynamic SQL is built from 
 
 ## Conversions
 
-Each core domain package (e.g. `user/`) owns a `conv.go` that covers all type conversions between `mdl` and `pgstores` types. Define one function per direction — never construct a foreign type inline in a core method:
+Each core package (e.g. `user/`) owns a `conv.go` that covers all type conversions between `mdl` and `pgstores` types. Define one function per direction — never construct a foreign type inline in a core method:
 
 ```
 mdl.CreateUser  →  pguser.CreateUser   (createUserToPG)
@@ -83,9 +83,9 @@ Nesting is safe: if `RunTx` is called with a context that already carries a tran
 
 ## Testing
 
-Each core domain package uses two complementary layers of tests:
+Each core package uses two complementary layers of tests:
 
-- **Unit tests** — mock the storer interface(s) (via moq) and cover the bulk of the logic: conversions, error wrapping, edge cases. Fast, no database required.
-- **Flow tests** — use a real database via `pgtest` and cover the happy path end-to-end through the actual store. One or two per domain is enough; their job is to catch wiring mistakes that mocks cannot, not to duplicate unit test coverage.
+- **Unit tests** — mock the storer interface(s) and cover the bulk of the logic: conversions, error wrapping, edge cases. Fast, no database required.
+- **Integration tests** (named `Test<Core>_integration`) — use a real database via `pgtest` and cover the happy path end-to-end through the actual store. One or two per package is enough; their job is to catch wiring mistakes that mocks cannot, not to duplicate unit test coverage.
 
 Every new (exported) method added to a `core/` package or a `pgstores/` package requires tests. For `pgstores/`, that means integration tests against a real database following the patterns in the existing `store_test.go` files.

@@ -163,6 +163,8 @@ linters:
         - "github.com/jackc/pgx/v5.*"
         # Allow go-cmp options
         - "github.com/google/go-cmp/cmp.Option"
+        # Allow DBOS context interface
+        - "github.com/dbos-inc/dbos-transact-golang/dbos.DBOSContext"
   exclusions:
     rules:
       - path: main\.go

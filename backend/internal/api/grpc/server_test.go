@@ -27,6 +27,8 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
 	"github.com/zorcal/theapp/backend/internal/testingx"
+	workflowsauth "github.com/zorcal/theapp/backend/internal/workflows/auth"
+	"github.com/zorcal/theapp/backend/internal/workflows/dbostest"
 )
 
 // testJWTKey is the HMAC key used to sign JWTs in tests. All test servers use
@@ -73,6 +75,8 @@ type ServerIntegrationTest struct {
 func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 	t.Helper()
 
+	log := testingx.NewLogger(t)
+
 	// context.Background() rather than t.Context(): pgtest registers a Cleanup that drops the database, which runs
 	// after the test ends — at which point t.Context() is already canceled.
 	pool := pgtest.New(t, context.Background())
@@ -82,7 +86,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 
 	emailSender := &testingx.CaptureEmailSender{}
 
-	authCore := auth.NewCore(pgAuthStore, pgUserStore, emailSender, pgdb.NewTransactor(pool), auth.Config{
+	authCoreCfg := auth.Config{
 		JWTKey:             testJWTKey,
 		JWTIssuer:          testJWTIssuer,
 		JWTAudience:        testJWTAudience,
@@ -92,16 +96,25 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		MagicLinkRateLimit: 0,
 		AccessTokenTTL:     15 * time.Minute,
 		RefreshTokenTTL:    720 * time.Hour,
-	})
+	}
+
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgdb.NewTransactor(pool), authCoreCfg)
 	userCore := user.NewCore(pgUserStore)
 
+	dbosCtx := dbostest.New(t, context.Background(), pool)
+
+	workflowAuthCore := workflowsauth.NewWorkflowCore(authCore, emailSender, authCoreCfg, dbosCtx)
+	workflowsauth.RegisterWorkflows(dbosCtx, workflowAuthCore)
+	dbostest.Launch(t, dbosCtx)
+
 	conn := newBufconnClientConn(t, ServerConfig{
-		Log:         testingx.NewLogger(t),
-		UserCore:    userCore,
-		AuthCore:    authCore,
-		JWTKey:      testJWTKey,
-		JWTIssuer:   testJWTIssuer,
-		JWTAudience: testJWTAudience,
+		Log:              log,
+		UserCore:         userCore,
+		AuthCore:         authCore,
+		WorkflowAuthCore: workflowAuthCore,
+		JWTKey:           testJWTKey,
+		JWTIssuer:        testJWTIssuer,
+		JWTAudience:      testJWTAudience,
 	})
 
 	return ServerIntegrationTest{

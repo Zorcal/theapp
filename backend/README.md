@@ -14,6 +14,7 @@ backend/
 │   │   └── pgstores/
 │   │       └── <pkg>/   # Postgres store for one domain (e.g. pguser/)
 │   ├── data/        # database infrastructure
+│   ├── workflows/   # durable, DBOS-backed operations — see internal/workflows/README.md
 │   └── <pkg>/       # other packages live here directly
 └── pkg/             # general-purpose, app-agnostic packages
     ├── <pkg>/       # standalone utility packages
@@ -23,6 +24,16 @@ backend/
 When a new package has no obvious home, put it directly under `internal/`. Group under a sub-directory only when there is a natural umbrella concept (as with `core/` or `clients/`). Each sub-directory with conventions has its own README.
 
 Code belongs in `pkg/` only if it has no dependency on this application's domain and would make sense in any Go project. Extensions to standard library packages go under `pkg/x/<pkgname>x`.
+
+## Mocking
+
+The project uses [moq](https://github.com/matryer/moq) to generate mocks for interfaces, by default. Place a `go:generate` directive on the file that defines the interface, then run `go generate ./...` to produce the mock:
+
+```go
+//go:generate moq -rm -fmt goimports -out storer_moq_test.go . Storer:MockedStorer
+```
+
+Never write mocks by hand.
 
 ## Authentication
 

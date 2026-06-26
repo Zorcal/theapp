@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
-	"embed"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -18,27 +17,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
-	htmltmpl "html/template"
-	texttmpl "text/template"
-
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
-	"github.com/zorcal/theapp/backend/internal/email"
 )
-
-//go:embed templates/magic_link_email.txt templates/magic_link_email.html
-var emailFS embed.FS
-
-var (
-	magicLinkEmailTextTmpl = texttmpl.Must(texttmpl.ParseFS(emailFS, "templates/magic_link_email.txt"))
-	magicLinkEmailHTMLTmpl = htmltmpl.Must(htmltmpl.ParseFS(emailFS, "templates/magic_link_email.html"))
-)
-
-type magicLinkTemplateData struct {
-	Link string
-	TTL  string
-}
 
 // Transactor runs a function inside a database transaction.
 type Transactor interface {
@@ -104,39 +86,35 @@ type Config struct {
 
 // Core holds the business logic for authentication.
 type Core struct {
-	authStorer  AuthStorer
-	userStorer  UserStorer
-	emailSender email.Sender
-	transactor  Transactor
-	cfg         Config
+	authStorer AuthStorer
+	userStorer UserStorer
+	transactor Transactor
+	cfg        Config
 }
 
 // NewCore constructs a Core with the given dependencies and configuration.
-func NewCore(as AuthStorer, us UserStorer, es email.Sender, tr Transactor, cfg Config) *Core {
+func NewCore(as AuthStorer, us UserStorer, tr Transactor, cfg Config) *Core {
 	return &Core{
-		authStorer:  as,
-		userStorer:  us,
-		emailSender: es,
-		transactor:  tr,
-		cfg:         cfg,
+		authStorer: as,
+		userStorer: us,
+		transactor: tr,
+		cfg:        cfg,
 	}
 }
 
-// RequestMagicLink sends a sign-in link to emailAddr. If no account exists for the email address, one is created
-// automatically so that registration and first login are the same act.
-// When MagicLinkRateLimit > 0, repeated requests within the cooldown window silently succeed without sending a new
-// link — this avoids leaking whether the address is registered.
-func (c *Core) RequestMagicLink(ctx context.Context, emailAddr string) error {
+// MagicLinkToken ensures the user exists, rate-checks, invalidates prior tokens, and creates a
+// new one inside a transaction. Returns the raw token.
+// Returns [mdl.ErrRateLimited] if a token was already issued to emailAddr within the rate-limit window.
+func (c *Core) MagicLinkToken(ctx context.Context, emailAddr string) (string, error) {
 	emailAddr = strings.ToLower(emailAddr)
 
 	pgUser, err := c.userStorer.GetOrCreateUserByEmail(ctx, emailAddr)
 	if err != nil {
-		return fmt.Errorf("get or create user: %w", err)
+		return "", fmt.Errorf("get or create user: %w", err)
 	}
 
-	// Wrap the token-lifecycle operations in a transaction. A row lock on the user record is
-	// acquired first to serialize concurrent requests and prevent TOCTOU on the rate-limit check.
 	var rawTok string
+	var rateLimited bool
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
 		if err := c.authStorer.LockUser(ctx, pgUser.ID); err != nil {
 			return fmt.Errorf("lock user: %w", err)
@@ -148,7 +126,8 @@ func (c *Core) RequestMagicLink(ctx context.Context, emailAddr string) error {
 				return fmt.Errorf("check magic link rate limit: %w", err)
 			}
 			if err == nil && time.Since(lastSent) < c.cfg.MagicLinkRateLimit {
-				return nil // rate limited; rawTok stays ""
+				rateLimited = true
+				return nil
 			}
 		}
 
@@ -168,38 +147,14 @@ func (c *Core) RequestMagicLink(ctx context.Context, emailAddr string) error {
 
 		return nil
 	}); err != nil {
-		return fmt.Errorf("run tx: %w", err)
+		return "", fmt.Errorf("run tx: %w", err)
 	}
 
-	if rawTok == "" {
-		return nil // rate limited
+	if rateLimited {
+		return "", mdl.ErrRateLimited
 	}
 
-	link := c.cfg.MagicLinkBaseURL + "?token=" + rawTok
-	tmplData := magicLinkTemplateData{Link: link, TTL: c.cfg.MagicLinkTTL.String()}
-
-	// Execute errors are unreachable: both templates only reference the Link and
-	// TTL fields which magicLinkTemplateData always provides.
-	var textBuf, htmlBuf strings.Builder
-	if err := magicLinkEmailTextTmpl.Execute(&textBuf, tmplData); err != nil {
-		return fmt.Errorf("render magic link text email: %w", err)
-	}
-	if err := magicLinkEmailHTMLTmpl.Execute(&htmlBuf, tmplData); err != nil {
-		return fmt.Errorf("render magic link html email: %w", err)
-	}
-
-	msg := email.Message{
-		From:     c.cfg.MagicLinkFromEmail,
-		To:       []string{emailAddr},
-		Subject:  "Your sign-in link",
-		TextBody: textBuf.String(),
-		HTMLBody: htmlBuf.String(),
-	}
-	if err := c.emailSender.SendEmail(ctx, msg); err != nil {
-		return fmt.Errorf("send magic link email: %w", err)
-	}
-
-	return nil
+	return rawTok, nil
 }
 
 // VerifyMagicLink validates rawToken and returns an access/refresh token pair.

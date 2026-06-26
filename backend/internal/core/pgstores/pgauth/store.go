@@ -140,8 +140,14 @@ func (s *Store) CreateRefreshToken(ctx context.Context, cr CreateRefreshToken) (
 // LockUser acquires a transaction-level advisory lock keyed on userID, serializing concurrent
 // operations for the same user. Must be called within a transaction; the lock is released
 // automatically when the transaction ends.
+//
+// Uses the two-key form of pg_advisory_xact_lock, namespaced with hashtext('auth.user'), so this
+// lock can never collide with an unrelated single-key advisory lock some other feature takes on the
+// same small integer. Advisory locks share one keyspace per database; without a namespace, a future
+// pg_advisory_xact_lock(n) call for something unrelated to auth would silently contend with the
+// magic-link flow for user id n.
 func (s *Store) LockUser(ctx context.Context, userID int) error {
-	return pgdb.RunExec(ctx, s.pool, "SELECT pg_advisory_xact_lock($1)", userID)
+	return pgdb.RunExec(ctx, s.pool, "SELECT pg_advisory_xact_lock(hashtext('auth.user'), $1)", userID)
 }
 
 // ConsumeRefreshToken atomically revokes the valid (unexpired, unrevoked) refresh token with the
