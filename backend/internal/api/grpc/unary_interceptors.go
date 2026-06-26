@@ -19,6 +19,7 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/telemetry"
+	"github.com/zorcal/theapp/backend/internal/workflows"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
 
@@ -29,6 +30,19 @@ var publicMethods = map[string]struct{}{
 	"/theapp.v1.AuthService/VerifyMagicLink":    {},
 	"/theapp.v1.AuthService/RefreshAccessToken": {},
 	"/theapp.v1.AuthService/RevokeRefreshToken": {},
+}
+
+// idempotencyUnaryInterceptor reads the x-idempotency-key metadata header and attaches it to the
+// context so that workflow handlers can use it as a DBOS workflow ID for deduplication.
+func idempotencyUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			if vals := md.Get("x-idempotency-key"); len(vals) > 0 && vals[0] != "" {
+				ctx = workflows.WithWorkflowID(ctx, vals[0])
+			}
+		}
+		return handler(ctx, req)
+	}
 }
 
 // authUnaryInterceptor validates the JWT Bearer token on every method not in

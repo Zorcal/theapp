@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ardanlabs/conf/v3"
+	"github.com/dbos-inc/dbos-transact-golang/dbos"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lmittmann/tint"
 	"github.com/pgx-contrib/pgxotel"
@@ -30,6 +31,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgschema"
 	"github.com/zorcal/theapp/backend/internal/email"
 	"github.com/zorcal/theapp/backend/internal/telemetry"
+	workflowsauth "github.com/zorcal/theapp/backend/internal/workflows/auth"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
 
@@ -237,7 +239,7 @@ func run(ctx context.Context, cfg Config) error {
 	// Setup cores.
 
 	userCore := user.NewCore(pgUserStore)
-	authCore := auth.NewCore(pgAuthStore, pgUserStore, emailSender, pgdb.NewTransactor(pgPool), auth.Config{
+	authCoreCfg := auth.Config{
 		JWTKey:             []byte(cfg.Auth.JWTSecret),
 		JWTIssuer:          cfg.Auth.JWTIssuer,
 		JWTAudience:        cfg.Auth.JWTAudience,
@@ -247,7 +249,29 @@ func run(ctx context.Context, cfg Config) error {
 		MagicLinkRateLimit: cfg.Auth.MagicLinkRateLimit,
 		AccessTokenTTL:     cfg.Auth.AccessTokenTTL,
 		RefreshTokenTTL:    cfg.Auth.RefreshTokenTTL,
+	}
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgdb.NewTransactor(pgPool), authCoreCfg)
+
+	// Setup DBOS.
+
+	log.InfoContext(ctx, "Setting up DBOS")
+
+	dbosCtx, err := dbos.NewDBOSContext(ctx, dbos.Config{
+		AppName:      appName,
+		SystemDBPool: pgPool,
+		Logger:       log,
 	})
+	if err != nil {
+		return fmt.Errorf("init dbos: %w", err)
+	}
+
+	authWorkflowCore := workflowsauth.NewWorkflowCore(authCore, emailSender, authCoreCfg, dbosCtx)
+	workflowsauth.RegisterWorkflows(dbosCtx, authWorkflowCore)
+
+	if err := dbos.Launch(dbosCtx); err != nil {
+		return fmt.Errorf("launch dbos: %w", err)
+	}
+	defer dbos.Shutdown(dbosCtx, 30*time.Second)
 
 	// Setup gRPC server.
 
@@ -255,13 +279,14 @@ func run(ctx context.Context, cfg Config) error {
 	defer log.InfoContext(ctx, "gRPC server stopped")
 
 	srv := grpc.NewServer(grpc.ServerConfig{
-		Log:         log,
-		UserCore:    userCore,
-		AuthCore:    authCore,
-		JWTKey:      []byte(cfg.Auth.JWTSecret),
-		JWTIssuer:   cfg.Auth.JWTIssuer,
-		JWTAudience: cfg.Auth.JWTAudience,
-		Reflection:  cfg.IsLocalEnvironment(),
+		Log:              log,
+		UserCore:         userCore,
+		AuthCore:         authCore,
+		WorkflowAuthCore: authWorkflowCore,
+		JWTKey:           []byte(cfg.Auth.JWTSecret),
+		JWTIssuer:        cfg.Auth.JWTIssuer,
+		JWTAudience:      cfg.Auth.JWTAudience,
+		Reflection:       cfg.IsLocalEnvironment(),
 	})
 
 	// Setup HTTP gateway server.

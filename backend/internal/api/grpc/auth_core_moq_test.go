@@ -24,9 +24,6 @@ var _ AuthCore = &MockedAuthCore{}
 //			RefreshAccessTokenFunc: func(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error) {
 //				panic("mock out the RefreshAccessToken method")
 //			},
-//			RequestMagicLinkFunc: func(ctx context.Context, email string) error {
-//				panic("mock out the RequestMagicLink method")
-//			},
 //			RevokeAllUserRefreshTokensFunc: func(ctx context.Context, userExternalID uuid.UUID) error {
 //				panic("mock out the RevokeAllUserRefreshTokens method")
 //			},
@@ -46,9 +43,6 @@ type MockedAuthCore struct {
 	// RefreshAccessTokenFunc mocks the RefreshAccessToken method.
 	RefreshAccessTokenFunc func(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error)
 
-	// RequestMagicLinkFunc mocks the RequestMagicLink method.
-	RequestMagicLinkFunc func(ctx context.Context, email string) error
-
 	// RevokeAllUserRefreshTokensFunc mocks the RevokeAllUserRefreshTokens method.
 	RevokeAllUserRefreshTokensFunc func(ctx context.Context, userExternalID uuid.UUID) error
 
@@ -66,13 +60,6 @@ type MockedAuthCore struct {
 			Ctx context.Context
 			// RawToken is the rawToken argument value.
 			RawToken string
-		}
-		// RequestMagicLink holds details about calls to the RequestMagicLink method.
-		RequestMagicLink []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Email is the email argument value.
-			Email string
 		}
 		// RevokeAllUserRefreshTokens holds details about calls to the RevokeAllUserRefreshTokens method.
 		RevokeAllUserRefreshTokens []struct {
@@ -97,7 +84,6 @@ type MockedAuthCore struct {
 		}
 	}
 	lockRefreshAccessToken         sync.RWMutex
-	lockRequestMagicLink           sync.RWMutex
 	lockRevokeAllUserRefreshTokens sync.RWMutex
 	lockRevokeRefreshToken         sync.RWMutex
 	lockVerifyMagicLink            sync.RWMutex
@@ -136,42 +122,6 @@ func (mock *MockedAuthCore) RefreshAccessTokenCalls() []struct {
 	mock.lockRefreshAccessToken.RLock()
 	calls = mock.calls.RefreshAccessToken
 	mock.lockRefreshAccessToken.RUnlock()
-	return calls
-}
-
-// RequestMagicLink calls RequestMagicLinkFunc.
-func (mock *MockedAuthCore) RequestMagicLink(ctx context.Context, email string) error {
-	if mock.RequestMagicLinkFunc == nil {
-		panic("MockedAuthCore.RequestMagicLinkFunc: method is nil but AuthCore.RequestMagicLink was just called")
-	}
-	callInfo := struct {
-		Ctx   context.Context
-		Email string
-	}{
-		Ctx:   ctx,
-		Email: email,
-	}
-	mock.lockRequestMagicLink.Lock()
-	mock.calls.RequestMagicLink = append(mock.calls.RequestMagicLink, callInfo)
-	mock.lockRequestMagicLink.Unlock()
-	return mock.RequestMagicLinkFunc(ctx, email)
-}
-
-// RequestMagicLinkCalls gets all the calls that were made to RequestMagicLink.
-// Check the length with:
-//
-//	len(mockedAuthCore.RequestMagicLinkCalls())
-func (mock *MockedAuthCore) RequestMagicLinkCalls() []struct {
-	Ctx   context.Context
-	Email string
-} {
-	var calls []struct {
-		Ctx   context.Context
-		Email string
-	}
-	mock.lockRequestMagicLink.RLock()
-	calls = mock.calls.RequestMagicLink
-	mock.lockRequestMagicLink.RUnlock()
 	return calls
 }
 

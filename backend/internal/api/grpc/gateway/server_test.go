@@ -137,12 +137,13 @@ func newTestGRPCBufconn(t *testing.T) *bufconn.Listener {
 	})
 
 	srv := grpcapi.NewServer(grpcapi.ServerConfig{
-		Log:         testingx.NewLogger(t),
-		UserCore:    &noopUserCore{},
-		AuthCore:    &noopAuthCore{},
-		JWTKey:      []byte("test-key"),
-		JWTIssuer:   "test",
-		JWTAudience: "test",
+		Log:              testingx.NewLogger(t),
+		UserCore:         &noopUserCore{},
+		AuthCore:         &noopAuthCore{},
+		WorkflowAuthCore: &noopWorkflowAuthCore{},
+		JWTKey:           []byte("test-key"),
+		JWTIssuer:        "test",
+		JWTAudience:      "test",
 	})
 	t.Cleanup(srv.Stop)
 
@@ -175,7 +176,6 @@ func (noopUserCore) UpdateUser(_ context.Context, _ mdl.UpdateUser) (mdl.User, e
 
 type noopAuthCore struct{}
 
-func (noopAuthCore) RequestMagicLink(_ context.Context, _ string) error { return nil }
 func (noopAuthCore) VerifyMagicLink(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
 	return mdl.AuthTokenPair{}, nil
 }
@@ -185,3 +185,7 @@ func (noopAuthCore) RefreshAccessToken(_ context.Context, _ string) (mdl.AuthTok
 }
 func (noopAuthCore) RevokeRefreshToken(_ context.Context, _ string) error            { return nil }
 func (noopAuthCore) RevokeAllUserRefreshTokens(_ context.Context, _ uuid.UUID) error { return nil }
+
+type noopWorkflowAuthCore struct{}
+
+func (noopWorkflowAuthCore) RequestMagicLink(_ context.Context, _ string) error { return nil }

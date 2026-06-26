@@ -26,6 +26,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
+	"github.com/zorcal/theapp/backend/internal/email"
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
@@ -82,7 +83,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 
 	emailSender := &testingx.CaptureEmailSender{}
 
-	authCore := auth.NewCore(pgAuthStore, pgUserStore, emailSender, pgdb.NewTransactor(pool), auth.Config{
+	authCoreCfg := auth.Config{
 		JWTKey:             testJWTKey,
 		JWTIssuer:          testJWTIssuer,
 		JWTAudience:        testJWTAudience,
@@ -92,16 +93,25 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		MagicLinkRateLimit: 0,
 		AccessTokenTTL:     15 * time.Minute,
 		RefreshTokenTTL:    720 * time.Hour,
-	})
+	}
+
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgdb.NewTransactor(pool), authCoreCfg)
 	userCore := user.NewCore(pgUserStore)
 
+	workflowAuthCore := &directWorkflowAuthCore{
+		core:        authCore,
+		emailSender: emailSender,
+		cfg:         authCoreCfg,
+	}
+
 	conn := newBufconnClientConn(t, ServerConfig{
-		Log:         testingx.NewLogger(t),
-		UserCore:    userCore,
-		AuthCore:    authCore,
-		JWTKey:      testJWTKey,
-		JWTIssuer:   testJWTIssuer,
-		JWTAudience: testJWTAudience,
+		Log:              testingx.NewLogger(t),
+		UserCore:         userCore,
+		AuthCore:         authCore,
+		WorkflowAuthCore: workflowAuthCore,
+		JWTKey:           testJWTKey,
+		JWTIssuer:        testJWTIssuer,
+		JWTAudience:      testJWTAudience,
 	})
 
 	return ServerIntegrationTest{
@@ -160,6 +170,31 @@ func equateApproxTimestamppb() cmp.Option {
 	return cmp.Comparer(func(a, b *timestamppb.Timestamp) bool {
 		d := a.AsTime().Sub(b.AsTime())
 		return math.Abs(float64(d)) <= float64(tolerance)
+	})
+}
+
+// directWorkflowAuthCore is a thin WorkflowAuthCore adapter for integration tests. It bypasses DBOS and
+// calls the auth core and email sender directly so tests don't need a multi-connection pool.
+type directWorkflowAuthCore struct {
+	core        *auth.Core
+	emailSender email.Sender
+	cfg         auth.Config
+}
+
+func (d *directWorkflowAuthCore) RequestMagicLink(ctx context.Context, emailAddr string) error {
+	tok, err := d.core.MagicLinkToken(ctx, emailAddr)
+	if err != nil {
+		return err
+	}
+	if tok == "" {
+		return nil
+	}
+	signInURL := d.cfg.MagicLinkBaseURL + "?token=" + tok
+	return d.emailSender.SendEmail(ctx, email.Message{
+		From:     d.cfg.MagicLinkFromEmail,
+		To:       []string{emailAddr},
+		Subject:  "Your sign-in link",
+		TextBody: signInURL,
 	})
 }
 

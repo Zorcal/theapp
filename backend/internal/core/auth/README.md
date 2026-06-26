@@ -12,6 +12,4 @@ Magic-link authentication and JWT/refresh-token issuance.
 
 **HS256 (symmetric) JWT signing.** The same key signs and verifies tokens. This is fine for a single-service deployment — there is no verifier that shouldn't also be able to mint tokens. If token verification ever needs to happen in a separate service, switch to RS256 or ES256 so the signing key stays private.
 
-**Magic-link token committed before email is sent.** The transaction that stores the token and invalidates prior tokens commits before `SendEmail` is called. Without this ordering, a token stored inside the transaction would be unreachable after commit if the email send always fails — but the side effect is that a `SendEmail` failure leaves a stored token the user cannot retrieve, and the rate-limit cooldown prevents a fresh request for `MagicLinkRateLimit`. This is acceptable given email delivery errors are transient.
-
 **Rate-limit check includes consumed and expired tokens.** `LatestMagicLinkTokenCreatedAt` returns the `created_at` of the most recent token regardless of whether it was consumed or has expired. Consuming a link and immediately requesting a new one still triggers the cooldown. This is intentional: it prevents clients from link-farming by rapidly consuming and re-requesting, and the 1-minute window matches the expected re-delivery delay for transient email failures.

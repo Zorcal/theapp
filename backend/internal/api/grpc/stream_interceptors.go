@@ -13,11 +13,26 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/zorcal/theapp/backend/internal/telemetry"
+	"github.com/zorcal/theapp/backend/internal/workflows"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
+
+// idempotencyStreamInterceptor is the streaming counterpart of idempotencyUnaryInterceptor.
+func idempotencyStreamInterceptor() grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		ctx := ss.Context()
+		if md, ok := metadata.FromIncomingContext(ctx); ok {
+			if vals := md.Get("x-idempotency-key"); len(vals) > 0 && vals[0] != "" {
+				ss = newCtxOverrideStream(ss, workflows.WithWorkflowID(ctx, vals[0]))
+			}
+		}
+		return handler(srv, ss)
+	}
+}
 
 // authStreamInterceptor is the streaming counterpart of authUnaryInterceptor.
 func authStreamInterceptor(jwtKey []byte, issuer, audience string) grpc.StreamServerInterceptor {

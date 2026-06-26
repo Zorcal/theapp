@@ -20,14 +20,15 @@ import (
 type authService struct {
 	pb.UnimplementedAuthServiceServer
 
-	authCore AuthCore
+	authCore         AuthCore
+	workflowAuthCore WorkflowAuthCore
 }
 
 //go:generate moq -rm -fmt goimports -out auth_core_moq_test.go . AuthCore:MockedAuthCore
 
-// AuthCore defines the auth operations required by the gRPC layer.
+// AuthCore handles direct, non-durable auth operations.
+// Implemented by *core/auth.Core.
 type AuthCore interface {
-	RequestMagicLink(ctx context.Context, email string) error
 	// VerifyMagicLink validates a magic-link token and returns a token pair.
 	// Returns [mdl.ErrTokenInvalid] if the token is expired, consumed, or not found.
 	VerifyMagicLink(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error)
@@ -37,8 +38,16 @@ type AuthCore interface {
 	// RevokeRefreshToken invalidates a refresh token.
 	// Returns [mdl.ErrTokenInvalid] if the token is not found or already revoked.
 	RevokeRefreshToken(ctx context.Context, rawToken string) error
-	// RevokeAllUserRefreshTokens revokes all active refresh tokens for the user, ending all sessions.
+	// RevokeAllUserRefreshTokens revokes all active refresh tokens for the user.
 	RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uuid.UUID) error
+}
+
+//go:generate moq -rm -fmt goimports -out workflow_auth_core_moq_test.go . WorkflowAuthCore:MockedWorkflowAuthCore
+
+// WorkflowAuthCore handles durable auth operations backed by DBOS.
+// Implemented by *workflows/auth.WorkflowCore.
+type WorkflowAuthCore interface {
+	RequestMagicLink(ctx context.Context, email string) error
 }
 
 func (s *authService) RequestMagicLink(ctx context.Context, req *pb.RequestMagicLinkRequest) (*emptypb.Empty, error) {
@@ -53,7 +62,7 @@ func (s *authService) RequestMagicLink(ctx context.Context, req *pb.RequestMagic
 		})
 	}
 
-	if err := s.authCore.RequestMagicLink(ctx, req.GetEmail()); err != nil {
+	if err := s.workflowAuthCore.RequestMagicLink(ctx, req.GetEmail()); err != nil {
 		return nil, fmt.Errorf("request magic link: %w", err)
 	}
 

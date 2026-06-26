@@ -15,9 +15,10 @@ import (
 
 // ServerConfig contains all the mandatory systems required by the GRPC server.
 type ServerConfig struct {
-	Log      *slog.Logger
-	UserCore UserCore
-	AuthCore AuthCore
+	Log              *slog.Logger
+	UserCore         UserCore
+	AuthCore         AuthCore
+	WorkflowAuthCore WorkflowAuthCore
 	// JWTKey is the HMAC secret used to validate access tokens.
 	JWTKey      []byte
 	JWTIssuer   string
@@ -35,12 +36,14 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 		grpc.ChainUnaryInterceptor(
 			loggingUnaryInterceptor(cfg.Log),
 			errorUnaryInterceptor(cfg.Log),
+			idempotencyUnaryInterceptor(),
 			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
 			recoveryUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			loggingStreamInterceptor(cfg.Log),
 			errorStreamInterceptor(cfg.Log),
+			idempotencyStreamInterceptor(),
 			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
 			recoveryStreamInterceptor(),
 		),
@@ -52,7 +55,8 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	})
 
 	pb.RegisterAuthServiceServer(srv, &authService{
-		authCore: cfg.AuthCore,
+		authCore:         cfg.AuthCore,
+		workflowAuthCore: cfg.WorkflowAuthCore,
 	})
 
 	if cfg.Reflection {

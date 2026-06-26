@@ -86,13 +86,13 @@ func TestAuth_MagicLinkFlow(t *testing.T) {
 
 func TestAuthService_RequestMagicLink(t *testing.T) {
 	tests := []struct {
-		name     string
-		authCore AuthCore
-		in       *pb.RequestMagicLinkRequest
+		name             string
+		workflowAuthCore WorkflowAuthCore
+		in               *pb.RequestMagicLinkRequest
 	}{
 		{
 			name: "sends link",
-			authCore: &MockedAuthCore{
+			workflowAuthCore: &MockedWorkflowAuthCore{
 				RequestMagicLinkFunc: func(_ context.Context, _ string) error { return nil },
 			},
 			in: &pb.RequestMagicLinkRequest{Email: "alice@test.com"},
@@ -101,8 +101,8 @@ func TestAuthService_RequestMagicLink(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
-				Log:      testingx.NewLogger(t),
-				AuthCore: tt.authCore,
+				Log:              testingx.NewLogger(t),
+				WorkflowAuthCore: tt.workflowAuthCore,
 			})
 
 			if _, err := srvTest.authServiceClient.RequestMagicLink(t.Context(), tt.in); err != nil {
@@ -114,26 +114,26 @@ func TestAuthService_RequestMagicLink(t *testing.T) {
 
 func TestAuthService_RequestMagicLink_error(t *testing.T) {
 	tests := []struct {
-		name     string
-		authCore AuthCore
-		in       *pb.RequestMagicLinkRequest
-		want     *status.Status
+		name             string
+		workflowAuthCore WorkflowAuthCore
+		in               *pb.RequestMagicLinkRequest
+		want             *status.Status
 	}{
 		{
-			name:     "empty email",
-			authCore: &MockedAuthCore{},
-			in:       &pb.RequestMagicLinkRequest{},
-			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
+			name:             "empty email",
+			workflowAuthCore: &MockedWorkflowAuthCore{},
+			in:               &pb.RequestMagicLinkRequest{},
+			want:             status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
 		},
 		{
-			name:     "malformed email",
-			authCore: &MockedAuthCore{},
-			in:       &pb.RequestMagicLinkRequest{Email: "notanemail"},
-			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
+			name:             "malformed email",
+			workflowAuthCore: &MockedWorkflowAuthCore{},
+			in:               &pb.RequestMagicLinkRequest{Email: "notanemail"},
+			want:             status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
 		},
 		{
 			name: "core error",
-			authCore: &MockedAuthCore{
+			workflowAuthCore: &MockedWorkflowAuthCore{
 				RequestMagicLinkFunc: func(_ context.Context, _ string) error {
 					return errors.New("boom")
 				},
@@ -145,8 +145,8 @@ func TestAuthService_RequestMagicLink_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
-				Log:      testingx.NewLogger(t),
-				AuthCore: tt.authCore,
+				Log:              testingx.NewLogger(t),
+				WorkflowAuthCore: tt.workflowAuthCore,
 			})
 
 			_, err := srvTest.authServiceClient.RequestMagicLink(t.Context(), tt.in)

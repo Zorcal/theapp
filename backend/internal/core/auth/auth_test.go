@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
-	"github.com/zorcal/theapp/backend/internal/email"
 )
 
 func TestCore_flow(t *testing.T) {
@@ -24,37 +22,29 @@ func TestCore_flow(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
 
-	var capturedToken string
-	sender := sendEmailFunc(func(_ context.Context, m email.Message) error {
-		parts := strings.SplitN(m.TextBody, "?token=", 2)
-		capturedToken = strings.TrimSpace(parts[1])
-		return nil
-	})
-
 	core := NewCore(
 		pgauth.NewStore(pool),
 		userStore,
-		sender,
 		pgdb.NewTransactor(pool),
 		testConfig(),
 	)
 
-	// RequestMagicLink — new user is created and receives a link.
-	if err := core.RequestMagicLink(ctx, "alice@test.com"); err != nil {
-		t.Fatalf("RequestMagicLink() error = %v", err)
+	// MagicLinkToken — new user is created and a token is returned.
+	firstToken, err := core.MagicLinkToken(ctx, "alice@test.com")
+	if err != nil {
+		t.Fatalf("MagicLinkToken() error = %v", err)
 	}
-	if capturedToken == "" {
-		t.Fatal("RequestMagicLink() did not capture token from email")
+	if firstToken == "" {
+		t.Fatal("MagicLinkToken() = empty, want non-empty token")
 	}
-	firstToken := capturedToken
 
-	// RequestMagicLink again while first token is still live — first token must be invalidated.
-	if err := core.RequestMagicLink(ctx, "alice@test.com"); err != nil {
-		t.Fatalf("RequestMagicLink() second call error = %v", err)
+	// MagicLinkToken again while first token is still live — first token must be invalidated.
+	secondToken, err := core.MagicLinkToken(ctx, "alice@test.com")
+	if err != nil {
+		t.Fatalf("MagicLinkToken() second call error = %v", err)
 	}
-	secondToken := capturedToken
 	if secondToken == firstToken {
-		t.Fatal("RequestMagicLink() second call did not issue a new token")
+		t.Fatal("MagicLinkToken() second call did not issue a new token")
 	}
 	if _, err := core.VerifyMagicLink(ctx, firstToken); !errors.Is(err, mdl.ErrTokenInvalid) {
 		t.Errorf("VerifyMagicLink() first token after re-request error = %v, want mdl.ErrTokenInvalid", err)
@@ -111,7 +101,7 @@ func TestCore_flow(t *testing.T) {
 	}
 }
 
-func TestCore_RequestMagicLink(t *testing.T) {
+func TestCore_MagicLinkToken(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -134,17 +124,7 @@ func TestCore_RequestMagicLink(t *testing.T) {
 		},
 	}
 
-	captureEmail := func() (sender email.Sender, sentTo func() string) {
-		var to string
-		return sendEmailFunc(func(_ context.Context, m email.Message) error {
-			to = m.To[0]
-			return nil
-		}), func() string { return to }
-	}
-
-	t.Run("existing user gets link", func(t *testing.T) {
-		sender, sentTo := captureEmail()
-
+	t.Run("existing user gets token", func(t *testing.T) {
 		userStorerMock := &MockedUserStorer{
 			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 				return pguser.User{
@@ -155,20 +135,18 @@ func TestCore_RequestMagicLink(t *testing.T) {
 			},
 		}
 
-		core := NewCore(authStorerMock, userStorerMock, sender, noopTransactor{}, testConfig())
+		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, testConfig())
 
-		if err := core.RequestMagicLink(ctx, "alice@test.com"); err != nil {
-			t.Fatalf("RequestMagicLink() error = %v", err)
+		tok, err := core.MagicLinkToken(ctx, "alice@test.com")
+		if err != nil {
+			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
-
-		if got, want := sentTo(), "alice@test.com"; got != want {
-			t.Errorf("RequestMagicLink() email sent to %q, want %q", got, want)
+		if tok == "" {
+			t.Error("MagicLinkToken() = empty, want non-empty token")
 		}
 	})
 
-	t.Run("new user is created and gets link", func(t *testing.T) {
-		sender, sentTo := captureEmail()
-
+	t.Run("new user is created and gets token", func(t *testing.T) {
 		userStorerMock := &MockedUserStorer{
 			GetOrCreateUserByEmailFunc: func(_ context.Context, email string) (pguser.User, error) {
 				return pguser.User{
@@ -179,14 +157,14 @@ func TestCore_RequestMagicLink(t *testing.T) {
 			},
 		}
 
-		core := NewCore(authStorerMock, userStorerMock, sender, noopTransactor{}, testConfig())
+		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, testConfig())
 
-		if err := core.RequestMagicLink(ctx, "new@test.com"); err != nil {
-			t.Fatalf("RequestMagicLink() error = %v", err)
+		tok, err := core.MagicLinkToken(ctx, "new@test.com")
+		if err != nil {
+			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
-
-		if got, want := sentTo(), "new@test.com"; got != want {
-			t.Errorf("RequestMagicLink() email sent to %q, want %q", got, want)
+		if tok == "" {
+			t.Error("MagicLinkToken() = empty, want non-empty token")
 		}
 	})
 
@@ -203,19 +181,19 @@ func TestCore_RequestMagicLink(t *testing.T) {
 			},
 		}
 
-		core := NewCore(authStorerMock, userStorerMock, noopEmail, noopTransactor{}, testConfig())
+		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, testConfig())
 
-		if err := core.RequestMagicLink(ctx, "Alice@Test.COM"); err != nil {
-			t.Fatalf("RequestMagicLink() error = %v", err)
+		if _, err := core.MagicLinkToken(ctx, "Alice@Test.COM"); err != nil {
+			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
 
 		if got, want := lookedUpEmail, "alice@test.com"; got != want {
-			t.Errorf("RequestMagicLink() looked up email = %q, want %q", got, want)
+			t.Errorf("MagicLinkToken() looked up email = %q, want %q", got, want)
 		}
 	})
 }
 
-func TestCore_RequestMagicLink_error(t *testing.T) {
+func TestCore_MagicLinkToken_error(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 
@@ -231,13 +209,12 @@ func TestCore_RequestMagicLink_error(t *testing.T) {
 		core := NewCore(
 			&MockedAuthStorer{},
 			userStorerMock,
-			noopEmail,
 			noopTransactor{},
 			testConfig(),
 		)
 
-		if err := core.RequestMagicLink(ctx, "alice@test.com"); !errors.Is(err, dbErr) {
-			t.Errorf("RequestMagicLink() error = %v, want wrapping %v", err, dbErr)
+		if _, err := core.MagicLinkToken(ctx, "alice@test.com"); !errors.Is(err, dbErr) {
+			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, dbErr)
 		}
 	})
 
@@ -264,14 +241,14 @@ func TestCore_RequestMagicLink_error(t *testing.T) {
 
 		cfg := testConfig()
 		cfg.MagicLinkRateLimit = time.Minute
-		core := NewCore(authStorerMock, userStorerMock, noopEmail, noopTransactor{}, cfg)
+		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, cfg)
 
-		if err := core.RequestMagicLink(ctx, "alice@test.com"); !errors.Is(err, rateLimitErr) {
-			t.Errorf("RequestMagicLink() error = %v, want wrapping %v", err, rateLimitErr)
+		if _, err := core.MagicLinkToken(ctx, "alice@test.com"); !errors.Is(err, rateLimitErr) {
+			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, rateLimitErr)
 		}
 	})
 
-	t.Run("rate limited silently succeeds", func(t *testing.T) {
+	t.Run("rate limited returns empty token", func(t *testing.T) {
 		userStorerMock := &MockedUserStorer{
 			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 				return pguser.User{
@@ -292,10 +269,14 @@ func TestCore_RequestMagicLink_error(t *testing.T) {
 
 		cfg := testConfig()
 		cfg.MagicLinkRateLimit = time.Minute
-		core := NewCore(authStorerMock, userStorerMock, noopEmail, noopTransactor{}, cfg)
+		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, cfg)
 
-		if err := core.RequestMagicLink(ctx, "alice@test.com"); err != nil {
-			t.Errorf("RequestMagicLink() rate-limited error = %v, want nil", err)
+		tok, err := core.MagicLinkToken(ctx, "alice@test.com")
+		if err != nil {
+			t.Errorf("MagicLinkToken() rate-limited error = %v, want nil", err)
+		}
+		if tok != "" {
+			t.Errorf("MagicLinkToken() rate-limited = %q, want empty", tok)
 		}
 	})
 
@@ -324,10 +305,10 @@ func TestCore_RequestMagicLink_error(t *testing.T) {
 			},
 		}
 
-		core := NewCore(authStorerMock, userStorerMock, noopEmail, noopTransactor{}, testConfig())
+		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, testConfig())
 
-		if err := core.RequestMagicLink(ctx, "alice@test.com"); !errors.Is(err, invalidateErr) {
-			t.Errorf("RequestMagicLink() error = %v, want wrapping %v", err, invalidateErr)
+		if _, err := core.MagicLinkToken(ctx, "alice@test.com"); !errors.Is(err, invalidateErr) {
+			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, invalidateErr)
 		}
 	})
 
@@ -361,61 +342,11 @@ func TestCore_RequestMagicLink_error(t *testing.T) {
 		core := NewCore(
 			authStorerMock,
 			userStorerMock,
-			noopEmail,
 			noopTransactor{},
 			testConfig(),
 		)
-		if err := core.RequestMagicLink(ctx, "alice@test.com"); !errors.Is(err, tokenErr) {
-			t.Errorf("RequestMagicLink() error = %v, want wrapping %v", err, tokenErr)
-		}
-	})
-
-	t.Run("email send fails", func(t *testing.T) {
-		sendErr := errors.New("smtp error")
-
-		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
-				return pguser.User{
-					ID:         1,
-					ExternalID: userID,
-					Email:      "alice@test.com",
-				}, nil
-			},
-		}
-
-		authStorerMock := &MockedAuthStorer{
-			LockUserFunc: func(_ context.Context, _ int) error {
-				return nil
-			},
-			LatestMagicLinkTokenCreatedAtFunc: func(_ context.Context, _ int) (time.Time, error) {
-				return time.Time{}, sql.ErrNoRows
-			},
-			InvalidateUserMagicLinkTokensFunc: func(_ context.Context, _ int) error {
-				return nil
-			},
-			CreateMagicLinkTokenFunc: func(_ context.Context, cm pgauth.CreateMagicLinkToken) (pgauth.MagicLinkToken, error) {
-				return pgauth.MagicLinkToken{
-					ID:        1,
-					UserID:    cm.UserID,
-					ExpiresAt: cm.ExpiresAt,
-				}, nil
-			},
-		}
-
-		failingSender := sendEmailFunc(func(_ context.Context, _ email.Message) error {
-			return sendErr
-		})
-
-		core := NewCore(
-			authStorerMock,
-			userStorerMock,
-			failingSender,
-			noopTransactor{},
-			testConfig(),
-		)
-
-		if err := core.RequestMagicLink(ctx, "alice@test.com"); !errors.Is(err, sendErr) {
-			t.Errorf("RequestMagicLink() error = %v, want wrapping %v", err, sendErr)
+		if _, err := core.MagicLinkToken(ctx, "alice@test.com"); !errors.Is(err, tokenErr) {
+			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, tokenErr)
 		}
 	})
 }
@@ -455,7 +386,6 @@ func TestCore_VerifyMagicLink(t *testing.T) {
 		&MockedUserStorer{
 			MarkEmailVerifiedFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 		},
-		noopEmail,
 		noopTransactor{},
 		testConfig(),
 	)
@@ -513,7 +443,6 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 			core := NewCore(
 				authStorerMock,
 				&MockedUserStorer{},
-				noopEmail,
 				noopTransactor{},
 				testConfig(),
 			)
@@ -546,7 +475,6 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 		core := NewCore(
 			authStorerMock,
 			&MockedUserStorer{},
-			noopEmail,
 			noopTransactor{},
 			testConfig(),
 		)
@@ -580,7 +508,6 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 		core := NewCore(
 			authStorerMock,
 			&MockedUserStorer{},
-			noopEmail,
 			noopTransactor{},
 			testConfig(),
 		)
@@ -619,7 +546,6 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 			&MockedUserStorer{
 				MarkEmailVerifiedFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 			},
-			noopEmail,
 			noopTransactor{},
 			testConfig(),
 		)
@@ -661,7 +587,6 @@ func TestCore_RefreshAccessToken(t *testing.T) {
 	core := NewCore(
 		authStorerMock,
 		&MockedUserStorer{},
-		noopEmail,
 		noopTransactor{},
 		testConfig(),
 	)
@@ -700,7 +625,6 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 			core := NewCore(
 				authStorerMock,
 				&MockedUserStorer{},
-				noopEmail,
 				noopTransactor{},
 				testConfig(),
 			)
@@ -735,7 +659,6 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 		core := NewCore(
 			authStorerMock,
 			&MockedUserStorer{},
-			noopEmail,
 			noopTransactor{},
 			testConfig(),
 		)
@@ -768,7 +691,6 @@ func TestCore_RevokeRefreshToken(t *testing.T) {
 	core := NewCore(
 		authStorerMock,
 		&MockedUserStorer{},
-		noopEmail,
 		noopTransactor{},
 		testConfig(),
 	)
@@ -800,7 +722,6 @@ func TestCore_RevokeRefreshToken_error(t *testing.T) {
 			core := NewCore(
 				authStorerMock,
 				&MockedUserStorer{},
-				noopEmail,
 				noopTransactor{},
 				testConfig(),
 			)
@@ -815,23 +736,19 @@ func TestCore_txRollback(t *testing.T) {
 	// Verifies that a failure inside the transaction rolls back the preceding
 	// write, leaving the credential reusable on retry.
 
-	captureToken := func(t *testing.T) (sender email.Sender, token func() string) {
-		t.Helper()
-		var captured string
-		return sendEmailFunc(func(_ context.Context, m email.Message) error {
-			parts := strings.SplitN(m.TextBody, "?token=", 2)
-			captured = strings.TrimSpace(parts[1])
-			return nil
-		}), func() string { return captured }
-	}
-
 	t.Run("VerifyMagicLink leaves magic link reusable on CreateRefreshToken failure", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		sender, tok := captureToken(t)
 
 		createErr := errors.New("db error")
 		realAuthStore := pgauth.NewStore(pool)
+
+		// Get a raw token using the real store.
+		coreSetup := NewCore(realAuthStore, pguser.NewStore(pool), pgdb.NewTransactor(pool), testConfig())
+		magicTok, err := coreSetup.MagicLinkToken(ctx, "alice@test.com")
+		if err != nil {
+			t.Fatalf("MagicLinkToken() error = %v", err)
+		}
 
 		coreFailStore := NewCore(
 			&failingRefreshTokenStorer{
@@ -839,14 +756,9 @@ func TestCore_txRollback(t *testing.T) {
 				err:   createErr,
 			},
 			pguser.NewStore(pool),
-			sender,
 			pgdb.NewTransactor(pool),
 			testConfig(),
 		)
-		if err := coreFailStore.RequestMagicLink(ctx, "alice@test.com"); err != nil {
-			t.Fatalf("RequestMagicLink() error = %v", err)
-		}
-		magicTok := tok()
 
 		// CreateRefreshToken fails → tx rolls back → ConsumeMagicLinkToken is undone.
 		if _, err := coreFailStore.VerifyMagicLink(ctx, magicTok); !errors.Is(err, createErr) {
@@ -854,7 +766,7 @@ func TestCore_txRollback(t *testing.T) {
 		}
 
 		// Same token must still be consumable.
-		coreReal := NewCore(realAuthStore, pguser.NewStore(pool), sender, pgdb.NewTransactor(pool), testConfig())
+		coreReal := NewCore(realAuthStore, pguser.NewStore(pool), pgdb.NewTransactor(pool), testConfig())
 		if _, err := coreReal.VerifyMagicLink(ctx, magicTok); err != nil {
 			t.Errorf("VerifyMagicLink() after rollback error = %v, want nil", err)
 		}
@@ -863,16 +775,16 @@ func TestCore_txRollback(t *testing.T) {
 	t.Run("RefreshAccessToken leaves refresh token valid on CreateRefreshToken failure", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		sender, tok := captureToken(t)
 
 		realAuthStore := pgauth.NewStore(pool)
 		realUserStore := pguser.NewStore(pool)
-		coreReal := NewCore(realAuthStore, realUserStore, sender, pgdb.NewTransactor(pool), testConfig())
+		coreReal := NewCore(realAuthStore, realUserStore, pgdb.NewTransactor(pool), testConfig())
 
-		if err := coreReal.RequestMagicLink(ctx, "bob@test.com"); err != nil {
-			t.Fatalf("RequestMagicLink() error = %v", err)
+		magicTok, err := coreReal.MagicLinkToken(ctx, "bob@test.com")
+		if err != nil {
+			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
-		pair, err := coreReal.VerifyMagicLink(ctx, tok())
+		pair, err := coreReal.VerifyMagicLink(ctx, magicTok)
 		if err != nil {
 			t.Fatalf("VerifyMagicLink() error = %v", err)
 		}
@@ -885,7 +797,6 @@ func TestCore_txRollback(t *testing.T) {
 				err:   createErr,
 			},
 			realUserStore,
-			sender,
 			pgdb.NewTransactor(pool),
 			testConfig(),
 		)
@@ -907,13 +818,6 @@ type noopTransactor struct{}
 func (noopTransactor) RunTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }
-
-// sendEmailFunc adapts a function to the email.Sender interface.
-type sendEmailFunc func(ctx context.Context, m email.Message) error
-
-func (f sendEmailFunc) SendEmail(ctx context.Context, m email.Message) error { return f(ctx, m) }
-
-var noopEmail sendEmailFunc = func(_ context.Context, _ email.Message) error { return nil }
 
 func testConfig() Config {
 	return Config{
