@@ -9,6 +9,10 @@ backend/
 │   ├── api/         # transport layers (grpc/); transport types stay here and are converted to domain types at the boundary
 │   ├── clients/     # third-party API wrappers (resend/, ...)
 │   ├── core/        # business logic — see internal/core/README.md
+│   │   ├── mdl/         # shared domain types (output + input)
+│   │   ├── <pkg>/       # business logic for one domain (e.g. user/)
+│   │   └── pgstores/
+│   │       └── <pkg>/   # Postgres store for one domain (e.g. pguser/)
 │   ├── data/        # database infrastructure
 │   └── <pkg>/       # other packages live here directly
 └── pkg/             # general-purpose, app-agnostic packages
