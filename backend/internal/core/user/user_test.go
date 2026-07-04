@@ -99,14 +99,14 @@ func TestCore_UserByID(t *testing.T) {
 	id, etag, now := uuid.New(), uuid.New(), time.Now()
 
 	tests := []struct {
-		name   string
-		storer *MockedStorer
-		in     uuid.UUID
-		want   mdl.User
+		name       string
+		userStorer *MockedUserStorer
+		in         uuid.UUID
+		want       mdl.User
 	}{
 		{
 			name: "returns converted user",
-			storer: &MockedStorer{
+			userStorer: &MockedUserStorer{
 				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
 					return pguser.User{
 						ExternalID: id,
@@ -129,7 +129,7 @@ func TestCore_UserByID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.storer)
+			core := NewCore(tt.userStorer)
 
 			got, err := core.UserByID(t.Context(), tt.in)
 			if err != nil {
@@ -143,7 +143,7 @@ func TestCore_UserByID(t *testing.T) {
 
 func TestCore_UserByID_error(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
-		core := NewCore(&MockedStorer{
+		core := NewCore(&MockedUserStorer{
 			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
 				return pguser.User{}, sql.ErrNoRows
 			},
@@ -155,7 +155,7 @@ func TestCore_UserByID_error(t *testing.T) {
 	})
 
 	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedStorer{
+		core := NewCore(&MockedUserStorer{
 			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
 				return pguser.User{}, errors.New("db down")
 			},
@@ -172,14 +172,14 @@ func TestCore_UpdateUser(t *testing.T) {
 	id, etag, now := uuid.New(), uuid.New(), time.Now()
 
 	tests := []struct {
-		name   string
-		storer *MockedStorer
-		in     mdl.UpdateUser
-		want   mdl.User
+		name       string
+		userStorer *MockedUserStorer
+		in         mdl.UpdateUser
+		want       mdl.User
 	}{
 		{
 			name: "returns converted user",
-			storer: &MockedStorer{
+			userStorer: &MockedUserStorer{
 				UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
 					return pguser.User{
 						ExternalID: id,
@@ -206,7 +206,7 @@ func TestCore_UpdateUser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.storer)
+			core := NewCore(tt.userStorer)
 
 			got, err := core.UpdateUser(t.Context(), tt.in)
 			if err != nil {
@@ -220,7 +220,7 @@ func TestCore_UpdateUser(t *testing.T) {
 
 func TestCore_UpdateUser_error(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
-		core := NewCore(&MockedStorer{
+		core := NewCore(&MockedUserStorer{
 			UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
 				return pguser.User{}, sql.ErrNoRows
 			},
@@ -236,7 +236,7 @@ func TestCore_UpdateUser_error(t *testing.T) {
 	})
 
 	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedStorer{
+		core := NewCore(&MockedUserStorer{
 			UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
 				return pguser.User{}, errors.New("db down")
 			},
@@ -257,14 +257,14 @@ func TestCore_CreateUser(t *testing.T) {
 	id, etag, now := uuid.New(), uuid.New(), time.Now()
 
 	tests := []struct {
-		name   string
-		storer *MockedStorer
-		in     mdl.CreateUser
-		want   mdl.User
+		name       string
+		userStorer *MockedUserStorer
+		in         mdl.CreateUser
+		want       mdl.User
 	}{
 		{
 			name: "returns converted user",
-			storer: &MockedStorer{
+			userStorer: &MockedUserStorer{
 				CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
 					return pguser.User{
 						ExternalID: id,
@@ -289,7 +289,7 @@ func TestCore_CreateUser(t *testing.T) {
 		},
 		{
 			name: "normalizes email before storing",
-			storer: &MockedStorer{
+			userStorer: &MockedUserStorer{
 				CreateUserFunc: func(_ context.Context, cu pguser.CreateUser) (pguser.User, error) {
 					return pguser.User{
 						ExternalID: id,
@@ -315,7 +315,7 @@ func TestCore_CreateUser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.storer)
+			core := NewCore(tt.userStorer)
 
 			got, err := core.CreateUser(t.Context(), tt.in)
 			if err != nil {
@@ -334,7 +334,7 @@ func TestCore_CreateUser_error(t *testing.T) {
 	}
 
 	t.Run("duplicate email returns ErrAlreadyExists", func(t *testing.T) {
-		core := NewCore(&MockedStorer{
+		core := NewCore(&MockedUserStorer{
 			CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
 				return pguser.User{}, pgdb.ErrAlreadyExists
 			},
@@ -346,7 +346,7 @@ func TestCore_CreateUser_error(t *testing.T) {
 	})
 
 	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedStorer{
+		core := NewCore(&MockedUserStorer{
 			CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
 				return pguser.User{}, errors.New("db down")
 			},
@@ -366,15 +366,15 @@ func TestCore_Users(t *testing.T) {
 	bobID, bobETag := uuid.New(), uuid.New()
 
 	tests := []struct {
-		name      string
-		storer    *MockedStorer
-		orderBys  []order.By[mdl.UserOrderByField]
-		wantUsers []mdl.User
-		wantCount int
+		name       string
+		userStorer *MockedUserStorer
+		orderBys   []order.By[mdl.UserOrderByField]
+		wantUsers  []mdl.User
+		wantCount  int
 	}{
 		{
 			name: "returns converted users and total count",
-			storer: &MockedStorer{
+			userStorer: &MockedUserStorer{
 				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return []pguser.User{
 						{
@@ -421,7 +421,7 @@ func TestCore_Users(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.storer)
+			core := NewCore(tt.userStorer)
 
 			gotUsers, gotCount, err := core.Users(t.Context(), mdl.UserFilter{}, tt.orderBys, 10, 0)
 			if err != nil {
@@ -440,19 +440,19 @@ func TestCore_Users(t *testing.T) {
 func TestCore_Users_error(t *testing.T) {
 	tests := []struct {
 		name        string
-		storer      *MockedStorer
+		userStorer  *MockedUserStorer
 		orderBys    []order.By[mdl.UserOrderByField]
 		wantErrStrs []string
 	}{
 		{
 			name:        "unknown order by field",
-			storer:      &MockedStorer{},
+			userStorer:  &MockedUserStorer{},
 			orderBys:    []order.By[mdl.UserOrderByField]{order.NewBy(mdl.UserOrderByField("unknown"), order.DirectionAsc)},
 			wantErrStrs: []string{"unknown"},
 		},
 		{
 			name: "query users error",
-			storer: &MockedStorer{
+			userStorer: &MockedUserStorer{
 				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return nil, errors.New("db down")
 				},
@@ -464,7 +464,7 @@ func TestCore_Users_error(t *testing.T) {
 		},
 		{
 			name: "user count error",
-			storer: &MockedStorer{
+			userStorer: &MockedUserStorer{
 				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
 					return nil, nil
 				},
@@ -477,7 +477,7 @@ func TestCore_Users_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.storer)
+			core := NewCore(tt.userStorer)
 
 			_, _, err := core.Users(t.Context(), mdl.UserFilter{}, tt.orderBys, 10, 0)
 			if err == nil {

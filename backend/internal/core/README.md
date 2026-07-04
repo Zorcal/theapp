@@ -50,6 +50,10 @@ pguser.User     →  mdl.User            (userFromPG)
 
 Without dedicated conv functions, type construction scatters and there is no single place to update when a type changes.
 
+## Storer naming
+
+Name storer interfaces with the domain as a prefix, e.g. `UserStorer`, `AuthStorer` — never a plain `Storer`, even when a core package interfaces out only one store. This contradicts the Go idiom of relying on the package qualifier (`user.Storer` vs `user.UserStorer`), but a core package might end up interfacing out more than one store, and adding a prefixed name later means renaming the original interface and every initialization of it.
+
 ## Cross-store transactions
 
 When a core method must write through more than one store atomically, inject a `Transactor` interface and call `RunTx`. Define the interface in the core package so it doesn't import `pgdb`:
@@ -81,7 +85,7 @@ Nesting is safe: if `RunTx` is called with a context that already carries a tran
 
 Each core domain package uses two complementary layers of tests:
 
-- **Unit tests** — mock the `Storer` interface (via moq) and cover the bulk of the logic: conversions, error wrapping, edge cases. Fast, no database required.
+- **Unit tests** — mock the storer interface(s) (via moq) and cover the bulk of the logic: conversions, error wrapping, edge cases. Fast, no database required.
 - **Flow tests** — use a real database via `pgtest` and cover the happy path end-to-end through the actual store. One or two per domain is enough; their job is to catch wiring mistakes that mocks cannot, not to duplicate unit test coverage.
 
 Every new (exported) method added to a `core/` package or a `pgstores/` package requires tests. For `pgstores/`, that means integration tests against a real database following the patterns in the existing `store_test.go` files.

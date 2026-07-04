@@ -12,16 +12,16 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/order"
 )
 
-// Ensure, that MockedStorer does implement Storer.
+// Ensure, that MockedUserStorer does implement UserStorer.
 // If this is not the case, regenerate this file with moq.
-var _ Storer = &MockedStorer{}
+var _ UserStorer = &MockedUserStorer{}
 
-// MockedStorer is a mock implementation of Storer.
+// MockedUserStorer is a mock implementation of UserStorer.
 //
-//	func TestSomethingThatUsesStorer(t *testing.T) {
+//	func TestSomethingThatUsesUserStorer(t *testing.T) {
 //
-//		// make and configure a mocked Storer
-//		mockedStorer := &MockedStorer{
+//		// make and configure a mocked UserStorer
+//		mockedUserStorer := &MockedUserStorer{
 //			CreateUserFunc: func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
 //				panic("mock out the CreateUser method")
 //			},
@@ -39,11 +39,11 @@ var _ Storer = &MockedStorer{}
 //			},
 //		}
 //
-//		// use mockedStorer in code that requires Storer
+//		// use mockedUserStorer in code that requires UserStorer
 //		// and then make assertions.
 //
 //	}
-type MockedStorer struct {
+type MockedUserStorer struct {
 	// CreateUserFunc mocks the CreateUser method.
 	CreateUserFunc func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
 
@@ -111,9 +111,9 @@ type MockedStorer struct {
 }
 
 // CreateUser calls CreateUserFunc.
-func (mock *MockedStorer) CreateUser(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
+func (mock *MockedUserStorer) CreateUser(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
 	if mock.CreateUserFunc == nil {
-		panic("MockedStorer.CreateUserFunc: method is nil but Storer.CreateUser was just called")
+		panic("MockedUserStorer.CreateUserFunc: method is nil but UserStorer.CreateUser was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
@@ -131,8 +131,8 @@ func (mock *MockedStorer) CreateUser(ctx context.Context, cu pguser.CreateUser) 
 // CreateUserCalls gets all the calls that were made to CreateUser.
 // Check the length with:
 //
-//	len(mockedStorer.CreateUserCalls())
-func (mock *MockedStorer) CreateUserCalls() []struct {
+//	len(mockedUserStorer.CreateUserCalls())
+func (mock *MockedUserStorer) CreateUserCalls() []struct {
 	Ctx context.Context
 	Cu  pguser.CreateUser
 } {
@@ -147,9 +147,9 @@ func (mock *MockedStorer) CreateUserCalls() []struct {
 }
 
 // UpdateUser calls UpdateUserFunc.
-func (mock *MockedStorer) UpdateUser(ctx context.Context, uu pguser.UpdateUser) (pguser.User, error) {
+func (mock *MockedUserStorer) UpdateUser(ctx context.Context, uu pguser.UpdateUser) (pguser.User, error) {
 	if mock.UpdateUserFunc == nil {
-		panic("MockedStorer.UpdateUserFunc: method is nil but Storer.UpdateUser was just called")
+		panic("MockedUserStorer.UpdateUserFunc: method is nil but UserStorer.UpdateUser was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
@@ -167,8 +167,8 @@ func (mock *MockedStorer) UpdateUser(ctx context.Context, uu pguser.UpdateUser) 
 // UpdateUserCalls gets all the calls that were made to UpdateUser.
 // Check the length with:
 //
-//	len(mockedStorer.UpdateUserCalls())
-func (mock *MockedStorer) UpdateUserCalls() []struct {
+//	len(mockedUserStorer.UpdateUserCalls())
+func (mock *MockedUserStorer) UpdateUserCalls() []struct {
 	Ctx context.Context
 	Uu  pguser.UpdateUser
 } {
@@ -183,9 +183,9 @@ func (mock *MockedStorer) UpdateUserCalls() []struct {
 }
 
 // UserByExternalID calls UserByExternalIDFunc.
-func (mock *MockedStorer) UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error) {
+func (mock *MockedUserStorer) UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error) {
 	if mock.UserByExternalIDFunc == nil {
-		panic("MockedStorer.UserByExternalIDFunc: method is nil but Storer.UserByExternalID was just called")
+		panic("MockedUserStorer.UserByExternalIDFunc: method is nil but UserStorer.UserByExternalID was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
@@ -203,8 +203,8 @@ func (mock *MockedStorer) UserByExternalID(ctx context.Context, id uuid.UUID) (p
 // UserByExternalIDCalls gets all the calls that were made to UserByExternalID.
 // Check the length with:
 //
-//	len(mockedStorer.UserByExternalIDCalls())
-func (mock *MockedStorer) UserByExternalIDCalls() []struct {
+//	len(mockedUserStorer.UserByExternalIDCalls())
+func (mock *MockedUserStorer) UserByExternalIDCalls() []struct {
 	Ctx context.Context
 	ID  uuid.UUID
 } {
@@ -219,9 +219,9 @@ func (mock *MockedStorer) UserByExternalIDCalls() []struct {
 }
 
 // UserCount calls UserCountFunc.
-func (mock *MockedStorer) UserCount(ctx context.Context, filter pguser.Filter) (int, error) {
+func (mock *MockedUserStorer) UserCount(ctx context.Context, filter pguser.Filter) (int, error) {
 	if mock.UserCountFunc == nil {
-		panic("MockedStorer.UserCountFunc: method is nil but Storer.UserCount was just called")
+		panic("MockedUserStorer.UserCountFunc: method is nil but UserStorer.UserCount was just called")
 	}
 	callInfo := struct {
 		Ctx    context.Context
@@ -239,8 +239,8 @@ func (mock *MockedStorer) UserCount(ctx context.Context, filter pguser.Filter) (
 // UserCountCalls gets all the calls that were made to UserCount.
 // Check the length with:
 //
-//	len(mockedStorer.UserCountCalls())
-func (mock *MockedStorer) UserCountCalls() []struct {
+//	len(mockedUserStorer.UserCountCalls())
+func (mock *MockedUserStorer) UserCountCalls() []struct {
 	Ctx    context.Context
 	Filter pguser.Filter
 } {
@@ -255,9 +255,9 @@ func (mock *MockedStorer) UserCountCalls() []struct {
 }
 
 // Users calls UsersFunc.
-func (mock *MockedStorer) Users(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error) {
+func (mock *MockedUserStorer) Users(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error) {
 	if mock.UsersFunc == nil {
-		panic("MockedStorer.UsersFunc: method is nil but Storer.Users was just called")
+		panic("MockedUserStorer.UsersFunc: method is nil but UserStorer.Users was just called")
 	}
 	callInfo := struct {
 		Ctx        context.Context
@@ -281,8 +281,8 @@ func (mock *MockedStorer) Users(ctx context.Context, filter pguser.Filter, order
 // UsersCalls gets all the calls that were made to Users.
 // Check the length with:
 //
-//	len(mockedStorer.UsersCalls())
-func (mock *MockedStorer) UsersCalls() []struct {
+//	len(mockedUserStorer.UsersCalls())
+func (mock *MockedUserStorer) UsersCalls() []struct {
 	Ctx        context.Context
 	Filter     pguser.Filter
 	OrderBys   []order.By[pguser.OrderByField]

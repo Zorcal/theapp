@@ -16,10 +16,10 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
-//go:generate moq -rm -fmt goimports -out storer_moq_test.go . Storer:MockedStorer
+//go:generate moq -rm -fmt goimports -out user_storer_moq_test.go . UserStorer:MockedUserStorer
 
-// Storer defines the database operations the Core requires.
-type Storer interface {
+// UserStorer defines the database operations the Core requires.
+type UserStorer interface {
 	// UserByExternalID returns the user with the given external ID.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error)
@@ -35,18 +35,18 @@ type Storer interface {
 
 // Core holds the business logic for the user domain.
 type Core struct {
-	storer Storer
+	userStorer UserStorer
 }
 
-// NewCore constructs a Core backed by the provided Storer.
-func NewCore(storer Storer) *Core {
-	return &Core{storer: storer}
+// NewCore constructs a Core backed by the provided UserStorer.
+func NewCore(us UserStorer) *Core {
+	return &Core{userStorer: us}
 }
 
 // UserByID returns the user with the given ID.
 // Returns [mdl.ErrNotFound] if no user with that ID exists.
 func (c *Core) UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error) {
-	pgUser, err := c.storer.UserByExternalID(ctx, id)
+	pgUser, err := c.userStorer.UserByExternalID(ctx, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.User{}, mdl.ErrNotFound
@@ -64,7 +64,7 @@ func (c *Core) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, err
 
 	pgCreateUser := createUserToPg(cu)
 
-	pgUser, err := c.storer.CreateUser(ctx, pgCreateUser)
+	pgUser, err := c.userStorer.CreateUser(ctx, pgCreateUser)
 	if err != nil {
 		if errors.Is(err, pgdb.ErrAlreadyExists) {
 			return mdl.User{}, mdl.ErrAlreadyExists
@@ -80,7 +80,7 @@ func (c *Core) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, err
 func (c *Core) UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error) {
 	pgUpdateUser := updateUserToPg(uu)
 
-	pgUser, err := c.storer.UpdateUser(ctx, pgUpdateUser)
+	pgUser, err := c.userStorer.UpdateUser(ctx, pgUpdateUser)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.User{}, mdl.ErrNotFound
@@ -100,12 +100,12 @@ func (c *Core) Users(ctx context.Context, filter mdl.UserFilter, orderBys []orde
 
 	pgFilter := filterToPg(filter)
 
-	pgUsers, err := c.storer.Users(ctx, pgFilter, pgOrderBys, pageSize, pageOffset)
+	pgUsers, err := c.userStorer.Users(ctx, pgFilter, pgOrderBys, pageSize, pageOffset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query users: %w", err)
 	}
 
-	count, err := c.storer.UserCount(ctx, pgFilter)
+	count, err := c.userStorer.UserCount(ctx, pgFilter)
 	if err != nil {
 		return nil, 0, fmt.Errorf("user count: %w", err)
 	}
