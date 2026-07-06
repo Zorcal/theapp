@@ -344,14 +344,17 @@ func run(ctx context.Context, cfg Config) error {
 
 func configureLogger(cfg Config, otelHandler slog.Handler) *slog.Logger {
 	h := configureSlogHandler(cfg, otelHandler)
-	buildInfo, _ := debug.ReadBuildInfo()
-	return slog.New(h).
-		With(slog.Group(
+	l := slog.New(h)
+	if !cfg.IsLocalEnvironment() {
+		buildInfo, _ := debug.ReadBuildInfo()
+		l = l.With(slog.Group(
 			"program_info",
 			"build", appVersion,
 			"pid", os.Getpid(),
 			"go_version", buildInfo.GoVersion,
 		))
+	}
+	return l
 }
 
 func configureSlogHandler(cfg Config, otelHandler slog.Handler) slog.Handler {
