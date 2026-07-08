@@ -42,7 +42,7 @@ The project ID is sent as request metadata rather than as a field on each RPC's 
 
 ## Standard roles
 
-`superadmin` holds every permission in the system. Beyond it, a set of other static roles might be hardcoded in the codebase and seeded at startup, scoped to a narrower slice of permissions than superadmin — for example a `useradmin` role limited to user-management permissions, or a `rolesadmin` role limited to role-management permissions (the exact set is still open, these are illustrative). Without at least one assigned role a user can authenticate but cannot call any protected endpoint.
+`superadmin` holds every permission in the system. This isn't a code-level bypass of the permission check — `superadmin` is a role like any other, with a real `role_permissions` row for every permission, so its grants are visible as ordinary data rather than a special case in the interceptor. Beyond it, a set of other static roles might be hardcoded in the codebase and seeded at startup, scoped to a narrower slice of permissions than superadmin — for example a `useradmin` role limited to user-management permissions, or a `rolesadmin` role limited to role-management permissions (the exact set is still open, these are illustrative). Without at least one assigned role a user can authenticate but cannot call any protected endpoint.
 
 Static roles are hardcoded and seeded at startup, and are structurally distinct from the project-specific custom roles an organization can define through the role service (see "Role management" below): the role service's create/update/delete operations only ever operate on custom roles, and reject any attempt to target a static role. This is enforced in code, not left as a convention, so a static role can never end up edited or deleted through the API and drift from what the codebase expects it to be.
 
@@ -94,6 +94,8 @@ Permissions are hardcoded in the codebase, not created through any endpoint, but
 
 If a permission is removed from the code-defined list, the sync also deletes the corresponding row from the stored set — which fails on a foreign key if any custom role still references it. The sync therefore strips the removed permission from every role that holds it before deleting the permission row itself, so removing a permission from the codebase can't leave a role definition in a broken or inconsistent state.
 
+Because `superadmin` holds every permission as real `role_permissions` rows (see "Standard roles" above) rather than a code-level bypass, the sync also grants any newly added permission to `superadmin` — otherwise a permission added to the codebase would be unassignable to `superadmin` until someone updated the database by hand, the same failure mode the sync exists to prevent for the `permissions` table itself. A unit test resolves `superadmin`'s permission set after sync and asserts it equals the full code-defined permission list, so a permission that's added to the codebase but not wired into this grant step fails the build instead of silently leaving `superadmin` incomplete.
+
 ## Exposing auth data to clients
 
 The auth service exposes an endpoint that returns the authenticated caller's ID, email, and resolved permissions — not full profile data. Without it, a frontend has no way to conditionally render UI based on permissions short of probing individual endpoints and reacting to `codes.PermissionDenied`. This lives on the auth service rather than the user service because it is authorization context for the current session, not user profile data, and it only ever concerns the caller rather than an arbitrary user ID.
@@ -136,6 +138,8 @@ This same lockout can be reached by two other paths that aren't a revoke and so 
 
 Since organization is mostly a hidden concept for clients, discovery is project-first: an endpoint lists the projects the caller has any role in (directly, or via an org- or system-wide scoped assignment), which is what a frontend uses to build a project switcher and to pick the `ProjectID` it sends as metadata on every subsequent call. Organization-level information is only included for the smaller set of users who administer an organization directly, rather than being a concept every client has to deal with.
 
+For most callers this list is small — a handful of projects at most — but a system-scoped assignment (`superadmin` and friends) resolves to every project in the system, since system scope is unconditional. This endpoint is therefore paginated like any other list endpoint returning a potentially unbounded set, rather than assuming the common case (a handful of projects) is the only case.
+
 ## Creating organizations and projects
 
 Creating an organization is not self-service — without a permission check, any authenticated user could create one. Rather than making org creation a global exception to project-scoped permissions, the `org:create` permission is itself project-scoped, to a dedicated `control` project under the `theapp` organization. This keeps enforcement uniform — every permission check is a project-scoped lookup, with no separate "global permission" code path.
@@ -144,7 +148,7 @@ Holding `org:create` isn't enough on its own, though: the caller must also actua
 
 When an organization is created, it is seeded with a default project of the same name, so a newly created organization is immediately usable without a separate "create your first project" step.
 
-Once an organization exists, the internal user who created it (or whoever they designate) is assigned an admin role scoped to that organization's default project. That role holds the ordinary `project:create` permission, so creating further projects within the organization uses the same project-scoped enforcement as `org:create` did, just scoped to that org instead of `theapp/control`.
+Once an organization exists, the internal user who created it (or whoever they designate) is assigned an admin role scoped to that organization — not to its default project. Org scope, not project scope, matters here: the same rationale as "Role assignment scope" above, an org's own admin needs access to every project under it, including ones created after this initial assignment, without being re-assigned each time a new project is created. That role holds the ordinary `project:create` permission; resolving it for a project-creation call anchors on the org's default project the same way `org:create` anchors on `theapp/control` — the `ProjectID` metadata sent is the default project's ID, which resolves to the org via the project→org lookup, and the org-scoped assignment grants `project:create` through that same three-way union used everywhere else.
 
 ## Deleting organizations and projects
 
