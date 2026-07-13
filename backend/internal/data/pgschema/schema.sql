@@ -16,6 +16,13 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: rbac; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA rbac;
+
+
+--
 -- Name: useraccess; Type: SCHEMA; Schema: -; Owner: -
 --
 
@@ -47,6 +54,36 @@ SET default_table_access_method = heap;
 CREATE TABLE public.schema_migrations (
     version character varying NOT NULL
 );
+
+
+--
+-- Name: permissions; Type: TABLE; Schema: rbac; Owner: -
+--
+
+CREATE TABLE rbac.permissions (
+    id integer NOT NULL,
+    name text NOT NULL
+);
+
+
+--
+-- Name: permissions_id_seq; Type: SEQUENCE; Schema: rbac; Owner: -
+--
+
+CREATE SEQUENCE rbac.permissions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: permissions_id_seq; Type: SEQUENCE OWNED BY; Schema: rbac; Owner: -
+--
+
+ALTER SEQUENCE rbac.permissions_id_seq OWNED BY rbac.permissions.id;
 
 
 --
@@ -152,6 +189,13 @@ ALTER SEQUENCE useraccess.users_id_seq OWNED BY useraccess.users.id;
 
 
 --
+-- Name: permissions id; Type: DEFAULT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.permissions ALTER COLUMN id SET DEFAULT nextval('rbac.permissions_id_seq'::regclass);
+
+
+--
 -- Name: magic_link_tokens id; Type: DEFAULT; Schema: useraccess; Owner: -
 --
 
@@ -178,6 +222,22 @@ ALTER TABLE ONLY useraccess.users ALTER COLUMN id SET DEFAULT nextval('useracces
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: permissions permissions_name_key; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.permissions
+    ADD CONSTRAINT permissions_name_key UNIQUE (name);
+
+
+--
+-- Name: permissions permissions_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.permissions
+    ADD CONSTRAINT permissions_pkey PRIMARY KEY (id);
 
 
 --
@@ -318,4 +378,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260605070601'),
     ('20260605070602'),
     ('20260613000001'),
-    ('20260613000002');
+    ('20260613000002'),
+    ('20260713150000'),
+    ('20260713150001');

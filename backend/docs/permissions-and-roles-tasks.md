@@ -40,12 +40,12 @@ Also delivered in this phase, beyond the original task list: a `db migrate` comm
 
 **Checkpoint:** an operator can create a user via the CLI today. Met.
 
-## Phase 2 — permission types and table
+## Phase 2 — permission types and table — done
 
-3. `mdl.Permission` type and the full hardcoded constant list, in `internal/core/mdl`.
-4. Migration: `permissions` table.
+3. `mdl.Permission` type and the full hardcoded constant list, in `internal/core/mdl`. The list currently covers only the permissions the existing `user` RPCs need (`user:read`, `user:create`, `user:update` — no `user:delete`, since there's no delete endpoint); it grows as later phases add resources and RPCs, rather than pre-declaring permissions for services that don't exist yet.
+4. Migration: `permissions` table, in a new `rbac` schema (mirroring `useraccess`) that will hold this feature's tables going forward.
 
-**Checkpoint:** the type compiles and the migration runs; the table exists (empty until phase 3 seeds it — there's no role yet to reference a permission by ID).
+**Checkpoint:** the type compiles and the migration runs; the table exists (empty until phase 3 seeds it — there's no role yet to reference a permission by ID). Met.
 
 ## Phase 3 — static roles and the permission sync
 
