@@ -206,6 +206,14 @@ func errorUnaryInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 			return resp, nil
 		}
 
+		// A core method rejected a request the handler's own validation should have caught — the two
+		// validation layers have drifted apart.
+		if errors.Is(err, mdl.ErrValidation) {
+			log.ErrorContext(ctx, "Core rejected a request the endpoint validation should have caught",
+				slog.String("method", info.FullMethod), slog.String("error", err.Error()))
+			return resp, status.Error(codes.InvalidArgument, "invalid request")
+		}
+
 		st := status.New(codes.Internal, codes.Internal.String())
 
 		var gs interface{ GRPCStatus() *status.Status }

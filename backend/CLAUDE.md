@@ -38,10 +38,16 @@ Avoid import aliases. Only alias an import when two imported packages would othe
 
 ## Testing conventions
 
+### Subtests
+
+- The subtest name describes only what differentiates the case — assume the function under test is known. Inside a `TestFoo_error` function every subtest already produces an error, so don't restate that in the name (`"bar returns ErrBar"`, `"baz fails"`, `"qux errors out"`) — name it after only the differentiating cause (`"bar"`, `"baz"`, `"qux"`).
+
 ### Table tests
 
+Table tests are a subtest structured as a data-driven loop; the naming rule above still applies to the `name` field.
+
 - Name the slice `tests` and the loop variable `tt`.
-- The `name` field describes only what differentiates the case — assume the function under test is known.
+- Each case has a `name` field used as the subtest name (`t.Run(tt.name, ...)`) — exceptions are rare.
 - No blank line between the slice declaration and the `for` loop.
 - Never use a `wantErr bool` field. Split success and error cases into separate functions named `TestXyz` and `TestXyz_error`.
 - Each test case struct field on its own line, using named fields.
@@ -93,6 +99,12 @@ func TestCalculate_error(t *testing.T) {
     }
 }
 ```
+
+## Comments
+
+- Don't restate what code already makes obvious. If removing the comment wouldn't confuse a reader, remove it.
+- Don't write comments that explain a decision by narrating the conversation that led to it ("we agreed to do X", "per your request", "as discussed, this is intentional"). State the constraint plainly, or let the code speak for itself.
+- Avoid comments that go stale as soon as the code around them changes. Describe purpose, not the current shape of the code.
 
 ## Sentinel errors documention
 

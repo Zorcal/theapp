@@ -30,7 +30,7 @@ func TestCore_integration(t *testing.T) {
 	)
 
 	// MagicLinkToken — new user is created and a token is returned.
-	firstToken, err := core.MagicLinkToken(ctx, "alice@test.com")
+	firstToken, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"})
 	if err != nil {
 		t.Fatalf("MagicLinkToken() error = %v", err)
 	}
@@ -39,19 +39,19 @@ func TestCore_integration(t *testing.T) {
 	}
 
 	// MagicLinkToken again while first token is still live — first token must be invalidated.
-	secondToken, err := core.MagicLinkToken(ctx, "alice@test.com")
+	secondToken, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"})
 	if err != nil {
 		t.Fatalf("MagicLinkToken() second call error = %v", err)
 	}
 	if secondToken == firstToken {
 		t.Fatal("MagicLinkToken() second call did not issue a new token")
 	}
-	if _, err := core.VerifyMagicLink(ctx, firstToken); !errors.Is(err, mdl.ErrTokenInvalid) {
+	if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: firstToken}); !errors.Is(err, mdl.ErrTokenInvalid) {
 		t.Errorf("VerifyMagicLink() first token after re-request error = %v, want mdl.ErrTokenInvalid", err)
 	}
 
 	// VerifyMagicLink — consumes the second token and returns a token pair.
-	pair, err := core.VerifyMagicLink(ctx, secondToken)
+	pair, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: secondToken})
 	if err != nil {
 		t.Fatalf("VerifyMagicLink() error = %v", err)
 	}
@@ -72,12 +72,12 @@ func TestCore_integration(t *testing.T) {
 	}
 
 	// VerifyMagicLink again — token is consumed, must return ErrTokenInvalid.
-	if _, err := core.VerifyMagicLink(ctx, secondToken); !errors.Is(err, mdl.ErrTokenInvalid) {
+	if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: secondToken}); !errors.Is(err, mdl.ErrTokenInvalid) {
 		t.Errorf("VerifyMagicLink() second use error = %v, want mdl.ErrTokenInvalid", err)
 	}
 
 	// RefreshAccessToken — old token is revoked and a new pair is issued.
-	newPair, err := core.RefreshAccessToken(ctx, pair.RefreshToken)
+	newPair, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: pair.RefreshToken})
 	if err != nil {
 		t.Fatalf("RefreshAccessToken() error = %v", err)
 	}
@@ -86,17 +86,17 @@ func TestCore_integration(t *testing.T) {
 	}
 
 	// RefreshAccessToken with the old token — must return ErrTokenInvalid after rotation.
-	if _, err := core.RefreshAccessToken(ctx, pair.RefreshToken); !errors.Is(err, mdl.ErrTokenInvalid) {
+	if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: pair.RefreshToken}); !errors.Is(err, mdl.ErrTokenInvalid) {
 		t.Errorf("RefreshAccessToken() old token error = %v, want mdl.ErrTokenInvalid", err)
 	}
 
 	// RevokeRefreshToken — invalidates the new token.
-	if err := core.RevokeRefreshToken(ctx, newPair.RefreshToken); err != nil {
+	if err := core.RevokeRefreshToken(ctx, mdl.RefreshToken{Token: newPair.RefreshToken}); err != nil {
 		t.Fatalf("RevokeRefreshToken() error = %v", err)
 	}
 
 	// RefreshAccessToken with revoked token — must return ErrTokenInvalid.
-	if _, err := core.RefreshAccessToken(ctx, newPair.RefreshToken); !errors.Is(err, mdl.ErrTokenInvalid) {
+	if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: newPair.RefreshToken}); !errors.Is(err, mdl.ErrTokenInvalid) {
 		t.Errorf("RefreshAccessToken() revoked token error = %v, want mdl.ErrTokenInvalid", err)
 	}
 }
@@ -137,7 +137,7 @@ func TestCore_MagicLinkToken(t *testing.T) {
 
 		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, testConfig())
 
-		tok, err := core.MagicLinkToken(ctx, "alice@test.com")
+		tok, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"})
 		if err != nil {
 			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
@@ -159,7 +159,7 @@ func TestCore_MagicLinkToken(t *testing.T) {
 
 		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, testConfig())
 
-		tok, err := core.MagicLinkToken(ctx, "new@test.com")
+		tok, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "new@test.com"})
 		if err != nil {
 			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
@@ -183,7 +183,7 @@ func TestCore_MagicLinkToken(t *testing.T) {
 
 		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, testConfig())
 
-		if _, err := core.MagicLinkToken(ctx, "Alice@Test.COM"); err != nil {
+		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "Alice@Test.COM"}); err != nil {
 			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
 
@@ -197,7 +197,15 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 
-	t.Run("get or create user fails", func(t *testing.T) {
+	t.Run("invalid input", func(t *testing.T) {
+		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, noopTransactor{}, testConfig())
+
+		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: ""}); !errors.Is(err, mdl.ErrValidation) {
+			t.Errorf("MagicLinkToken() error = %v, want mdl.ErrValidation", err)
+		}
+	})
+
+	t.Run("get or create user", func(t *testing.T) {
 		dbErr := errors.New("db error")
 
 		userStorerMock := &MockedUserStorer{
@@ -213,12 +221,12 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 			testConfig(),
 		)
 
-		if _, err := core.MagicLinkToken(ctx, "alice@test.com"); !errors.Is(err, dbErr) {
+		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"}); !errors.Is(err, dbErr) {
 			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, dbErr)
 		}
 	})
 
-	t.Run("rate limit check fails", func(t *testing.T) {
+	t.Run("rate limit check", func(t *testing.T) {
 		rateLimitErr := errors.New("db error")
 
 		userStorerMock := &MockedUserStorer{
@@ -243,7 +251,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 		cfg.MagicLinkRateLimit = time.Minute
 		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, cfg)
 
-		if _, err := core.MagicLinkToken(ctx, "alice@test.com"); !errors.Is(err, rateLimitErr) {
+		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"}); !errors.Is(err, rateLimitErr) {
 			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, rateLimitErr)
 		}
 	})
@@ -271,7 +279,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 		cfg.MagicLinkRateLimit = time.Minute
 		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, cfg)
 
-		tok, err := core.MagicLinkToken(ctx, "alice@test.com")
+		tok, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"})
 		if !errors.Is(err, mdl.ErrRateLimited) {
 			t.Errorf("MagicLinkToken() error = %v, want mdl.ErrRateLimited", err)
 		}
@@ -280,7 +288,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 		}
 	})
 
-	t.Run("invalidation fails", func(t *testing.T) {
+	t.Run("invalidation", func(t *testing.T) {
 		invalidateErr := errors.New("db error")
 
 		userStorerMock := &MockedUserStorer{
@@ -307,12 +315,12 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 
 		core := NewCore(authStorerMock, userStorerMock, noopTransactor{}, testConfig())
 
-		if _, err := core.MagicLinkToken(ctx, "alice@test.com"); !errors.Is(err, invalidateErr) {
+		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"}); !errors.Is(err, invalidateErr) {
 			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, invalidateErr)
 		}
 	})
 
-	t.Run("token creation fails", func(t *testing.T) {
+	t.Run("token creation", func(t *testing.T) {
 		tokenErr := errors.New("db error")
 
 		userStorerMock := &MockedUserStorer{
@@ -345,7 +353,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 			noopTransactor{},
 			testConfig(),
 		)
-		if _, err := core.MagicLinkToken(ctx, "alice@test.com"); !errors.Is(err, tokenErr) {
+		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"}); !errors.Is(err, tokenErr) {
 			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, tokenErr)
 		}
 	})
@@ -390,7 +398,7 @@ func TestCore_VerifyMagicLink(t *testing.T) {
 		testConfig(),
 	)
 
-	pair, err := core.VerifyMagicLink(ctx, rawToken)
+	pair, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: rawToken})
 	if err != nil {
 		t.Fatalf("VerifyMagicLink() error = %v", err)
 	}
@@ -425,13 +433,21 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 	ctx := context.Background()
 	dbErr := errors.New("db error")
 
+	t.Run("invalid input", func(t *testing.T) {
+		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, noopTransactor{}, testConfig())
+
+		if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: ""}); !errors.Is(err, mdl.ErrValidation) {
+			t.Errorf("VerifyMagicLink() error = %v, want mdl.ErrValidation", err)
+		}
+	})
+
 	tests := []struct {
 		name    string
 		mockErr error
 		wantErr error
 	}{
 		{name: "token not found", mockErr: sql.ErrNoRows, wantErr: mdl.ErrTokenInvalid},
-		{name: "lookup error propagates", mockErr: dbErr, wantErr: dbErr},
+		{name: "lookup error", mockErr: dbErr, wantErr: dbErr},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -446,13 +462,13 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 				noopTransactor{},
 				testConfig(),
 			)
-			if _, err := core.VerifyMagicLink(ctx, "anytoken"); !errors.Is(err, tt.wantErr) {
+			if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
 				t.Errorf("VerifyMagicLink() error = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}
 
-	t.Run("concurrent consume returns ErrTokenInvalid", func(t *testing.T) {
+	t.Run("concurrent consume", func(t *testing.T) {
 		rawToken, tokenHash := mustGenerateToken(t)
 
 		authStorerMock := &MockedAuthStorer{
@@ -479,12 +495,12 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 			testConfig(),
 		)
 
-		if _, err := core.VerifyMagicLink(ctx, rawToken); !errors.Is(err, mdl.ErrTokenInvalid) {
+		if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: rawToken}); !errors.Is(err, mdl.ErrTokenInvalid) {
 			t.Errorf("VerifyMagicLink() error = %v, want mdl.ErrTokenInvalid", err)
 		}
 	})
 
-	t.Run("consume error propagates", func(t *testing.T) {
+	t.Run("consume error", func(t *testing.T) {
 		rawToken, tokenHash := mustGenerateToken(t)
 		consumeErr := errors.New("db error")
 
@@ -512,12 +528,12 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 			testConfig(),
 		)
 
-		if _, err := core.VerifyMagicLink(ctx, rawToken); !errors.Is(err, consumeErr) {
+		if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: rawToken}); !errors.Is(err, consumeErr) {
 			t.Errorf("VerifyMagicLink() error = %v, want wrapping %v", err, consumeErr)
 		}
 	})
 
-	t.Run("refresh token creation fails", func(t *testing.T) {
+	t.Run("refresh token creation", func(t *testing.T) {
 		rawToken, tokenHash := mustGenerateToken(t)
 		createErr := errors.New("db error")
 
@@ -550,7 +566,7 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 			testConfig(),
 		)
 
-		if _, err := core.VerifyMagicLink(ctx, rawToken); !errors.Is(err, createErr) {
+		if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: rawToken}); !errors.Is(err, createErr) {
 			t.Errorf("VerifyMagicLink() error = %v, want wrapping %v", err, createErr)
 		}
 	})
@@ -591,7 +607,7 @@ func TestCore_RefreshAccessToken(t *testing.T) {
 		testConfig(),
 	)
 
-	pair, err := core.RefreshAccessToken(ctx, rawToken)
+	pair, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: rawToken})
 	if err != nil {
 		t.Fatalf("RefreshAccessToken() error = %v", err)
 	}
@@ -607,13 +623,21 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 	ctx := context.Background()
 	dbErr := errors.New("db error")
 
+	t.Run("invalid input", func(t *testing.T) {
+		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, noopTransactor{}, testConfig())
+
+		if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: ""}); !errors.Is(err, mdl.ErrValidation) {
+			t.Errorf("RefreshAccessToken() error = %v, want mdl.ErrValidation", err)
+		}
+	})
+
 	tests := []struct {
 		name    string
 		mockErr error
 		wantErr error
 	}{
 		{name: "token not found", mockErr: sql.ErrNoRows, wantErr: mdl.ErrTokenInvalid},
-		{name: "consume error propagates", mockErr: dbErr, wantErr: dbErr},
+		{name: "consume error", mockErr: dbErr, wantErr: dbErr},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -628,13 +652,13 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 				noopTransactor{},
 				testConfig(),
 			)
-			if _, err := core.RefreshAccessToken(ctx, "anytoken"); !errors.Is(err, tt.wantErr) {
+			if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
 				t.Errorf("RefreshAccessToken() error = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}
 
-	t.Run("refresh token creation fails", func(t *testing.T) {
+	t.Run("refresh token creation", func(t *testing.T) {
 		rawToken, tokenHash := mustGenerateToken(t)
 		createErr := errors.New("db error")
 
@@ -663,7 +687,7 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 			testConfig(),
 		)
 
-		if _, err := core.RefreshAccessToken(ctx, rawToken); !errors.Is(err, createErr) {
+		if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: rawToken}); !errors.Is(err, createErr) {
 			t.Errorf("RefreshAccessToken() error = %v, want wrapping %v", err, createErr)
 		}
 	})
@@ -695,7 +719,7 @@ func TestCore_RevokeRefreshToken(t *testing.T) {
 		testConfig(),
 	)
 
-	if err := core.RevokeRefreshToken(ctx, rawToken); err != nil {
+	if err := core.RevokeRefreshToken(ctx, mdl.RefreshToken{Token: rawToken}); err != nil {
 		t.Fatalf("RevokeRefreshToken() error = %v", err)
 	}
 }
@@ -704,13 +728,21 @@ func TestCore_RevokeRefreshToken_error(t *testing.T) {
 	ctx := context.Background()
 	dbErr := errors.New("db error")
 
+	t.Run("invalid input", func(t *testing.T) {
+		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, noopTransactor{}, testConfig())
+
+		if err := core.RevokeRefreshToken(ctx, mdl.RefreshToken{Token: ""}); !errors.Is(err, mdl.ErrValidation) {
+			t.Errorf("RevokeRefreshToken() error = %v, want mdl.ErrValidation", err)
+		}
+	})
+
 	tests := []struct {
 		name    string
 		mockErr error
 		wantErr error
 	}{
 		{name: "token not found or already revoked", mockErr: sql.ErrNoRows, wantErr: mdl.ErrTokenInvalid},
-		{name: "consume error propagates", mockErr: dbErr, wantErr: dbErr},
+		{name: "consume error", mockErr: dbErr, wantErr: dbErr},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -725,7 +757,7 @@ func TestCore_RevokeRefreshToken_error(t *testing.T) {
 				noopTransactor{},
 				testConfig(),
 			)
-			if err := core.RevokeRefreshToken(ctx, "anytoken"); !errors.Is(err, tt.wantErr) {
+			if err := core.RevokeRefreshToken(ctx, mdl.RefreshToken{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
 				t.Errorf("RevokeRefreshToken() error = %v, want %v", err, tt.wantErr)
 			}
 		})
@@ -745,7 +777,7 @@ func TestCore_txRollback(t *testing.T) {
 
 		// Get a raw token using the real store.
 		coreSetup := NewCore(realAuthStore, pguser.NewStore(pool), pgdb.NewTransactor(pool), testConfig())
-		magicTok, err := coreSetup.MagicLinkToken(ctx, "alice@test.com")
+		magicTok, err := coreSetup.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"})
 		if err != nil {
 			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
@@ -761,13 +793,13 @@ func TestCore_txRollback(t *testing.T) {
 		)
 
 		// CreateRefreshToken fails → tx rolls back → ConsumeMagicLinkToken is undone.
-		if _, err := coreFailStore.VerifyMagicLink(ctx, magicTok); !errors.Is(err, createErr) {
+		if _, err := coreFailStore.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: magicTok}); !errors.Is(err, createErr) {
 			t.Fatalf("VerifyMagicLink() error = %v, want wrapping %v", err, createErr)
 		}
 
 		// Same token must still be consumable.
 		coreReal := NewCore(realAuthStore, pguser.NewStore(pool), pgdb.NewTransactor(pool), testConfig())
-		if _, err := coreReal.VerifyMagicLink(ctx, magicTok); err != nil {
+		if _, err := coreReal.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: magicTok}); err != nil {
 			t.Errorf("VerifyMagicLink() after rollback error = %v, want nil", err)
 		}
 	})
@@ -780,11 +812,11 @@ func TestCore_txRollback(t *testing.T) {
 		realUserStore := pguser.NewStore(pool)
 		coreReal := NewCore(realAuthStore, realUserStore, pgdb.NewTransactor(pool), testConfig())
 
-		magicTok, err := coreReal.MagicLinkToken(ctx, "bob@test.com")
+		magicTok, err := coreReal.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "bob@test.com"})
 		if err != nil {
 			t.Fatalf("MagicLinkToken() error = %v", err)
 		}
-		pair, err := coreReal.VerifyMagicLink(ctx, magicTok)
+		pair, err := coreReal.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: magicTok})
 		if err != nil {
 			t.Fatalf("VerifyMagicLink() error = %v", err)
 		}
@@ -802,12 +834,12 @@ func TestCore_txRollback(t *testing.T) {
 		)
 
 		// CreateRefreshToken fails → tx rolls back → ConsumeRefreshToken is undone.
-		if _, err := coreFailStore.RefreshAccessToken(ctx, refreshTok); !errors.Is(err, createErr) {
+		if _, err := coreFailStore.RefreshAccessToken(ctx, mdl.RefreshToken{Token: refreshTok}); !errors.Is(err, createErr) {
 			t.Fatalf("RefreshAccessToken() error = %v, want wrapping %v", err, createErr)
 		}
 
 		// Old refresh token must still be valid.
-		if _, err := coreReal.RefreshAccessToken(ctx, refreshTok); err != nil {
+		if _, err := coreReal.RefreshAccessToken(ctx, mdl.RefreshToken{Token: refreshTok}); err != nil {
 			t.Errorf("RefreshAccessToken() after rollback error = %v, want nil", err)
 		}
 	})

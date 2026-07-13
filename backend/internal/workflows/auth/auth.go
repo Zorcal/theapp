@@ -38,8 +38,9 @@ type magicLinkTemplateData struct {
 // Implemented by *core/auth.Core.
 type AuthCore interface {
 	// MagicLinkToken ensures the user exists, rate-checks, invalidates prior tokens, and creates a new one.
-	// Returns [mdl.ErrRateLimited] if a token was already issued to emailAddr within the rate-limit window.
-	MagicLinkToken(ctx context.Context, emailAddr string) (string, error)
+	// Returns [mdl.ErrRateLimited] if a token was already issued to rml.Email within the rate-limit window.
+	// Returns [mdl.ErrValidation] if rml is invalid.
+	MagicLinkToken(ctx context.Context, rml mdl.RequestMagicLink) (string, error)
 }
 
 // WorkflowCore executes auth operations that require durable execution via DBOS.
@@ -105,7 +106,7 @@ func (w *WorkflowCore) requestMagicLinkWorkflow(ctx dbos.DBOSContext, emailAddr 
 
 func (w *WorkflowCore) storeTokenStep(emailAddr string) dbos.Step[string] {
 	return func(ctx context.Context) (string, error) {
-		return w.core.MagicLinkToken(ctx, emailAddr)
+		return w.core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: emailAddr})
 	}
 }
 

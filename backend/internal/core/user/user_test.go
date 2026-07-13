@@ -219,6 +219,19 @@ func TestCore_UpdateUser(t *testing.T) {
 }
 
 func TestCore_UpdateUser_error(t *testing.T) {
+	t.Run("invalid input", func(t *testing.T) {
+		core := NewCore(&MockedUserStorer{})
+
+		_, err := core.UpdateUser(t.Context(), mdl.UpdateUser{
+			ID:     uuid.New(),
+			Name:   "",
+			Fields: mdl.UserUpdateFields{Name: true},
+		})
+		if !errors.Is(err, mdl.ErrValidation) {
+			t.Errorf("UpdateUser() error = %v, want mdl.ErrValidation", err)
+		}
+	})
+
 	t.Run("not found", func(t *testing.T) {
 		core := NewCore(&MockedUserStorer{
 			UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
@@ -333,7 +346,16 @@ func TestCore_CreateUser_error(t *testing.T) {
 		Name:  "Alice Smith",
 	}
 
-	t.Run("duplicate email returns ErrAlreadyExists", func(t *testing.T) {
+	t.Run("invalid input", func(t *testing.T) {
+		core := NewCore(&MockedUserStorer{})
+
+		_, err := core.CreateUser(t.Context(), mdl.CreateUser{Email: "", Name: "Alice Smith"})
+		if !errors.Is(err, mdl.ErrValidation) {
+			t.Errorf("CreateUser() error = %v, want mdl.ErrValidation", err)
+		}
+	})
+
+	t.Run("duplicate email", func(t *testing.T) {
 		core := NewCore(&MockedUserStorer{
 			CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
 				return pguser.User{}, pgdb.ErrAlreadyExists

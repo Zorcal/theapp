@@ -60,7 +60,7 @@ func TestWorkflowCore_integration(t *testing.T) {
 	}
 
 	// Token is consumable via the auth core.
-	pair, err := authCore.VerifyMagicLink(ctx, tok)
+	pair, err := authCore.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: tok})
 	if err != nil {
 		t.Fatalf("VerifyMagicLink() error = %v", err)
 	}
@@ -79,7 +79,7 @@ func TestWorkflowCore_RequestMagicLink_resume(t *testing.T) {
 
 	var tokenCalls atomic.Int32
 	authCore := &MockedAuthCore{
-		MagicLinkTokenFunc: func(_ context.Context, _ string) (string, error) {
+		MagicLinkTokenFunc: func(_ context.Context, _ mdl.RequestMagicLink) (string, error) {
 			tokenCalls.Add(1)
 			return "fixed-token", nil
 		},
@@ -117,7 +117,7 @@ func TestWorkflowCore_RequestMagicLink_rateLimited(t *testing.T) {
 	dbosCtx := dbostest.New(t, ctx, pool)
 
 	authCore := &MockedAuthCore{
-		MagicLinkTokenFunc: func(_ context.Context, _ string) (string, error) {
+		MagicLinkTokenFunc: func(_ context.Context, _ mdl.RequestMagicLink) (string, error) {
 			return "", mdl.ErrRateLimited
 		},
 	}
@@ -144,7 +144,7 @@ func TestWorkflowCore_RequestMagicLink_error(t *testing.T) {
 
 	wantErr := errors.New("boom")
 	authCore := &MockedAuthCore{
-		MagicLinkTokenFunc: func(_ context.Context, _ string) (string, error) {
+		MagicLinkTokenFunc: func(_ context.Context, _ mdl.RequestMagicLink) (string, error) {
 			return "", wantErr
 		},
 	}

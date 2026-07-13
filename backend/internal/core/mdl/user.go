@@ -17,19 +17,41 @@ type User struct {
 	ETag            string
 }
 
-// CreateUser holds the fields required to create a new user.
+// CreateUser holds the fields needed to create a new user.
 type CreateUser struct {
 	Email string
 	Name  string
 }
 
-// UpdateUser holds the fields to update on a user.
+// Validate reports whether cu is valid.
+func (cu CreateUser) Validate() error {
+	if cu.Email == "" {
+		return validationError("email required")
+	}
+	if !IsValidEmail(cu.Email) {
+		return validationError("email invalid")
+	}
+	if cu.Name == "" {
+		return validationError("name required")
+	}
+	return nil
+}
+
+// UpdateUser holds the fields that can be updated on a user.
 // ID identifies the user to update and is not itself updated.
 // Fields controls which fields are applied; fields not listed are left unchanged.
 type UpdateUser struct {
 	ID     uuid.UUID
 	Fields UserUpdateFields
 	Name   string
+}
+
+// Validate reports whether uu is valid.
+func (uu UpdateUser) Validate() error {
+	if uu.Fields.Name && uu.Name == "" {
+		return validationError("name required")
+	}
+	return nil
 }
 
 // UserUpdateFields specifies which fields on an UpdateUser should be applied.

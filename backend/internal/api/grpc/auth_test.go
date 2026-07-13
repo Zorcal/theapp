@@ -176,7 +176,7 @@ func TestAuthService_VerifyMagicLink(t *testing.T) {
 		{
 			name: "returns token pair",
 			authCore: &MockedAuthCore{
-				VerifyMagicLinkFunc: func(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
+				VerifyMagicLinkFunc: func(_ context.Context, _ mdl.VerifyMagicLink) (mdl.AuthTokenPair, error) {
 					return mdl.AuthTokenPair{
 						AccessToken:  "access-token",
 						RefreshToken: "refresh-token",
@@ -225,7 +225,7 @@ func TestAuthService_VerifyMagicLink_error(t *testing.T) {
 		{
 			name: "token invalid",
 			authCore: &MockedAuthCore{
-				VerifyMagicLinkFunc: func(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
+				VerifyMagicLinkFunc: func(_ context.Context, _ mdl.VerifyMagicLink) (mdl.AuthTokenPair, error) {
 					return mdl.AuthTokenPair{}, mdl.ErrTokenInvalid
 				},
 			},
@@ -235,7 +235,7 @@ func TestAuthService_VerifyMagicLink_error(t *testing.T) {
 		{
 			name: "core error",
 			authCore: &MockedAuthCore{
-				VerifyMagicLinkFunc: func(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
+				VerifyMagicLinkFunc: func(_ context.Context, _ mdl.VerifyMagicLink) (mdl.AuthTokenPair, error) {
 					return mdl.AuthTokenPair{}, errors.New("boom")
 				},
 			},
@@ -277,7 +277,7 @@ func TestAuthService_RefreshAccessToken(t *testing.T) {
 		{
 			name: "returns new token pair",
 			authCore: &MockedAuthCore{
-				RefreshAccessTokenFunc: func(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
+				RefreshAccessTokenFunc: func(_ context.Context, _ mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 					return mdl.AuthTokenPair{
 						AccessToken:  "new-access",
 						RefreshToken: "new-refresh",
@@ -326,7 +326,7 @@ func TestAuthService_RefreshAccessToken_error(t *testing.T) {
 		{
 			name: "token invalid",
 			authCore: &MockedAuthCore{
-				RefreshAccessTokenFunc: func(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
+				RefreshAccessTokenFunc: func(_ context.Context, _ mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 					return mdl.AuthTokenPair{}, mdl.ErrTokenInvalid
 				},
 			},
@@ -336,7 +336,7 @@ func TestAuthService_RefreshAccessToken_error(t *testing.T) {
 		{
 			name: "core error",
 			authCore: &MockedAuthCore{
-				RefreshAccessTokenFunc: func(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
+				RefreshAccessTokenFunc: func(_ context.Context, _ mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 					return mdl.AuthTokenPair{}, errors.New("boom")
 				},
 			},
@@ -456,7 +456,7 @@ func TestAuthService_RevokeRefreshToken(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
 				Log: testingx.NewLogger(t),
 				AuthCore: &MockedAuthCore{
-					RevokeRefreshTokenFunc: func(_ context.Context, _ string) error { return nil },
+					RevokeRefreshTokenFunc: func(_ context.Context, _ mdl.RefreshToken) error { return nil },
 				},
 			})
 
@@ -488,7 +488,7 @@ func TestAuthService_RevokeRefreshToken_error(t *testing.T) {
 		{
 			name: "token not found",
 			authCore: &MockedAuthCore{
-				RevokeRefreshTokenFunc: func(_ context.Context, _ string) error {
+				RevokeRefreshTokenFunc: func(_ context.Context, _ mdl.RefreshToken) error {
 					return mdl.ErrTokenInvalid
 				},
 			},
@@ -498,7 +498,7 @@ func TestAuthService_RevokeRefreshToken_error(t *testing.T) {
 		{
 			name: "core error",
 			authCore: &MockedAuthCore{
-				RevokeRefreshTokenFunc: func(_ context.Context, _ string) error {
+				RevokeRefreshTokenFunc: func(_ context.Context, _ mdl.RefreshToken) error {
 					return errors.New("boom")
 				},
 			},

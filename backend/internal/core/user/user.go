@@ -59,8 +59,13 @@ func (c *Core) UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error) {
 
 // CreateUser creates a new user and returns the created user.
 // Returns [mdl.ErrAlreadyExists] if a user with the same email already exists.
+// Returns [mdl.ErrValidation] if cu is invalid.
 func (c *Core) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error) {
 	cu.Email = strings.ToLower(strings.TrimSpace(cu.Email))
+
+	if err := cu.Validate(); err != nil {
+		return mdl.User{}, fmt.Errorf("validate: %w", err)
+	}
 
 	pgCreateUser := createUserToPg(cu)
 
@@ -77,7 +82,12 @@ func (c *Core) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, err
 
 // UpdateUser updates the name of the user with the given ID and returns the updated user.
 // Returns [mdl.ErrNotFound] if no user with that ID exists.
+// Returns [mdl.ErrValidation] if uu is invalid.
 func (c *Core) UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error) {
+	if err := uu.Validate(); err != nil {
+		return mdl.User{}, fmt.Errorf("validate: %w", err)
+	}
+
 	pgUpdateUser := updateUserToPg(uu)
 
 	pgUser, err := c.userStorer.UpdateUser(ctx, pgUpdateUser)

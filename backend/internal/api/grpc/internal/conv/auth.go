@@ -12,3 +12,15 @@ func TokenPairToPB(p mdl.AuthTokenPair) *pb.TokenPair {
 		ExpiresIn:    int64(p.ExpiresIn.Seconds()),
 	}
 }
+
+func VerifyMagicLinkFromPB(req *pb.VerifyMagicLinkRequest) mdl.VerifyMagicLink {
+	return mdl.VerifyMagicLink{Token: req.GetToken()}
+}
+
+func RefreshAccessTokenFromPB(req *pb.RefreshAccessTokenRequest) mdl.RefreshToken {
+	return mdl.RefreshToken{Token: req.GetRefreshToken()}
+}
+
+func RevokeRefreshTokenFromPB(req *pb.RevokeRefreshTokenRequest) mdl.RefreshToken {
+	return mdl.RefreshToken{Token: req.GetRefreshToken()}
+}

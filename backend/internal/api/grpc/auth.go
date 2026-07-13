@@ -14,7 +14,6 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
-	"github.com/zorcal/theapp/backend/internal/email"
 )
 
 type authService struct {
@@ -31,13 +30,16 @@ type authService struct {
 type AuthCore interface {
 	// VerifyMagicLink validates a magic-link token and returns a token pair.
 	// Returns [mdl.ErrTokenInvalid] if the token is expired, consumed, or not found.
-	VerifyMagicLink(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error)
+	// Returns [mdl.ErrValidation] if vml is invalid.
+	VerifyMagicLink(ctx context.Context, vml mdl.VerifyMagicLink) (mdl.AuthTokenPair, error)
 	// RefreshAccessToken rotates the refresh token and returns a new token pair.
 	// Returns [mdl.ErrTokenInvalid] if the token is expired, revoked, or not found.
-	RefreshAccessToken(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error)
+	// Returns [mdl.ErrValidation] if rt is invalid.
+	RefreshAccessToken(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error)
 	// RevokeRefreshToken invalidates a refresh token.
 	// Returns [mdl.ErrTokenInvalid] if the token is not found or already revoked.
-	RevokeRefreshToken(ctx context.Context, rawToken string) error
+	// Returns [mdl.ErrValidation] if rt is invalid.
+	RevokeRefreshToken(ctx context.Context, rt mdl.RefreshToken) error
 	// RevokeAllUserRefreshTokens revokes all active refresh tokens for the user.
 	RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uuid.UUID) error
 }
@@ -56,7 +58,7 @@ func (s *authService) RequestMagicLink(ctx context.Context, req *pb.RequestMagic
 			{Field: "email", Description: "required"},
 		})
 	}
-	if !email.Validate(req.GetEmail()) {
+	if !mdl.IsValidEmail(req.GetEmail()) {
 		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 			{Field: "email", Description: "invalid format"},
 		})
@@ -76,7 +78,7 @@ func (s *authService) VerifyMagicLink(ctx context.Context, req *pb.VerifyMagicLi
 		})
 	}
 
-	pair, err := s.authCore.VerifyMagicLink(ctx, req.GetToken())
+	pair, err := s.authCore.VerifyMagicLink(ctx, conv.VerifyMagicLinkFromPB(req))
 	if err != nil {
 		if errors.Is(err, mdl.ErrTokenInvalid) {
 			return nil, status.Error(codes.Unauthenticated, "token invalid or expired")
@@ -94,7 +96,7 @@ func (s *authService) RefreshAccessToken(ctx context.Context, req *pb.RefreshAcc
 		})
 	}
 
-	pair, err := s.authCore.RefreshAccessToken(ctx, req.GetRefreshToken())
+	pair, err := s.authCore.RefreshAccessToken(ctx, conv.RefreshAccessTokenFromPB(req))
 	if err != nil {
 		if errors.Is(err, mdl.ErrTokenInvalid) {
 			return nil, status.Error(codes.Unauthenticated, "refresh token invalid, expired, or revoked")
@@ -112,7 +114,7 @@ func (s *authService) RevokeRefreshToken(ctx context.Context, req *pb.RevokeRefr
 		})
 	}
 
-	if err := s.authCore.RevokeRefreshToken(ctx, req.GetRefreshToken()); err != nil {
+	if err := s.authCore.RevokeRefreshToken(ctx, conv.RevokeRefreshTokenFromPB(req)); err != nil {
 		if errors.Is(err, mdl.ErrTokenInvalid) {
 			return nil, status.Error(codes.NotFound, "refresh token not found or already revoked")
 		}

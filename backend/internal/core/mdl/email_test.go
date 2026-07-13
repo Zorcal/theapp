@@ -1,8 +1,8 @@
-package email
+package mdl
 
 import "testing"
 
-func TestValidate(t *testing.T) {
+func TestIsValidEmail(t *testing.T) {
 	tests := []struct {
 		name string
 		addr string
@@ -46,8 +46,8 @@ func TestValidate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Validate(tt.addr); got != tt.want {
-				t.Errorf("Validate(%q) = %v, want %v", tt.addr, got, tt.want)
+			if got := IsValidEmail(tt.addr); got != tt.want {
+				t.Errorf("IsValidEmail(%q) = %v, want %v", tt.addr, got, tt.want)
 			}
 		})
 	}

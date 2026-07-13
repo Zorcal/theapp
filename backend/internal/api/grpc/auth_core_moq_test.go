@@ -21,16 +21,16 @@ var _ AuthCore = &MockedAuthCore{}
 //
 //		// make and configure a mocked AuthCore
 //		mockedAuthCore := &MockedAuthCore{
-//			RefreshAccessTokenFunc: func(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error) {
+//			RefreshAccessTokenFunc: func(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 //				panic("mock out the RefreshAccessToken method")
 //			},
 //			RevokeAllUserRefreshTokensFunc: func(ctx context.Context, userExternalID uuid.UUID) error {
 //				panic("mock out the RevokeAllUserRefreshTokens method")
 //			},
-//			RevokeRefreshTokenFunc: func(ctx context.Context, rawToken string) error {
+//			RevokeRefreshTokenFunc: func(ctx context.Context, rt mdl.RefreshToken) error {
 //				panic("mock out the RevokeRefreshToken method")
 //			},
-//			VerifyMagicLinkFunc: func(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error) {
+//			VerifyMagicLinkFunc: func(ctx context.Context, vml mdl.VerifyMagicLink) (mdl.AuthTokenPair, error) {
 //				panic("mock out the VerifyMagicLink method")
 //			},
 //		}
@@ -41,16 +41,16 @@ var _ AuthCore = &MockedAuthCore{}
 //	}
 type MockedAuthCore struct {
 	// RefreshAccessTokenFunc mocks the RefreshAccessToken method.
-	RefreshAccessTokenFunc func(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error)
+	RefreshAccessTokenFunc func(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error)
 
 	// RevokeAllUserRefreshTokensFunc mocks the RevokeAllUserRefreshTokens method.
 	RevokeAllUserRefreshTokensFunc func(ctx context.Context, userExternalID uuid.UUID) error
 
 	// RevokeRefreshTokenFunc mocks the RevokeRefreshToken method.
-	RevokeRefreshTokenFunc func(ctx context.Context, rawToken string) error
+	RevokeRefreshTokenFunc func(ctx context.Context, rt mdl.RefreshToken) error
 
 	// VerifyMagicLinkFunc mocks the VerifyMagicLink method.
-	VerifyMagicLinkFunc func(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error)
+	VerifyMagicLinkFunc func(ctx context.Context, vml mdl.VerifyMagicLink) (mdl.AuthTokenPair, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -58,8 +58,8 @@ type MockedAuthCore struct {
 		RefreshAccessToken []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// RawToken is the rawToken argument value.
-			RawToken string
+			// Rt is the rt argument value.
+			Rt mdl.RefreshToken
 		}
 		// RevokeAllUserRefreshTokens holds details about calls to the RevokeAllUserRefreshTokens method.
 		RevokeAllUserRefreshTokens []struct {
@@ -72,15 +72,15 @@ type MockedAuthCore struct {
 		RevokeRefreshToken []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// RawToken is the rawToken argument value.
-			RawToken string
+			// Rt is the rt argument value.
+			Rt mdl.RefreshToken
 		}
 		// VerifyMagicLink holds details about calls to the VerifyMagicLink method.
 		VerifyMagicLink []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// RawToken is the rawToken argument value.
-			RawToken string
+			// Vml is the vml argument value.
+			Vml mdl.VerifyMagicLink
 		}
 	}
 	lockRefreshAccessToken         sync.RWMutex
@@ -90,21 +90,21 @@ type MockedAuthCore struct {
 }
 
 // RefreshAccessToken calls RefreshAccessTokenFunc.
-func (mock *MockedAuthCore) RefreshAccessToken(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error) {
+func (mock *MockedAuthCore) RefreshAccessToken(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 	if mock.RefreshAccessTokenFunc == nil {
 		panic("MockedAuthCore.RefreshAccessTokenFunc: method is nil but AuthCore.RefreshAccessToken was just called")
 	}
 	callInfo := struct {
-		Ctx      context.Context
-		RawToken string
+		Ctx context.Context
+		Rt  mdl.RefreshToken
 	}{
-		Ctx:      ctx,
-		RawToken: rawToken,
+		Ctx: ctx,
+		Rt:  rt,
 	}
 	mock.lockRefreshAccessToken.Lock()
 	mock.calls.RefreshAccessToken = append(mock.calls.RefreshAccessToken, callInfo)
 	mock.lockRefreshAccessToken.Unlock()
-	return mock.RefreshAccessTokenFunc(ctx, rawToken)
+	return mock.RefreshAccessTokenFunc(ctx, rt)
 }
 
 // RefreshAccessTokenCalls gets all the calls that were made to RefreshAccessToken.
@@ -112,12 +112,12 @@ func (mock *MockedAuthCore) RefreshAccessToken(ctx context.Context, rawToken str
 //
 //	len(mockedAuthCore.RefreshAccessTokenCalls())
 func (mock *MockedAuthCore) RefreshAccessTokenCalls() []struct {
-	Ctx      context.Context
-	RawToken string
+	Ctx context.Context
+	Rt  mdl.RefreshToken
 } {
 	var calls []struct {
-		Ctx      context.Context
-		RawToken string
+		Ctx context.Context
+		Rt  mdl.RefreshToken
 	}
 	mock.lockRefreshAccessToken.RLock()
 	calls = mock.calls.RefreshAccessToken
@@ -162,21 +162,21 @@ func (mock *MockedAuthCore) RevokeAllUserRefreshTokensCalls() []struct {
 }
 
 // RevokeRefreshToken calls RevokeRefreshTokenFunc.
-func (mock *MockedAuthCore) RevokeRefreshToken(ctx context.Context, rawToken string) error {
+func (mock *MockedAuthCore) RevokeRefreshToken(ctx context.Context, rt mdl.RefreshToken) error {
 	if mock.RevokeRefreshTokenFunc == nil {
 		panic("MockedAuthCore.RevokeRefreshTokenFunc: method is nil but AuthCore.RevokeRefreshToken was just called")
 	}
 	callInfo := struct {
-		Ctx      context.Context
-		RawToken string
+		Ctx context.Context
+		Rt  mdl.RefreshToken
 	}{
-		Ctx:      ctx,
-		RawToken: rawToken,
+		Ctx: ctx,
+		Rt:  rt,
 	}
 	mock.lockRevokeRefreshToken.Lock()
 	mock.calls.RevokeRefreshToken = append(mock.calls.RevokeRefreshToken, callInfo)
 	mock.lockRevokeRefreshToken.Unlock()
-	return mock.RevokeRefreshTokenFunc(ctx, rawToken)
+	return mock.RevokeRefreshTokenFunc(ctx, rt)
 }
 
 // RevokeRefreshTokenCalls gets all the calls that were made to RevokeRefreshToken.
@@ -184,12 +184,12 @@ func (mock *MockedAuthCore) RevokeRefreshToken(ctx context.Context, rawToken str
 //
 //	len(mockedAuthCore.RevokeRefreshTokenCalls())
 func (mock *MockedAuthCore) RevokeRefreshTokenCalls() []struct {
-	Ctx      context.Context
-	RawToken string
+	Ctx context.Context
+	Rt  mdl.RefreshToken
 } {
 	var calls []struct {
-		Ctx      context.Context
-		RawToken string
+		Ctx context.Context
+		Rt  mdl.RefreshToken
 	}
 	mock.lockRevokeRefreshToken.RLock()
 	calls = mock.calls.RevokeRefreshToken
@@ -198,21 +198,21 @@ func (mock *MockedAuthCore) RevokeRefreshTokenCalls() []struct {
 }
 
 // VerifyMagicLink calls VerifyMagicLinkFunc.
-func (mock *MockedAuthCore) VerifyMagicLink(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error) {
+func (mock *MockedAuthCore) VerifyMagicLink(ctx context.Context, vml mdl.VerifyMagicLink) (mdl.AuthTokenPair, error) {
 	if mock.VerifyMagicLinkFunc == nil {
 		panic("MockedAuthCore.VerifyMagicLinkFunc: method is nil but AuthCore.VerifyMagicLink was just called")
 	}
 	callInfo := struct {
-		Ctx      context.Context
-		RawToken string
+		Ctx context.Context
+		Vml mdl.VerifyMagicLink
 	}{
-		Ctx:      ctx,
-		RawToken: rawToken,
+		Ctx: ctx,
+		Vml: vml,
 	}
 	mock.lockVerifyMagicLink.Lock()
 	mock.calls.VerifyMagicLink = append(mock.calls.VerifyMagicLink, callInfo)
 	mock.lockVerifyMagicLink.Unlock()
-	return mock.VerifyMagicLinkFunc(ctx, rawToken)
+	return mock.VerifyMagicLinkFunc(ctx, vml)
 }
 
 // VerifyMagicLinkCalls gets all the calls that were made to VerifyMagicLink.
@@ -220,12 +220,12 @@ func (mock *MockedAuthCore) VerifyMagicLink(ctx context.Context, rawToken string
 //
 //	len(mockedAuthCore.VerifyMagicLinkCalls())
 func (mock *MockedAuthCore) VerifyMagicLinkCalls() []struct {
-	Ctx      context.Context
-	RawToken string
+	Ctx context.Context
+	Vml mdl.VerifyMagicLink
 } {
 	var calls []struct {
-		Ctx      context.Context
-		RawToken string
+		Ctx context.Context
+		Vml mdl.VerifyMagicLink
 	}
 	mock.lockVerifyMagicLink.RLock()
 	calls = mock.calls.VerifyMagicLink

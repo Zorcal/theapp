@@ -51,6 +51,10 @@ One test file per service (`auth_test.go`, `user_test.go`, …). When a test exe
 
 Validate request payloads at the handler level before calling into the core. Return `codes.InvalidArgument` with `errdetails.BadRequest` field violations so callers get actionable field-level feedback.
 
+This is UX, not the enforcement boundary — the core enforces validation itself and returns `mdl.ErrValidation` (see `core/README.md`). The duplication is deliberate: handler-level checks can reference proto field names (`user.email`) and messages tailored to the API, which the core can't express without knowing about its callers. Relying on the core alone would also mean maintaining a mapping from field violations back to proto field names for every input type.
+
+A `mdl.ErrValidation` escaping from a core call means the two layers have drifted apart; `errorUnaryInterceptor`/`errorStreamInterceptor` catch this centrally rather than per handler.
+
 ## Idempotency
 
 `idempotencyUnaryInterceptor` (in `unary_interceptors.go`) lets a caller resume a dropped request by sending a `x-idempotency-key` header, which it turns into a DBOS workflow ID. The raw key is never used directly: it's hashed together with the authenticated user, the method, and the request payload before use, so two unrelated requests that happen to reuse the same key can never collide on the same workflow, and a caller can never receive another caller's cached result. This is also why `authUnaryInterceptor` must run before it in the chain — the derivation needs the authenticated user ID when one exists.

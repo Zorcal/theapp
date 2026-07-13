@@ -176,14 +176,14 @@ func (noopUserCore) UpdateUser(_ context.Context, _ mdl.UpdateUser) (mdl.User, e
 
 type noopAuthCore struct{}
 
-func (noopAuthCore) VerifyMagicLink(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
+func (noopAuthCore) VerifyMagicLink(_ context.Context, _ mdl.VerifyMagicLink) (mdl.AuthTokenPair, error) {
 	return mdl.AuthTokenPair{}, nil
 }
 
-func (noopAuthCore) RefreshAccessToken(_ context.Context, _ string) (mdl.AuthTokenPair, error) {
+func (noopAuthCore) RefreshAccessToken(_ context.Context, _ mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 	return mdl.AuthTokenPair{}, nil
 }
-func (noopAuthCore) RevokeRefreshToken(_ context.Context, _ string) error            { return nil }
+func (noopAuthCore) RevokeRefreshToken(_ context.Context, _ mdl.RefreshToken) error  { return nil }
 func (noopAuthCore) RevokeAllUserRefreshTokens(_ context.Context, _ uuid.UUID) error { return nil }
 
 type noopWorkflowAuthCore struct{}

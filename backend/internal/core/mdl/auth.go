@@ -22,3 +22,45 @@ type AuthTokenPair struct {
 	// ExpiresIn is the access token's remaining lifetime.
 	ExpiresIn time.Duration
 }
+
+// RequestMagicLink holds the fields needed to send a magic-link sign-in token.
+type RequestMagicLink struct {
+	Email string
+}
+
+// Validate reports whether rml is valid.
+func (rml RequestMagicLink) Validate() error {
+	if rml.Email == "" {
+		return validationError("email required")
+	}
+	if !IsValidEmail(rml.Email) {
+		return validationError("email invalid")
+	}
+	return nil
+}
+
+// VerifyMagicLink holds the fields needed to verify a magic-link token.
+type VerifyMagicLink struct {
+	Token string
+}
+
+// Validate reports whether vml is valid.
+func (vml VerifyMagicLink) Validate() error {
+	if vml.Token == "" {
+		return validationError("token required")
+	}
+	return nil
+}
+
+// RefreshToken holds the fields needed to mint a new access/refresh token pair or revoke an existing session.
+type RefreshToken struct {
+	Token string
+}
+
+// Validate reports whether rt is valid.
+func (rt RefreshToken) Validate() error {
+	if rt.Token == "" {
+		return validationError("token required")
+	}
+	return nil
+}

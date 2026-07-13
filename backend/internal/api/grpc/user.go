@@ -17,7 +17,6 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/data/order"
-	"github.com/zorcal/theapp/backend/internal/email"
 	"github.com/zorcal/theapp/backend/pkg/mustconv"
 )
 
@@ -35,9 +34,13 @@ type UserCore interface {
 	// Returns [mdl.ErrNotFound] if no user with that ID exists.
 	UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error)
 	Users(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
+	// CreateUser creates a new user and returns the created user.
+	// Returns [mdl.ErrAlreadyExists] if a user with the same email already exists.
+	// Returns [mdl.ErrValidation] if cu is invalid.
 	CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
 	// UpdateUser updates the name of the user with the given ID and returns the updated user.
 	// Returns [mdl.ErrNotFound] if no user with that ID exists.
+	// Returns [mdl.ErrValidation] if uu is invalid.
 	UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error)
 }
 
@@ -157,7 +160,7 @@ func validateCreateUserRequest(req *pb.CreateUserRequest) error {
 			Field:       "user.email",
 			Description: "required",
 		})
-	} else if !email.Validate(req.GetUser().GetEmail()) {
+	} else if !mdl.IsValidEmail(req.GetUser().GetEmail()) {
 		violations = append(violations, &errdetails.BadRequest_FieldViolation{
 			Field:       "user.email",
 			Description: "must be a valid email address",

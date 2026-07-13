@@ -1,11 +1,14 @@
 package grpc
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -14,6 +17,31 @@ import (
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
+
+func TestErrorUnaryInterceptor_validationEscaped(t *testing.T) {
+	interceptor := errorUnaryInterceptor(testingx.NewLogger(t))
+
+	handler := func(ctx context.Context, req any) (any, error) {
+		return nil, fmt.Errorf("name required: %w", mdl.ErrValidation)
+	}
+
+	_, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/CreateUser"}, handler)
+	if err == nil {
+		t.Fatal("errorUnaryInterceptor() error = nil, want error")
+	}
+
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("errorUnaryInterceptor() error = %q, want a gRPC status error", err)
+	}
+
+	if got, want := st.Code(), codes.InvalidArgument; got != want {
+		t.Errorf("errorUnaryInterceptor() code = %v, want %v", got, want)
+	}
+	if got, want := st.Message(), "invalid request"; got != want {
+		t.Errorf("errorUnaryInterceptor() message = %q, want %q", got, want)
+	}
+}
 
 func TestAuthInterceptor_unauthenticated(t *testing.T) {
 	tests := []struct {

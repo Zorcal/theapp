@@ -1,6 +1,9 @@
 package mdl
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // ErrNotFound is returned when a requested resource does not exist.
 var ErrNotFound = errors.New("not found")
@@ -17,3 +20,11 @@ var ErrTokenInvalid = errors.New("token invalid")
 // ErrRateLimited is returned when a request is rejected because the caller
 // issued a prior request too recently.
 var ErrRateLimited = errors.New("rate limited")
+
+// ErrValidation is returned by an input type's Validate method when the value is invalid.
+var ErrValidation = errors.New("validation failed")
+
+// validationError wraps msg, a short field-level description, with ErrValidation.
+func validationError(msg string) error {
+	return fmt.Errorf("%s: %w", msg, ErrValidation)
+}

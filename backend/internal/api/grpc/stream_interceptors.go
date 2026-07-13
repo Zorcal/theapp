@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/telemetry"
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
@@ -93,6 +94,14 @@ func errorStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 		err := handler(srv, ss)
 		if err == nil {
 			return nil
+		}
+
+		// A core method rejected a request the handler's own validation should have caught — the two
+		// validation layers have drifted apart.
+		if errors.Is(err, mdl.ErrValidation) {
+			log.ErrorContext(ctx, "Core rejected a request the endpoint validation should have caught",
+				slog.String("method", info.FullMethod), slog.String("error", err.Error()))
+			return status.Error(codes.InvalidArgument, "invalid request")
 		}
 
 		st := status.New(codes.Internal, codes.Internal.String())

@@ -104,9 +104,14 @@ func NewCore(as AuthStorer, us UserStorer, tr Transactor, cfg Config) *Core {
 
 // MagicLinkToken ensures the user exists, rate-checks, invalidates prior tokens, and creates a
 // new one inside a transaction. Returns the raw token.
-// Returns [mdl.ErrRateLimited] if a token was already issued to emailAddr within the rate-limit window.
-func (c *Core) MagicLinkToken(ctx context.Context, emailAddr string) (string, error) {
-	emailAddr = strings.ToLower(emailAddr)
+// Returns [mdl.ErrRateLimited] if a token was already issued to rml.Email within the rate-limit window.
+// Returns [mdl.ErrValidation] if rml is invalid.
+func (c *Core) MagicLinkToken(ctx context.Context, rml mdl.RequestMagicLink) (string, error) {
+	if err := rml.Validate(); err != nil {
+		return "", fmt.Errorf("validate: %w", err)
+	}
+
+	emailAddr := strings.ToLower(rml.Email)
 
 	pgUser, err := c.userStorer.GetOrCreateUserByEmail(ctx, emailAddr)
 	if err != nil {
@@ -157,10 +162,15 @@ func (c *Core) MagicLinkToken(ctx context.Context, emailAddr string) (string, er
 	return rawTok, nil
 }
 
-// VerifyMagicLink validates rawToken and returns an access/refresh token pair.
+// VerifyMagicLink validates vml and returns an access/refresh token pair.
 // Returns [mdl.ErrTokenInvalid] if the token is expired, consumed, or not found.
-func (c *Core) VerifyMagicLink(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error) {
-	hash := hashToken(rawToken)
+// Returns [mdl.ErrValidation] if vml is invalid.
+func (c *Core) VerifyMagicLink(ctx context.Context, vml mdl.VerifyMagicLink) (mdl.AuthTokenPair, error) {
+	if err := vml.Validate(); err != nil {
+		return mdl.AuthTokenPair{}, fmt.Errorf("validate: %w", err)
+	}
+
+	hash := hashToken(vml.Token)
 
 	tok, err := c.authStorer.MagicLinkTokenByHash(ctx, hash)
 	if err != nil {
@@ -198,11 +208,16 @@ func (c *Core) VerifyMagicLink(ctx context.Context, rawToken string) (mdl.AuthTo
 	return pair, nil
 }
 
-// RefreshAccessToken rotates rawToken and returns a new access/refresh token pair. The old refresh
+// RefreshAccessToken rotates rt and returns a new access/refresh token pair. The old refresh
 // token is revoked atomically with the new pair being issued. Returns [mdl.ErrTokenInvalid] if the
 // token is expired, revoked, or not found.
-func (c *Core) RefreshAccessToken(ctx context.Context, rawToken string) (mdl.AuthTokenPair, error) {
-	hash := hashToken(rawToken)
+// Returns [mdl.ErrValidation] if rt is invalid.
+func (c *Core) RefreshAccessToken(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error) {
+	if err := rt.Validate(); err != nil {
+		return mdl.AuthTokenPair{}, fmt.Errorf("validate: %w", err)
+	}
+
+	hash := hashToken(rt.Token)
 
 	var pair mdl.AuthTokenPair
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
@@ -227,10 +242,15 @@ func (c *Core) RefreshAccessToken(ctx context.Context, rawToken string) (mdl.Aut
 	return pair, nil
 }
 
-// RevokeRefreshToken invalidates rawToken, ending that session.
+// RevokeRefreshToken invalidates rt, ending that session.
 // Returns [mdl.ErrTokenInvalid] if the token is not found, already revoked, or expired.
-func (c *Core) RevokeRefreshToken(ctx context.Context, rawToken string) error {
-	hash := hashToken(rawToken)
+// Returns [mdl.ErrValidation] if rt is invalid.
+func (c *Core) RevokeRefreshToken(ctx context.Context, rt mdl.RefreshToken) error {
+	if err := rt.Validate(); err != nil {
+		return fmt.Errorf("validate: %w", err)
+	}
+
+	hash := hashToken(rt.Token)
 
 	if _, err := c.authStorer.ConsumeRefreshToken(ctx, hash); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

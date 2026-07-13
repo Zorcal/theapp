@@ -6,6 +6,8 @@ package auth
 import (
 	"context"
 	"sync"
+
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
 // Ensure, that MockedAuthCore does implement AuthCore.
@@ -18,7 +20,7 @@ var _ AuthCore = &MockedAuthCore{}
 //
 //		// make and configure a mocked AuthCore
 //		mockedAuthCore := &MockedAuthCore{
-//			MagicLinkTokenFunc: func(ctx context.Context, emailAddr string) (string, error) {
+//			MagicLinkTokenFunc: func(ctx context.Context, rml mdl.RequestMagicLink) (string, error) {
 //				panic("mock out the MagicLinkToken method")
 //			},
 //		}
@@ -29,7 +31,7 @@ var _ AuthCore = &MockedAuthCore{}
 //	}
 type MockedAuthCore struct {
 	// MagicLinkTokenFunc mocks the MagicLinkToken method.
-	MagicLinkTokenFunc func(ctx context.Context, emailAddr string) (string, error)
+	MagicLinkTokenFunc func(ctx context.Context, rml mdl.RequestMagicLink) (string, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -37,29 +39,29 @@ type MockedAuthCore struct {
 		MagicLinkToken []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// EmailAddr is the emailAddr argument value.
-			EmailAddr string
+			// Rml is the rml argument value.
+			Rml mdl.RequestMagicLink
 		}
 	}
 	lockMagicLinkToken sync.RWMutex
 }
 
 // MagicLinkToken calls MagicLinkTokenFunc.
-func (mock *MockedAuthCore) MagicLinkToken(ctx context.Context, emailAddr string) (string, error) {
+func (mock *MockedAuthCore) MagicLinkToken(ctx context.Context, rml mdl.RequestMagicLink) (string, error) {
 	if mock.MagicLinkTokenFunc == nil {
 		panic("MockedAuthCore.MagicLinkTokenFunc: method is nil but AuthCore.MagicLinkToken was just called")
 	}
 	callInfo := struct {
-		Ctx       context.Context
-		EmailAddr string
+		Ctx context.Context
+		Rml mdl.RequestMagicLink
 	}{
-		Ctx:       ctx,
-		EmailAddr: emailAddr,
+		Ctx: ctx,
+		Rml: rml,
 	}
 	mock.lockMagicLinkToken.Lock()
 	mock.calls.MagicLinkToken = append(mock.calls.MagicLinkToken, callInfo)
 	mock.lockMagicLinkToken.Unlock()
-	return mock.MagicLinkTokenFunc(ctx, emailAddr)
+	return mock.MagicLinkTokenFunc(ctx, rml)
 }
 
 // MagicLinkTokenCalls gets all the calls that were made to MagicLinkToken.
@@ -67,12 +69,12 @@ func (mock *MockedAuthCore) MagicLinkToken(ctx context.Context, emailAddr string
 //
 //	len(mockedAuthCore.MagicLinkTokenCalls())
 func (mock *MockedAuthCore) MagicLinkTokenCalls() []struct {
-	Ctx       context.Context
-	EmailAddr string
+	Ctx context.Context
+	Rml mdl.RequestMagicLink
 } {
 	var calls []struct {
-		Ctx       context.Context
-		EmailAddr string
+		Ctx context.Context
+		Rml mdl.RequestMagicLink
 	}
 	mock.lockMagicLinkToken.RLock()
 	calls = mock.calls.MagicLinkToken

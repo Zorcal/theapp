@@ -31,6 +31,8 @@ Edges are imports. `mdl` and `pgstores` are leaves — they import neither each 
 - **Output types** — what the core returns: `User`, `Order`, etc.
 - **Input types** — what callers pass in for mutating operations: `CreateUser`, `UpdateUser`, etc. Name them after the operation. Never reuse an output type as an input; without a dedicated input type, adding a field later forces a signature change at every call site.
 
+Input types implement `Validate() error`. Core methods call it before touching a store.
+
 ## Update pattern
 
 Update input types (e.g. `UpdateUser`) pair with a companion `UserUpdateFields` struct whose boolean fields declare which values should be written. A field absent from `UserUpdateFields` is left unchanged, regardless of its value in the input type.
