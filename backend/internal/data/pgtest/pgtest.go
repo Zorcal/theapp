@@ -21,8 +21,20 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgschema"
 )
 
-// New returns a connection pool to a fresh, isolated test database.
+// New returns a connection pool to a fresh, isolated, fully seeded test database.
 func New(t *testing.T, ctx context.Context) *pgxpool.Pool {
+	t.Helper()
+
+	pool := NewWithoutSeed(t, ctx)
+
+	seed(t, ctx, pool)
+
+	return pool
+}
+
+// NewWithoutSeed returns a connection pool to a fresh, isolated test database with the migrations
+// applied but no seed data loaded.
+func NewWithoutSeed(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 
 	// The schema is built once into a template database and each call hands out a fast low-level clone of that
@@ -56,9 +68,9 @@ func New(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	return openPool(t, ctx, dbName)
 }
 
-// NewWithoutTemplate returns a connection pool to a fresh, isolated test database built directly from the migrations,
-// without going through the template. It is slower than New and exists for tests that exercise the schema/migration
-// build itself rather than the resulting schema.
+// NewWithoutTemplate returns a connection pool to a fresh, isolated, fully seeded test database built directly from
+// the migrations, without going through the template. It is slower than New and exists for tests that exercise the
+// schema/migration build itself rather than the resulting schema.
 func NewWithoutTemplate(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	t.Helper()
 
@@ -74,7 +86,19 @@ func NewWithoutTemplate(t *testing.T, ctx context.Context) *pgxpool.Pool {
 		}
 	})
 
-	return openPool(t, ctx, dbName)
+	pool := openPool(t, ctx, dbName)
+
+	seed(t, ctx, pool)
+
+	return pool
+}
+
+// seed loads hardcoded data that a fresh database needs but migrations don't provide.
+func seed(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	if err := pgschema.Seed(ctx, pool); err != nil {
+		t.Fatalf("seed db: %v", err)
+	}
 }
 
 // sharedAdminPool returns the process-wide admin pool, initializing it on the first call.

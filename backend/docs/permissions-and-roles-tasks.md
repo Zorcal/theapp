@@ -47,14 +47,16 @@ Also delivered in this phase, beyond the original task list: a `db migrate` comm
 
 **Checkpoint:** the type compiles and the migration runs; the table exists (empty until phase 3 seeds it — there's no role yet to reference a permission by ID). Met.
 
-## Phase 3 — static roles and the permission sync
+## Phase 3 — static roles and permission seeding — done
 
 5. Migration: `roles` table (`is_static`; `org_id` deferred to phase 11, added once organizations exist) and `role_permissions` join table. Depends on 4.
-6. `is_static` trigger on `roles` (`BEFORE UPDATE OR DELETE`). Depends on 5.
-7. Permission sync at startup: reconcile `permissions` table against the code-defined list, stripping removed permissions from roles before deleting the row, and granting any newly added permission to `superadmin`. Depends on 3, 4, 5.
-8. Static role definitions: hardcode `superadmin` (every permission, granted as real `role_permissions` rows kept in sync by 7) and other illustrative static roles (`useradmin`, `rolesadmin`), seeded at startup. Unit test asserting `superadmin`'s resolved permission set equals the full code-defined permission list. Depends on 5, 7.
+6. `is_static` trigger (`prevent_static_role_mutation`, `BEFORE UPDATE OR DELETE`) on `roles`. Depends on 5.
+7. `internal/data/pgschema/seed.sql` (its statements wrapped in a single `BEGIN`/`COMMIT`) plus `pgschema.Seed(ctx, pool)`, run wherever a pool is set up (`cmd/server`, test setup): idempotent (`ON CONFLICT ... DO NOTHING`) `INSERT`s for every permission, `superadmin`, and its grants. Depends on 3, 4, 5.
+8. Static role definitions: `superadmin` (every permission), seeded via 7. Depends on 5, 7.
 
-**Checkpoint:** static roles exist in the DB with correct, sync-maintained permission sets, proven by the unit test in task 8.
+Permissions and static roles are rows inserted by `seed.sql`, not something any Go code reconciles at runtime or filters on read. Removing a permission or a static role is a manual step against the database after the code change deploys (see `internal/core/rbac/README.md`) — an accepted tradeoff given how rarely this is expected to happen; if that stops being true, this cleanup can move into a `cmd/cli` command instead of staying a hand-run SQL snippet. `useradmin`/`rolesadmin` are dropped for now — illustrative roles with no permissions of their own to hold yet, given only `user:*` permissions exist at this point; add them back once there's a real permission set for each to scope down to.
+
+**Checkpoint:** static roles exist in the DB with correct permission sets, proven by `TestCore_integration`. `pgschema.Seed`'s idempotency (`TestSeed`, asserting the total row count across every table is unchanged after a second call) and the `is_static` trigger (`TestIsStaticTrigger`) each have their own dedicated test. Met.
 
 ## Phase 4 — system-scope assignment and resolver
 

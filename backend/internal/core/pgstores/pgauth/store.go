@@ -55,7 +55,11 @@ func (s *Store) InvalidateUserMagicLinkTokens(ctx context.Context, userID int) e
 		return nil
 	}
 
-	return pgdb.RunBatch(ctx, s.pool, doInBatch)
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CreateMagicLinkToken inserts a new magic-link token and returns the created row.
@@ -114,7 +118,11 @@ func (s *Store) ConsumeMagicLinkToken(ctx context.Context, id int) error {
 		return nil
 	}
 
-	return pgdb.RunBatch(ctx, s.pool, doInBatch)
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CreateRefreshToken inserts a new refresh token and returns the created row.
@@ -185,5 +193,9 @@ func (s *Store) RevokeAllUserRefreshTokens(ctx context.Context, userExternalID u
 		return nil
 	}
 
-	return pgdb.RunBatch(ctx, s.pool, doInBatch)
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
 }

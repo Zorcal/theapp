@@ -232,6 +232,12 @@ func run(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("status check pg db connection: %w", err)
 	}
 
+	log.InfoContext(ctx, "Seeding PostgreSQL database")
+
+	if err := pgschema.Seed(ctx, pgPool); err != nil {
+		return fmt.Errorf("seed pg db: %w", err)
+	}
+
 	// Setup clients.
 
 	var emailSender email.Sender = email.NewLogSender(log)

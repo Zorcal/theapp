@@ -157,7 +157,11 @@ func (s *Store) MarkEmailVerified(ctx context.Context, externalID uuid.UUID) err
 		return nil
 	}
 
-	return pgdb.RunBatch(ctx, s.pool, doInBatch)
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Store) CreateUser(ctx context.Context, cu CreateUser) (User, error) {

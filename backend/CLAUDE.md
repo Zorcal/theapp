@@ -28,6 +28,21 @@ error while tracking location: unable to fetch order status: DB connection faile
 
 Assign and check an error in the same `if` statement when no other values are needed outside the block. Split into two statements only when the result value is used after the check.
 
+Never end a function by returning the result of a call directly (`return pgdb.RunBatch(...)`, `return c.transactor.RunTx(...)`). Always check it explicitly and return `nil` on the success path, even when there's nothing else to do:
+
+```go
+// Good
+if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+    return err
+}
+return nil
+
+// Bad
+return pgdb.RunBatch(ctx, s.pool, doInBatch)
+```
+
+This keeps every function's error handling shape the same regardless of whether a case is later added that needs to do something after the call succeeds — that case doesn't force a restructure of an existing bare `return`.
+
 ## Code organisation
 
 Order functions by importance: exported and primary functions first, helpers at the bottom. Group functions by relevance.
