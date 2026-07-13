@@ -168,6 +168,101 @@ func TestCore_UserByID_error(t *testing.T) {
 	})
 }
 
+func TestCore_UserByEmail(t *testing.T) {
+	id, etag, now := uuid.New(), uuid.New(), time.Now()
+
+	tests := []struct {
+		name       string
+		userStorer *MockedUserStorer
+		in         string
+		want       mdl.User
+	}{
+		{
+			name: "returns converted user",
+			userStorer: &MockedUserStorer{
+				UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+					return pguser.User{
+						ExternalID: id,
+						Email:      "alice@test.com",
+						Name:       "Alice Smith",
+						CreatedAt:  now,
+						ETag:       etag,
+					}, nil
+				},
+			},
+			in: "alice@test.com",
+			want: mdl.User{
+				ID:        id,
+				Email:     "alice@test.com",
+				Name:      "Alice Smith",
+				CreatedAt: now,
+				ETag:      etag.String(),
+			},
+		},
+		{
+			name: "normalizes email before lookup",
+			userStorer: &MockedUserStorer{
+				UserByEmailFunc: func(_ context.Context, email string) (pguser.User, error) {
+					return pguser.User{
+						ExternalID: id,
+						Email:      email,
+						Name:       "Alice Smith",
+						CreatedAt:  now,
+						ETag:       etag,
+					}, nil
+				},
+			},
+			in: "  Alice@Test.COM  ",
+			want: mdl.User{
+				ID:        id,
+				Email:     "alice@test.com",
+				Name:      "Alice Smith",
+				CreatedAt: now,
+				ETag:      etag.String(),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.userStorer)
+
+			got, err := core.UserByEmail(t.Context(), tt.in)
+			if err != nil {
+				t.Fatalf("UserByEmail(%v) error = %v", tt.in, err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want)
+		})
+	}
+}
+
+func TestCore_UserByEmail_error(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
+		core := NewCore(&MockedUserStorer{
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+				return pguser.User{}, sql.ErrNoRows
+			},
+		})
+		_, err := core.UserByEmail(t.Context(), "alice@test.com")
+		if !errors.Is(err, mdl.ErrNotFound) {
+			t.Errorf("UserByEmail() error = %v, want mdl.ErrNotFound", err)
+		}
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		core := NewCore(&MockedUserStorer{
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+				return pguser.User{}, errors.New("db down")
+			},
+		})
+		_, err := core.UserByEmail(t.Context(), "alice@test.com")
+		if err == nil {
+			t.Fatal("UserByEmail() error = nil, want error")
+		}
+		testingx.AssertErrContains(t, err, "db down")
+	})
+}
+
 func TestCore_UpdateUser(t *testing.T) {
 	id, etag, now := uuid.New(), uuid.New(), time.Now()
 

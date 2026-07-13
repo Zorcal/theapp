@@ -4,8 +4,8 @@ Breaks down docs/permissions-and-roles.md into ordered, independently-shippable 
 code referenced for grounding: users/auth already exist (internal/core/mdl, internal/core/auth,
 internal/core/pgstores/pguser, internal/api/grpc/unary_interceptors.go, schemas/auth.proto,
 schemas/user.proto); organizations, projects, roles, and permissions don't exist yet, and there's
-no proto schema for any of them. There's also no `cmd/admin` or urfave/cli dependency yet — only
-`cmd/server`.
+no proto schema for any of them. `cmd/cli` and the urfave/cli dependency exist as of phase 1 (see
+below), alongside the existing `cmd/server`.
 
 ## Working process
 
@@ -25,20 +25,20 @@ sometimes needs revisiting once a later phase's tables exist, e.g. `roles.org_id
 organizations exist), but it keeps each review small and keeps no phase assuming the full shape of
 a later phase's schema up front — which matters because that shape may still change mid-implementation.
 
-The admin CLI (`cmd/admin`) grows the same way, in its own dedicated phases rather than as tasks
+The CLI (`cmd/cli`) grows the same way, in its own dedicated phases rather than as tasks
 folded into whichever feature phase happens to need a new command: phase 1 stands the tool up with
 a `user create` command; phase 5 adds granting `superadmin`; phase 9 adds bootstrapping `theapp`/
 `dev`/`control`; phase 26 adds seeding the `robot` user. Each CLI phase depends only on the scaffold
 (phase 1) plus whatever core-layer function it wires up, never on another CLI phase.
 
-## Phase 1 — CLI tool scaffold and user creation
+## Phase 1 — CLI tool scaffold and user creation — done
 
-Needs nothing new — users and auth already exist. Can be built and reviewed today.
-
-1. `cmd/admin` CLI scaffold ([urfave/cli](https://github.com/urfave/cli), shell completion, commands split into their own files under a `commands` package), alongside the existing `cmd/server` entrypoint. Every mutating command takes a required `--operator` flag (resolved by UUID or email, the same way any user lookup is) for actor attribution — it has no observable effect until `pgdb` sets `app.user_id` from it (phase 19) and auditing exists to record it (phase 24), but building it into the scaffold now means no later command has to retrofit it.
+1. `cmd/cli` CLI scaffold ([urfave/cli](https://github.com/urfave/cli), shell completion, commands split into their own files under a `commands` package), alongside the existing `cmd/server` entrypoint. Every mutating command takes a required `--operator` flag (resolved by UUID or email, the same way any user lookup is) for actor attribution — it has no observable effect until `pgdb` sets `app.user_id` from it (phase 19) and auditing exists to record it (phase 24), but building it into the scaffold now means no later command has to retrofit it.
 2. `user create` command, wired to the existing user-creation core logic. Depends on 1.
 
-**Checkpoint:** an operator can create a user via the CLI today.
+Also delivered in this phase, beyond the original task list: a `db migrate` command (no `--operator` — it's schema DDL, not an audited data write, and it's what creates the `users` table in the first place); a `user list` command (paginated, no `--operator` since it's read-only); and `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) to seed a local bootstrap operator, since `--operator` always requiring an existing user means the very first one in a fresh environment can't come from the CLI itself.
+
+**Checkpoint:** an operator can create a user via the CLI today. Met.
 
 ## Phase 2 — permission types and table
 
@@ -244,3 +244,4 @@ Needs nothing new — users and auth already exist. Can be built and reviewed to
 - Tasks 45 and 51 should be written as soon as their dependencies land, not deferred to the end — they're what prove the backstop actually works.
 - Review happens once per phase, at the phase boundary — see "Working process" above. The phase checkpoints describe what should be true and demonstrable by the time that review happens.
 - Phase 13's checkpoint calls out a phase that is intentionally not yet safe to expose broadly. It's the one phase in this breakdown where "reviewed and committed" doesn't mean "safe to deploy publicly" — flag this distinction if it ever needs to leave a dev/staging environment before phase 15 lands.
+- `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) seeds a local-only bootstrap operator user (`operator@theapp.com`), so every `cmd/cli` command has a valid `--operator` to reference without a manual `psql` insert. It's a standing dev convenience, not a task with its own checkpoint — revisit it whenever a phase changes what a fresh local environment needs to be immediately useful (e.g. phase 5 might have it also grant `superadmin` to the seeded operator; phase 9 might have it add `theapp` org membership) instead of leaving that as another manual step.

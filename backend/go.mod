@@ -14,6 +14,7 @@ require (
 	github.com/lmittmann/tint v1.1.3
 	github.com/pgx-contrib/pgxotel v0.0.0-20260525021520-833b321e9eae
 	github.com/resend/resend-go/v3 v3.7.0
+	github.com/urfave/cli/v3 v3.10.1
 	go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.69.0

@@ -23,6 +23,9 @@ type UserStorer interface {
 	// UserByExternalID returns the user with the given external ID.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error)
+	// UserByEmail returns the user with the given email address.
+	// Returns [sql.ErrNoRows] if no such user exists.
+	UserByEmail(ctx context.Context, email string) (pguser.User, error)
 	Users(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize, pageOffset int) ([]pguser.User, error)
 	UserCount(ctx context.Context, filter pguser.Filter) (int, error)
 	// CreateUser inserts a new user and returns it.
@@ -52,6 +55,20 @@ func (c *Core) UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error) {
 			return mdl.User{}, mdl.ErrNotFound
 		}
 		return mdl.User{}, fmt.Errorf("user by external id: %w", err)
+	}
+
+	return userFromPg(pgUser), nil
+}
+
+// UserByEmail returns the user with the given email address.
+// Returns [mdl.ErrNotFound] if no user with that email exists.
+func (c *Core) UserByEmail(ctx context.Context, email string) (mdl.User, error) {
+	pgUser, err := c.userStorer.UserByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.User{}, mdl.ErrNotFound
+		}
+		return mdl.User{}, fmt.Errorf("user by email: %w", err)
 	}
 
 	return userFromPg(pgUser), nil

@@ -3,6 +3,10 @@ DBMATE_SCHEMA_DIR=$(shell pwd)/internal/data/pgschema
 DBMATE_IMAGE=ghcr.io/amacneil/dbmate
 PG_IMAGE=postgres:17
 
+.PHONY: seed-dev-operator
+seed-dev-operator:
+	./scripts/seed-dev-operator.sh
+
 .PHONY: new-pg-migration
 new-pg-migration:
 	@if [ -z "$(name)" ]; then \
