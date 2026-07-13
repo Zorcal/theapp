@@ -9,6 +9,9 @@ no proto schema for any of them. There's also no `cmd/admin` or urfave/cli depen
 
 ## Working process
 
+For any new agent session working on this, make sure to read all .md (CLAUDE.md and README.md) files in the codebase to
+get the proper context.
+
 This is built iteratively, phase by phase. Work through all the tasks in a phase, then stop and
 hand the whole phase back for review rather than continuing on to the next phase. The code gets
 committed after review before the next phase starts, so each phase begins from a clean, committed
