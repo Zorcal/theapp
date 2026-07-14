@@ -74,12 +74,12 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** an operator can grant `superadmin` to a user via the CLI. Verified manually against a local dev database (`role assign-system --role superadmin`, then confirmed the `system_role_assignments` row).
 
-## Phase 6 — permission registry and the superadmin gate
+## Phase 6 — permission registry and the superadmin gate — done
 
-15. Permission registry: map of every existing RPC method to its real, correct required permissions (using the constants from 3), including explicit empty-list entries for endpoints that legitimately require none. Exhaustiveness test asserts every registered gRPC method has an entry. No new proto needed — this maps permissions onto RPCs that already exist. Depends on 3.
-16. `mdl.AuthSession` struct (`User AuthUser`, `ProjectID int`), alongside existing `mdl/auth.go`. Interceptor: resolve one per-request via 12, enforce `codes.PermissionDenied` via the registry (15). Depends on 12, 15.
+15. Permission registry (`permissionRegistry` in `internal/api/grpc/permissions.go`): map of every existing RPC method to its real, correct required permissions (using the constants from 3), including explicit empty-list entries for endpoints that legitimately require none (`AuthService/RevokeAllSessions`). `TestPermissionRegistry_exhaustiveness` enumerates every method the server actually registers (via `grpc.Server.GetServiceInfo`) and asserts each one is either public (`publicMethods`) or has a registry entry, so a new RPC added without one fails the build. No new proto needed — this maps permissions onto RPCs that already exist. Depends on 3.
+16. `mdl.AuthSession` struct (`User AuthUser`, `ProjectID int`), alongside existing `mdl/auth.go`. `ProjectID` stays at its zero value this phase — the request-metadata plumbing that would populate it doesn't exist until phase 10. `permissionUnaryInterceptor` resolves one per protected request via 12, enforce `codes.PermissionDenied` via the registry (15); runs right after the existing auth interceptor in the unary chain, since it depends on the authenticated user ID already being in context. Depends on 12, 15.
 
-**Checkpoint:** every existing RPC is permission-gated and enforced. A user granted `superadmin` via phase 5's CLI command can call anything requiring a permission; every other authenticated user is denied on any endpoint with a non-empty required-permission list. Still no organizations, projects, custom roles, or self-service creation endpoint.
+**Checkpoint:** every existing RPC is permission-gated and enforced. A user granted `superadmin` via phase 5's CLI command can call anything requiring a permission; every other authenticated user is denied on any endpoint with a non-empty required-permission list. Still no organizations, projects, custom roles, or self-service creation endpoint. Proven by `TestPermissionRegistry_exhaustiveness`, `TestPermissionUnaryInterceptor(_error)`, and `TestAuth_MagicLinkIntegration`'s use of a real `ListUsers` call gated on an assigned role.
 
 ## Phase 7 — organizations and projects schema
 

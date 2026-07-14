@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -268,4 +269,150 @@ func TestScopedWorkflowID_error(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPermissionRegistry_exhaustiveness asserts every method registered on the gRPC server is
+// either public (see publicMethods) or has a permissionRegistry entry, so a new RPC added without
+// registering one fails the build instead of silently defaulting to either extreme.
+func TestPermissionRegistry_exhaustiveness(t *testing.T) {
+	srv := NewServer(ServerConfig{Log: testingx.NewLogger(t)})
+	defer srv.Stop()
+
+	for serviceName, info := range srv.GetServiceInfo() {
+		for _, m := range info.Methods {
+			method := fmt.Sprintf("/%s/%s", serviceName, m.Name)
+
+			_, public := publicMethods[method]
+			_, registered := permissionRegistry[method]
+
+			if !public && !registered {
+				t.Errorf("method %q has no permissionRegistry entry and is not public", method)
+			}
+			if public && registered {
+				t.Errorf("method %q is both public and has a permissionRegistry entry", method)
+			}
+		}
+	}
+}
+
+func TestPermissionUnaryInterceptor(t *testing.T) {
+	handler := func(ctx context.Context, _ any) (any, error) {
+		s, ok := AuthSessionFromContext(ctx)
+		if !ok {
+			return nil, errors.New("no auth session in context")
+		}
+		return s, nil
+	}
+
+	t.Run("public method bypasses check", func(t *testing.T) {
+		interceptor := permissionUnaryInterceptor(&MockedAuthCore{})
+
+		_, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.AuthService/RequestMagicLink"}, handler)
+		if err == nil {
+			t.Fatal("permissionUnaryInterceptor() error = nil, want error")
+		}
+		// The handler ran (and failed for lack of an auth session), proving the permission check itself was skipped.
+		testingx.AssertErrContains(t, err, "no auth session in context")
+	})
+
+	t.Run("permission granted", func(t *testing.T) {
+		userID := uuid.New()
+		authCore := &MockedAuthCore{
+			AuthUserFunc: func(_ context.Context, id uuid.UUID) (mdl.AuthUser, error) {
+				return mdl.AuthUser{UserID: id, Permissions: []mdl.Permission{mdl.PermissionUserRead}}, nil
+			},
+		}
+		interceptor := permissionUnaryInterceptor(authCore)
+
+		ctx := contextWithUserID(t.Context(), userID)
+		resp, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
+		if err != nil {
+			t.Fatalf("permissionUnaryInterceptor() error = %v, want nil", err)
+		}
+		got, ok := resp.(mdl.AuthSession)
+		if !ok {
+			t.Fatalf("permissionUnaryInterceptor() response = %T, want mdl.AuthSession", resp)
+		}
+
+		want := mdl.AuthSession{User: mdl.AuthUser{UserID: userID, Permissions: []mdl.Permission{mdl.PermissionUserRead}}}
+		testingx.AssertDiff(t, got, want)
+	})
+}
+
+func TestPermissionUnaryInterceptor_error(t *testing.T) {
+	handler := func(ctx context.Context, _ any) (any, error) {
+		return "handler ran", nil
+	}
+
+	tests := []struct {
+		name     string
+		authCore AuthCore
+		ctx      context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		method   string
+		want     codes.Code
+	}{
+		{
+			name:     "unregistered method",
+			authCore: &MockedAuthCore{},
+			ctx:      contextWithUserID(t.Context(), uuid.New()),
+			method:   "/theapp.v1.UserService/NoSuchMethod",
+			want:     codes.PermissionDenied,
+		},
+		{
+			name:     "unauthenticated",
+			authCore: &MockedAuthCore{},
+			ctx:      t.Context(),
+			method:   "/theapp.v1.UserService/GetUser",
+			want:     codes.Unauthenticated,
+		},
+		{
+			name: "caller no longer exists",
+			authCore: &MockedAuthCore{
+				AuthUserFunc: func(_ context.Context, _ uuid.UUID) (mdl.AuthUser, error) {
+					return mdl.AuthUser{}, mdl.ErrNotFound
+				},
+			},
+			ctx:    contextWithUserID(t.Context(), uuid.New()),
+			method: "/theapp.v1.UserService/GetUser",
+			want:   codes.Unauthenticated,
+		},
+		{
+			name: "missing permission",
+			authCore: &MockedAuthCore{
+				AuthUserFunc: func(_ context.Context, id uuid.UUID) (mdl.AuthUser, error) {
+					return mdl.AuthUser{UserID: id}, nil
+				},
+			},
+			ctx:    contextWithUserID(t.Context(), uuid.New()),
+			method: "/theapp.v1.UserService/GetUser",
+			want:   codes.PermissionDenied,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			interceptor := permissionUnaryInterceptor(tt.authCore)
+
+			_, err := interceptor(tt.ctx, nil, &grpc.UnaryServerInfo{FullMethod: tt.method}, handler)
+			if got := status.Code(err); got != tt.want {
+				t.Errorf("permissionUnaryInterceptor() code = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("resolve auth user store error", func(t *testing.T) {
+		authCore := &MockedAuthCore{
+			AuthUserFunc: func(_ context.Context, _ uuid.UUID) (mdl.AuthUser, error) {
+				return mdl.AuthUser{}, errors.New("db down")
+			},
+		}
+		interceptor := permissionUnaryInterceptor(authCore)
+
+		ctx := contextWithUserID(t.Context(), uuid.New())
+		_, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
+		if err == nil {
+			t.Fatal("permissionUnaryInterceptor() error = nil, want error")
+		}
+
+		testingx.AssertErrContains(t, err, "db down")
+	})
 }

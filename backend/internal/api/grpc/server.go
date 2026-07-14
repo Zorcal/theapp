@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/stats"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
 // ServerConfig contains all the mandatory systems required by the GRPC server.
@@ -28,6 +29,29 @@ type ServerConfig struct {
 	Reflection bool
 }
 
+// publicMethods lists gRPC methods that do not require a valid JWT. All other
+// methods are authenticated by authUnaryInterceptor / authStreamInterceptor.
+var publicMethods = map[string]struct{}{
+	"/theapp.v1.AuthService/RequestMagicLink":   {},
+	"/theapp.v1.AuthService/VerifyMagicLink":    {},
+	"/theapp.v1.AuthService/RefreshAccessToken": {},
+	"/theapp.v1.AuthService/RevokeRefreshToken": {},
+}
+
+// permissionRegistry maps every protected (non-public, see publicMethods) gRPC method to the
+// permissions required to call it. All listed permissions must be held — this is a conjunction
+// (AND), never a disjunction. A method with no entry here is denied rather than let through
+// unchecked; an endpoint that legitimately requires no permission still needs an explicit empty-list
+// entry, so a missing entry can never be mistaken for "deliberately open".
+var permissionRegistry = map[string][]mdl.Permission{
+	"/theapp.v1.AuthService/RevokeAllSessions": {},
+
+	"/theapp.v1.UserService/GetUser":    {mdl.PermissionUserRead},
+	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},
+	"/theapp.v1.UserService/CreateUser": {mdl.PermissionUserCreate},
+	"/theapp.v1.UserService/UpdateUser": {mdl.PermissionUserUpdate},
+}
+
 // NewServer constructs the GRPC server.
 func NewServer(cfg ServerConfig) *grpc.Server {
 	srv := grpc.NewServer(
@@ -43,6 +67,7 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			errorUnaryInterceptor(cfg.Log),
 			recoveryUnaryInterceptor(),
 			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
+			permissionUnaryInterceptor(cfg.AuthCore),
 			idempotencyUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(

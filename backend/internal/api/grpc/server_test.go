@@ -47,13 +47,23 @@ type ServerTest struct {
 }
 
 // NewServerTest starts a gRPC server with the given config over an in-memory transport and returns
-// a harness with pre-wired clients. The JWT config is always overridden with test credentials.
+// a harness with pre-wired clients. The JWT config is always overridden with test credentials. AuthCore
+// defaults to a mock granting every permission, so tests exercising unrelated RPCs don't each need to
+// stub out permission resolution; tests targeting permission enforcement itself set AuthCore explicitly.
 func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 	t.Helper()
 
 	cfg.JWTKey = testJWTKey
 	cfg.JWTIssuer = testJWTIssuer
 	cfg.JWTAudience = testJWTAudience
+
+	if cfg.AuthCore == nil {
+		cfg.AuthCore = &MockedAuthCore{
+			AuthUserFunc: func(_ context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
+				return mdl.AuthUser{UserID: userID, Permissions: mdl.AllPermissions}, nil
+			},
+		}
+	}
 
 	conn := newBufconnClientConn(t, cfg)
 
@@ -69,6 +79,8 @@ type ServerIntegrationTest struct {
 	userServiceClient pb.UserServiceClient
 	authServiceClient pb.AuthServiceClient
 	emailSender       *testingx.CaptureEmailSender
+	userStore         *pguser.Store
+	rbacStore         *pgrbac.Store
 }
 
 // NewServerIntegrationTest starts a gRPC server over an in-memory transport wired to real cores
@@ -123,6 +135,8 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		userServiceClient: pb.NewUserServiceClient(conn),
 		authServiceClient: pb.NewAuthServiceClient(conn),
 		emailSender:       emailSender,
+		userStore:         pgUserStore,
+		rbacStore:         pgRBACStore,
 	}
 }
 

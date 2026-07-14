@@ -27,15 +27,6 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/slogctx"
 )
 
-// publicMethods lists gRPC methods that do not require a valid JWT. All other
-// methods are authenticated by authUnaryInterceptor.
-var publicMethods = map[string]struct{}{
-	"/theapp.v1.AuthService/RequestMagicLink":   {},
-	"/theapp.v1.AuthService/VerifyMagicLink":    {},
-	"/theapp.v1.AuthService/RefreshAccessToken": {},
-	"/theapp.v1.AuthService/RevokeRefreshToken": {},
-}
-
 // idempotencyUnaryInterceptor reads the x-idempotency-key metadata header and attaches a derived DBOS
 // workflow ID to the context so that workflow handlers can deduplicate on it. Must run after
 // authUnaryInterceptor so the authenticated user ID (if any) is available to scope the key. The raw
@@ -148,6 +139,45 @@ func parseBearer(ctx context.Context, jwtKey []byte, issuer, audience string) (*
 	}
 
 	return claims, nil
+}
+
+// permissionUnaryInterceptor resolves an mdl.AuthSession for the authenticated caller via authCore
+// and rejects the call with codes.PermissionDenied unless every permission permissionRegistry
+// requires for the method is held. Must run after authUnaryInterceptor so the authenticated user ID
+// is already in ctx.
+func permissionUnaryInterceptor(authCore AuthCore) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if _, public := publicMethods[info.FullMethod]; public {
+			return handler(ctx, req)
+		}
+
+		required, ok := permissionRegistry[info.FullMethod]
+		if !ok {
+			return nil, status.Errorf(codes.PermissionDenied, "method %q is not registered", info.FullMethod)
+		}
+
+		userID, ok := UserIDFromContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "unauthenticated")
+		}
+
+		authUser, err := authCore.AuthUser(ctx, userID)
+		if err != nil {
+			if errors.Is(err, mdl.ErrNotFound) {
+				return nil, status.Error(codes.Unauthenticated, "unauthenticated")
+			}
+			return nil, fmt.Errorf("resolve auth user: %w", err)
+		}
+
+		for _, p := range required {
+			if !slices.Contains(authUser.Permissions, p) {
+				return nil, status.Error(codes.PermissionDenied, "missing required permission")
+			}
+		}
+
+		s := mdl.AuthSession{User: authUser}
+		return handler(contextWithAuthSession(ctx, s), req)
+	}
 }
 
 // loggingUnaryInterceptor logs the method, request, response, and duration for every unary RPC.

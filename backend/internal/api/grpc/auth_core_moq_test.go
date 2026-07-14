@@ -21,6 +21,9 @@ var _ AuthCore = &MockedAuthCore{}
 //
 //		// make and configure a mocked AuthCore
 //		mockedAuthCore := &MockedAuthCore{
+//			AuthUserFunc: func(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
+//				panic("mock out the AuthUser method")
+//			},
 //			RefreshAccessTokenFunc: func(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 //				panic("mock out the RefreshAccessToken method")
 //			},
@@ -40,6 +43,9 @@ var _ AuthCore = &MockedAuthCore{}
 //
 //	}
 type MockedAuthCore struct {
+	// AuthUserFunc mocks the AuthUser method.
+	AuthUserFunc func(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error)
+
 	// RefreshAccessTokenFunc mocks the RefreshAccessToken method.
 	RefreshAccessTokenFunc func(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error)
 
@@ -54,6 +60,13 @@ type MockedAuthCore struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AuthUser holds details about calls to the AuthUser method.
+		AuthUser []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+		}
 		// RefreshAccessToken holds details about calls to the RefreshAccessToken method.
 		RefreshAccessToken []struct {
 			// Ctx is the ctx argument value.
@@ -83,10 +96,47 @@ type MockedAuthCore struct {
 			Vml mdl.VerifyMagicLink
 		}
 	}
+	lockAuthUser                   sync.RWMutex
 	lockRefreshAccessToken         sync.RWMutex
 	lockRevokeAllUserRefreshTokens sync.RWMutex
 	lockRevokeRefreshToken         sync.RWMutex
 	lockVerifyMagicLink            sync.RWMutex
+}
+
+// AuthUser calls AuthUserFunc.
+func (mock *MockedAuthCore) AuthUser(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
+	if mock.AuthUserFunc == nil {
+		panic("MockedAuthCore.AuthUserFunc: method is nil but AuthCore.AuthUser was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+	}
+	mock.lockAuthUser.Lock()
+	mock.calls.AuthUser = append(mock.calls.AuthUser, callInfo)
+	mock.lockAuthUser.Unlock()
+	return mock.AuthUserFunc(ctx, userID)
+}
+
+// AuthUserCalls gets all the calls that were made to AuthUser.
+// Check the length with:
+//
+//	len(mockedAuthCore.AuthUserCalls())
+func (mock *MockedAuthCore) AuthUserCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+	}
+	mock.lockAuthUser.RLock()
+	calls = mock.calls.AuthUser
+	mock.lockAuthUser.RUnlock()
+	return calls
 }
 
 // RefreshAccessToken calls RefreshAccessTokenFunc.

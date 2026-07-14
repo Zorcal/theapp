@@ -30,6 +30,13 @@ type AuthUser struct {
 	Permissions []Permission
 }
 
+// AuthSession is resolved once per request and threaded through the call stack, pairing the
+// caller's identity with the project it's currently operating in.
+type AuthSession struct {
+	User      AuthUser
+	ProjectID int
+}
+
 // RequestMagicLink holds the fields needed to send a magic-link sign-in token.
 type RequestMagicLink struct {
 	Email string

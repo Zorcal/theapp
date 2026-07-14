@@ -42,6 +42,9 @@ type AuthCore interface {
 	RevokeRefreshToken(ctx context.Context, rt mdl.RefreshToken) error
 	// RevokeAllUserRefreshTokens revokes all active refresh tokens for the user.
 	RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uuid.UUID) error
+	// AuthUser resolves userID's identity and the permissions it holds.
+	// Returns [mdl.ErrNotFound] if no user with that ID exists.
+	AuthUser(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error)
 }
 
 //go:generate moq -rm -fmt goimports -out workflow_auth_core_moq_test.go . WorkflowAuthCore:MockedWorkflowAuthCore

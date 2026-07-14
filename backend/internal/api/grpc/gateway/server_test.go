@@ -186,6 +186,10 @@ func (noopAuthCore) RefreshAccessToken(_ context.Context, _ mdl.RefreshToken) (m
 func (noopAuthCore) RevokeRefreshToken(_ context.Context, _ mdl.RefreshToken) error  { return nil }
 func (noopAuthCore) RevokeAllUserRefreshTokens(_ context.Context, _ uuid.UUID) error { return nil }
 
+func (noopAuthCore) AuthUser(_ context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
+	return mdl.AuthUser{UserID: userID, Permissions: mdl.AllPermissions}, nil
+}
+
 type noopWorkflowAuthCore struct{}
 
 func (noopWorkflowAuthCore) RequestMagicLink(_ context.Context, _ string) error { return nil }

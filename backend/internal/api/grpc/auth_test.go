@@ -43,8 +43,21 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 		t.Error("VerifyMagicLink() refresh_token = empty, want non-empty")
 	}
 
-	// Access token grants access to protected endpoints.
+	// A freshly created user holds no role yet, so a protected endpoint denies them.
 	authedCtx := authCtxWithToken(ctx, pair.GetAccessToken())
+	if _, err := srv.userServiceClient.ListUsers(authedCtx, &pb.ListUsersRequest{}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("ListUsers() before role assignment code = %v, want %v", status.Code(err), codes.PermissionDenied)
+	}
+
+	// Access token grants access to protected endpoints, once granted the permission it requires.
+	aliceUser, err := srv.userStore.UserByEmail(ctx, "alice@test.com")
+	if err != nil {
+		t.Fatalf("UserByEmail() error = %v", err)
+	}
+	if err := srv.rbacStore.AssignSystemRole(ctx, aliceUser.ID, "superadmin"); err != nil {
+		t.Fatalf("AssignSystemRole() error = %v", err)
+	}
+
 	if _, err := srv.userServiceClient.ListUsers(authedCtx, &pb.ListUsersRequest{}); err != nil {
 		t.Fatalf("ListUsers() with valid access token error = %v", err)
 	}
@@ -371,6 +384,9 @@ func TestAuthService_RevokeAllSessions(t *testing.T) {
 		Log: testingx.NewLogger(t),
 		AuthCore: &MockedAuthCore{
 			RevokeAllUserRefreshTokensFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+			AuthUserFunc: func(_ context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
+				return mdl.AuthUser{UserID: userID}, nil
+			},
 		},
 	})
 
@@ -396,6 +412,9 @@ func TestAuthService_RevokeAllSessions_error(t *testing.T) {
 			authCore: &MockedAuthCore{
 				RevokeAllUserRefreshTokensFunc: func(_ context.Context, _ uuid.UUID) error {
 					return errors.New("boom")
+				},
+				AuthUserFunc: func(_ context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
+					return mdl.AuthUser{UserID: userID}, nil
 				},
 			},
 			ctxFunc: func(t *testing.T) context.Context {
