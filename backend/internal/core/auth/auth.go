@@ -65,6 +65,18 @@ type UserStorer interface {
 	// MarkEmailVerified marks the email as verified for the user with the given external ID.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	MarkEmailVerified(ctx context.Context, externalID uuid.UUID) error
+	// UserByExternalID returns the user with the given external ID.
+	// Returns [sql.ErrNoRows] if no such user exists.
+	UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error)
+}
+
+//go:generate moq -rm -fmt goimports -out permission_storer_moq_test.go . PermissionStorer:MockedPermissionStorer
+
+// PermissionStorer defines the permission database operations required by Core.
+type PermissionStorer interface {
+	// SystemPermissions returns the names of the permissions granted to userID through
+	// system-scope role assignments.
+	SystemPermissions(ctx context.Context, userID int) ([]string, error)
 }
 
 // Config holds tunables for Core.
@@ -86,19 +98,21 @@ type Config struct {
 
 // Core holds the business logic for authentication.
 type Core struct {
-	authStorer AuthStorer
-	userStorer UserStorer
-	transactor Transactor
-	cfg        Config
+	authStorer       AuthStorer
+	userStorer       UserStorer
+	permissionStorer PermissionStorer
+	transactor       Transactor
+	cfg              Config
 }
 
 // NewCore constructs a Core with the given dependencies and configuration.
-func NewCore(as AuthStorer, us UserStorer, tr Transactor, cfg Config) *Core {
+func NewCore(as AuthStorer, us UserStorer, ps PermissionStorer, tr Transactor, cfg Config) *Core {
 	return &Core{
-		authStorer: as,
-		userStorer: us,
-		transactor: tr,
-		cfg:        cfg,
+		authStorer:       as,
+		userStorer:       us,
+		permissionStorer: ps,
+		transactor:       tr,
+		cfg:              cfg,
 	}
 }
 
@@ -268,6 +282,29 @@ func (c *Core) RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uu
 		return fmt.Errorf("revoke all user refresh tokens: %w", err)
 	}
 	return nil
+}
+
+// AuthUser resolves userID's identity and the permissions it holds through system-scope role
+// assignments.
+// Returns [mdl.ErrNotFound] if no user with that ID exists.
+func (c *Core) AuthUser(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
+	u, err := c.userStorer.UserByExternalID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthUser{}, mdl.ErrNotFound
+		}
+		return mdl.AuthUser{}, fmt.Errorf("user by external id: %w", err)
+	}
+
+	systemPerms, err := c.permissionStorer.SystemPermissions(ctx, u.ID)
+	if err != nil {
+		return mdl.AuthUser{}, fmt.Errorf("system permissions: %w", err)
+	}
+
+	return mdl.AuthUser{
+		UserID:      userID,
+		Permissions: permissionsFromPg(systemPerms),
+	}, nil
 }
 
 // issueTokenPair mints a signed JWT access token and a new opaque refresh token, persists the refresh token,

@@ -27,6 +27,9 @@ var _ UserStorer = &MockedUserStorer{}
 //			MarkEmailVerifiedFunc: func(ctx context.Context, externalID uuid.UUID) error {
 //				panic("mock out the MarkEmailVerified method")
 //			},
+//			UserByExternalIDFunc: func(ctx context.Context, id uuid.UUID) (pguser.User, error) {
+//				panic("mock out the UserByExternalID method")
+//			},
 //		}
 //
 //		// use mockedUserStorer in code that requires UserStorer
@@ -39,6 +42,9 @@ type MockedUserStorer struct {
 
 	// MarkEmailVerifiedFunc mocks the MarkEmailVerified method.
 	MarkEmailVerifiedFunc func(ctx context.Context, externalID uuid.UUID) error
+
+	// UserByExternalIDFunc mocks the UserByExternalID method.
+	UserByExternalIDFunc func(ctx context.Context, id uuid.UUID) (pguser.User, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -56,9 +62,17 @@ type MockedUserStorer struct {
 			// ExternalID is the externalID argument value.
 			ExternalID uuid.UUID
 		}
+		// UserByExternalID holds details about calls to the UserByExternalID method.
+		UserByExternalID []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID uuid.UUID
+		}
 	}
 	lockGetOrCreateUserByEmail sync.RWMutex
 	lockMarkEmailVerified      sync.RWMutex
+	lockUserByExternalID       sync.RWMutex
 }
 
 // GetOrCreateUserByEmail calls GetOrCreateUserByEmailFunc.
@@ -130,5 +144,41 @@ func (mock *MockedUserStorer) MarkEmailVerifiedCalls() []struct {
 	mock.lockMarkEmailVerified.RLock()
 	calls = mock.calls.MarkEmailVerified
 	mock.lockMarkEmailVerified.RUnlock()
+	return calls
+}
+
+// UserByExternalID calls UserByExternalIDFunc.
+func (mock *MockedUserStorer) UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error) {
+	if mock.UserByExternalIDFunc == nil {
+		panic("MockedUserStorer.UserByExternalIDFunc: method is nil but UserStorer.UserByExternalID was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockUserByExternalID.Lock()
+	mock.calls.UserByExternalID = append(mock.calls.UserByExternalID, callInfo)
+	mock.lockUserByExternalID.Unlock()
+	return mock.UserByExternalIDFunc(ctx, id)
+}
+
+// UserByExternalIDCalls gets all the calls that were made to UserByExternalID.
+// Check the length with:
+//
+//	len(mockedUserStorer.UserByExternalIDCalls())
+func (mock *MockedUserStorer) UserByExternalIDCalls() []struct {
+	Ctx context.Context
+	ID  uuid.UUID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}
+	mock.lockUserByExternalID.RLock()
+	calls = mock.calls.UserByExternalID
+	mock.lockUserByExternalID.RUnlock()
 	return calls
 }

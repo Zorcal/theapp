@@ -12,6 +12,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/core/auth"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
@@ -42,6 +43,7 @@ func TestWorkflowCore_integration(t *testing.T) {
 	authCore := auth.NewCore(
 		pgauth.NewStore(pool),
 		pguser.NewStore(pool),
+		pgrbac.NewStore(pool),
 		pgdb.NewTransactor(pool),
 		cfg,
 	)

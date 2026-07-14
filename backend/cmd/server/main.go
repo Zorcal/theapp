@@ -25,6 +25,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/clients/resend"
 	"github.com/zorcal/theapp/backend/internal/core/auth"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -249,6 +250,7 @@ func run(ctx context.Context, cfg Config) error {
 
 	pgUserStore := pguser.NewStore(pgPool)
 	pgAuthStore := pgauth.NewStore(pgPool)
+	pgRBACStore := pgrbac.NewStore(pgPool)
 
 	// Setup cores.
 
@@ -264,7 +266,7 @@ func run(ctx context.Context, cfg Config) error {
 		AccessTokenTTL:     cfg.Auth.AccessTokenTTL,
 		RefreshTokenTTL:    cfg.Auth.RefreshTokenTTL,
 	}
-	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgdb.NewTransactor(pgPool), authCoreCfg)
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdb.NewTransactor(pgPool), authCoreCfg)
 
 	// Setup DBOS.
 

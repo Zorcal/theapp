@@ -58,15 +58,15 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** static roles exist in the DB with correct permission sets, proven by `TestCore_integration`. `pgschema.Seed`'s idempotency (`TestSeed`, asserting the total row count across every table is unchanged after a second call) and the `is_static` trigger (`TestIsStaticTrigger`) each have their own dedicated test. Met.
 
-## Phase 4 — system-scope assignment and resolver
+## Phase 4 — system-scope assignment and resolver — done
 
 9. Migration: `system_role_assignments` table (user, role — no project or org). Depends on 5.
-10. Trigger on `system_role_assignments` rejecting inserts where the target role isn't static. Depends on 5, 9.
-11. `mdl.AuthSession` / `mdl.AuthUser` structs, alongside existing `mdl/auth.go`.
-12. System-scope-only resolver: permissions for a user from `system_role_assignments` alone (project/org legs added in phase 11). Depends on 8, 9, 11.
-13. Core-layer function to insert a `system_role_assignments` row (no gRPC endpoint yet). Depends on 9, 10.
+10. Trigger (`prevent_custom_role_system_assignment`, `BEFORE INSERT`) on `system_role_assignments` rejecting inserts where the target role isn't static. Depends on 5, 9.
+11. `mdl.AuthUser` struct, alongside existing `mdl/auth.go`. `mdl.AuthSession` isn't added yet — it pairs `AuthUser` with a `ProjectID` that has no meaning until request-time resolution exists, so it's deferred to phase 6, which is what actually assembles one.
+12. System-scope-only resolver: `auth.Core.AuthUser(ctx, userID)` resolves a user's identity and the permissions it holds from `system_role_assignments` alone (project/org legs added in phase 11), backed by a `PermissionStorer` interface implemented by `pgrbac.Store`. Depends on 8, 9, 11.
+13. `rbac.Core.AssignSystemRole(ctx, userID, roleName)` inserts a `system_role_assignments` row (no gRPC endpoint yet). Depends on 9, 10.
 
-**Checkpoint:** given a manually-inserted (via task 13) `system_role_assignments` row, the resolver in task 12 returns the correct permission set for that user.
+**Checkpoint:** given a `system_role_assignments` row inserted via `AssignSystemRole`, `AuthUser` resolves the correct identity and permission set for that user, proven by `auth.TestCore_integration`. The `BEFORE INSERT` trigger rejecting a non-static role is proven by `TestStore_AssignSystemRole_error`. Met.
 
 ## Phase 5 — CLI: grant superadmin
 
@@ -77,7 +77,7 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 ## Phase 6 — permission registry and the superadmin gate
 
 15. Permission registry: map of every existing RPC method to its real, correct required permissions (using the constants from 3), including explicit empty-list entries for endpoints that legitimately require none. Exhaustiveness test asserts every registered gRPC method has an entry. No new proto needed — this maps permissions onto RPCs that already exist. Depends on 3.
-16. Interceptor: resolve `AuthSession` per-request via 12, enforce `codes.PermissionDenied` via the registry (15). Depends on 12, 15.
+16. `mdl.AuthSession` struct (`User AuthUser`, `ProjectID int`), alongside existing `mdl/auth.go`. Interceptor: resolve one per-request via 12, enforce `codes.PermissionDenied` via the registry (15). Depends on 12, 15.
 
 **Checkpoint:** every existing RPC is permission-gated and enforced. A user granted `superadmin` via phase 5's CLI command can call anything requiring a permission; every other authenticated user is denied on any endpoint with a non-empty required-permission list. Still no organizations, projects, custom roles, or self-service creation endpoint.
 
@@ -246,4 +246,4 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 - Tasks 45 and 51 should be written as soon as their dependencies land, not deferred to the end — they're what prove the backstop actually works.
 - Review happens once per phase, at the phase boundary — see "Working process" above. The phase checkpoints describe what should be true and demonstrable by the time that review happens.
 - Phase 13's checkpoint calls out a phase that is intentionally not yet safe to expose broadly. It's the one phase in this breakdown where "reviewed and committed" doesn't mean "safe to deploy publicly" — flag this distinction if it ever needs to leave a dev/staging environment before phase 15 lands.
-- `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) seeds a local-only bootstrap operator user (`operator@theapp.com`), so every `cmd/cli` command has a valid `--operator` to reference without a manual `psql` insert. It's a standing dev convenience, not a task with its own checkpoint — revisit it whenever a phase changes what a fresh local environment needs to be immediately useful (e.g. phase 5 might have it also grant `superadmin` to the seeded operator; phase 9 might have it add `theapp` org membership) instead of leaving that as another manual step.
+- `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) seeds a local-only bootstrap operator user (`operator@theapp.com`) and grants it `superadmin` at system scope, so every `cmd/cli` command has a valid, usable `--operator` without a manual `psql` insert. The `superadmin` grant is a direct SQL insert rather than a CLI call, since phase 5 hasn't added a CLI command for it yet — switch the script to that command once it exists. It's a standing dev convenience, not a task with its own checkpoint — revisit it whenever a phase changes what a fresh local environment needs to be immediately useful (e.g. phase 9 might have it add `theapp` org membership) instead of leaving that as another manual step.

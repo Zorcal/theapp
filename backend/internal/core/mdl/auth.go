@@ -23,6 +23,13 @@ type AuthTokenPair struct {
 	ExpiresIn time.Duration
 }
 
+// AuthUser is the authenticated caller's identity and resolved permissions.
+type AuthUser struct {
+	UserID uuid.UUID
+	// Permissions is the distinct union of permissions granted through every role UserID holds.
+	Permissions []Permission
+}
+
 // RequestMagicLink holds the fields needed to send a magic-link sign-in token.
 type RequestMagicLink struct {
 	Email string

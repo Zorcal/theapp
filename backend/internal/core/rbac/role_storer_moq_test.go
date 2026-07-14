@@ -20,6 +20,9 @@ var _ RoleStorer = &MockedRoleStorer{}
 //
 //		// make and configure a mocked RoleStorer
 //		mockedRoleStorer := &MockedRoleStorer{
+//			AssignSystemRoleFunc: func(ctx context.Context, userID int, roleName string) error {
+//				panic("mock out the AssignSystemRole method")
+//			},
 //			RolesFunc: func(ctx context.Context) ([]pgrbac.Role, error) {
 //				panic("mock out the Roles method")
 //			},
@@ -30,18 +33,71 @@ var _ RoleStorer = &MockedRoleStorer{}
 //
 //	}
 type MockedRoleStorer struct {
+	// AssignSystemRoleFunc mocks the AssignSystemRole method.
+	AssignSystemRoleFunc func(ctx context.Context, userID int, roleName string) error
+
 	// RolesFunc mocks the Roles method.
 	RolesFunc func(ctx context.Context) ([]pgrbac.Role, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AssignSystemRole holds details about calls to the AssignSystemRole method.
+		AssignSystemRole []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID int
+			// RoleName is the roleName argument value.
+			RoleName string
+		}
 		// Roles holds details about calls to the Roles method.
 		Roles []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
 	}
-	lockRoles sync.RWMutex
+	lockAssignSystemRole sync.RWMutex
+	lockRoles            sync.RWMutex
+}
+
+// AssignSystemRole calls AssignSystemRoleFunc.
+func (mock *MockedRoleStorer) AssignSystemRole(ctx context.Context, userID int, roleName string) error {
+	if mock.AssignSystemRoleFunc == nil {
+		panic("MockedRoleStorer.AssignSystemRoleFunc: method is nil but RoleStorer.AssignSystemRole was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		UserID   int
+		RoleName string
+	}{
+		Ctx:      ctx,
+		UserID:   userID,
+		RoleName: roleName,
+	}
+	mock.lockAssignSystemRole.Lock()
+	mock.calls.AssignSystemRole = append(mock.calls.AssignSystemRole, callInfo)
+	mock.lockAssignSystemRole.Unlock()
+	return mock.AssignSystemRoleFunc(ctx, userID, roleName)
+}
+
+// AssignSystemRoleCalls gets all the calls that were made to AssignSystemRole.
+// Check the length with:
+//
+//	len(mockedRoleStorer.AssignSystemRoleCalls())
+func (mock *MockedRoleStorer) AssignSystemRoleCalls() []struct {
+	Ctx      context.Context
+	UserID   int
+	RoleName string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		UserID   int
+		RoleName string
+	}
+	mock.lockAssignSystemRole.RLock()
+	calls = mock.calls.AssignSystemRole
+	mock.lockAssignSystemRole.RUnlock()
+	return calls
 }
 
 // Roles calls RolesFunc.

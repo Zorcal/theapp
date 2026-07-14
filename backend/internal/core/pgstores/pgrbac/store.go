@@ -38,3 +38,45 @@ func (s *Store) Roles(ctx context.Context) ([]Role, error) {
 
 	return roles, nil
 }
+
+// SystemPermissions returns the names of the permissions granted to userID through system-scope
+// role assignments.
+func (s *Store) SystemPermissions(ctx context.Context, userID int) ([]string, error) {
+	var names []string
+
+	q := systemPermissionsQuery(userID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.QueueMany(ctx, b, &names); err != nil {
+			return fmt.Errorf("system permissions: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return nil, err
+	}
+
+	return names, nil
+}
+
+// AssignSystemRole grants userID the role named roleName at system scope.
+// Returns [sql.ErrNoRows] if no role named roleName exists.
+func (s *Store) AssignSystemRole(ctx context.Context, userID int, roleName string) error {
+	var roleID int
+
+	q := assignSystemRoleQuery(userID, roleName)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &roleID); err != nil {
+			return fmt.Errorf("assign system role: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -43,6 +43,41 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
 
 
+--
+-- Name: prevent_custom_role_system_assignment(); Type: FUNCTION; Schema: rbac; Owner: -
+--
+
+CREATE FUNCTION rbac.prevent_custom_role_system_assignment() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    target_is_static BOOLEAN;
+BEGIN
+    SELECT is_static INTO target_is_static FROM rbac.roles WHERE id = NEW.role_id;
+    IF NOT target_is_static THEN
+        RAISE EXCEPTION 'only a static role can be assigned at system scope';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: prevent_static_role_mutation(); Type: FUNCTION; Schema: rbac; Owner: -
+--
+
+CREATE FUNCTION rbac.prevent_static_role_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.is_static THEN
+        RAISE EXCEPTION 'static role "%" cannot be updated or deleted', OLD.name;
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -84,6 +119,59 @@ CREATE SEQUENCE rbac.permissions_id_seq
 --
 
 ALTER SEQUENCE rbac.permissions_id_seq OWNED BY rbac.permissions.id;
+
+
+--
+-- Name: role_permissions; Type: TABLE; Schema: rbac; Owner: -
+--
+
+CREATE TABLE rbac.role_permissions (
+    role_id integer NOT NULL,
+    permission_id integer NOT NULL
+);
+
+
+--
+-- Name: roles; Type: TABLE; Schema: rbac; Owner: -
+--
+
+CREATE TABLE rbac.roles (
+    id integer NOT NULL,
+    name text NOT NULL,
+    is_static boolean NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone
+);
+
+
+--
+-- Name: roles_id_seq; Type: SEQUENCE; Schema: rbac; Owner: -
+--
+
+CREATE SEQUENCE rbac.roles_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: roles_id_seq; Type: SEQUENCE OWNED BY; Schema: rbac; Owner: -
+--
+
+ALTER SEQUENCE rbac.roles_id_seq OWNED BY rbac.roles.id;
+
+
+--
+-- Name: system_role_assignments; Type: TABLE; Schema: rbac; Owner: -
+--
+
+CREATE TABLE rbac.system_role_assignments (
+    user_id integer NOT NULL,
+    role_id integer NOT NULL
+);
 
 
 --
@@ -196,6 +284,13 @@ ALTER TABLE ONLY rbac.permissions ALTER COLUMN id SET DEFAULT nextval('rbac.perm
 
 
 --
+-- Name: roles id; Type: DEFAULT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.roles ALTER COLUMN id SET DEFAULT nextval('rbac.roles_id_seq'::regclass);
+
+
+--
 -- Name: magic_link_tokens id; Type: DEFAULT; Schema: useraccess; Owner: -
 --
 
@@ -238,6 +333,38 @@ ALTER TABLE ONLY rbac.permissions
 
 ALTER TABLE ONLY rbac.permissions
     ADD CONSTRAINT permissions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: role_permissions role_permissions_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.role_permissions
+    ADD CONSTRAINT role_permissions_pkey PRIMARY KEY (role_id, permission_id);
+
+
+--
+-- Name: roles roles_name_key; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.roles
+    ADD CONSTRAINT roles_name_key UNIQUE (name);
+
+
+--
+-- Name: roles roles_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.roles
+    ADD CONSTRAINT roles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: system_role_assignments system_role_assignments_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.system_role_assignments
+    ADD CONSTRAINT system_role_assignments_pkey PRIMARY KEY (user_id, role_id);
 
 
 --
@@ -347,6 +474,52 @@ CREATE INDEX users_updated_at_idx ON useraccess.users USING btree (updated_at);
 
 
 --
+-- Name: system_role_assignments prevent_custom_role_system_assignment; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER prevent_custom_role_system_assignment BEFORE INSERT ON rbac.system_role_assignments FOR EACH ROW EXECUTE FUNCTION rbac.prevent_custom_role_system_assignment();
+
+
+--
+-- Name: roles prevent_static_role_mutation; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER prevent_static_role_mutation BEFORE DELETE OR UPDATE ON rbac.roles FOR EACH ROW EXECUTE FUNCTION rbac.prevent_static_role_mutation();
+
+
+--
+-- Name: role_permissions role_permissions_permission_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.role_permissions
+    ADD CONSTRAINT role_permissions_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES rbac.permissions(id);
+
+
+--
+-- Name: role_permissions role_permissions_role_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.role_permissions
+    ADD CONSTRAINT role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.roles(id);
+
+
+--
+-- Name: system_role_assignments system_role_assignments_role_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.system_role_assignments
+    ADD CONSTRAINT system_role_assignments_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.roles(id);
+
+
+--
+-- Name: system_role_assignments system_role_assignments_user_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.system_role_assignments
+    ADD CONSTRAINT system_role_assignments_user_id_fkey FOREIGN KEY (user_id) REFERENCES useraccess.users(id);
+
+
+--
 -- Name: magic_link_tokens magic_link_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: useraccess; Owner: -
 --
 
@@ -380,4 +553,8 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260613000001'),
     ('20260613000002'),
     ('20260713150000'),
-    ('20260713150001');
+    ('20260713150001'),
+    ('20260713150002'),
+    ('20260713150003'),
+    ('20260714120000'),
+    ('20260714120001');

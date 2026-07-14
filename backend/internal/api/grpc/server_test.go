@@ -22,6 +22,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/core/auth"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -83,6 +84,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 
 	pgUserStore := pguser.NewStore(pool)
 	pgAuthStore := pgauth.NewStore(pool)
+	pgRBACStore := pgrbac.NewStore(pool)
 
 	emailSender := &testingx.CaptureEmailSender{}
 
@@ -98,7 +100,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		RefreshTokenTTL:    720 * time.Hour,
 	}
 
-	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgdb.NewTransactor(pool), authCoreCfg)
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdb.NewTransactor(pool), authCoreCfg)
 	userCore := user.NewCore(pgUserStore)
 
 	dbosCtx := dbostest.New(t, context.Background(), pool)
