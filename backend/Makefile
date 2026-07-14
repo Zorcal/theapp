@@ -1,7 +1,10 @@
 DBMATE_VOLUME=$(shell pwd)/internal/data/pgschema/migrations
 DBMATE_SCHEMA_DIR=$(shell pwd)/internal/data/pgschema
-DBMATE_IMAGE=ghcr.io/amacneil/dbmate
-PG_IMAGE=postgres:17
+# Pinned to an exact version (not a floating major-only tag) so the bundled pg_dump/postgres
+# versions used to produce schema.sql stay identical between local runs and CI. Bump both
+# deliberately together when there's a reason to.
+DBMATE_IMAGE=ghcr.io/amacneil/dbmate:2.33.0
+PG_IMAGE=postgres:17.10
 
 .PHONY: seed-dev-operator
 seed-dev-operator:

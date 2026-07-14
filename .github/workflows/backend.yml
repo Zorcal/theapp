@@ -46,7 +46,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17.10
         ports:
           - 5432:5432
         env:
@@ -86,7 +86,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17.10
         ports:
           - 5432:5432
         env:
@@ -99,7 +99,10 @@ jobs:
           --health-retries 5
 
     env:
-      DBMATE_IMAGE: ghcr.io/amacneil/dbmate
+      # Pinned to an exact version, alongside the postgres service image above and Makefile's
+      # dump-pg-schema target, so the pg_dump/postgres versions producing schema.sql stay
+      # identical regardless of what a floating major-only tag resolves to on any given day.
+      DBMATE_IMAGE: ghcr.io/amacneil/dbmate:2.33.0
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/theapp?sslmode=disable
       MIGRATIONS_DIR: ${{ github.workspace }}/backend/internal/data/pgschema/migrations
       SCHEMA_DIR: ${{ github.workspace }}/backend/internal/data/pgschema
