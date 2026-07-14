@@ -12,7 +12,9 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/zorcal/theapp/backend/cmd/cli/commands"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
+	"github.com/zorcal/theapp/backend/internal/core/rbac"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
@@ -62,7 +64,9 @@ func run(ctx context.Context) error {
 	defer pgPool.Close()
 
 	pgUserStore := pguser.NewStore(pgPool)
+	pgRBACStore := pgrbac.NewStore(pgPool)
 	userCore := user.NewCore(pgUserStore)
+	rbacCore := rbac.NewCore(pgRBACStore, pgUserStore)
 
 	cmd := &cli.Command{
 		Name:                  "cli",
@@ -73,6 +77,7 @@ func run(ctx context.Context) error {
 		Commands: []*cli.Command{
 			commands.NewDBCommand(pgDBConnStr),
 			commands.NewUserCommand(userCore),
+			commands.NewRoleCommand(userCore, rbacCore),
 		},
 	}
 

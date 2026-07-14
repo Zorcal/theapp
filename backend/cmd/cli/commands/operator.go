@@ -24,17 +24,16 @@ func operatorFlag() *cli.StringFlag {
 	}
 }
 
-// resolveOperator resolves the --operator flag to an existing user, by UUID or email.
+// validateOperator checks that the --operator flag resolves to an existing user, by UUID or email.
 // Returns [mdl.ErrNotFound] if no such user exists.
-func resolveOperator(ctx context.Context, cmd *cli.Command, userCore *user.Core) (mdl.User, error) {
+func validateOperator(ctx context.Context, cmd *cli.Command, userCore *user.Core) error {
 	ref := cmd.String(operatorFlagName)
 
-	u, err := resolveUser(ctx, userCore, ref)
-	if err != nil {
-		return mdl.User{}, fmt.Errorf("resolve user %q: %w", ref, err)
+	if _, err := resolveUser(ctx, userCore, ref); err != nil {
+		return fmt.Errorf("resolve user %q: %w", ref, err)
 	}
 
-	return u, nil
+	return nil
 }
 
 // resolveUser looks up a user by UUID or email, trying UUID first.

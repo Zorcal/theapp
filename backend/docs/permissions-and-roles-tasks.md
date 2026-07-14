@@ -68,11 +68,11 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** given a `system_role_assignments` row inserted via `AssignSystemRole`, `AuthUser` resolves the correct identity and permission set for that user, proven by `auth.TestCore_integration`. The `BEFORE INSERT` trigger rejecting a non-static role is proven by `TestStore_AssignSystemRole_error`. Met.
 
-## Phase 5 — CLI: grant superadmin
+## Phase 5 — CLI: grant superadmin — done
 
-14. CLI command granting `superadmin` to a user, wired to 13, using the scaffold from phase 1. Depends on 1, 13.
+14. `role assign-system` command (takes `--role` rather than being superadmin-specific, since 13 itself assigns any static role by name), wired to 13, using the scaffold from phase 1. Depends on 1, 13.
 
-**Checkpoint:** an operator can grant `superadmin` to a user via the CLI.
+**Checkpoint:** an operator can grant `superadmin` to a user via the CLI. Verified manually against a local dev database (`role assign-system --role superadmin`, then confirmed the `system_role_assignments` row).
 
 ## Phase 6 — permission registry and the superadmin gate
 
