@@ -57,7 +57,6 @@ type RequestMagicLink struct {
 	Email string
 }
 
-// Validate reports whether rml is valid.
 func (rml RequestMagicLink) Validate() error {
 	if rml.Email == "" {
 		return validationError("email required")
@@ -73,7 +72,6 @@ type VerifyMagicLink struct {
 	Token string
 }
 
-// Validate reports whether vml is valid.
 func (vml VerifyMagicLink) Validate() error {
 	if vml.Token == "" {
 		return validationError("token required")
@@ -86,7 +84,6 @@ type RefreshToken struct {
 	Token string
 }
 
-// Validate reports whether rt is valid.
 func (rt RefreshToken) Validate() error {
 	if rt.Token == "" {
 		return validationError("token required")

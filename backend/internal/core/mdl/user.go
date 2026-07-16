@@ -23,7 +23,6 @@ type CreateUser struct {
 	Name  string
 }
 
-// Validate reports whether cu is valid.
 func (cu CreateUser) Validate() error {
 	if cu.Email == "" {
 		return validationError("email required")
@@ -46,7 +45,6 @@ type UpdateUser struct {
 	Name   string
 }
 
-// Validate reports whether uu is valid.
 func (uu UpdateUser) Validate() error {
 	if uu.Fields.Name && uu.Name == "" {
 		return validationError("name required")

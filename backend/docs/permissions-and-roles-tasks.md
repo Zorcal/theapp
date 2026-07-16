@@ -88,11 +88,11 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** the tables exist; org/project/membership rows can be created and joined correctly, and the per-org unique-name constraint holds on both insert and rename — proven directly at the DB level (verified manually; no core logic yet, so no Go tests are checked in for this phase — dedicated tests land once `internal/core/org` exists in phase 8 onward).
 
-## Phase 8 — org/project core creation functions
+## Phase 8 — org/project core creation functions — done
 
-19. Core-layer `CreateOrganization` / `CreateProject` functions (no gRPC endpoint yet). Depends on 17.
+19. Core-layer `CreateOrganization` / `CreateProject` functions (`internal/core/org`, backed by `internal/core/pgstores/pgorg`; no gRPC endpoint yet). `mdl.CreateOrganization` takes the default project's name explicitly (`ProjectName`) rather than defaulting it to the organization's own name. The store layer exposes `CreateOrganization` and `CreateProject` as two separate methods; the core layer's `CreateOrganization` calls both inside a single `Transactor.RunTx` so the organization and its default project are created atomically. `CreateProject` resolves the target org via a join rather than relying on the `org_id` foreign key's violation error, returning `sql.ErrNoRows` (→ `mdl.ErrNotFound`) the same way `pgrbac.AssignSystemRole` resolves a role by name — so an invalid org ID fails via "zero rows returned", not a distinct FK-violation code path. Depends on 17.
 
-**Checkpoint:** an org and a project can be created via these functions directly, proven by a test — independent of any CLI or gRPC surface.
+**Checkpoint:** an org and a project can be created via these functions directly, proven by `TestCore_integration`, `TestStore_CreateOrganization(_error)`, and `TestStore_CreateProject(_error)` — independent of any CLI or gRPC surface.
 
 ## Phase 9 — CLI: bootstrap theapp/dev/control
 
@@ -149,7 +149,7 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 36. Proto schema: `schemas/organization.proto` (create/delete org). Run `make generate`.
 37. Org creation gRPC endpoint: wires 19 behind `org:create` scoped to `theapp/control`, plus the `theapp` org-membership check. Depends on 25, 30, 36.
-38. Org creation seeds a default project of the same name via 19's `CreateProject`. Depends on 37.
+38. Org creation request carries the default project's name, passed through to 19's `CreateOrganization` (which already seeds the default project atomically as of phase 8 — no separate `CreateProject` call needed here). Depends on 37.
 39. Org creator assigned an admin role at org scope (see permissions-and-roles.md, "Creating organizations and projects"). Depends on 30, 37.
 
 **Checkpoint:** an organization can be created end-to-end via the API, seeded with a default project and an org-scoped admin assignment for its creator.
