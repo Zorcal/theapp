@@ -117,8 +117,11 @@ func TestCalculate_error(t *testing.T) {
 
 ## Comments
 
+This applies to inline code comments and to any other documentation — READMEs, design docs, everything — not just Go comments.
+
 - Don't restate what code already makes obvious. If removing the comment wouldn't confuse a reader, remove it.
 - Don't write comments that explain a decision by narrating the conversation that led to it ("we agreed to do X", "per your request", "as discussed, this is intentional"). State the constraint plainly, or let the code speak for itself.
+- When a correction (from the user, or your own re-check) changes what you believe is true, write the resulting text as if you'd known the correct fact from the start. The exchange that revealed it — what was assumed, what changed, why — is not part of the domain and must leave no trace in the doc. Narrating that exchange is the usual way this mistake shows up.
 - Avoid comments that go stale as soon as the code around them changes. Describe purpose, not the current shape of the code.
 
 ## Sentinel errors documention
