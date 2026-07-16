@@ -12,7 +12,7 @@ This union is strictly additive: there is no explicit deny. A role can only ever
 
 An **organization** (tenant) can contain multiple **projects** — for example a real project alongside test and demo projects. Role assignment is scoped per project rather than per organization, so a role can be tried out in a test project before being granted in the real one without affecting real users. Users belong to organizations and projects rather than to the system globally, and can belong to more than one of each. In practice, belonging to multiple organizations on a single account is expected mainly for developer and internal accounts; most other users who need access to more than one organization do so with a separate account per organization instead of one account spanning tenants.
 
-Organizations and projects are separate tables, joined by a mapping table rather than a `project.org_id` implied hierarchy on the same table. A project belongs to exactly one organization. Organization is mostly a hidden concept for clients: most users only ever interact with projects directly and never need to know which organization a project belongs to. Organization membership only surfaces for the smaller set of users who create or administer an organization itself (see "Creating organizations and projects" below).
+A project belongs to exactly one organization, via a `projects.org_id` column (`UNIQUE (org_id, name)` also enforces that a project's name is unique within its organization). Organization is mostly a hidden concept for clients: most users only ever interact with projects directly and never need to know which organization a project belongs to. Organization membership only surfaces for the smaller set of users who create or administer an organization itself (see "Creating organizations and projects" below).
 
 Organization membership and org-scoped role assignment are separate concepts, and the former gates the latter: an `org_role_assignments` row can only be created for a user who is already a member of that organization. Without this, an org-scoped role could be granted to a user who has no other relationship to the organization at all, which defeats the point of tracking membership as a distinct concept in the first place — role assignment would become the only place membership was ever checked, for one scope only, rather than membership meaning "belongs to this organization" everywhere it's referenced. This gate is enforced only in the role service, with no database-level backstop; see "Database backstops vs. application checks" under "Enforcement" below for why.
 
@@ -156,7 +156,7 @@ Once an organization exists, the internal user who created it (or whoever they d
 
 ## Deleting organizations and projects
 
-Deleting a project or organization leaves behind role assignments, custom roles, and org-project mappings that reference it. Rather than relying on `ON DELETE CASCADE` to clean these up implicitly, the core layer deletes dependent rows explicitly, in the correct order, in the same transaction as the delete — so the cleanup is visible as ordinary code rather than hidden in schema constraints.
+Deleting a project or organization leaves behind role assignments and custom roles that reference it. Rather than relying on `ON DELETE CASCADE` to clean these up implicitly, the core layer deletes dependent rows explicitly, in the correct order, in the same transaction as the delete — so the cleanup is visible as ordinary code rather than hidden in schema constraints.
 
 ## Deleting users
 

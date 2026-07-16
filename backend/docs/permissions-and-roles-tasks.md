@@ -81,12 +81,12 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** every existing RPC is permission-gated and enforced. A user granted `superadmin` via phase 5's CLI command can call anything requiring a permission; every other authenticated user is denied on any endpoint with a non-empty required-permission list. Still no organizations, projects, custom roles, or self-service creation endpoint. Proven by `TestPermissionRegistry_exhaustiveness`, `TestPermissionUnaryInterceptor(_error)`, and `TestAuth_MagicLinkIntegration`'s use of a real `ListUsers` call gated on an assigned role.
 
-## Phase 7 — organizations and projects schema
+## Phase 7 — organizations and projects schema — done
 
-17. Migration: `organizations`, `projects`, `org_project` mapping table.
-18. Migration: `org_membership` table (or equivalent) gating org-scoped assignment. Depends on 17.
+17. Migration: new `org` schema; `organizations` and `projects`, with `projects.org_id` (a project belongs to exactly one organization) and `UNIQUE (org_id, name)` enforcing a project's name is unique within its organization. Project IDs (the `projects.id` serial) are globally unique by construction. No mapping table or trigger: an earlier version of this migration modeled the org/project link as a separate `org_project` table with a trigger to enforce the per-org name uniqueness, but since the design has no case where a project's org changes or a project spans more than one org, that indirection bought nothing — a plain `org_id` column plus a native `UNIQUE` constraint enforces the same invariant with no PL/pgSQL and no per-write trigger.
+18. Migration: `org_membership` table (`user_id`, `org_id`) gating org-scoped assignment. Depends on 17.
 
-**Checkpoint:** the tables exist; org/project/membership rows can be created and joined correctly, proven directly at the DB level — no core logic yet.
+**Checkpoint:** the tables exist; org/project/membership rows can be created and joined correctly, and the per-org unique-name constraint holds on both insert and rename — proven directly at the DB level (verified manually; no core logic yet, so no Go tests are checked in for this phase — dedicated tests land once `internal/core/org` exists in phase 8 onward).
 
 ## Phase 8 — org/project core creation functions
 
