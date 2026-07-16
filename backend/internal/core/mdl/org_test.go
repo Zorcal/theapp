@@ -10,7 +10,14 @@ func TestCreateOrganization_Validate(t *testing.T) {
 		name string
 		in   CreateOrganization
 	}{
-		{"valid", CreateOrganization{Name: "acme", ProjectName: "acme"}},
+		{
+			name: "valid",
+			in:   CreateOrganization{Name: "acme", ProjectName: "acme"},
+		},
+		{
+			name: "project name control is no longer reserved",
+			in:   CreateOrganization{Name: "acme", ProjectName: "control"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -26,8 +33,14 @@ func TestCreateOrganization_Validate_error(t *testing.T) {
 		name string
 		in   CreateOrganization
 	}{
-		{"empty name", CreateOrganization{Name: "", ProjectName: "acme"}},
-		{"empty project name", CreateOrganization{Name: "acme", ProjectName: ""}},
+		{
+			name: "empty name",
+			in:   CreateOrganization{Name: "", ProjectName: "acme"},
+		},
+		{
+			name: "empty project name",
+			in:   CreateOrganization{Name: "acme", ProjectName: ""},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -43,7 +56,10 @@ func TestCreateProject_Validate(t *testing.T) {
 		name string
 		in   CreateProject
 	}{
-		{"valid", CreateProject{OrgID: 1, Name: "widgets"}},
+		{
+			name: "valid",
+			in:   CreateProject{OrgID: 1, Name: "widgets"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,8 +75,14 @@ func TestCreateProject_Validate_error(t *testing.T) {
 		name string
 		in   CreateProject
 	}{
-		{"org id missing", CreateProject{OrgID: 0, Name: "widgets"}},
-		{"empty name", CreateProject{OrgID: 1, Name: ""}},
+		{
+			name: "org id missing",
+			in:   CreateProject{OrgID: 0, Name: "widgets"},
+		},
+		{
+			name: "empty name",
+			in:   CreateProject{OrgID: 1, Name: ""},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

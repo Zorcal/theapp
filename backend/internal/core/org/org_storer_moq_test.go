@@ -26,6 +26,12 @@ var _ OrgStorer = &MockedOrgStorer{}
 //			CreateProjectFunc: func(ctx context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
 //				panic("mock out the CreateProject method")
 //			},
+//			OrganizationByNameFunc: func(ctx context.Context, name string) (pgorg.Organization, error) {
+//				panic("mock out the OrganizationByName method")
+//			},
+//			ProjectByNameFunc: func(ctx context.Context, orgID int, name string) (pgorg.Project, error) {
+//				panic("mock out the ProjectByName method")
+//			},
 //		}
 //
 //		// use mockedOrgStorer in code that requires OrgStorer
@@ -38,6 +44,12 @@ type MockedOrgStorer struct {
 
 	// CreateProjectFunc mocks the CreateProject method.
 	CreateProjectFunc func(ctx context.Context, cp pgorg.CreateProject) (pgorg.Project, error)
+
+	// OrganizationByNameFunc mocks the OrganizationByName method.
+	OrganizationByNameFunc func(ctx context.Context, name string) (pgorg.Organization, error)
+
+	// ProjectByNameFunc mocks the ProjectByName method.
+	ProjectByNameFunc func(ctx context.Context, orgID int, name string) (pgorg.Project, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -55,9 +67,27 @@ type MockedOrgStorer struct {
 			// Cp is the cp argument value.
 			Cp pgorg.CreateProject
 		}
+		// OrganizationByName holds details about calls to the OrganizationByName method.
+		OrganizationByName []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+		}
+		// ProjectByName holds details about calls to the ProjectByName method.
+		ProjectByName []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// OrgID is the orgID argument value.
+			OrgID int
+			// Name is the name argument value.
+			Name string
+		}
 	}
 	lockCreateOrganization sync.RWMutex
 	lockCreateProject      sync.RWMutex
+	lockOrganizationByName sync.RWMutex
+	lockProjectByName      sync.RWMutex
 }
 
 // CreateOrganization calls CreateOrganizationFunc.
@@ -129,5 +159,81 @@ func (mock *MockedOrgStorer) CreateProjectCalls() []struct {
 	mock.lockCreateProject.RLock()
 	calls = mock.calls.CreateProject
 	mock.lockCreateProject.RUnlock()
+	return calls
+}
+
+// OrganizationByName calls OrganizationByNameFunc.
+func (mock *MockedOrgStorer) OrganizationByName(ctx context.Context, name string) (pgorg.Organization, error) {
+	if mock.OrganizationByNameFunc == nil {
+		panic("MockedOrgStorer.OrganizationByNameFunc: method is nil but OrgStorer.OrganizationByName was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Name string
+	}{
+		Ctx:  ctx,
+		Name: name,
+	}
+	mock.lockOrganizationByName.Lock()
+	mock.calls.OrganizationByName = append(mock.calls.OrganizationByName, callInfo)
+	mock.lockOrganizationByName.Unlock()
+	return mock.OrganizationByNameFunc(ctx, name)
+}
+
+// OrganizationByNameCalls gets all the calls that were made to OrganizationByName.
+// Check the length with:
+//
+//	len(mockedOrgStorer.OrganizationByNameCalls())
+func (mock *MockedOrgStorer) OrganizationByNameCalls() []struct {
+	Ctx  context.Context
+	Name string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name string
+	}
+	mock.lockOrganizationByName.RLock()
+	calls = mock.calls.OrganizationByName
+	mock.lockOrganizationByName.RUnlock()
+	return calls
+}
+
+// ProjectByName calls ProjectByNameFunc.
+func (mock *MockedOrgStorer) ProjectByName(ctx context.Context, orgID int, name string) (pgorg.Project, error) {
+	if mock.ProjectByNameFunc == nil {
+		panic("MockedOrgStorer.ProjectByNameFunc: method is nil but OrgStorer.ProjectByName was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		OrgID int
+		Name  string
+	}{
+		Ctx:   ctx,
+		OrgID: orgID,
+		Name:  name,
+	}
+	mock.lockProjectByName.Lock()
+	mock.calls.ProjectByName = append(mock.calls.ProjectByName, callInfo)
+	mock.lockProjectByName.Unlock()
+	return mock.ProjectByNameFunc(ctx, orgID, name)
+}
+
+// ProjectByNameCalls gets all the calls that were made to ProjectByName.
+// Check the length with:
+//
+//	len(mockedOrgStorer.ProjectByNameCalls())
+func (mock *MockedOrgStorer) ProjectByNameCalls() []struct {
+	Ctx   context.Context
+	OrgID int
+	Name  string
+} {
+	var calls []struct {
+		Ctx   context.Context
+		OrgID int
+		Name  string
+	}
+	mock.lockProjectByName.RLock()
+	calls = mock.calls.ProjectByName
+	mock.lockProjectByName.RUnlock()
 	return calls
 }

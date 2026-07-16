@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
@@ -21,6 +22,12 @@ func TestCore_integration(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	core := NewCore(pgorg.NewStore(pool), pgdb.NewTransactor(pool))
 
+	diffOpts := cmp.Options{
+		cmpopts.IgnoreFields(mdl.Organization{}, "ID", "ControlProjectID"),
+		cmpopts.IgnoreFields(mdl.Project{}, "ID"),
+		cmpopts.EquateApproxTime(time.Minute),
+	}
+
 	org, err := core.CreateOrganization(ctx, mdl.CreateOrganization{Name: "acme", ProjectName: "acme"})
 	if err != nil {
 		t.Fatalf("CreateOrganization() error = %v", err)
@@ -31,14 +38,35 @@ func TestCore_integration(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	testingx.AssertDiff(
-		t, org, wantOrg,
-		cmpopts.IgnoreFields(mdl.Organization{}, "ID"),
-		cmpopts.EquateApproxTime(time.Minute),
-	)
+	testingx.AssertDiff(t, org, wantOrg, diffOpts...)
 
 	if org.ID == 0 {
 		t.Error("CreateOrganization() ID = 0, want non-zero")
+	}
+	if org.ControlProjectID == 0 {
+		t.Error("CreateOrganization() ControlProjectID = 0, want non-zero")
+	}
+
+	control, err := core.ProjectByName(ctx, org.ID, "control")
+	if err != nil {
+		t.Fatalf("ProjectByName(%d, %q) error = %v, want the control project to have been created alongside the organization", org.ID, "control", err)
+	}
+
+	wantControl := mdl.Project{
+		OrgID:     org.ID,
+		Name:      "control",
+		IsControl: true,
+		CreatedAt: time.Now(),
+	}
+
+	testingx.AssertDiff(t, control, wantControl, diffOpts...)
+
+	if control.ID != org.ControlProjectID {
+		t.Errorf("control project ID = %d, want %d (Organization.ControlProjectID)", control.ID, org.ControlProjectID)
+	}
+
+	if _, err := core.CreateOrganization(ctx, mdl.CreateOrganization{Name: "widgets-inc", ProjectName: "control"}); !errors.Is(err, mdl.ErrControlProjectNameConflict) {
+		t.Errorf("CreateOrganization() error = %v, want mdl.ErrControlProjectNameConflict", err)
 	}
 
 	// Creating an organization seeds a default project of the same name, so this collides.
@@ -57,15 +85,25 @@ func TestCore_integration(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	testingx.AssertDiff(
-		t, gotProject, wantProject,
-		cmpopts.IgnoreFields(mdl.Project{}, "ID"),
-		cmpopts.EquateApproxTime(time.Minute),
-	)
+	testingx.AssertDiff(t, gotProject, wantProject, diffOpts...)
 
 	if gotProject.ID == 0 {
 		t.Error("CreateProject() ID = 0, want non-zero")
 	}
+
+	orgByName, err := core.OrganizationByName(ctx, "acme")
+	if err != nil {
+		t.Fatalf("OrganizationByName() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, orgByName, org)
+
+	projectByName, err := core.ProjectByName(ctx, org.ID, "widgets")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, projectByName, gotProject)
 }
 
 func TestCore_CreateOrganization(t *testing.T) {
@@ -107,6 +145,21 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 
 		if _, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{Name: "acme", ProjectName: "acme"}); !errors.Is(err, mdl.ErrAlreadyExists) {
 			t.Errorf("CreateOrganization() error = %v, want mdl.ErrAlreadyExists", err)
+		}
+	})
+
+	t.Run("project name conflicts with control project", func(t *testing.T) {
+		core := NewCore(&MockedOrgStorer{
+			CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+				return pgorg.Organization{ID: 1, Name: co.Name}, nil
+			},
+			CreateProjectFunc: func(_ context.Context, _ pgorg.CreateProject) (pgorg.Project, error) {
+				return pgorg.Project{}, pgdb.ErrAlreadyExists
+			},
+		}, noopTransactor{})
+
+		if _, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{Name: "acme", ProjectName: "control"}); !errors.Is(err, mdl.ErrControlProjectNameConflict) {
+			t.Errorf("CreateOrganization() error = %v, want mdl.ErrControlProjectNameConflict", err)
 		}
 	})
 
@@ -198,6 +251,100 @@ func TestCore_CreateProject_error(t *testing.T) {
 		_, err := core.CreateProject(t.Context(), mdl.CreateProject{OrgID: 7, Name: "widgets"})
 		if err == nil {
 			t.Fatal("CreateProject() error = nil, want error")
+		}
+
+		testingx.AssertErrContains(t, err, "db down")
+	})
+}
+
+func TestCore_OrganizationByName(t *testing.T) {
+	orgStorer := &MockedOrgStorer{
+		OrganizationByNameFunc: func(_ context.Context, name string) (pgorg.Organization, error) {
+			return pgorg.Organization{ID: 1, Name: name}, nil
+		},
+	}
+	core := NewCore(orgStorer, noopTransactor{})
+
+	got, err := core.OrganizationByName(t.Context(), "acme")
+	if err != nil {
+		t.Fatalf("OrganizationByName() error = %v", err)
+	}
+
+	want := mdl.Organization{ID: 1, Name: "acme"}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_OrganizationByName_error(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
+		core := NewCore(&MockedOrgStorer{
+			OrganizationByNameFunc: func(_ context.Context, _ string) (pgorg.Organization, error) {
+				return pgorg.Organization{}, sql.ErrNoRows
+			},
+		}, noopTransactor{})
+
+		if _, err := core.OrganizationByName(t.Context(), "acme"); !errors.Is(err, mdl.ErrNotFound) {
+			t.Errorf("OrganizationByName() error = %v, want mdl.ErrNotFound", err)
+		}
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		core := NewCore(&MockedOrgStorer{
+			OrganizationByNameFunc: func(_ context.Context, _ string) (pgorg.Organization, error) {
+				return pgorg.Organization{}, errors.New("db down")
+			},
+		}, noopTransactor{})
+
+		_, err := core.OrganizationByName(t.Context(), "acme")
+		if err == nil {
+			t.Fatal("OrganizationByName() error = nil, want error")
+		}
+
+		testingx.AssertErrContains(t, err, "db down")
+	})
+}
+
+func TestCore_ProjectByName(t *testing.T) {
+	orgStorer := &MockedOrgStorer{
+		ProjectByNameFunc: func(_ context.Context, orgID int, name string) (pgorg.Project, error) {
+			return pgorg.Project{ID: 1, OrgID: orgID, Name: name}, nil
+		},
+	}
+	core := NewCore(orgStorer, noopTransactor{})
+
+	got, err := core.ProjectByName(t.Context(), 7, "control")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+
+	want := mdl.Project{ID: 1, OrgID: 7, Name: "control"}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_ProjectByName_error(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
+		core := NewCore(&MockedOrgStorer{
+			ProjectByNameFunc: func(_ context.Context, _ int, _ string) (pgorg.Project, error) {
+				return pgorg.Project{}, sql.ErrNoRows
+			},
+		}, noopTransactor{})
+
+		if _, err := core.ProjectByName(t.Context(), 7, "control"); !errors.Is(err, mdl.ErrNotFound) {
+			t.Errorf("ProjectByName() error = %v, want mdl.ErrNotFound", err)
+		}
+	})
+
+	t.Run("store error", func(t *testing.T) {
+		core := NewCore(&MockedOrgStorer{
+			ProjectByNameFunc: func(_ context.Context, _ int, _ string) (pgorg.Project, error) {
+				return pgorg.Project{}, errors.New("db down")
+			},
+		}, noopTransactor{})
+
+		_, err := core.ProjectByName(t.Context(), 7, "control")
+		if err == nil {
+			t.Fatal("ProjectByName() error = nil, want error")
 		}
 
 		testingx.AssertErrContains(t, err, "db down")

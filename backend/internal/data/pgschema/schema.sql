@@ -51,6 +51,29 @@ COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching
 
 
 --
+-- Name: protect_control_project(); Type: FUNCTION; Schema: org; Owner: -
+--
+
+CREATE FUNCTION org.protect_control_project() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        IF OLD.is_control THEN
+            RAISE EXCEPTION 'control project "%" cannot be deleted', OLD.name;
+        END IF;
+        RETURN OLD;
+    END IF;
+
+    IF NEW.is_control IS DISTINCT FROM OLD.is_control THEN
+        RAISE EXCEPTION 'is_control cannot be changed after creation (project "%")', OLD.name;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: prevent_custom_role_system_assignment(); Type: FUNCTION; Schema: rbac; Owner: -
 --
 
@@ -139,6 +162,7 @@ CREATE TABLE org.projects (
     id integer NOT NULL,
     org_id integer NOT NULL,
     name text NOT NULL,
+    is_control boolean NOT NULL,
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone
 );
@@ -432,14 +456,6 @@ ALTER TABLE ONLY org.organizations
 
 
 --
--- Name: projects projects_org_id_name_key; Type: CONSTRAINT; Schema: org; Owner: -
---
-
-ALTER TABLE ONLY org.projects
-    ADD CONSTRAINT projects_org_id_name_key UNIQUE (org_id, name);
-
-
---
 -- Name: projects projects_pkey; Type: CONSTRAINT; Schema: org; Owner: -
 --
 
@@ -568,6 +584,20 @@ ALTER TABLE ONLY useraccess.users
 
 
 --
+-- Name: projects_org_id_control_key; Type: INDEX; Schema: org; Owner: -
+--
+
+CREATE UNIQUE INDEX projects_org_id_control_key ON org.projects USING btree (org_id) WHERE is_control;
+
+
+--
+-- Name: projects_org_id_lower_name_key; Type: INDEX; Schema: org; Owner: -
+--
+
+CREATE UNIQUE INDEX projects_org_id_lower_name_key ON org.projects USING btree (org_id, lower(name));
+
+
+--
 -- Name: magic_link_tokens_user_id_created_at_idx; Type: INDEX; Schema: useraccess; Owner: -
 --
 
@@ -607,6 +637,13 @@ CREATE INDEX users_name_trgm_idx ON useraccess.users USING gin (name public.gin_
 --
 
 CREATE INDEX users_updated_at_idx ON useraccess.users USING btree (updated_at);
+
+
+--
+-- Name: projects protect_control_project; Type: TRIGGER; Schema: org; Owner: -
+--
+
+CREATE TRIGGER protect_control_project BEFORE DELETE OR UPDATE ON org.projects FOR EACH ROW EXECUTE FUNCTION org.protect_control_project();
 
 
 --
@@ -721,4 +758,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260714130000'),
     ('20260714130001'),
     ('20260714130002'),
-    ('20260714130004');
+    ('20260714130004'),
+    ('20260716134326');

@@ -2,16 +2,21 @@ package mdl
 
 import "time"
 
+// BootstrapOrgName is the name of the well-known bootstrap organization, guaranteed to exist by
+// the CLI's "org bootstrap" command.
+const BootstrapOrgName = "theapp"
+
 // Organization represents a tenant.
 type Organization struct {
-	ID        int
-	Name      string
-	CreatedAt time.Time
-	UpdatedAt *time.Time
+	ID               int
+	Name             string
+	ControlProjectID int
+	CreatedAt        time.Time
+	UpdatedAt        *time.Time
 }
 
 // CreateOrganization holds the fields needed to create a new organization. Creating an
-// organization also seeds a default project, named ProjectName.
+// organization also seeds a default project, named ProjectName, and a control project.
 type CreateOrganization struct {
 	Name        string
 	ProjectName string
@@ -27,11 +32,14 @@ func (co CreateOrganization) Validate() error {
 	return nil
 }
 
-// Project represents a project within an organization.
+// Project represents a project within an organization. IsControl marks the one project every
+// organization is automatically given alongside itself, used to anchor permission checks (e.g.
+// org:create, project:create) that have no project of their own to check against yet.
 type Project struct {
 	ID        int
 	OrgID     int
 	Name      string
+	IsControl bool
 	CreatedAt time.Time
 	UpdatedAt *time.Time
 }

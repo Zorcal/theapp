@@ -10,7 +10,10 @@ func TestRequestMagicLink_Validate(t *testing.T) {
 		name string
 		in   RequestMagicLink
 	}{
-		{"valid", RequestMagicLink{Email: "alice@test.com"}},
+		{
+			name: "valid",
+			in:   RequestMagicLink{Email: "alice@test.com"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -26,8 +29,14 @@ func TestRequestMagicLink_Validate_error(t *testing.T) {
 		name string
 		in   RequestMagicLink
 	}{
-		{"empty email", RequestMagicLink{Email: ""}},
-		{"malformed email", RequestMagicLink{Email: "notanemail"}},
+		{
+			name: "empty email",
+			in:   RequestMagicLink{Email: ""},
+		},
+		{
+			name: "malformed email",
+			in:   RequestMagicLink{Email: "notanemail"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -43,7 +52,10 @@ func TestVerifyMagicLink_Validate(t *testing.T) {
 		name string
 		in   VerifyMagicLink
 	}{
-		{"valid", VerifyMagicLink{Token: "sometoken"}},
+		{
+			name: "valid",
+			in:   VerifyMagicLink{Token: "sometoken"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,7 +71,10 @@ func TestVerifyMagicLink_Validate_error(t *testing.T) {
 		name string
 		in   VerifyMagicLink
 	}{
-		{"empty token", VerifyMagicLink{Token: ""}},
+		{
+			name: "empty token",
+			in:   VerifyMagicLink{Token: ""},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -75,7 +90,10 @@ func TestRefreshToken_Validate(t *testing.T) {
 		name string
 		in   RefreshToken
 	}{
-		{"valid", RefreshToken{Token: "sometoken"}},
+		{
+			name: "valid",
+			in:   RefreshToken{Token: "sometoken"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,7 +109,10 @@ func TestRefreshToken_Validate_error(t *testing.T) {
 		name string
 		in   RefreshToken
 	}{
-		{"empty token", RefreshToken{Token: ""}},
+		{
+			name: "empty token",
+			in:   RefreshToken{Token: ""},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

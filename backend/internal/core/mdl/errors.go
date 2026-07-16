@@ -24,6 +24,11 @@ var ErrRateLimited = errors.New("rate limited")
 // ErrValidation is returned by an input type's Validate method when the value is invalid.
 var ErrValidation = errors.New("validation failed")
 
+// ErrControlProjectNameConflict is returned when attempting to create an organization
+// and the requested default project name collides with the org's automatically created
+// control project.
+var ErrControlProjectNameConflict = errors.New("project name conflicts with control project")
+
 // validationError wraps msg, a short field-level description, with ErrValidation.
 func validationError(msg string) error {
 	return fmt.Errorf("%s: %w", msg, ErrValidation)

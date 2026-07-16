@@ -30,8 +30,8 @@ type User struct {
 
 // CreateUser holds all fields required to create a new user in the database.
 type CreateUser struct {
-	Email string `db:"email"`
-	Name  string `db:"name"`
+	Email string
+	Name  string
 }
 
 // UpdateUser holds the fields to update on a user in the database.

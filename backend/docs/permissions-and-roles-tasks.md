@@ -90,15 +90,15 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 ## Phase 8 — org/project core creation functions — done
 
-19. Core-layer `CreateOrganization` / `CreateProject` functions (`internal/core/org`, backed by `internal/core/pgstores/pgorg`; no gRPC endpoint yet). `mdl.CreateOrganization` takes the default project's name explicitly (`ProjectName`) rather than defaulting it to the organization's own name. The store layer exposes `CreateOrganization` and `CreateProject` as two separate methods; the core layer's `CreateOrganization` calls both inside a single `Transactor.RunTx` so the organization and its default project are created atomically. `CreateProject` resolves the target org via a join rather than relying on the `org_id` foreign key's violation error, returning `sql.ErrNoRows` (→ `mdl.ErrNotFound`) the same way `pgrbac.AssignSystemRole` resolves a role by name — so an invalid org ID fails via "zero rows returned", not a distinct FK-violation code path. Depends on 17.
+19. Core-layer `CreateOrganization` / `CreateProject` functions (`internal/core/org`, backed by `internal/core/pgstores/pgorg`; no gRPC endpoint yet). `mdl.CreateOrganization` takes the default project's name explicitly (`ProjectName`) rather than defaulting it to the organization's own name. The store layer's `CreateOrganization` inserts the organization and a control project (`org.projects.is_control`) in one statement, so the two rows are created atomically; a project's identity as an org's control project is tracked by `is_control`, not by name, so it can be renamed later without losing that identity — `mdl.Organization.ControlProjectID` exposes it directly, no name lookup needed. The core layer's `CreateOrganization` then calls the store's `CreateProject` inside the same `Transactor.RunTx` to add the caller's named default project. `CreateProject` resolves the target org via a join rather than relying on the `org_id` foreign key's violation error, returning `sql.ErrNoRows` (→ `mdl.ErrNotFound`) the same way `pgrbac.AssignSystemRole` resolves a role by name — so an invalid org ID fails via "zero rows returned", not a distinct FK-violation code path. Depends on 17.
 
 **Checkpoint:** an org and a project can be created via these functions directly, proven by `TestCore_integration`, `TestStore_CreateOrganization(_error)`, and `TestStore_CreateProject(_error)` — independent of any CLI or gRPC surface.
 
-## Phase 9 — CLI: bootstrap theapp/dev/control
+## Phase 9 — CLI: bootstrap theapp/dev/control — done
 
-20. CLI command to bootstrap `theapp`/`dev`/`control`, wired to 19, using the scaffold from phase 1 — idempotent, safe to re-run. Depends on 1, 19.
+20. `org bootstrap` command, wired to 19, using the scaffold from phase 1. It looks up `theapp` by name before creating it, so re-running the command is a no-op once it (and its `dev`/control projects, created alongside it per phase 8) already exists, rather than failing on `mdl.ErrAlreadyExists`. `theapp.ControlProjectID` (populated by 19 regardless of whether the org was just created or already existed) is used directly — no separate lookup for the control project is needed. This adds `OrganizationByName` / `ProjectByName` to `internal/core/org` and `internal/core/pgstores/pgorg`, alongside the existing `Create*` functions from phase 8. Depends on 1, 19.
 
-**Checkpoint:** an operator can bootstrap `theapp`/`dev`/`control` via the CLI.
+**Checkpoint:** an operator can bootstrap `theapp`/`dev`/`control` via the CLI. Verified manually against a local dev database (`org bootstrap --operator ...`, run twice, confirming identical org/project IDs both times).
 
 ## Phase 10 — ProjectID metadata plumbing
 
@@ -148,8 +148,8 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 ## Phase 16 — org creation endpoint
 
 36. Proto schema: `schemas/organization.proto` (create/delete org). Run `make generate`.
-37. Org creation gRPC endpoint: wires 19 behind `org:create` scoped to `theapp/control`, plus the `theapp` org-membership check. Depends on 25, 30, 36.
-38. Org creation request carries the default project's name, passed through to 19's `CreateOrganization` (which already seeds the default project atomically as of phase 8 — no separate `CreateProject` call needed here). Depends on 37.
+37. Org creation gRPC endpoint: wires 19 behind `org:create` scoped to `theapp/control`, plus the `theapp` org-membership check. The membership check resolves the `theapp` org by `mdl.BootstrapOrgName` — at that point, rename the constant to drop the `Bootstrap` prefix (it's no longer just a CLI-seeding detail but a permission-anchoring concept referenced from endpoint code too, the same as `mdl.ControlProjectName`). Depends on 25, 30, 36.
+38. Org creation request carries the default project's name (`CreateOrganization.ProjectName`), passed through to 19's `CreateOrganization`, which creates the organization, its control project, and the named default project. Depends on 37.
 39. Org creator assigned an admin role at org scope (see permissions-and-roles.md, "Creating organizations and projects"). Depends on 30, 37.
 
 **Checkpoint:** an organization can be created end-to-end via the API, seeded with a default project and an org-scoped admin assignment for its creator.

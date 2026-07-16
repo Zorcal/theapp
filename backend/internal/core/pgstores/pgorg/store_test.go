@@ -19,7 +19,7 @@ func TestStore_CreateOrganization(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	orgStore := NewStore(pool)
 
-	got, err := orgStore.CreateOrganization(ctx, CreateOrganization{Name: "acme"})
+	got, err := orgStore.CreateOrganization(ctx, CreateOrganization{Name: "acme", ControlProjectName: "control"})
 	if err != nil {
 		t.Fatalf("CreateOrganization() error = %v", err)
 	}
@@ -29,13 +29,39 @@ func TestStore_CreateOrganization(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	testingx.AssertDiff(t, got, want,
-		cmpopts.IgnoreFields(Organization{}, "ID"),
+	testingx.AssertDiff(
+		t, got, want,
+		cmpopts.IgnoreFields(Organization{}, "ID", "ControlProjectID"),
 		cmpopts.EquateApproxTime(time.Minute),
 	)
 
 	if got.ID == 0 {
 		t.Error("CreateOrganization() ID = 0, want non-zero")
+	}
+	if got.ControlProjectID == 0 {
+		t.Error("CreateOrganization() ControlProjectID = 0, want non-zero")
+	}
+
+	control, err := orgStore.ProjectByName(ctx, got.ID, "control")
+	if err != nil {
+		t.Fatalf("ProjectByName(%d, %q) error = %v, want the control project to have been created alongside the organization", got.ID, "control", err)
+	}
+
+	wantControl := Project{
+		OrgID:     got.ID,
+		Name:      "control",
+		IsControl: true,
+		CreatedAt: time.Now(),
+	}
+
+	testingx.AssertDiff(
+		t, control, wantControl,
+		cmpopts.IgnoreFields(Project{}, "ID"),
+		cmpopts.EquateApproxTime(time.Minute),
+	)
+
+	if control.ID != got.ControlProjectID {
+		t.Errorf("control project ID = %d, want %d (Organization.ControlProjectID)", control.ID, got.ControlProjectID)
 	}
 }
 
@@ -71,7 +97,8 @@ func TestStore_CreateProject(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	testingx.AssertDiff(t, got, want,
+	testingx.AssertDiff(
+		t, got, want,
 		cmpopts.IgnoreFields(Project{}, "ID"),
 		cmpopts.EquateApproxTime(time.Minute),
 	)
@@ -92,7 +119,7 @@ func TestStore_CreateProject_error(t *testing.T) {
 		}
 	})
 
-	t.Run("duplicate name in org", func(t *testing.T) {
+	t.Run("duplicate name", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
 		orgStore := NewStore(pool)
@@ -100,8 +127,131 @@ func TestStore_CreateProject_error(t *testing.T) {
 		org := seedOrg(t, orgStore, "acme")
 		seedProject(t, orgStore, org.ID, "widgets")
 
-		if _, err := orgStore.CreateProject(ctx, CreateProject{OrgID: org.ID, Name: "widgets"}); !errors.Is(err, pgdb.ErrAlreadyExists) {
-			t.Errorf("CreateProject() error = %v, want pgdb.ErrAlreadyExists", err)
+		tests := []struct {
+			name string
+			dup  string
+		}{
+			{
+				name: "same case",
+				dup:  "widgets",
+			},
+			{
+				name: "different case",
+				dup:  "WIDGETS",
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if _, err := orgStore.CreateProject(ctx, CreateProject{OrgID: org.ID, Name: tt.dup}); !errors.Is(err, pgdb.ErrAlreadyExists) {
+					t.Errorf("CreateProject() error = %v, want pgdb.ErrAlreadyExists", err)
+				}
+			})
+		}
+	})
+}
+
+func TestStore_OrganizationByName(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := NewStore(pool)
+
+	seeded := seedOrg(t, orgStore, "acme")
+
+	got, err := orgStore.OrganizationByName(ctx, "acme")
+	if err != nil {
+		t.Fatalf("OrganizationByName() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, got, seeded)
+}
+
+func TestStore_OrganizationByName_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := NewStore(pool)
+
+	if _, err := orgStore.OrganizationByName(ctx, "acme"); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("OrganizationByName() error = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestStore_ProjectByName(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := NewStore(pool)
+
+	org := seedOrg(t, orgStore, "acme")
+	seeded := seedProject(t, orgStore, org.ID, "widgets")
+
+	got, err := orgStore.ProjectByName(ctx, org.ID, "widgets")
+	if err != nil {
+		t.Fatalf("ProjectByName() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, got, seeded)
+}
+
+func TestStore_ProjectByName_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := NewStore(pool)
+
+	org := seedOrg(t, orgStore, "acme")
+
+	if _, err := orgStore.ProjectByName(ctx, org.ID, "widgets"); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("ProjectByName() error = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestProtectControlProjectTrigger(t *testing.T) {
+	t.Run("delete", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		org := seedOrg(t, NewStore(pool), "acme")
+
+		_, err := pool.Exec(ctx, `DELETE FROM org.projects WHERE id = $1`, org.ControlProjectID)
+		if err == nil {
+			t.Fatal("DELETE control project error = nil, want error")
+		}
+
+		testingx.AssertErrContains(t, err, "cannot be deleted")
+	})
+
+	t.Run("update is_control on a control project", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		org := seedOrg(t, NewStore(pool), "acme")
+
+		_, err := pool.Exec(ctx, `UPDATE org.projects SET is_control = false WHERE id = $1`, org.ControlProjectID)
+		if err == nil {
+			t.Fatal("UPDATE is_control error = nil, want error")
+		}
+
+		testingx.AssertErrContains(t, err, "cannot be changed after creation")
+	})
+
+	t.Run("update is_control on an ordinary project", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		orgStore := NewStore(pool)
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "widgets")
+
+		_, err := pool.Exec(ctx, `UPDATE org.projects SET is_control = true WHERE id = $1`, project.ID)
+		if err == nil {
+			t.Fatal("UPDATE is_control error = nil, want error")
+		}
+
+		testingx.AssertErrContains(t, err, "cannot be changed after creation")
+	})
+
+	t.Run("rename a control project", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		org := seedOrg(t, NewStore(pool), "acme")
+
+		if _, err := pool.Exec(ctx, `UPDATE org.projects SET name = 'renamed' WHERE id = $1`, org.ControlProjectID); err != nil {
+			t.Errorf("UPDATE name error = %v, want nil", err)
 		}
 	})
 }
@@ -109,7 +259,7 @@ func TestStore_CreateProject_error(t *testing.T) {
 func seedOrg(t *testing.T, s *Store, name string) Organization {
 	t.Helper()
 
-	org, err := s.CreateOrganization(t.Context(), CreateOrganization{Name: name})
+	org, err := s.CreateOrganization(t.Context(), CreateOrganization{Name: name, ControlProjectName: "control"})
 	if err != nil {
 		t.Fatalf("seed org %q: %v", name, err)
 	}
