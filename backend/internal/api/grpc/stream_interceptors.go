@@ -24,7 +24,7 @@ import (
 // them yet. See the Idempotency section in README.md for why and what's needed to support it.
 
 // authStreamInterceptor is the streaming counterpart of authUnaryInterceptor.
-func authStreamInterceptor(jwtKey []byte, issuer, audience string) grpc.StreamServerInterceptor {
+func authStreamInterceptor(jwtKey []byte, issuer, audience string, authCore AuthCore) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if _, public := publicMethods[info.FullMethod]; public {
 			return handler(srv, ss)
@@ -35,7 +35,15 @@ func authStreamInterceptor(jwtKey []byte, issuer, audience string) grpc.StreamSe
 			return fmt.Errorf("parse bearer: %w", err)
 		}
 
-		return handler(srv, newCtxOverrideStream(ss, contextWithUserID(ss.Context(), claims.UserID)))
+		authUser, err := authCore.AuthUser(ss.Context(), claims.UserID)
+		if err != nil {
+			if errors.Is(err, mdl.ErrNotFound) {
+				return status.Error(codes.Unauthenticated, "unauthenticated")
+			}
+			return fmt.Errorf("resolve auth user: %w", err)
+		}
+
+		return handler(srv, newCtxOverrideStream(ss, mdl.ContextWithAuthUser(ss.Context(), authUser)))
 	}
 }
 

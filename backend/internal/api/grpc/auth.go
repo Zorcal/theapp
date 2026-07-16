@@ -128,12 +128,12 @@ func (s *authService) RevokeRefreshToken(ctx context.Context, req *pb.RevokeRefr
 }
 
 func (s *authService) RevokeAllSessions(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
-	userID, ok := UserIDFromContext(ctx)
+	authUser, ok := mdl.AuthUserFromContext(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
 	}
 
-	if err := s.authCore.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
+	if err := s.authCore.RevokeAllUserRefreshTokens(ctx, authUser.UserID); err != nil {
 		return nil, fmt.Errorf("revoke all sessions: %w", err)
 	}
 

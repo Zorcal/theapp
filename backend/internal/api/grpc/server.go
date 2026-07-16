@@ -66,15 +66,15 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			loggingUnaryInterceptor(cfg.Log),
 			errorUnaryInterceptor(cfg.Log),
 			recoveryUnaryInterceptor(),
-			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
-			permissionUnaryInterceptor(cfg.AuthCore),
+			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
+			permissionUnaryInterceptor(),
 			idempotencyUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			loggingStreamInterceptor(cfg.Log),
 			errorStreamInterceptor(cfg.Log),
 			recoveryStreamInterceptor(),
-			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience),
+			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
 		),
 	)
 

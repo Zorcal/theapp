@@ -66,10 +66,13 @@ func scopedWorkflowID(ctx context.Context, method string, payload []byte, key st
 		return "", status.Error(codes.InvalidArgument, "x-idempotency-key must be a valid UUID")
 	}
 
-	userID, _ := UserIDFromContext(ctx)
+	var userID string
+	if authUser, ok := mdl.AuthUserFromContext(ctx); ok {
+		userID = authUser.UserID.String()
+	}
 
 	h := sha256.New()
-	h.Write([]byte(userID.String()))
+	h.Write([]byte(userID))
 	h.Write([]byte{0})
 	h.Write([]byte(method))
 	h.Write([]byte{0})
@@ -92,9 +95,9 @@ func marshalRequest(req any) ([]byte, error) {
 	return payload, nil
 }
 
-// authUnaryInterceptor validates the JWT Bearer token on every method not in
-// publicMethods and attaches the authenticated user ID to the context.
-func authUnaryInterceptor(jwtKey []byte, issuer, audience string) grpc.UnaryServerInterceptor {
+// authUnaryInterceptor validates the JWT Bearer token on every method not in publicMethods,
+// resolves the caller's mdl.AuthUser via authCore, and attaches it to the context.
+func authUnaryInterceptor(jwtKey []byte, issuer, audience string, authCore AuthCore) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if _, public := publicMethods[info.FullMethod]; public {
 			return handler(ctx, req)
@@ -105,7 +108,15 @@ func authUnaryInterceptor(jwtKey []byte, issuer, audience string) grpc.UnaryServ
 			return nil, fmt.Errorf("parse bearer: %w", err)
 		}
 
-		return handler(contextWithUserID(ctx, claims.UserID), req)
+		authUser, err := authCore.AuthUser(ctx, claims.UserID)
+		if err != nil {
+			if errors.Is(err, mdl.ErrNotFound) {
+				return nil, status.Error(codes.Unauthenticated, "unauthenticated")
+			}
+			return nil, fmt.Errorf("resolve auth user: %w", err)
+		}
+
+		return handler(mdl.ContextWithAuthUser(ctx, authUser), req)
 	}
 }
 
@@ -141,11 +152,10 @@ func parseBearer(ctx context.Context, jwtKey []byte, issuer, audience string) (*
 	return claims, nil
 }
 
-// permissionUnaryInterceptor resolves an mdl.AuthSession for the authenticated caller via authCore
-// and rejects the call with codes.PermissionDenied unless every permission permissionRegistry
-// requires for the method is held. Must run after authUnaryInterceptor so the authenticated user ID
-// is already in ctx.
-func permissionUnaryInterceptor(authCore AuthCore) grpc.UnaryServerInterceptor {
+// permissionUnaryInterceptor rejects the call with codes.PermissionDenied unless every permission
+// permissionRegistry requires for the method is held by the mdl.AuthUser authUnaryInterceptor
+// resolved into ctx. Must run after authUnaryInterceptor.
+func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if _, public := publicMethods[info.FullMethod]; public {
 			return handler(ctx, req)
@@ -156,17 +166,9 @@ func permissionUnaryInterceptor(authCore AuthCore) grpc.UnaryServerInterceptor {
 			return nil, status.Errorf(codes.PermissionDenied, "method %q is not registered", info.FullMethod)
 		}
 
-		userID, ok := UserIDFromContext(ctx)
+		authUser, ok := mdl.AuthUserFromContext(ctx)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "unauthenticated")
-		}
-
-		authUser, err := authCore.AuthUser(ctx, userID)
-		if err != nil {
-			if errors.Is(err, mdl.ErrNotFound) {
-				return nil, status.Error(codes.Unauthenticated, "unauthenticated")
-			}
-			return nil, fmt.Errorf("resolve auth user: %w", err)
 		}
 
 		for _, p := range required {
@@ -175,8 +177,7 @@ func permissionUnaryInterceptor(authCore AuthCore) grpc.UnaryServerInterceptor {
 			}
 		}
 
-		s := mdl.AuthSession{User: authUser}
-		return handler(contextWithAuthSession(ctx, s), req)
+		return handler(ctx, req)
 	}
 }
 

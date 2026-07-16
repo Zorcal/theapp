@@ -1,6 +1,7 @@
 package mdl
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -28,6 +29,20 @@ type AuthUser struct {
 	UserID uuid.UUID
 	// Permissions is the distinct union of permissions granted through every role UserID holds.
 	Permissions []Permission
+}
+
+type contextKeyAuthUser struct{}
+
+// ContextWithAuthUser returns a copy of ctx carrying u as the authenticated caller's identity.
+func ContextWithAuthUser(ctx context.Context, u AuthUser) context.Context {
+	return context.WithValue(ctx, contextKeyAuthUser{}, u)
+}
+
+// AuthUserFromContext extracts the authenticated caller's identity from ctx.
+// Returns the zero AuthUser and false when no user is present (unauthenticated request).
+func AuthUserFromContext(ctx context.Context) (AuthUser, bool) {
+	u, ok := ctx.Value(contextKeyAuthUser{}).(AuthUser)
+	return u, ok
 }
 
 // AuthSession is resolved once per request and threaded through the call stack, pairing the
