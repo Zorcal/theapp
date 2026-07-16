@@ -38,6 +38,13 @@ var publicMethods = map[string]struct{}{
 	"/theapp.v1.AuthService/RevokeRefreshToken": {},
 }
 
+// noProjectMethods lists protected (non-public, see publicMethods) gRPC methods that legitimately
+// have no project context, so they're exempt from requiring x-project-id metadata. All other
+// protected methods require it.
+var noProjectMethods = map[string]struct{}{
+	"/theapp.v1.AuthService/RevokeAllSessions": {},
+}
+
 // permissionRegistry maps every protected (non-public, see publicMethods) gRPC method to the
 // permissions required to call it. All listed permissions must be held — this is a conjunction
 // (AND), never a disjunction. A method with no entry here is denied rather than let through
@@ -67,6 +74,7 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			errorUnaryInterceptor(cfg.Log),
 			recoveryUnaryInterceptor(),
 			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
+			projectUnaryInterceptor(),
 			permissionUnaryInterceptor(),
 			idempotencyUnaryInterceptor(),
 		),
@@ -75,6 +83,8 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			errorStreamInterceptor(cfg.Log),
 			recoveryStreamInterceptor(),
 			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
+			projectStreamInterceptor(),
+			permissionStreamInterceptor(),
 		),
 	)
 

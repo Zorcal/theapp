@@ -40,6 +40,9 @@ var (
 	testJWTAudience = "theapp-api-test"
 )
 
+// testProjectID is the fixed project ID authCtxForTestUser sends as x-project-id metadata.
+const testProjectID = "1"
+
 // ServerTest is a test harness for the gRPC server using mock cores. Use NewServerTest to construct one.
 type ServerTest struct {
 	userServiceClient pb.UserServiceClient
@@ -140,10 +143,11 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 	}
 }
 
-// authCtxForTestUser returns ctx with a valid JWT for a fixed test user in the gRPC outgoing metadata.
-// Use it for calls to any protected endpoint in tests.
+// authCtxForTestUser returns ctx with a valid JWT for a fixed test user, and a fixed project ID,
+// in the gRPC outgoing metadata. Use it for calls to any protected endpoint in tests.
 func authCtxForTestUser(t *testing.T, ctx context.Context) context.Context {
 	t.Helper()
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-project-id", testProjectID)
 	return authCtxWithClaims(t, ctx, mdl.AuthClaims{
 		UserID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 		RegisteredClaims: jwt.RegisteredClaims{

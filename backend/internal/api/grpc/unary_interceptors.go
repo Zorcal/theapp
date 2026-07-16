@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -179,6 +180,51 @@ func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 
 		return handler(ctx, req)
 	}
+}
+
+// projectMetadataKey is the gRPC request-metadata key carrying the project the caller is currently
+// operating in.
+const projectMetadataKey = "x-project-id"
+
+// projectUnaryInterceptor reads the x-project-id metadata key and attaches it to the context as the
+// request's target project, rejecting the call if it's missing or malformed. Public methods and
+// methods listed in noProjectMethods are exempt. Must run after authUnaryInterceptor.
+func projectUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if _, public := publicMethods[info.FullMethod]; public {
+			return handler(ctx, req)
+		}
+		if _, noProject := noProjectMethods[info.FullMethod]; noProject {
+			return handler(ctx, req)
+		}
+
+		projectID, err := parseProjectID(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("parse project id: %w", err)
+		}
+
+		return handler(contextWithProjectID(ctx, projectID), req)
+	}
+}
+
+// parseProjectID extracts and validates the x-project-id metadata key from ctx.
+func parseProjectID(ctx context.Context) (int, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return 0, status.Error(codes.InvalidArgument, "missing metadata")
+	}
+
+	vals := md.Get(projectMetadataKey)
+	if len(vals) == 0 || vals[0] == "" {
+		return 0, status.Errorf(codes.InvalidArgument, "missing %s metadata", projectMetadataKey)
+	}
+
+	id, err := strconv.Atoi(vals[0])
+	if err != nil || id <= 0 {
+		return 0, status.Errorf(codes.InvalidArgument, "%s metadata must be a positive integer", projectMetadataKey)
+	}
+
+	return id, nil
 }
 
 // loggingUnaryInterceptor logs the method, request, response, and duration for every unary RPC.

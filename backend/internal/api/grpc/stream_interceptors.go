@@ -47,6 +47,54 @@ func authStreamInterceptor(jwtKey []byte, issuer, audience string, authCore Auth
 	}
 }
 
+// projectStreamInterceptor is the streaming counterpart of projectUnaryInterceptor. Must run after
+// authStreamInterceptor.
+func projectStreamInterceptor() grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if _, public := publicMethods[info.FullMethod]; public {
+			return handler(srv, ss)
+		}
+		if _, noProject := noProjectMethods[info.FullMethod]; noProject {
+			return handler(srv, ss)
+		}
+
+		projectID, err := parseProjectID(ss.Context())
+		if err != nil {
+			return fmt.Errorf("parse project id: %w", err)
+		}
+
+		return handler(srv, newCtxOverrideStream(ss, contextWithProjectID(ss.Context(), projectID)))
+	}
+}
+
+// permissionStreamInterceptor is the streaming counterpart of permissionUnaryInterceptor. Must run
+// after authStreamInterceptor.
+func permissionStreamInterceptor() grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if _, public := publicMethods[info.FullMethod]; public {
+			return handler(srv, ss)
+		}
+
+		required, ok := permissionRegistry[info.FullMethod]
+		if !ok {
+			return fmt.Errorf("method %q is not registered in the permission registry", info.FullMethod)
+		}
+
+		authUser, ok := mdl.AuthUserFromContext(ss.Context())
+		if !ok {
+			return status.Error(codes.Unauthenticated, "unauthenticated")
+		}
+
+		for _, p := range required {
+			if !slices.Contains(authUser.Permissions, p) {
+				return status.Error(codes.PermissionDenied, "missing required permission")
+			}
+		}
+
+		return handler(srv, ss)
+	}
+}
+
 // loggingStreamInterceptor logs the method and duration at stream boundaries, and each individual message at DEBUG level.
 // Sensitive pb types implement slog.LogValuer to ensure credentials are redacted, not logged in plaintext.
 func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {

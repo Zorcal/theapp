@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
@@ -44,7 +45,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// A freshly created user holds no role yet, so a protected endpoint denies them.
-	authedCtx := authCtxWithToken(ctx, pair.GetAccessToken())
+	authedCtx := metadata.AppendToOutgoingContext(authCtxWithToken(ctx, pair.GetAccessToken()), "x-project-id", testProjectID)
 	if _, err := srv.userServiceClient.ListUsers(authedCtx, &pb.ListUsersRequest{}); status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("ListUsers() before role assignment code = %v, want %v", status.Code(err), codes.PermissionDenied)
 	}

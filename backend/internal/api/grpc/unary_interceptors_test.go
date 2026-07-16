@@ -441,3 +441,101 @@ func TestPermissionUnaryInterceptor_error(t *testing.T) {
 		}
 	})
 }
+
+func TestProjectUnaryInterceptor(t *testing.T) {
+	t.Run("public method bypasses check", func(t *testing.T) {
+		handler := func(ctx context.Context, _ any) (any, error) {
+			return "handler ran", nil
+		}
+
+		interceptor := projectUnaryInterceptor()
+
+		// No x-project-id metadata at all — a public method must not require one.
+		got, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.AuthService/RequestMagicLink"}, handler)
+		if err != nil {
+			t.Fatalf("projectUnaryInterceptor() error = %v, want nil", err)
+		}
+		testingx.AssertDiff(t, got, "handler ran")
+	})
+
+	t.Run("no-project method bypasses check", func(t *testing.T) {
+		handler := func(ctx context.Context, _ any) (any, error) {
+			return "handler ran", nil
+		}
+
+		interceptor := projectUnaryInterceptor()
+
+		// No x-project-id metadata at all — a noProjectMethods entry must not require one.
+		got, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.AuthService/RevokeAllSessions"}, handler)
+		if err != nil {
+			t.Fatalf("projectUnaryInterceptor() error = %v, want nil", err)
+		}
+		testingx.AssertDiff(t, got, "handler ran")
+	})
+
+	t.Run("project id attached to context", func(t *testing.T) {
+		handler := func(ctx context.Context, _ any) (any, error) {
+			id, ok := projectIDFromContext(ctx)
+			if !ok {
+				return nil, errors.New("no project id in context")
+			}
+			return id, nil
+		}
+
+		interceptor := projectUnaryInterceptor()
+
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "7"))
+		resp, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
+		if err != nil {
+			t.Fatalf("projectUnaryInterceptor() error = %v, want nil", err)
+		}
+
+		testingx.AssertDiff(t, resp, 7)
+	})
+}
+
+func TestProjectUnaryInterceptor_error(t *testing.T) {
+	handler := func(ctx context.Context, _ any) (any, error) {
+		return "handler ran", nil
+	}
+
+	tests := []struct {
+		name string
+		ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+	}{
+		{
+			name: "missing metadata",
+			ctx:  t.Context(),
+		},
+		{
+			name: "missing project id header",
+			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs()),
+		},
+		{
+			name: "empty project id value",
+			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "")),
+		},
+		{
+			name: "non-numeric project id",
+			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "abc")),
+		},
+		{
+			name: "zero project id",
+			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "0")),
+		},
+		{
+			name: "negative project id",
+			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "-5")),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			interceptor := projectUnaryInterceptor()
+
+			_, err := interceptor(tt.ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
+			if got, want := status.Code(err), codes.InvalidArgument; got != want {
+				t.Errorf("projectUnaryInterceptor() code = %v, want %v", got, want)
+			}
+		})
+	}
+}
