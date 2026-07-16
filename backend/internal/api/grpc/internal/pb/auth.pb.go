@@ -290,9 +290,11 @@ const file_auth_proto_rawDesc = "" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
 	"\n" +
-	"expires_in\x18\x03 \x01(\x03R\texpiresIn2\xc6\x04\n" +
-	"\vAuthService\x12s\n" +
-	"\x10RequestMagicLink\x12\".theapp.v1.RequestMagicLinkRequest\x1a\x16.google.protobuf.Empty\"#\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/v1/auth/magic-link\x12k\n" +
+	"expires_in\x18\x03 \x01(\x03R\texpiresIn2\xf2\x05\n" +
+	"\vAuthService\x12\x9e\x02\n" +
+	"\x10RequestMagicLink\x12\".theapp.v1.RequestMagicLinkRequest\x1a\x16.google.protobuf.Empty\"\xcd\x01\x92A\xab\x01b\x00r\xa6\x01\n" +
+	"\xa3\x01\n" +
+	"\x11x-idempotency-key\x12\x8b\x01A client-generated UUID. Retrying the same request with the same key returns the original result instead of sending a second sign-in email.\x18\x01\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/v1/auth/magic-link\x12k\n" +
 	"\x0fVerifyMagicLink\x12!.theapp.v1.VerifyMagicLinkRequest\x1a\x14.theapp.v1.TokenPair\"\x1f\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/verify\x12r\n" +
 	"\x12RefreshAccessToken\x12$.theapp.v1.RefreshAccessTokenRequest\x1a\x14.theapp.v1.TokenPair\" \x92A\x02b\x00\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/auth/refresh\x12s\n" +
 	"\x12RevokeRefreshToken\x12$.theapp.v1.RevokeRefreshTokenRequest\x1a\x16.google.protobuf.Empty\"\x1f\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/revoke\x12l\n" +

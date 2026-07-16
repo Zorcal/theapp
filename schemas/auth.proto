@@ -44,6 +44,14 @@ service AuthService {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       security: {}
+      parameters: {
+        headers: {
+          name: "x-idempotency-key"
+          description: "A client-generated UUID. Retrying the same request with the same key returns the original result instead of sending a second sign-in email."
+          type: STRING
+          required: false
+        }
+      }
     };
   }
 

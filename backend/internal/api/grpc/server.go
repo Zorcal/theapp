@@ -43,6 +43,12 @@ var publicMethods = map[string]struct{}{
 // protected methods require it.
 var noProjectMethods = map[string]struct{}{
 	"/theapp.v1.AuthService/RevokeAllSessions": {},
+
+	// UserService is a system-wide directory, not a project- or org-scoped resource.
+	"/theapp.v1.UserService/GetUser":    {},
+	"/theapp.v1.UserService/ListUsers":  {},
+	"/theapp.v1.UserService/CreateUser": {},
+	"/theapp.v1.UserService/UpdateUser": {},
 }
 
 // permissionRegistry maps every protected (non-public, see publicMethods) gRPC method to the

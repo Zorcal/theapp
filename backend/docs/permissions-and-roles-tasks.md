@@ -100,7 +100,7 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** an operator can bootstrap `theapp`/`dev`/`control` via the CLI. Verified manually against a local dev database (`org bootstrap --operator ...`, run twice, confirming identical org/project IDs both times).
 
-## Phase 10 — ProjectID metadata plumbing
+## Phase 10 — ProjectID metadata plumbing — done
 
 21. `ProjectID` request-metadata plumbing: `projectUnaryInterceptor` reads the `x-project-id` metadata key and attaches it to the context (`contextWithProjectID` / `projectIDFromContext`, in the new `internal/api/grpc/context.go` — unlike `mdl.ContextWithAuthUser`, this is transport-layer plumbing with no app-wide need yet, so it stays gRPC-internal rather than living in `mdl`; phase 11 folding it into `mdl.AuthSession` is what will give it an app-wide home), rejecting the call with `codes.InvalidArgument` if it's missing, empty, non-numeric, or not a positive integer. `publicMethods` and a new explicit `noProjectMethods` list (seeded with `AuthService/RevokeAllSessions`, the one existing endpoint that reflects only the caller's own identity) are exempt. Runs after `authUnaryInterceptor`, before `permissionUnaryInterceptor` — the latter doesn't consume `ProjectID` yet, that's phase 11. No stream counterpart yet, mirroring `permissionUnaryInterceptor` (added only once a protected streaming RPC needs it).
 

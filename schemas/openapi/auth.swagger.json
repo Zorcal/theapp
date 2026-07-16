@@ -44,6 +44,13 @@
             "schema": {
               "$ref": "#/definitions/v1RequestMagicLinkRequest"
             }
+          },
+          {
+            "name": "x-idempotency-key",
+            "description": "A client-generated UUID. Retrying the same request with the same key returns the original result instead of sending a second sign-in email.",
+            "in": "header",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
