@@ -404,12 +404,6 @@ func TestPermissionUnaryInterceptor_error(t *testing.T) {
 		want   codes.Code
 	}{
 		{
-			name:   "unregistered method",
-			ctx:    mdl.ContextWithAuthUser(t.Context(), mdl.AuthUser{UserID: uuid.New()}),
-			method: "/theapp.v1.UserService/NoSuchMethod",
-			want:   codes.PermissionDenied,
-		},
-		{
 			name:   "unauthenticated",
 			ctx:    t.Context(),
 			method: "/theapp.v1.UserService/GetUser",
@@ -432,4 +426,18 @@ func TestPermissionUnaryInterceptor_error(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("unregistered method", func(t *testing.T) {
+		interceptor := permissionUnaryInterceptor()
+
+		ctx := mdl.ContextWithAuthUser(t.Context(), mdl.AuthUser{UserID: uuid.New()})
+		_, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/NoSuchMethod"}, handler)
+		if err == nil {
+			t.Fatal("permissionUnaryInterceptor() error = nil, want error")
+		}
+
+		if _, ok := status.FromError(err); ok {
+			t.Errorf("permissionUnaryInterceptor() error = %v, want a plain error, not a gRPC status error", err)
+		}
+	})
 }

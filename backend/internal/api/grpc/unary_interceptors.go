@@ -163,7 +163,7 @@ func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 
 		required, ok := permissionRegistry[info.FullMethod]
 		if !ok {
-			return nil, status.Errorf(codes.PermissionDenied, "method %q is not registered", info.FullMethod)
+			return nil, fmt.Errorf("method %q is not registered in the permission registry", info.FullMethod)
 		}
 
 		authUser, ok := mdl.AuthUserFromContext(ctx)
