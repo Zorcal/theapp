@@ -198,6 +198,17 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: org_role_assignments; Type: TABLE; Schema: rbac; Owner: -
+--
+
+CREATE TABLE rbac.org_role_assignments (
+    user_id integer NOT NULL,
+    role_id integer NOT NULL,
+    org_id integer NOT NULL
+);
+
+
+--
 -- Name: permissions; Type: TABLE; Schema: rbac; Owner: -
 --
 
@@ -228,6 +239,17 @@ ALTER SEQUENCE rbac.permissions_id_seq OWNED BY rbac.permissions.id;
 
 
 --
+-- Name: project_role_assignments; Type: TABLE; Schema: rbac; Owner: -
+--
+
+CREATE TABLE rbac.project_role_assignments (
+    user_id integer NOT NULL,
+    role_id integer NOT NULL,
+    project_id integer NOT NULL
+);
+
+
+--
 -- Name: role_permissions; Type: TABLE; Schema: rbac; Owner: -
 --
 
@@ -245,6 +267,7 @@ CREATE TABLE rbac.roles (
     id integer NOT NULL,
     name text NOT NULL,
     is_static boolean NOT NULL,
+    org_id integer,
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone
 );
@@ -472,6 +495,14 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: org_role_assignments org_role_assignments_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.org_role_assignments
+    ADD CONSTRAINT org_role_assignments_pkey PRIMARY KEY (user_id, role_id, org_id);
+
+
+--
 -- Name: permissions permissions_name_key; Type: CONSTRAINT; Schema: rbac; Owner: -
 --
 
@@ -485,6 +516,14 @@ ALTER TABLE ONLY rbac.permissions
 
 ALTER TABLE ONLY rbac.permissions
     ADD CONSTRAINT permissions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: project_role_assignments project_role_assignments_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.project_role_assignments
+    ADD CONSTRAINT project_role_assignments_pkey PRIMARY KEY (user_id, role_id, project_id);
 
 
 --
@@ -598,6 +637,20 @@ CREATE UNIQUE INDEX projects_org_id_lower_name_key ON org.projects USING btree (
 
 
 --
+-- Name: org_role_assignments_user_id_org_id_idx; Type: INDEX; Schema: rbac; Owner: -
+--
+
+CREATE INDEX org_role_assignments_user_id_org_id_idx ON rbac.org_role_assignments USING btree (user_id, org_id);
+
+
+--
+-- Name: project_role_assignments_user_id_project_id_idx; Type: INDEX; Schema: rbac; Owner: -
+--
+
+CREATE INDEX project_role_assignments_user_id_project_id_idx ON rbac.project_role_assignments USING btree (user_id, project_id);
+
+
+--
 -- Name: magic_link_tokens_user_id_created_at_idx; Type: INDEX; Schema: useraccess; Owner: -
 --
 
@@ -685,6 +738,54 @@ ALTER TABLE ONLY org.projects
 
 
 --
+-- Name: org_role_assignments org_role_assignments_org_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.org_role_assignments
+    ADD CONSTRAINT org_role_assignments_org_id_fkey FOREIGN KEY (org_id) REFERENCES org.organizations(id);
+
+
+--
+-- Name: org_role_assignments org_role_assignments_role_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.org_role_assignments
+    ADD CONSTRAINT org_role_assignments_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.roles(id);
+
+
+--
+-- Name: org_role_assignments org_role_assignments_user_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.org_role_assignments
+    ADD CONSTRAINT org_role_assignments_user_id_fkey FOREIGN KEY (user_id) REFERENCES useraccess.users(id);
+
+
+--
+-- Name: project_role_assignments project_role_assignments_project_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.project_role_assignments
+    ADD CONSTRAINT project_role_assignments_project_id_fkey FOREIGN KEY (project_id) REFERENCES org.projects(id);
+
+
+--
+-- Name: project_role_assignments project_role_assignments_role_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.project_role_assignments
+    ADD CONSTRAINT project_role_assignments_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.roles(id);
+
+
+--
+-- Name: project_role_assignments project_role_assignments_user_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.project_role_assignments
+    ADD CONSTRAINT project_role_assignments_user_id_fkey FOREIGN KEY (user_id) REFERENCES useraccess.users(id);
+
+
+--
 -- Name: role_permissions role_permissions_permission_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
 --
 
@@ -698,6 +799,14 @@ ALTER TABLE ONLY rbac.role_permissions
 
 ALTER TABLE ONLY rbac.role_permissions
     ADD CONSTRAINT role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.roles(id);
+
+
+--
+-- Name: roles roles_org_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.roles
+    ADD CONSTRAINT roles_org_id_fkey FOREIGN KEY (org_id) REFERENCES org.organizations(id);
 
 
 --
@@ -749,14 +858,15 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260605070602'),
     ('20260613000001'),
     ('20260613000002'),
+    ('20260713145900'),
+    ('20260713145901'),
     ('20260713150000'),
     ('20260713150001'),
     ('20260713150002'),
     ('20260713150003'),
     ('20260714120000'),
     ('20260714120001'),
-    ('20260714130000'),
-    ('20260714130001'),
     ('20260714130002'),
     ('20260714130004'),
-    ('20260716134326');
+    ('20260716134326'),
+    ('20260716180931');

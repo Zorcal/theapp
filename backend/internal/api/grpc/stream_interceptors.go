@@ -35,35 +35,24 @@ func authStreamInterceptor(jwtKey []byte, issuer, audience string, authCore Auth
 			return fmt.Errorf("parse bearer: %w", err)
 		}
 
-		authUser, err := authCore.AuthUser(ss.Context(), claims.UserID)
+		var projectID *int
+		if _, noProject := noProjectMethods[info.FullMethod]; !noProject {
+			id, err := parseProjectID(ss.Context())
+			if err != nil {
+				return fmt.Errorf("parse project id: %w", err)
+			}
+			projectID = &id
+		}
+
+		sess, err := authCore.AuthSession(ss.Context(), claims.UserID, projectID)
 		if err != nil {
 			if errors.Is(err, mdl.ErrNotFound) {
-				return status.Error(codes.Unauthenticated, "unauthenticated")
+				return fmt.Errorf("resolve auth session: unknown user or project: %w", status.Error(codes.Unauthenticated, "unauthenticated"))
 			}
-			return fmt.Errorf("resolve auth user: %w", err)
+			return fmt.Errorf("resolve auth session: %w", err)
 		}
 
-		return handler(srv, newCtxOverrideStream(ss, mdl.ContextWithAuthUser(ss.Context(), authUser)))
-	}
-}
-
-// projectStreamInterceptor is the streaming counterpart of projectUnaryInterceptor. Must run after
-// authStreamInterceptor.
-func projectStreamInterceptor() grpc.StreamServerInterceptor {
-	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		if _, public := publicMethods[info.FullMethod]; public {
-			return handler(srv, ss)
-		}
-		if _, noProject := noProjectMethods[info.FullMethod]; noProject {
-			return handler(srv, ss)
-		}
-
-		projectID, err := parseProjectID(ss.Context())
-		if err != nil {
-			return fmt.Errorf("parse project id: %w", err)
-		}
-
-		return handler(srv, newCtxOverrideStream(ss, contextWithProjectID(ss.Context(), projectID)))
+		return handler(srv, newCtxOverrideStream(ss, mdl.ContextWithAuthSession(ss.Context(), sess)))
 	}
 }
 
@@ -80,13 +69,13 @@ func permissionStreamInterceptor() grpc.StreamServerInterceptor {
 			return fmt.Errorf("method %q is not registered in the permission registry", info.FullMethod)
 		}
 
-		authUser, ok := mdl.AuthUserFromContext(ss.Context())
+		sess, ok := mdl.AuthSessionFromContext(ss.Context())
 		if !ok {
 			return status.Error(codes.Unauthenticated, "unauthenticated")
 		}
 
 		for _, p := range required {
-			if !slices.Contains(authUser.Permissions, p) {
+			if !slices.Contains(sess.User.Permissions, p) {
 				return status.Error(codes.PermissionDenied, "missing required permission")
 			}
 		}

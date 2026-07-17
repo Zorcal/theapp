@@ -106,12 +106,12 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** a call missing `ProjectID` metadata is rejected unless the RPC is on the exceptions list — proven independent of any permission resolution logic, by `TestProjectUnaryInterceptor(_error)`.
 
-## Phase 11 — project-scoped resolution
+## Phase 11 — project-scoped resolution — done
 
 22. Migration: `project_role_assignments`, `org_role_assignments` tables. Depends on 5, 17.
 23. Add `org_id` (nullable) to `roles`, now that organizations exist (edits phase 3's migration from task 5 in place). Depends on 5, 17.
 24. Three-way union resolver: extend 12 to also union `project_role_assignments` (direct) and `org_role_assignments` (via project→org). Depends on 12, 21, 22.
-25. Interceptor updated to resolve `AuthSession` via the full three-way resolver (24) instead of the system-scope-only version from phase 6. Depends on 16, 24.
+25. Interceptor updated to resolve `mdl.AuthSession` via a single core method taking a `*int` project ID: non-nil triggers the full three-way resolver (24) plus an org lookup, setting `ProjectID`/`OrgID` on the session; nil (for a method in `noProjectMethods`) resolves system-scope permissions only, leaving `ProjectID`/`OrgID` unset, replacing the system-scope-only version from phase 6. Depends on 16, 24.
 
 **Checkpoint:** permission checks are project-scoped end-to-end, with real organizations/projects backing them — still no custom roles or self-service org/project creation endpoint.
 
@@ -234,10 +234,18 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** the endpoint lists every project the caller has any role in, paginated.
 
+## Phase 29 — org-scoped user management endpoints
+
+60. Extend `schemas/organization.proto` with a create-or-assign-user RPC: creates a user if none exists with the given email, then assigns them to the calling org; if the user already exists, only the org assignment happens. Anchored on the org's control project — the `x-project-id` metadata must be that project's ID. Run `make generate`. Depends on 36, 37.
+61. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an organization"). Also anchored on the org's control project; the request body additionally carries a project ID filter, resolved through the three-way union (24), not `org_membership`. Run `make generate`. Depends on 36, 37.
+62. Wire both endpoints behind the appropriate org-scoped permissions. Depends on 60, 61.
+
+**Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
+
 ## Ongoing / cross-cutting
 
-60. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 20.
-61. Periodic sweep job for soft-deleted users' assignment rows past retention. Depends on 49, existing DBOS workflow infra (`internal/workflows`).
+63. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 20.
+64. Periodic sweep job for soft-deleted users' assignment rows past retention. Depends on 49, existing DBOS workflow infra (`internal/workflows`).
 
 ## Notes
 
@@ -247,4 +255,5 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 - Review happens once per phase, at the phase boundary — see "Working process" above. The phase checkpoints describe what should be true and demonstrable by the time that review happens.
 - Phase 13's checkpoint calls out a phase that is intentionally not yet safe to expose broadly. It's the one phase in this breakdown where "reviewed and committed" doesn't mean "safe to deploy publicly" — flag this distinction if it ever needs to leave a dev/staging environment before phase 15 lands.
 - `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) seeds a local-only bootstrap operator user (`operator@theapp.com`) and grants it `superadmin` at system scope, so every `cmd/cli` command has a valid, usable `--operator` without a manual `psql` insert. The `superadmin` grant is a direct SQL insert rather than a CLI call, since phase 5 hasn't added a CLI command for it yet — switch the script to that command once it exists. It's a standing dev convenience, not a task with its own checkpoint — revisit it whenever a phase changes what a fresh local environment needs to be immediately useful (e.g. phase 9 might have it add `theapp` org membership) instead of leaving that as another manual step.
-- `permissionStreamInterceptor` and `projectStreamInterceptor` mirror `permissionUnaryInterceptor`/`projectUnaryInterceptor` exactly and are wired into the stream chain alongside `authStreamInterceptor`, even though no streaming RPC exists yet to exercise them — built proactively so a future streaming RPC is safe by construction rather than depending on someone remembering to add both when it lands.
+- `permissionStreamInterceptor` mirrors `permissionUnaryInterceptor` exactly and is wired into the stream chain alongside `authStreamInterceptor`, even though no streaming RPC exists yet to exercise it — built proactively so a future streaming RPC is safe by construction rather than depending on someone remembering to add it when it lands.
+- `projectUnaryInterceptor` and `projectStreamInterceptor` (phase 10) were removed once `authUnaryInterceptor`/`authStreamInterceptor` started parsing `x-project-id` themselves to build `mdl.AuthSession` — at that point the two interceptors ran the identical check a second time, and since `authUnaryInterceptor`/`authStreamInterceptor` always run first in the chain, the dedicated project interceptors could never actually be the one to reject a malformed project ID. Project-ID validation now lives solely in `authUnaryInterceptor`/`authStreamInterceptor`.

@@ -128,55 +128,63 @@ func TestCore_CreateOrganization(t *testing.T) {
 }
 
 func TestCore_CreateOrganization_error(t *testing.T) {
-	t.Run("invalid input", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{}, noopTransactor{})
+	dbErr := errors.New("db error")
 
-		if _, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{}); !errors.Is(err, mdl.ErrValidation) {
-			t.Errorf("CreateOrganization() error = %v, want mdl.ErrValidation", err)
-		}
-	})
-
-	t.Run("already exists", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{
-			CreateOrganizationFunc: func(_ context.Context, _ pgorg.CreateOrganization) (pgorg.Organization, error) {
-				return pgorg.Organization{}, pgdb.ErrAlreadyExists
+	tests := []struct {
+		name      string
+		in        mdl.CreateOrganization
+		orgStorer *MockedOrgStorer
+		want      error
+	}{
+		{
+			name:      "invalid input",
+			in:        mdl.CreateOrganization{},
+			orgStorer: &MockedOrgStorer{},
+			want:      mdl.ErrValidation,
+		},
+		{
+			name: "already exists",
+			in:   mdl.CreateOrganization{Name: "acme", ProjectName: "acme"},
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, _ pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{}, pgdb.ErrAlreadyExists
+				},
 			},
-		}, noopTransactor{})
-
-		if _, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{Name: "acme", ProjectName: "acme"}); !errors.Is(err, mdl.ErrAlreadyExists) {
-			t.Errorf("CreateOrganization() error = %v, want mdl.ErrAlreadyExists", err)
-		}
-	})
-
-	t.Run("project name conflicts with control project", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{
-			CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
-				return pgorg.Organization{ID: 1, Name: co.Name}, nil
+			want: mdl.ErrAlreadyExists,
+		},
+		{
+			name: "project name conflicts with control project",
+			in:   mdl.CreateOrganization{Name: "acme", ProjectName: "control"},
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, _ pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{}, pgdb.ErrAlreadyExists
+				},
 			},
-			CreateProjectFunc: func(_ context.Context, _ pgorg.CreateProject) (pgorg.Project, error) {
-				return pgorg.Project{}, pgdb.ErrAlreadyExists
+			want: mdl.ErrControlProjectNameConflict,
+		},
+		{
+			name: "store error",
+			in:   mdl.CreateOrganization{Name: "acme", ProjectName: "acme"},
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, _ pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{}, dbErr
+				},
 			},
-		}, noopTransactor{})
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.orgStorer, noopTransactor{})
 
-		if _, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{Name: "acme", ProjectName: "control"}); !errors.Is(err, mdl.ErrControlProjectNameConflict) {
-			t.Errorf("CreateOrganization() error = %v, want mdl.ErrControlProjectNameConflict", err)
-		}
-	})
-
-	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{
-			CreateOrganizationFunc: func(_ context.Context, _ pgorg.CreateOrganization) (pgorg.Organization, error) {
-				return pgorg.Organization{}, errors.New("db down")
-			},
-		}, noopTransactor{})
-
-		_, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{Name: "acme", ProjectName: "acme"})
-		if err == nil {
-			t.Fatal("CreateOrganization() error = nil, want error")
-		}
-
-		testingx.AssertErrContains(t, err, "db down")
-	})
+			if _, err := core.CreateOrganization(t.Context(), tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("CreateOrganization(%+v) error = %v, want %v", tt.in, err, tt.want)
+			}
+		})
+	}
 }
 
 func TestCore_CreateProject(t *testing.T) {
@@ -198,6 +206,8 @@ func TestCore_CreateProject(t *testing.T) {
 }
 
 func TestCore_CreateProject_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
 	tests := []struct {
 		name      string
 		in        mdl.CreateProject
@@ -230,6 +240,16 @@ func TestCore_CreateProject_error(t *testing.T) {
 			},
 			want: mdl.ErrAlreadyExists,
 		},
+		{
+			name: "store error",
+			in:   mdl.CreateProject{OrgID: 7, Name: "widgets"},
+			orgStorer: &MockedOrgStorer{
+				CreateProjectFunc: func(_ context.Context, _ pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -240,21 +260,6 @@ func TestCore_CreateProject_error(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{
-			CreateProjectFunc: func(_ context.Context, _ pgorg.CreateProject) (pgorg.Project, error) {
-				return pgorg.Project{}, errors.New("db down")
-			},
-		}, noopTransactor{})
-
-		_, err := core.CreateProject(t.Context(), mdl.CreateProject{OrgID: 7, Name: "widgets"})
-		if err == nil {
-			t.Fatal("CreateProject() error = nil, want error")
-		}
-
-		testingx.AssertErrContains(t, err, "db down")
-	})
 }
 
 func TestCore_OrganizationByName(t *testing.T) {
@@ -276,32 +281,37 @@ func TestCore_OrganizationByName(t *testing.T) {
 }
 
 func TestCore_OrganizationByName_error(t *testing.T) {
-	t.Run("not found", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{
-			OrganizationByNameFunc: func(_ context.Context, _ string) (pgorg.Organization, error) {
-				return pgorg.Organization{}, sql.ErrNoRows
-			},
-		}, noopTransactor{})
+	dbErr := errors.New("db error")
 
-		if _, err := core.OrganizationByName(t.Context(), "acme"); !errors.Is(err, mdl.ErrNotFound) {
-			t.Errorf("OrganizationByName() error = %v, want mdl.ErrNotFound", err)
-		}
-	})
+	tests := []struct {
+		name    string
+		mockErr error
+		want    error
+	}{
+		{
+			name:    "not found",
+			mockErr: sql.ErrNoRows,
+			want:    mdl.ErrNotFound,
+		},
+		{
+			name:    "store error",
+			mockErr: dbErr,
+			want:    dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(&MockedOrgStorer{
+				OrganizationByNameFunc: func(_ context.Context, _ string) (pgorg.Organization, error) {
+					return pgorg.Organization{}, tt.mockErr
+				},
+			}, noopTransactor{})
 
-	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{
-			OrganizationByNameFunc: func(_ context.Context, _ string) (pgorg.Organization, error) {
-				return pgorg.Organization{}, errors.New("db down")
-			},
-		}, noopTransactor{})
-
-		_, err := core.OrganizationByName(t.Context(), "acme")
-		if err == nil {
-			t.Fatal("OrganizationByName() error = nil, want error")
-		}
-
-		testingx.AssertErrContains(t, err, "db down")
-	})
+			if _, err := core.OrganizationByName(t.Context(), "acme"); !errors.Is(err, tt.want) {
+				t.Errorf("OrganizationByName() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
 }
 
 func TestCore_ProjectByName(t *testing.T) {
@@ -323,32 +333,37 @@ func TestCore_ProjectByName(t *testing.T) {
 }
 
 func TestCore_ProjectByName_error(t *testing.T) {
-	t.Run("not found", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{
-			ProjectByNameFunc: func(_ context.Context, _ int, _ string) (pgorg.Project, error) {
-				return pgorg.Project{}, sql.ErrNoRows
-			},
-		}, noopTransactor{})
+	dbErr := errors.New("db error")
 
-		if _, err := core.ProjectByName(t.Context(), 7, "control"); !errors.Is(err, mdl.ErrNotFound) {
-			t.Errorf("ProjectByName() error = %v, want mdl.ErrNotFound", err)
-		}
-	})
+	tests := []struct {
+		name    string
+		mockErr error
+		want    error
+	}{
+		{
+			name:    "not found",
+			mockErr: sql.ErrNoRows,
+			want:    mdl.ErrNotFound,
+		},
+		{
+			name:    "store error",
+			mockErr: dbErr,
+			want:    dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(&MockedOrgStorer{
+				ProjectByNameFunc: func(_ context.Context, _ int, _ string) (pgorg.Project, error) {
+					return pgorg.Project{}, tt.mockErr
+				},
+			}, noopTransactor{})
 
-	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{
-			ProjectByNameFunc: func(_ context.Context, _ int, _ string) (pgorg.Project, error) {
-				return pgorg.Project{}, errors.New("db down")
-			},
-		}, noopTransactor{})
-
-		_, err := core.ProjectByName(t.Context(), 7, "control")
-		if err == nil {
-			t.Fatal("ProjectByName() error = nil, want error")
-		}
-
-		testingx.AssertErrContains(t, err, "db down")
-	})
+			if _, err := core.ProjectByName(t.Context(), 7, "control"); !errors.Is(err, tt.want) {
+				t.Errorf("ProjectByName() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
 }
 
 type noopTransactor struct{}

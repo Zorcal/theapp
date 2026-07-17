@@ -142,30 +142,37 @@ func TestCore_UserByID(t *testing.T) {
 }
 
 func TestCore_UserByID_error(t *testing.T) {
-	t.Run("not found", func(t *testing.T) {
-		core := NewCore(&MockedUserStorer{
-			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-				return pguser.User{}, sql.ErrNoRows
-			},
-		})
-		_, err := core.UserByID(t.Context(), uuid.New())
-		if !errors.Is(err, mdl.ErrNotFound) {
-			t.Errorf("UserByID() error = %v, want mdl.ErrNotFound", err)
-		}
-	})
+	dbErr := errors.New("db error")
 
-	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedUserStorer{
-			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-				return pguser.User{}, errors.New("db down")
-			},
+	tests := []struct {
+		name    string
+		mockErr error
+		want    error
+	}{
+		{
+			name:    "not found",
+			mockErr: sql.ErrNoRows,
+			want:    mdl.ErrNotFound,
+		},
+		{
+			name:    "store error",
+			mockErr: dbErr,
+			want:    dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(&MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{}, tt.mockErr
+				},
+			})
+
+			if _, err := core.UserByID(t.Context(), uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("UserByID() error = %v, want %v", err, tt.want)
+			}
 		})
-		_, err := core.UserByID(t.Context(), uuid.New())
-		if err == nil {
-			t.Fatal("UserByID() error = nil, want error")
-		}
-		testingx.AssertErrContains(t, err, "db down")
-	})
+	}
 }
 
 func TestCore_UserByEmail(t *testing.T) {
@@ -237,30 +244,37 @@ func TestCore_UserByEmail(t *testing.T) {
 }
 
 func TestCore_UserByEmail_error(t *testing.T) {
-	t.Run("not found", func(t *testing.T) {
-		core := NewCore(&MockedUserStorer{
-			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
-				return pguser.User{}, sql.ErrNoRows
-			},
-		})
-		_, err := core.UserByEmail(t.Context(), "alice@test.com")
-		if !errors.Is(err, mdl.ErrNotFound) {
-			t.Errorf("UserByEmail() error = %v, want mdl.ErrNotFound", err)
-		}
-	})
+	dbErr := errors.New("db error")
 
-	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedUserStorer{
-			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
-				return pguser.User{}, errors.New("db down")
-			},
+	tests := []struct {
+		name    string
+		mockErr error
+		want    error
+	}{
+		{
+			name:    "not found",
+			mockErr: sql.ErrNoRows,
+			want:    mdl.ErrNotFound,
+		},
+		{
+			name:    "store error",
+			mockErr: dbErr,
+			want:    dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(&MockedUserStorer{
+				UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+					return pguser.User{}, tt.mockErr
+				},
+			})
+
+			if _, err := core.UserByEmail(t.Context(), "alice@test.com"); !errors.Is(err, tt.want) {
+				t.Errorf("UserByEmail() error = %v, want %v", err, tt.want)
+			}
 		})
-		_, err := core.UserByEmail(t.Context(), "alice@test.com")
-		if err == nil {
-			t.Fatal("UserByEmail() error = nil, want error")
-		}
-		testingx.AssertErrContains(t, err, "db down")
-	})
+	}
 }
 
 func TestCore_UpdateUser(t *testing.T) {
@@ -314,39 +328,51 @@ func TestCore_UpdateUser(t *testing.T) {
 }
 
 func TestCore_UpdateUser_error(t *testing.T) {
-	t.Run("invalid input", func(t *testing.T) {
-		core := NewCore(&MockedUserStorer{})
-
-		_, err := core.UpdateUser(t.Context(), mdl.UpdateUser{
-			ID:     uuid.New(),
-			Name:   "",
-			Fields: mdl.UserUpdateFields{Name: true},
-		})
-		if !errors.Is(err, mdl.ErrValidation) {
-			t.Errorf("UpdateUser() error = %v, want mdl.ErrValidation", err)
-		}
-	})
-
-	t.Run("not found", func(t *testing.T) {
-		core := NewCore(&MockedUserStorer{
-			UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
-				return pguser.User{}, sql.ErrNoRows
+	tests := []struct {
+		name       string
+		userStorer *MockedUserStorer
+		in         mdl.UpdateUser
+		want       error
+	}{
+		{
+			name:       "invalid input",
+			userStorer: &MockedUserStorer{},
+			in: mdl.UpdateUser{
+				ID:     uuid.New(),
+				Name:   "",
+				Fields: mdl.UserUpdateFields{Name: true},
 			},
+			want: mdl.ErrValidation,
+		},
+		{
+			name: "not found",
+			userStorer: &MockedUserStorer{
+				UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
+					return pguser.User{}, sql.ErrNoRows
+				},
+			},
+			in: mdl.UpdateUser{
+				ID:     uuid.New(),
+				Name:   "Alice Updated",
+				Fields: mdl.UserUpdateFields{Name: true},
+			},
+			want: mdl.ErrNotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.userStorer)
+
+			if _, err := core.UpdateUser(t.Context(), tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("UpdateUser() error = %v, want %v", err, tt.want)
+			}
 		})
-		_, err := core.UpdateUser(t.Context(), mdl.UpdateUser{
-			ID:     uuid.New(),
-			Name:   "Alice Updated",
-			Fields: mdl.UserUpdateFields{Name: true},
-		})
-		if !errors.Is(err, mdl.ErrNotFound) {
-			t.Errorf("UpdateUser() error = %v, want mdl.ErrNotFound", err)
-		}
-	})
+	}
 
 	t.Run("store error", func(t *testing.T) {
 		core := NewCore(&MockedUserStorer{
 			UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
-				return pguser.User{}, errors.New("db down")
+				return pguser.User{}, errors.New("db error")
 			},
 		})
 		_, err := core.UpdateUser(t.Context(), mdl.UpdateUser{
@@ -357,7 +383,7 @@ func TestCore_UpdateUser_error(t *testing.T) {
 		if err == nil {
 			t.Fatal("UpdateUser() error = nil, want error")
 		}
-		testingx.AssertErrContains(t, err, "update user", "db down")
+		testingx.AssertErrContains(t, err, "update user", "db error")
 	})
 }
 
@@ -441,38 +467,50 @@ func TestCore_CreateUser_error(t *testing.T) {
 		Name:  "Alice Smith",
 	}
 
-	t.Run("invalid input", func(t *testing.T) {
-		core := NewCore(&MockedUserStorer{})
-
-		_, err := core.CreateUser(t.Context(), mdl.CreateUser{Email: "", Name: "Alice Smith"})
-		if !errors.Is(err, mdl.ErrValidation) {
-			t.Errorf("CreateUser() error = %v, want mdl.ErrValidation", err)
-		}
-	})
-
-	t.Run("duplicate email", func(t *testing.T) {
-		core := NewCore(&MockedUserStorer{
-			CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
-				return pguser.User{}, pgdb.ErrAlreadyExists
+	tests := []struct {
+		name       string
+		userStorer *MockedUserStorer
+		in         mdl.CreateUser
+		want       error
+	}{
+		{
+			name:       "invalid input",
+			userStorer: &MockedUserStorer{},
+			in:         mdl.CreateUser{Email: "", Name: "Alice Smith"},
+			want:       mdl.ErrValidation,
+		},
+		{
+			name: "duplicate email",
+			userStorer: &MockedUserStorer{
+				CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
+					return pguser.User{}, pgdb.ErrAlreadyExists
+				},
 			},
+			in:   in,
+			want: mdl.ErrAlreadyExists,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.userStorer)
+
+			if _, err := core.CreateUser(t.Context(), tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("CreateUser() error = %v, want %v", err, tt.want)
+			}
 		})
-		_, err := core.CreateUser(t.Context(), in)
-		if !errors.Is(err, mdl.ErrAlreadyExists) {
-			t.Errorf("CreateUser() error = %v, want mdl.ErrAlreadyExists", err)
-		}
-	})
+	}
 
 	t.Run("store error", func(t *testing.T) {
 		core := NewCore(&MockedUserStorer{
 			CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
-				return pguser.User{}, errors.New("db down")
+				return pguser.User{}, errors.New("db error")
 			},
 		})
 		_, err := core.CreateUser(t.Context(), in)
 		if err == nil {
 			t.Fatalf("CreateUser() error = nil, want error")
 		}
-		testingx.AssertErrContains(t, err, "create user", "db down")
+		testingx.AssertErrContains(t, err, "create user", "db error")
 	})
 }
 
@@ -571,13 +609,13 @@ func TestCore_Users_error(t *testing.T) {
 			name: "query users error",
 			userStorer: &MockedUserStorer{
 				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
-					return nil, errors.New("db down")
+					return nil, errors.New("db error")
 				},
 				UserCountFunc: func(_ context.Context, _ pguser.Filter) (int, error) {
 					return 0, nil
 				},
 			},
-			wantErrStrs: []string{"query users", "db down"},
+			wantErrStrs: []string{"query users", "db error"},
 		},
 		{
 			name: "user count error",
@@ -586,10 +624,10 @@ func TestCore_Users_error(t *testing.T) {
 					return nil, nil
 				},
 				UserCountFunc: func(_ context.Context, _ pguser.Filter) (int, error) {
-					return 0, errors.New("db down")
+					return 0, errors.New("db error")
 				},
 			},
-			wantErrStrs: []string{"user count", "db down"},
+			wantErrStrs: []string{"user count", "db error"},
 		},
 	}
 	for _, tt := range tests {

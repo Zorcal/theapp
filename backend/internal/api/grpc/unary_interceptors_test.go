@@ -123,7 +123,7 @@ func TestAuthInterceptor_unauthenticated(t *testing.T) {
 }
 
 func TestScopedWorkflowID_deterministic(t *testing.T) {
-	ctx := mdl.ContextWithAuthUser(t.Context(), mdl.AuthUser{UserID: uuid.New()})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}})
 	method := "/theapp.v1.AuthService/RequestMagicLink"
 	payload := []byte("payload")
 	key := uuid.NewString()
@@ -146,7 +146,7 @@ func TestScopedWorkflowID_scoping(t *testing.T) {
 	basePayload := []byte("payload-a")
 	baseKey := uuid.NewString()
 
-	base, err := scopedWorkflowID(mdl.ContextWithAuthUser(t.Context(), mdl.AuthUser{UserID: baseUserID}), baseMethod, basePayload, baseKey)
+	base, err := scopedWorkflowID(mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: baseUserID}}), baseMethod, basePayload, baseKey)
 	if err != nil {
 		t.Fatalf("scopedWorkflowID() error = %v, want nil", err)
 	}
@@ -199,7 +199,7 @@ func TestScopedWorkflowID_scoping(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			if !tt.unauthed {
-				ctx = mdl.ContextWithAuthUser(ctx, mdl.AuthUser{UserID: tt.userID})
+				ctx = mdl.ContextWithAuthSession(ctx, mdl.AuthSession{User: mdl.AuthUser{UserID: tt.userID}})
 			}
 
 			got, err := scopedWorkflowID(ctx, tt.method, tt.payload, tt.key)
@@ -298,6 +298,8 @@ func TestPermissionRegistry_exhaustiveness(t *testing.T) {
 }
 
 func TestAuthUnaryInterceptor_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
 	handler := func(ctx context.Context, _ any) (any, error) {
 		return "handler ran", nil
 	}
@@ -319,34 +321,116 @@ func TestAuthUnaryInterceptor_error(t *testing.T) {
 		return metadata.NewIncomingContext(t.Context(), metadata.Pairs("authorization", "Bearer "+token))
 	}
 
+	withProjectID := func(ctx context.Context, id string) context.Context {
+		md, _ := metadata.FromIncomingContext(ctx)
+		md = md.Copy()
+		md.Set("x-project-id", id)
+		return metadata.NewIncomingContext(ctx, md)
+	}
+
 	t.Run("caller no longer exists", func(t *testing.T) {
 		authCore := &MockedAuthCore{
-			AuthUserFunc: func(_ context.Context, _ uuid.UUID) (mdl.AuthUser, error) {
-				return mdl.AuthUser{}, mdl.ErrNotFound
+			AuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ *int) (mdl.AuthSession, error) {
+				return mdl.AuthSession{}, mdl.ErrNotFound
 			},
 		}
 		interceptor := authUnaryInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, authCore)
 
-		_, err := interceptor(validCtx(t), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
-		if got, want := status.Code(err), codes.Unauthenticated; got != want {
-			t.Errorf("authUnaryInterceptor() code = %v, want %v", got, want)
+		tests := []struct {
+			name       string
+			ctx        context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+			fullMethod string
+		}{
+			{
+				name:       "no-project method",
+				ctx:        validCtx(t),
+				fullMethod: "/theapp.v1.UserService/GetUser",
+			},
+			{
+				name:       "project-scoped method",
+				ctx:        withProjectID(validCtx(t), "1"),
+				fullMethod: "/theapp.v1.ExampleService/ExampleMethod",
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				_, err := interceptor(tt.ctx, nil, &grpc.UnaryServerInfo{FullMethod: tt.fullMethod}, handler)
+				if got, want := status.Code(err), codes.Unauthenticated; got != want {
+					t.Errorf("authUnaryInterceptor() code = %v, want %v", got, want)
+				}
+			})
 		}
 	})
 
-	t.Run("resolve auth user store error", func(t *testing.T) {
+	t.Run("resolve auth session store error", func(t *testing.T) {
 		authCore := &MockedAuthCore{
-			AuthUserFunc: func(_ context.Context, _ uuid.UUID) (mdl.AuthUser, error) {
-				return mdl.AuthUser{}, errors.New("db down")
+			AuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ *int) (mdl.AuthSession, error) {
+				return mdl.AuthSession{}, dbErr
 			},
 		}
 		interceptor := authUnaryInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, authCore)
 
-		_, err := interceptor(validCtx(t), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
-		if err == nil {
-			t.Fatal("authUnaryInterceptor() error = nil, want error")
+		tests := []struct {
+			name       string
+			ctx        context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+			fullMethod string
+		}{
+			{
+				name:       "no-project method",
+				ctx:        validCtx(t),
+				fullMethod: "/theapp.v1.UserService/GetUser",
+			},
+			{
+				name:       "project-scoped method",
+				ctx:        withProjectID(validCtx(t), "1"),
+				fullMethod: "/theapp.v1.ExampleService/ExampleMethod",
+			},
 		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if _, err := interceptor(tt.ctx, nil, &grpc.UnaryServerInfo{FullMethod: tt.fullMethod}, handler); !errors.Is(err, dbErr) {
+					t.Errorf("authUnaryInterceptor() error = %v, want %v", err, dbErr)
+				}
+			})
+		}
+	})
 
-		testingx.AssertErrContains(t, err, "db down")
+	t.Run("malformed project id", func(t *testing.T) {
+		interceptor := authUnaryInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, &MockedAuthCore{})
+
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "missing project id header",
+				ctx:  validCtx(t),
+			},
+			{
+				name: "empty project id value",
+				ctx:  withProjectID(validCtx(t), ""),
+			},
+			{
+				name: "non-numeric project id",
+				ctx:  withProjectID(validCtx(t), "abc"),
+			},
+			{
+				name: "zero project id",
+				ctx:  withProjectID(validCtx(t), "0"),
+			},
+			{
+				name: "negative project id",
+				ctx:  withProjectID(validCtx(t), "-5"),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				_, err := interceptor(tt.ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.ExampleService/ExampleMethod"}, handler)
+				if got, want := status.Code(err), codes.InvalidArgument; got != want {
+					t.Errorf("authUnaryInterceptor() code = %v, want %v", got, want)
+				}
+			})
+		}
 	})
 }
 
@@ -358,34 +442,42 @@ func TestPermissionUnaryInterceptor(t *testing.T) {
 
 		interceptor := permissionUnaryInterceptor()
 
-		// No mdl.AuthUser in ctx at all — a public method must not require one.
+		// No auth user in ctx at all — a public method must not require one.
 		got, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.AuthService/RequestMagicLink"}, handler)
 		if err != nil {
 			t.Fatalf("permissionUnaryInterceptor() error = %v, want nil", err)
 		}
+
 		testingx.AssertDiff(t, got, "handler ran")
 	})
 
 	t.Run("permission granted", func(t *testing.T) {
 		handler := func(ctx context.Context, _ any) (any, error) {
-			u, ok := mdl.AuthUserFromContext(ctx)
+			sess, ok := mdl.AuthSessionFromContext(ctx)
 			if !ok {
-				return nil, errors.New("no auth user in context")
+				return nil, errors.New("no auth session in context")
 			}
-			return u, nil
+			return sess, nil
 		}
 
-		want := mdl.AuthUser{UserID: uuid.New(), Permissions: []mdl.Permission{mdl.PermissionUserRead}}
+		want := mdl.AuthSession{
+			User: mdl.AuthUser{
+				UserID:      uuid.New(),
+				Permissions: []mdl.Permission{mdl.PermissionUserRead},
+			},
+			ProjectID: new(1),
+		}
 		interceptor := permissionUnaryInterceptor()
 
-		ctx := mdl.ContextWithAuthUser(t.Context(), want)
+		ctx := mdl.ContextWithAuthSession(t.Context(), want)
 		resp, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
 		if err != nil {
 			t.Fatalf("permissionUnaryInterceptor() error = %v, want nil", err)
 		}
-		got, ok := resp.(mdl.AuthUser)
+
+		got, ok := resp.(mdl.AuthSession)
 		if !ok {
-			t.Fatalf("permissionUnaryInterceptor() response = %T, want mdl.AuthUser", resp)
+			t.Fatalf("permissionUnaryInterceptor() response = %T, want mdl.AuthSession", resp)
 		}
 
 		testingx.AssertDiff(t, got, want)
@@ -411,7 +503,7 @@ func TestPermissionUnaryInterceptor_error(t *testing.T) {
 		},
 		{
 			name:   "missing permission",
-			ctx:    mdl.ContextWithAuthUser(t.Context(), mdl.AuthUser{UserID: uuid.New()}),
+			ctx:    mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}),
 			method: "/theapp.v1.UserService/GetUser",
 			want:   codes.PermissionDenied,
 		},
@@ -430,112 +522,15 @@ func TestPermissionUnaryInterceptor_error(t *testing.T) {
 	t.Run("unregistered method", func(t *testing.T) {
 		interceptor := permissionUnaryInterceptor()
 
-		ctx := mdl.ContextWithAuthUser(t.Context(), mdl.AuthUser{UserID: uuid.New()})
+		ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}})
 		_, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/NoSuchMethod"}, handler)
 		if err == nil {
 			t.Fatal("permissionUnaryInterceptor() error = nil, want error")
 		}
 
+		// An unregistered method is considered an internal server error and those are caught by the error interceptor.
 		if _, ok := status.FromError(err); ok {
 			t.Errorf("permissionUnaryInterceptor() error = %v, want a plain error, not a gRPC status error", err)
 		}
 	})
-}
-
-func TestProjectUnaryInterceptor(t *testing.T) {
-	t.Run("public method bypasses check", func(t *testing.T) {
-		handler := func(ctx context.Context, _ any) (any, error) {
-			return "handler ran", nil
-		}
-
-		interceptor := projectUnaryInterceptor()
-
-		// No x-project-id metadata at all — a public method must not require one.
-		got, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.AuthService/RequestMagicLink"}, handler)
-		if err != nil {
-			t.Fatalf("projectUnaryInterceptor() error = %v, want nil", err)
-		}
-		testingx.AssertDiff(t, got, "handler ran")
-	})
-
-	t.Run("no-project method bypasses check", func(t *testing.T) {
-		handler := func(ctx context.Context, _ any) (any, error) {
-			return "handler ran", nil
-		}
-
-		interceptor := projectUnaryInterceptor()
-
-		// No x-project-id metadata at all — a noProjectMethods entry must not require one.
-		got, err := interceptor(t.Context(), nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.AuthService/RevokeAllSessions"}, handler)
-		if err != nil {
-			t.Fatalf("projectUnaryInterceptor() error = %v, want nil", err)
-		}
-		testingx.AssertDiff(t, got, "handler ran")
-	})
-
-	t.Run("project id attached to context", func(t *testing.T) {
-		handler := func(ctx context.Context, _ any) (any, error) {
-			id, ok := projectIDFromContext(ctx)
-			if !ok {
-				return nil, errors.New("no project id in context")
-			}
-			return id, nil
-		}
-
-		interceptor := projectUnaryInterceptor()
-
-		ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "7"))
-		resp, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
-		if err != nil {
-			t.Fatalf("projectUnaryInterceptor() error = %v, want nil", err)
-		}
-
-		testingx.AssertDiff(t, resp, 7)
-	})
-}
-
-func TestProjectUnaryInterceptor_error(t *testing.T) {
-	handler := func(ctx context.Context, _ any) (any, error) {
-		return "handler ran", nil
-	}
-
-	tests := []struct {
-		name string
-		ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
-	}{
-		{
-			name: "missing metadata",
-			ctx:  t.Context(),
-		},
-		{
-			name: "missing project id header",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs()),
-		},
-		{
-			name: "empty project id value",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "")),
-		},
-		{
-			name: "non-numeric project id",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "abc")),
-		},
-		{
-			name: "zero project id",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "0")),
-		},
-		{
-			name: "negative project id",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "-5")),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			interceptor := projectUnaryInterceptor()
-
-			_, err := interceptor(tt.ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
-			if got, want := status.Code(err), codes.InvalidArgument; got != want {
-				t.Errorf("projectUnaryInterceptor() code = %v, want %v", got, want)
-			}
-		})
-	}
 }

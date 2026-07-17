@@ -385,8 +385,8 @@ func TestAuthService_RevokeAllSessions(t *testing.T) {
 		Log: testingx.NewLogger(t),
 		AuthCore: &MockedAuthCore{
 			RevokeAllUserRefreshTokensFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
-			AuthUserFunc: func(_ context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
-				return mdl.AuthUser{UserID: userID}, nil
+			AuthSessionFunc: func(_ context.Context, userID uuid.UUID, _ *int) (mdl.AuthSession, error) {
+				return mdl.AuthSession{User: mdl.AuthUser{UserID: userID}}, nil
 			},
 		},
 	})
@@ -414,8 +414,8 @@ func TestAuthService_RevokeAllSessions_error(t *testing.T) {
 				RevokeAllUserRefreshTokensFunc: func(_ context.Context, _ uuid.UUID) error {
 					return errors.New("boom")
 				},
-				AuthUserFunc: func(_ context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
-					return mdl.AuthUser{UserID: userID}, nil
+				AuthSessionFunc: func(_ context.Context, userID uuid.UUID, _ *int) (mdl.AuthSession, error) {
+					return mdl.AuthSession{User: mdl.AuthUser{UserID: userID}}, nil
 				},
 			},
 			ctxFunc: func(t *testing.T) context.Context {

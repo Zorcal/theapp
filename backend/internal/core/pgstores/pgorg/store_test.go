@@ -175,7 +175,7 @@ func TestStore_OrganizationByName_error(t *testing.T) {
 	}
 }
 
-func TestStore_ProjectByName(t *testing.T) {
+func TestStore_ProjectByID(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	orgStore := NewStore(pool)
@@ -183,12 +183,55 @@ func TestStore_ProjectByName(t *testing.T) {
 	org := seedOrg(t, orgStore, "acme")
 	seeded := seedProject(t, orgStore, org.ID, "widgets")
 
-	got, err := orgStore.ProjectByName(ctx, org.ID, "widgets")
+	got, err := orgStore.ProjectByID(ctx, seeded.ID)
 	if err != nil {
-		t.Fatalf("ProjectByName() error = %v", err)
+		t.Fatalf("ProjectByID() error = %v", err)
 	}
 
 	testingx.AssertDiff(t, got, seeded)
+}
+
+func TestStore_ProjectByID_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := NewStore(pool)
+
+	if _, err := orgStore.ProjectByID(ctx, 999999); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("ProjectByID() error = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestStore_ProjectByName(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+	}{
+		{
+			name: "exact case",
+			in:   "widgets",
+		},
+		{
+			name: "different case",
+			in:   "WIDGETS",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			pool := pgtest.New(t, ctx)
+			orgStore := NewStore(pool)
+
+			org := seedOrg(t, orgStore, "acme")
+			seeded := seedProject(t, orgStore, org.ID, "widgets")
+
+			got, err := orgStore.ProjectByName(ctx, org.ID, tt.in)
+			if err != nil {
+				t.Fatalf("ProjectByName(%q) error = %v", tt.in, err)
+			}
+
+			testingx.AssertDiff(t, got, seeded)
+		})
+	}
 }
 
 func TestStore_ProjectByName_error(t *testing.T) {

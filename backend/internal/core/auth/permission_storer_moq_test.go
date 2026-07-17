@@ -6,6 +6,8 @@ package auth
 import (
 	"context"
 	"sync"
+
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 )
 
 // Ensure, that MockedPermissionStorer does implement PermissionStorer.
@@ -18,6 +20,9 @@ var _ PermissionStorer = &MockedPermissionStorer{}
 //
 //		// make and configure a mocked PermissionStorer
 //		mockedPermissionStorer := &MockedPermissionStorer{
+//			ProjectPermissionsFunc: func(ctx context.Context, userID int, projectID int) (pgrbac.ProjectPermissions, error) {
+//				panic("mock out the ProjectPermissions method")
+//			},
 //			SystemPermissionsFunc: func(ctx context.Context, userID int) ([]string, error) {
 //				panic("mock out the SystemPermissions method")
 //			},
@@ -28,11 +33,23 @@ var _ PermissionStorer = &MockedPermissionStorer{}
 //
 //	}
 type MockedPermissionStorer struct {
+	// ProjectPermissionsFunc mocks the ProjectPermissions method.
+	ProjectPermissionsFunc func(ctx context.Context, userID int, projectID int) (pgrbac.ProjectPermissions, error)
+
 	// SystemPermissionsFunc mocks the SystemPermissions method.
 	SystemPermissionsFunc func(ctx context.Context, userID int) ([]string, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// ProjectPermissions holds details about calls to the ProjectPermissions method.
+		ProjectPermissions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID int
+			// ProjectID is the projectID argument value.
+			ProjectID int
+		}
 		// SystemPermissions holds details about calls to the SystemPermissions method.
 		SystemPermissions []struct {
 			// Ctx is the ctx argument value.
@@ -41,7 +58,48 @@ type MockedPermissionStorer struct {
 			UserID int
 		}
 	}
-	lockSystemPermissions sync.RWMutex
+	lockProjectPermissions sync.RWMutex
+	lockSystemPermissions  sync.RWMutex
+}
+
+// ProjectPermissions calls ProjectPermissionsFunc.
+func (mock *MockedPermissionStorer) ProjectPermissions(ctx context.Context, userID int, projectID int) (pgrbac.ProjectPermissions, error) {
+	if mock.ProjectPermissionsFunc == nil {
+		panic("MockedPermissionStorer.ProjectPermissionsFunc: method is nil but PermissionStorer.ProjectPermissions was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		UserID    int
+		ProjectID int
+	}{
+		Ctx:       ctx,
+		UserID:    userID,
+		ProjectID: projectID,
+	}
+	mock.lockProjectPermissions.Lock()
+	mock.calls.ProjectPermissions = append(mock.calls.ProjectPermissions, callInfo)
+	mock.lockProjectPermissions.Unlock()
+	return mock.ProjectPermissionsFunc(ctx, userID, projectID)
+}
+
+// ProjectPermissionsCalls gets all the calls that were made to ProjectPermissions.
+// Check the length with:
+//
+//	len(mockedPermissionStorer.ProjectPermissionsCalls())
+func (mock *MockedPermissionStorer) ProjectPermissionsCalls() []struct {
+	Ctx       context.Context
+	UserID    int
+	ProjectID int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		UserID    int
+		ProjectID int
+	}
+	mock.lockProjectPermissions.RLock()
+	calls = mock.calls.ProjectPermissions
+	mock.lockProjectPermissions.RUnlock()
+	return calls
 }
 
 // SystemPermissions calls SystemPermissionsFunc.

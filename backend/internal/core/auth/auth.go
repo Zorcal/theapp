@@ -19,6 +19,7 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 )
 
@@ -74,9 +75,13 @@ type UserStorer interface {
 
 // PermissionStorer defines the permission database operations required by Core.
 type PermissionStorer interface {
-	// SystemPermissions returns the names of the permissions granted to userID through
-	// system-scope role assignments.
+	// SystemPermissions returns the names of the permissions userID holds through system-scope role
+	// assignments only.
 	SystemPermissions(ctx context.Context, userID int) ([]string, error)
+	// ProjectPermissions returns projectID's org and the names of the permissions userID holds for
+	// projectID, resolved from project-, org-, and system-scope role assignments.
+	// Returns [sql.ErrNoRows] if no such project exists.
+	ProjectPermissions(ctx context.Context, userID, projectID int) (pgrbac.ProjectPermissions, error)
 }
 
 // Config holds tunables for Core.
@@ -284,26 +289,53 @@ func (c *Core) RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uu
 	return nil
 }
 
-// AuthUser resolves userID's identity and the permissions it holds through system-scope role
-// assignments.
-// Returns [mdl.ErrNotFound] if no user with that ID exists.
-func (c *Core) AuthUser(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
+// AuthSession resolves userID's identity and its permissions. When projectID is non-nil, the
+// permissions are resolved from project-, org-, and system-scope role assignments for that
+// project, and the returned session's ProjectID and OrgID are both set; when projectID is nil,
+// the permissions are resolved from system-scope role assignments only, and ProjectID/OrgID are
+// both left nil.
+// Returns [mdl.ErrNotFound] if no user with that ID exists, or if projectID is non-nil and does
+// not match any project.
+// A user with no role assignment relevant to projectID is not an error: the session resolves with
+// an empty (or system-scope-only) permission set, which permission-checking code rejects on its own.
+func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
 	u, err := c.userStorer.UserByExternalID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return mdl.AuthUser{}, mdl.ErrNotFound
+			return mdl.AuthSession{}, mdl.ErrNotFound
 		}
-		return mdl.AuthUser{}, fmt.Errorf("user by external id: %w", err)
+		return mdl.AuthSession{}, fmt.Errorf("user by external id: %w", err)
 	}
 
-	systemPerms, err := c.permissionStorer.SystemPermissions(ctx, u.ID)
+	if projectID == nil {
+		perms, err := c.permissionStorer.SystemPermissions(ctx, u.ID)
+		if err != nil {
+			return mdl.AuthSession{}, fmt.Errorf("system permissions: %w", err)
+		}
+
+		return mdl.AuthSession{
+			User: mdl.AuthUser{
+				UserID:      userID,
+				Permissions: permissionsFromPg(perms),
+			},
+		}, nil
+	}
+
+	perms, err := c.permissionStorer.ProjectPermissions(ctx, u.ID, *projectID)
 	if err != nil {
-		return mdl.AuthUser{}, fmt.Errorf("system permissions: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthSession{}, mdl.ErrNotFound
+		}
+		return mdl.AuthSession{}, fmt.Errorf("project permissions: %w", err)
 	}
 
-	return mdl.AuthUser{
-		UserID:      userID,
-		Permissions: permissionsFromPg(systemPerms),
+	return mdl.AuthSession{
+		User: mdl.AuthUser{
+			UserID:      userID,
+			Permissions: permissionsFromPg(perms.PermissionNames),
+		},
+		ProjectID: projectID,
+		OrgID:     &perms.OrgID,
 	}, nil
 }
 

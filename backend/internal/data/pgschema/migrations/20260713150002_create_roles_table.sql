@@ -3,6 +3,8 @@ CREATE TABLE rbac.roles (
     id SERIAL PRIMARY KEY
     , name TEXT UNIQUE NOT NULL
     , is_static BOOLEAN NOT NULL
+    -- Nullable: only static roles have no owning organization.
+    , org_id INTEGER REFERENCES org.organizations (id)
     , created_at TIMESTAMPTZ NOT NULL
     , updated_at TIMESTAMPTZ
 );

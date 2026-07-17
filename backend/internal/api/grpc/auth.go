@@ -42,9 +42,11 @@ type AuthCore interface {
 	RevokeRefreshToken(ctx context.Context, rt mdl.RefreshToken) error
 	// RevokeAllUserRefreshTokens revokes all active refresh tokens for the user.
 	RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uuid.UUID) error
-	// AuthUser resolves userID's identity and the permissions it holds.
-	// Returns [mdl.ErrNotFound] if no user with that ID exists.
-	AuthUser(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error)
+	// AuthSession resolves userID's identity and its permissions, scoped to projectID when
+	// non-nil, or to system-scope role assignments only when nil.
+	// Returns [mdl.ErrNotFound] if no user with that ID exists, or if projectID is non-nil and
+	// does not match any project.
+	AuthSession(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error)
 }
 
 //go:generate moq -rm -fmt goimports -out workflow_auth_core_moq_test.go . WorkflowAuthCore:MockedWorkflowAuthCore
@@ -128,12 +130,12 @@ func (s *authService) RevokeRefreshToken(ctx context.Context, req *pb.RevokeRefr
 }
 
 func (s *authService) RevokeAllSessions(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
-	authUser, ok := mdl.AuthUserFromContext(ctx)
+	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "unauthenticated")
 	}
 
-	if err := s.authCore.RevokeAllUserRefreshTokens(ctx, authUser.UserID); err != nil {
+	if err := s.authCore.RevokeAllUserRefreshTokens(ctx, sess.User.UserID); err != nil {
 		return nil, fmt.Errorf("revoke all sessions: %w", err)
 	}
 

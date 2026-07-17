@@ -21,8 +21,8 @@ var _ AuthCore = &MockedAuthCore{}
 //
 //		// make and configure a mocked AuthCore
 //		mockedAuthCore := &MockedAuthCore{
-//			AuthUserFunc: func(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
-//				panic("mock out the AuthUser method")
+//			AuthSessionFunc: func(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+//				panic("mock out the AuthSession method")
 //			},
 //			RefreshAccessTokenFunc: func(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 //				panic("mock out the RefreshAccessToken method")
@@ -43,8 +43,8 @@ var _ AuthCore = &MockedAuthCore{}
 //
 //	}
 type MockedAuthCore struct {
-	// AuthUserFunc mocks the AuthUser method.
-	AuthUserFunc func(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error)
+	// AuthSessionFunc mocks the AuthSession method.
+	AuthSessionFunc func(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error)
 
 	// RefreshAccessTokenFunc mocks the RefreshAccessToken method.
 	RefreshAccessTokenFunc func(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error)
@@ -60,12 +60,14 @@ type MockedAuthCore struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// AuthUser holds details about calls to the AuthUser method.
-		AuthUser []struct {
+		// AuthSession holds details about calls to the AuthSession method.
+		AuthSession []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// UserID is the userID argument value.
 			UserID uuid.UUID
+			// ProjectID is the projectID argument value.
+			ProjectID *int
 		}
 		// RefreshAccessToken holds details about calls to the RefreshAccessToken method.
 		RefreshAccessToken []struct {
@@ -96,46 +98,50 @@ type MockedAuthCore struct {
 			Vml mdl.VerifyMagicLink
 		}
 	}
-	lockAuthUser                   sync.RWMutex
+	lockAuthSession                sync.RWMutex
 	lockRefreshAccessToken         sync.RWMutex
 	lockRevokeAllUserRefreshTokens sync.RWMutex
 	lockRevokeRefreshToken         sync.RWMutex
 	lockVerifyMagicLink            sync.RWMutex
 }
 
-// AuthUser calls AuthUserFunc.
-func (mock *MockedAuthCore) AuthUser(ctx context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
-	if mock.AuthUserFunc == nil {
-		panic("MockedAuthCore.AuthUserFunc: method is nil but AuthCore.AuthUser was just called")
+// AuthSession calls AuthSessionFunc.
+func (mock *MockedAuthCore) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+	if mock.AuthSessionFunc == nil {
+		panic("MockedAuthCore.AuthSessionFunc: method is nil but AuthCore.AuthSession was just called")
 	}
 	callInfo := struct {
-		Ctx    context.Context
-		UserID uuid.UUID
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID *int
 	}{
-		Ctx:    ctx,
-		UserID: userID,
+		Ctx:       ctx,
+		UserID:    userID,
+		ProjectID: projectID,
 	}
-	mock.lockAuthUser.Lock()
-	mock.calls.AuthUser = append(mock.calls.AuthUser, callInfo)
-	mock.lockAuthUser.Unlock()
-	return mock.AuthUserFunc(ctx, userID)
+	mock.lockAuthSession.Lock()
+	mock.calls.AuthSession = append(mock.calls.AuthSession, callInfo)
+	mock.lockAuthSession.Unlock()
+	return mock.AuthSessionFunc(ctx, userID, projectID)
 }
 
-// AuthUserCalls gets all the calls that were made to AuthUser.
+// AuthSessionCalls gets all the calls that were made to AuthSession.
 // Check the length with:
 //
-//	len(mockedAuthCore.AuthUserCalls())
-func (mock *MockedAuthCore) AuthUserCalls() []struct {
-	Ctx    context.Context
-	UserID uuid.UUID
+//	len(mockedAuthCore.AuthSessionCalls())
+func (mock *MockedAuthCore) AuthSessionCalls() []struct {
+	Ctx       context.Context
+	UserID    uuid.UUID
+	ProjectID *int
 } {
 	var calls []struct {
-		Ctx    context.Context
-		UserID uuid.UUID
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID *int
 	}
-	mock.lockAuthUser.RLock()
-	calls = mock.calls.AuthUser
-	mock.lockAuthUser.RUnlock()
+	mock.lockAuthSession.RLock()
+	calls = mock.calls.AuthSession
+	mock.lockAuthSession.RUnlock()
 	return calls
 }
 

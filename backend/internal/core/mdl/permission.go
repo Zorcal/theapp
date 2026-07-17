@@ -1,11 +1,13 @@
 package mdl
 
+// The full set of permissions defined by the system. Every protected endpoint's required permissions are drawn from
+// this list. This list and AllPermissions below must stay in sync with what's seeded into the database.
+
 // Permission is a single named capability an endpoint can require the caller to hold.
 type Permission string
 
-// The full set of permissions defined by the system. Every protected endpoint's required permissions are drawn from
-// this list. This list and AllPermissions below must stay in sync with what's seeded into the database — see
-// internal/core/rbac/README.md.
+// All user service permissions. User permissions are system-wide rather than project- or org-scoped — they can only be
+// granted through a system-scope role assignment.
 const (
 	PermissionUserRead   Permission = "user:read"
 	PermissionUserCreate Permission = "user:create"

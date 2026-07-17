@@ -80,7 +80,6 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			errorUnaryInterceptor(cfg.Log),
 			recoveryUnaryInterceptor(),
 			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
-			projectUnaryInterceptor(),
 			permissionUnaryInterceptor(),
 			idempotencyUnaryInterceptor(),
 		),
@@ -89,7 +88,6 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			errorStreamInterceptor(cfg.Log),
 			recoveryStreamInterceptor(),
 			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
-			projectStreamInterceptor(),
 			permissionStreamInterceptor(),
 		),
 	)

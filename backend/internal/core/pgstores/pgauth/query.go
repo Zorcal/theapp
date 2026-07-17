@@ -28,7 +28,7 @@ func createMagicLinkTokenQuery(cm CreateMagicLinkToken) pgdb.TypedQuery[MagicLin
 		)
 		SELECT ins.id, ins.user_id, u.external_id AS user_external_id, ins.expires_at, ins.created_at
 		FROM ins
-		JOIN useraccess.users u ON u.id = ins.user_id`
+		JOIN useraccess.users AS u ON u.id = ins.user_id`
 
 	return pgdb.TypedQuery[MagicLinkToken]{
 		SQL:    sql,
@@ -42,8 +42,8 @@ func magicLinkTokenByHashQuery(hash string) pgdb.TypedQuery[MagicLinkToken] {
 	params := pgx.NamedArgs{"token_hash": hash}
 	const sql = `
 		SELECT mlt.id, mlt.user_id, u.external_id AS user_external_id, mlt.expires_at, mlt.created_at
-		FROM useraccess.magic_link_tokens mlt
-		JOIN useraccess.users u ON u.id = mlt.user_id
+		FROM useraccess.magic_link_tokens AS mlt
+		JOIN useraccess.users AS u ON u.id = mlt.user_id
 		WHERE mlt.token_hash = @token_hash
 		  AND mlt.used_at IS NULL
 		  AND mlt.expires_at > NOW()`
@@ -136,7 +136,7 @@ func createRefreshTokenQuery(cr CreateRefreshToken) pgdb.TypedQuery[RefreshToken
 		)
 		SELECT ins.id, ins.user_id, u.external_id AS user_external_id, ins.expires_at, ins.created_at
 		FROM ins
-		JOIN useraccess.users u ON u.id = ins.user_id`
+		JOIN useraccess.users AS u ON u.id = ins.user_id`
 
 	return pgdb.TypedQuery[RefreshToken]{
 		SQL:    sql,
@@ -153,9 +153,9 @@ func consumeRefreshTokenQuery(hash string) pgdb.TypedQuery[RefreshToken] {
 	// serializes the writes at the row level so exactly one succeeds and gets the RETURNING row —
 	// the other gets zero rows (sql.ErrNoRows) without triggering false reuse detection.
 	const sql = `
-		UPDATE useraccess.refresh_tokens rt
+		UPDATE useraccess.refresh_tokens AS rt
 		SET revoked_at = NOW()
-		FROM useraccess.users u
+		FROM useraccess.users AS u
 		WHERE rt.token_hash = @token_hash
 		  AND rt.revoked_at IS NULL
 		  AND rt.expires_at > NOW()
@@ -173,9 +173,9 @@ func consumeRefreshTokenQuery(hash string) pgdb.TypedQuery[RefreshToken] {
 func revokeAllUserRefreshTokensQuery(userExternalID uuid.UUID) pgdb.TypedQuery[int] {
 	params := pgx.NamedArgs{"external_id": userExternalID}
 	const sql = `
-		UPDATE useraccess.refresh_tokens rt
+		UPDATE useraccess.refresh_tokens AS rt
 		SET revoked_at = NOW()
-		FROM useraccess.users u
+		FROM useraccess.users AS u
 		WHERE u.external_id = @external_id
 		  AND rt.user_id = u.id
 		  AND rt.revoked_at IS NULL

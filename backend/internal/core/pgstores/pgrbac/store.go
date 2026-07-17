@@ -39,8 +39,8 @@ func (s *Store) Roles(ctx context.Context) ([]Role, error) {
 	return roles, nil
 }
 
-// SystemPermissions returns the names of the permissions granted to userID through system-scope
-// role assignments.
+// SystemPermissions returns the names of the permissions userID holds through system-scope role
+// assignments only.
 func (s *Store) SystemPermissions(ctx context.Context, userID int) ([]string, error) {
 	var names []string
 
@@ -58,6 +58,28 @@ func (s *Store) SystemPermissions(ctx context.Context, userID int) ([]string, er
 	}
 
 	return names, nil
+}
+
+// ProjectPermissions returns projectID's org and the names of the permissions userID holds for
+// projectID, resolved from project-, org-, and system-scope role assignments.
+// Returns [sql.ErrNoRows] if no such project exists.
+func (s *Store) ProjectPermissions(ctx context.Context, userID, projectID int) (ProjectPermissions, error) {
+	var perms ProjectPermissions
+
+	q := projectPermissionsQuery(userID, projectID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &perms); err != nil {
+			return fmt.Errorf("project permissions: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return ProjectPermissions{}, err
+	}
+
+	return perms, nil
 }
 
 // AssignSystemRole grants userID the role named roleName at system scope.

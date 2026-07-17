@@ -62,8 +62,14 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 
 	if cfg.AuthCore == nil {
 		cfg.AuthCore = &MockedAuthCore{
-			AuthUserFunc: func(_ context.Context, userID uuid.UUID) (mdl.AuthUser, error) {
-				return mdl.AuthUser{UserID: userID, Permissions: mdl.AllPermissions}, nil
+			AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+				return mdl.AuthSession{
+					User: mdl.AuthUser{
+						UserID:      userID,
+						Permissions: mdl.AllPermissions,
+					},
+					ProjectID: projectID,
+				}, nil
 			},
 		}
 	}

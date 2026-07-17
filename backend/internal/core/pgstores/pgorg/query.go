@@ -39,8 +39,8 @@ func organizationByNameQuery(name string) pgdb.TypedQuery[Organization] {
 	params := pgx.NamedArgs{"name": name}
 	const sql = `
 		SELECT o.id, o.name, o.created_at, o.updated_at, p.id AS control_project_id
-		FROM org.organizations o
-		JOIN org.projects p ON p.org_id = o.id AND p.is_control
+		FROM org.organizations AS o
+		JOIN org.projects AS p ON p.org_id = o.id AND p.is_control
 		WHERE o.name = @name`
 
 	return pgdb.TypedQuery[Organization]{
@@ -51,12 +51,29 @@ func organizationByNameQuery(name string) pgdb.TypedQuery[Organization] {
 	}
 }
 
+// projectByNameQuery matches name case-insensitively, mirroring the org_id/lower(name) unique
+// index that enforces project name uniqueness within an org.
 func projectByNameQuery(orgID int, name string) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{"org_id": orgID, "name": name}
 	const sql = `
 		SELECT id, org_id, name, is_control, created_at, updated_at
 		FROM org.projects
-		WHERE org_id = @org_id AND name = @name`
+		WHERE org_id = @org_id AND lower(name) = lower(@name)`
+
+	return pgdb.TypedQuery[Project]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[Project],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func projectByIDQuery(id int) pgdb.TypedQuery[Project] {
+	params := pgx.NamedArgs{"id": id}
+	const sql = `
+		SELECT id, org_id, name, is_control, created_at, updated_at
+		FROM org.projects
+		WHERE id = @id`
 
 	return pgdb.TypedQuery[Project]{
 		SQL:    sql,
@@ -74,7 +91,7 @@ func createProjectQuery(cp CreateProject) pgdb.TypedQuery[Project] {
 	const sql = `
 		INSERT INTO org.projects (org_id, name, is_control, created_at)
 		SELECT o.id, @name, false, NOW()
-		FROM org.organizations o
+		FROM org.organizations AS o
 		WHERE o.id = @org_id
 		RETURNING id, org_id, name, is_control, created_at, updated_at`
 

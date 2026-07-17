@@ -73,20 +73,17 @@ func TestCore_Roles(t *testing.T) {
 }
 
 func TestCore_Roles_error(t *testing.T) {
-	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedRoleStorer{
-			RolesFunc: func(_ context.Context) ([]pgrbac.Role, error) {
-				return nil, errors.New("db down")
-			},
-		}, &MockedUserStorer{})
+	dbErr := errors.New("db error")
 
-		_, err := core.Roles(t.Context())
-		if err == nil {
-			t.Fatal("Roles() error = nil, want error")
-		}
+	core := NewCore(&MockedRoleStorer{
+		RolesFunc: func(_ context.Context) ([]pgrbac.Role, error) {
+			return nil, dbErr
+		},
+	}, &MockedUserStorer{})
 
-		testingx.AssertErrContains(t, err, "db down")
-	})
+	if _, err := core.Roles(t.Context()); !errors.Is(err, dbErr) {
+		t.Errorf("Roles() error = %v, want %v", err, dbErr)
+	}
 }
 
 func TestCore_AssignSystemRole(t *testing.T) {
@@ -108,50 +105,70 @@ func TestCore_AssignSystemRole(t *testing.T) {
 }
 
 func TestCore_AssignSystemRole_error(t *testing.T) {
-	t.Run("user not found", func(t *testing.T) {
-		core := NewCore(&MockedRoleStorer{}, &MockedUserStorer{
-			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-				return pguser.User{}, sql.ErrNoRows
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		userStorer *MockedUserStorer
+		want       error
+	}{
+		{
+			name:       "user not found",
+			roleStorer: &MockedRoleStorer{},
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{}, sql.ErrNoRows
+				},
 			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "role not found",
+			roleStorer: &MockedRoleStorer{
+				AssignSystemRoleFunc: func(_ context.Context, _ int, _ string) error {
+					return sql.ErrNoRows
+				},
+			},
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{ID: 7}, nil
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name:       "store error, user lookup",
+			roleStorer: &MockedRoleStorer{},
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "store error, role assignment",
+			roleStorer: &MockedRoleStorer{
+				AssignSystemRoleFunc: func(_ context.Context, _ int, _ string) error {
+					return dbErr
+				},
+			},
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{ID: 7}, nil
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, tt.userStorer)
+
+			if err := core.AssignSystemRole(t.Context(), uuid.New(), "superadmin"); !errors.Is(err, tt.want) {
+				t.Errorf("AssignSystemRole() error = %v, want %v", err, tt.want)
+			}
 		})
-
-		if err := core.AssignSystemRole(t.Context(), uuid.New(), "superadmin"); !errors.Is(err, mdl.ErrNotFound) {
-			t.Errorf("AssignSystemRole() error = %v, want mdl.ErrNotFound", err)
-		}
-	})
-
-	t.Run("role not found", func(t *testing.T) {
-		core := NewCore(&MockedRoleStorer{
-			AssignSystemRoleFunc: func(_ context.Context, _ int, _ string) error {
-				return sql.ErrNoRows
-			},
-		}, &MockedUserStorer{
-			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-				return pguser.User{ID: 7}, nil
-			},
-		})
-
-		if err := core.AssignSystemRole(t.Context(), uuid.New(), "nonexistent"); !errors.Is(err, mdl.ErrNotFound) {
-			t.Errorf("AssignSystemRole() error = %v, want mdl.ErrNotFound", err)
-		}
-	})
-
-	t.Run("store error", func(t *testing.T) {
-		core := NewCore(&MockedRoleStorer{
-			AssignSystemRoleFunc: func(_ context.Context, _ int, _ string) error {
-				return errors.New("db down")
-			},
-		}, &MockedUserStorer{
-			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-				return pguser.User{ID: 7}, nil
-			},
-		})
-
-		err := core.AssignSystemRole(t.Context(), uuid.New(), "superadmin")
-		if err == nil {
-			t.Fatal("AssignSystemRole() error = nil, want error")
-		}
-
-		testingx.AssertErrContains(t, err, "db down")
-	})
+	}
 }

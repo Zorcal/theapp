@@ -68,8 +68,8 @@ func scopedWorkflowID(ctx context.Context, method string, payload []byte, key st
 	}
 
 	var userID string
-	if authUser, ok := mdl.AuthUserFromContext(ctx); ok {
-		userID = authUser.UserID.String()
+	if sess, ok := mdl.AuthSessionFromContext(ctx); ok {
+		userID = sess.User.UserID.String()
 	}
 
 	h := sha256.New()
@@ -97,7 +97,11 @@ func marshalRequest(req any) ([]byte, error) {
 }
 
 // authUnaryInterceptor validates the JWT Bearer token on every method not in publicMethods,
-// resolves the caller's mdl.AuthUser via authCore, and attaches it to the context.
+// resolves the caller's mdl.AuthSession via authCore, and attaches it to the context. The
+// project ID passed to authCore is nil for a method in noProjectMethods, which resolves a session
+// scoped to system-scope role assignments only; every other method rejects the call with
+// codes.InvalidArgument if x-project-id metadata is missing or malformed, otherwise resolves the
+// project ID from it first.
 func authUnaryInterceptor(jwtKey []byte, issuer, audience string, authCore AuthCore) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if _, public := publicMethods[info.FullMethod]; public {
@@ -109,15 +113,24 @@ func authUnaryInterceptor(jwtKey []byte, issuer, audience string, authCore AuthC
 			return nil, fmt.Errorf("parse bearer: %w", err)
 		}
 
-		authUser, err := authCore.AuthUser(ctx, claims.UserID)
-		if err != nil {
-			if errors.Is(err, mdl.ErrNotFound) {
-				return nil, status.Error(codes.Unauthenticated, "unauthenticated")
+		var projectID *int
+		if _, noProject := noProjectMethods[info.FullMethod]; !noProject {
+			id, err := parseProjectID(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("parse project id: %w", err)
 			}
-			return nil, fmt.Errorf("resolve auth user: %w", err)
+			projectID = &id
 		}
 
-		return handler(mdl.ContextWithAuthUser(ctx, authUser), req)
+		sess, err := authCore.AuthSession(ctx, claims.UserID, projectID)
+		if err != nil {
+			if errors.Is(err, mdl.ErrNotFound) {
+				return nil, fmt.Errorf("resolve auth session: unknown user or project: %w", status.Error(codes.Unauthenticated, "unauthenticated"))
+			}
+			return nil, fmt.Errorf("resolve auth session: %w", err)
+		}
+
+		return handler(mdl.ContextWithAuthSession(ctx, sess), req)
 	}
 }
 
@@ -154,8 +167,8 @@ func parseBearer(ctx context.Context, jwtKey []byte, issuer, audience string) (*
 }
 
 // permissionUnaryInterceptor rejects the call with codes.PermissionDenied unless every permission
-// permissionRegistry requires for the method is held by the mdl.AuthUser authUnaryInterceptor
-// resolved into ctx. Must run after authUnaryInterceptor.
+// permissionRegistry requires for the method is held by the AuthUser authUnaryInterceptor resolved
+// into ctx. Must run after authUnaryInterceptor.
 func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if _, public := publicMethods[info.FullMethod]; public {
@@ -167,13 +180,13 @@ func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 			return nil, fmt.Errorf("method %q is not registered in the permission registry", info.FullMethod)
 		}
 
-		authUser, ok := mdl.AuthUserFromContext(ctx)
+		sess, ok := mdl.AuthSessionFromContext(ctx)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "unauthenticated")
 		}
 
 		for _, p := range required {
-			if !slices.Contains(authUser.Permissions, p) {
+			if !slices.Contains(sess.User.Permissions, p) {
 				return nil, status.Error(codes.PermissionDenied, "missing required permission")
 			}
 		}
@@ -185,27 +198,6 @@ func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 // projectMetadataKey is the gRPC request-metadata key carrying the project the caller is currently
 // operating in.
 const projectMetadataKey = "x-project-id"
-
-// projectUnaryInterceptor reads the x-project-id metadata key and attaches it to the context as the
-// request's target project, rejecting the call if it's missing or malformed. Public methods and
-// methods listed in noProjectMethods are exempt. Must run after authUnaryInterceptor.
-func projectUnaryInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if _, public := publicMethods[info.FullMethod]; public {
-			return handler(ctx, req)
-		}
-		if _, noProject := noProjectMethods[info.FullMethod]; noProject {
-			return handler(ctx, req)
-		}
-
-		projectID, err := parseProjectID(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("parse project id: %w", err)
-		}
-
-		return handler(contextWithProjectID(ctx, projectID), req)
-	}
-}
 
 // parseProjectID extracts and validates the x-project-id metadata key from ctx.
 func parseProjectID(ctx context.Context) (int, error) {

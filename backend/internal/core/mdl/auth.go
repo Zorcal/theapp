@@ -31,25 +31,30 @@ type AuthUser struct {
 	Permissions []Permission
 }
 
-type contextKeyAuthUser struct{}
-
-// ContextWithAuthUser returns a copy of ctx carrying u as the authenticated caller's identity.
-func ContextWithAuthUser(ctx context.Context, u AuthUser) context.Context {
-	return context.WithValue(ctx, contextKeyAuthUser{}, u)
-}
-
-// AuthUserFromContext extracts the authenticated caller's identity from ctx.
-// Returns the zero AuthUser and false when no user is present (unauthenticated request).
-func AuthUserFromContext(ctx context.Context) (AuthUser, bool) {
-	u, ok := ctx.Value(contextKeyAuthUser{}).(AuthUser)
-	return u, ok
-}
-
 // AuthSession is resolved once per request and threaded through the call stack, pairing the
-// caller's identity with the project it's currently operating in.
+// caller's identity with the project it's currently operating in, if any.
 type AuthSession struct {
-	User      AuthUser
-	ProjectID int
+	User AuthUser
+	// ProjectID is the project the caller is currently operating in. Nil for a request with no
+	// project context, in which case User.Permissions is resolved from system-scope role
+	// assignments only.
+	ProjectID *int
+	// OrgID is the organization ProjectID belongs to. Nil exactly when ProjectID is nil.
+	OrgID *int
+}
+
+type contextKeyAuthSession struct{}
+
+// ContextWithAuthSession returns a copy of ctx carrying s as the current request's auth session.
+func ContextWithAuthSession(ctx context.Context, s AuthSession) context.Context {
+	return context.WithValue(ctx, contextKeyAuthSession{}, s)
+}
+
+// AuthSessionFromContext extracts the current request's auth session from ctx.
+// Returns the zero AuthSession and false when no session is present (unauthenticated request).
+func AuthSessionFromContext(ctx context.Context) (AuthSession, bool) {
+	s, ok := ctx.Value(contextKeyAuthSession{}).(AuthSession)
+	return s, ok
 }
 
 // RequestMagicLink holds the fields needed to send a magic-link sign-in token.

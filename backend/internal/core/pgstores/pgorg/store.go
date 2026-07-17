@@ -85,6 +85,27 @@ func (s *Store) OrganizationByName(ctx context.Context, name string) (Organizati
 	return org, nil
 }
 
+// ProjectByID returns the project with the given ID.
+// Returns [sql.ErrNoRows] if no such project exists.
+func (s *Store) ProjectByID(ctx context.Context, id int) (Project, error) {
+	var project Project
+
+	q := projectByIDQuery(id)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &project); err != nil {
+			return fmt.Errorf("project by id: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return Project{}, err
+	}
+
+	return project, nil
+}
+
 // ProjectByName returns the project named name owned by orgID.
 // Returns [sql.ErrNoRows] if no such project exists.
 func (s *Store) ProjectByName(ctx context.Context, orgID int, name string) (Project, error) {

@@ -2,9 +2,12 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -40,110 +43,188 @@ func TestErrorStreamInterceptor_validationEscaped(t *testing.T) {
 	}
 }
 
-// fakeServerStream is a minimal grpc.ServerStream stub carrying only a context, sufficient
-// for interceptor tests that never send or receive a message.
-type fakeServerStream struct {
-	grpc.ServerStream
-
-	ctx context.Context //nolint:containedctx // test double, the whole point is to supply a fixed ctx.
-}
-
-func (s fakeServerStream) Context() context.Context {
-	return s.ctx
-}
-
-func TestProjectStreamInterceptor(t *testing.T) {
-	t.Run("public method bypasses check", func(t *testing.T) {
+func TestAuthStreamInterceptor(t *testing.T) {
+	t.Run("public method bypasses auth", func(t *testing.T) {
 		handler := func(_ any, _ grpc.ServerStream) error {
 			return nil
 		}
 
-		interceptor := projectStreamInterceptor()
+		// authCore has no AuthSessionFunc configured, so it panics if the interceptor tries to
+		// resolve an auth session instead of going straight to the handler.
+		authCore := &MockedAuthCore{
+			AuthSessionFunc: nil,
+		}
+		interceptor := authStreamInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, authCore)
 
-		err := interceptor(nil, fakeServerStream{ctx: t.Context()}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.AuthService/RequestMagicLink"}, handler)
-		if err != nil {
-			t.Fatalf("projectStreamInterceptor() error = %v, want nil", err)
+		if err := interceptor(nil, fakeServerStream{ctx: t.Context()}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.AuthService/RequestMagicLink"}, handler); err != nil {
+			t.Errorf("authStreamInterceptor() error = %v, want nil", err)
 		}
 	})
 
-	t.Run("no-project method bypasses check", func(t *testing.T) {
-		handler := func(_ any, _ grpc.ServerStream) error {
-			return nil
-		}
-
-		interceptor := projectStreamInterceptor()
-
-		err := interceptor(nil, fakeServerStream{ctx: t.Context()}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.AuthService/RevokeAllSessions"}, handler)
-		if err != nil {
-			t.Fatalf("projectStreamInterceptor() error = %v, want nil", err)
-		}
-	})
-
-	t.Run("project id attached to context", func(t *testing.T) {
-		var gotID int
-		var gotOK bool
+	t.Run("no-project method resolves session with a nil project id", func(t *testing.T) {
+		var gotSess mdl.AuthSession
 		handler := func(_ any, ss grpc.ServerStream) error {
-			gotID, gotOK = projectIDFromContext(ss.Context())
+			gotSess, _ = mdl.AuthSessionFromContext(ss.Context())
 			return nil
 		}
 
-		interceptor := projectStreamInterceptor()
+		want := mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}
 
-		ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "7"))
-		if err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler); err != nil {
-			t.Fatalf("projectStreamInterceptor() error = %v, want nil", err)
+		authCore := &MockedAuthCore{
+			AuthSessionFunc: func(_ context.Context, _ uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+				if projectID != nil {
+					t.Errorf("AuthSession() projectID = %v, want nil", *projectID)
+				}
+				return want, nil
+			},
 		}
-		if !gotOK {
-			t.Fatal("projectIDFromContext() ok = false, want true")
+		interceptor := authStreamInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, authCore)
+
+		if err := interceptor(nil, fakeServerStream{ctx: validStreamAuthCtx(t)}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.AuthService/RevokeAllSessions"}, handler); err != nil {
+			t.Fatalf("authStreamInterceptor() error = %v, want nil", err)
 		}
-		testingx.AssertDiff(t, gotID, 7)
+		testingx.AssertDiff(t, gotSess, want)
+	})
+
+	t.Run("project-scoped method resolves session with the parsed project id", func(t *testing.T) {
+		var gotSess mdl.AuthSession
+		handler := func(_ any, ss grpc.ServerStream) error {
+			gotSess, _ = mdl.AuthSessionFromContext(ss.Context())
+			return nil
+		}
+
+		projectID := 7
+		want := mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, ProjectID: &projectID}
+
+		authCore := &MockedAuthCore{
+			AuthSessionFunc: func(_ context.Context, _ uuid.UUID, gotProjectID *int) (mdl.AuthSession, error) {
+				if gotProjectID == nil || *gotProjectID != projectID {
+					t.Errorf("AuthSession() projectID = %v, want %d", gotProjectID, projectID)
+				}
+				return want, nil
+			},
+		}
+		interceptor := authStreamInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, authCore)
+
+		ctx := withStreamProjectID(validStreamAuthCtx(t), "7")
+		if err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.ExampleService/ExampleMethod"}, handler); err != nil {
+			t.Fatalf("authStreamInterceptor() error = %v, want nil", err)
+		}
+		testingx.AssertDiff(t, gotSess, want)
 	})
 }
 
-func TestProjectStreamInterceptor_error(t *testing.T) {
+func TestAuthStreamInterceptor_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
 	handler := func(_ any, _ grpc.ServerStream) error {
 		return nil
 	}
 
-	tests := []struct {
-		name string
-		ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
-	}{
-		{
-			name: "missing metadata",
-			ctx:  t.Context(),
-		},
-		{
-			name: "missing project id header",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs()),
-		},
-		{
-			name: "empty project id value",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "")),
-		},
-		{
-			name: "non-numeric project id",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "abc")),
-		},
-		{
-			name: "zero project id",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "0")),
-		},
-		{
-			name: "negative project id",
-			ctx:  metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-project-id", "-5")),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			interceptor := projectStreamInterceptor()
+	t.Run("caller no longer exists", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			ctx        context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+			fullMethod string
+		}{
+			{
+				name:       "no-project method",
+				ctx:        validStreamAuthCtx(t),
+				fullMethod: "/theapp.v1.AuthService/RevokeAllSessions",
+			},
+			{
+				name:       "project-scoped method",
+				ctx:        withStreamProjectID(validStreamAuthCtx(t), "1"),
+				fullMethod: "/theapp.v1.ExampleService/ExampleMethod",
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				authCore := &MockedAuthCore{
+					AuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ *int) (mdl.AuthSession, error) {
+						return mdl.AuthSession{}, mdl.ErrNotFound
+					},
+				}
+				interceptor := authStreamInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, authCore)
 
-			err := interceptor(nil, fakeServerStream{ctx: tt.ctx}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler)
-			if got, want := status.Code(err), codes.InvalidArgument; got != want {
-				t.Errorf("projectStreamInterceptor() code = %v, want %v", got, want)
-			}
-		})
-	}
+				err := interceptor(nil, fakeServerStream{ctx: tt.ctx}, &grpc.StreamServerInfo{FullMethod: tt.fullMethod}, handler)
+				if got, want := status.Code(err), codes.Unauthenticated; got != want {
+					t.Errorf("authStreamInterceptor() code = %v, want %v", got, want)
+				}
+			})
+		}
+	})
+
+	t.Run("resolve auth session store error", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			ctx        context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+			fullMethod string
+		}{
+			{
+				name:       "no-project method",
+				ctx:        validStreamAuthCtx(t),
+				fullMethod: "/theapp.v1.AuthService/RevokeAllSessions",
+			},
+			{
+				name:       "project-scoped method",
+				ctx:        withStreamProjectID(validStreamAuthCtx(t), "1"),
+				fullMethod: "/theapp.v1.ExampleService/ExampleMethod",
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				authCore := &MockedAuthCore{
+					AuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ *int) (mdl.AuthSession, error) {
+						return mdl.AuthSession{}, dbErr
+					},
+				}
+				interceptor := authStreamInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, authCore)
+
+				if err := interceptor(nil, fakeServerStream{ctx: tt.ctx}, &grpc.StreamServerInfo{FullMethod: tt.fullMethod}, handler); !errors.Is(err, dbErr) {
+					t.Errorf("authStreamInterceptor() error = %v, want %v", err, dbErr)
+				}
+			})
+		}
+	})
+
+	t.Run("malformed project id", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "missing project id header",
+				ctx:  validStreamAuthCtx(t),
+			},
+			{
+				name: "empty project id value",
+				ctx:  withStreamProjectID(validStreamAuthCtx(t), ""),
+			},
+			{
+				name: "non-numeric project id",
+				ctx:  withStreamProjectID(validStreamAuthCtx(t), "abc"),
+			},
+			{
+				name: "zero project id",
+				ctx:  withStreamProjectID(validStreamAuthCtx(t), "0"),
+			},
+			{
+				name: "negative project id",
+				ctx:  withStreamProjectID(validStreamAuthCtx(t), "-5"),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				interceptor := authStreamInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, &MockedAuthCore{})
+
+				err := interceptor(nil, fakeServerStream{ctx: tt.ctx}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.ExampleService/ExampleMethod"}, handler)
+				if got, want := status.Code(err), codes.InvalidArgument; got != want {
+					t.Errorf("authStreamInterceptor() code = %v, want %v", got, want)
+				}
+			})
+		}
+	})
 }
 
 func TestPermissionStreamInterceptor(t *testing.T) {
@@ -161,24 +242,33 @@ func TestPermissionStreamInterceptor(t *testing.T) {
 	})
 
 	t.Run("permission granted", func(t *testing.T) {
-		var gotUser mdl.AuthUser
+		var gotSess mdl.AuthSession
 		var gotOK bool
 		handler := func(_ any, ss grpc.ServerStream) error {
-			gotUser, gotOK = mdl.AuthUserFromContext(ss.Context())
+			gotSess, gotOK = mdl.AuthSessionFromContext(ss.Context())
 			return nil
 		}
 
-		want := mdl.AuthUser{UserID: uuid.New(), Permissions: []mdl.Permission{mdl.PermissionUserRead}}
+		want := mdl.AuthSession{
+			User: mdl.AuthUser{
+				UserID:      uuid.New(),
+				Permissions: []mdl.Permission{mdl.PermissionUserRead},
+			},
+			ProjectID: new(1),
+		}
+
 		interceptor := permissionStreamInterceptor()
 
-		ctx := mdl.ContextWithAuthUser(t.Context(), want)
+		ctx := mdl.ContextWithAuthSession(t.Context(), want)
 		if err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}, handler); err != nil {
 			t.Fatalf("permissionStreamInterceptor() error = %v, want nil", err)
 		}
+
 		if !gotOK {
-			t.Fatal("AuthUserFromContext() ok = false, want true")
+			t.Fatal("AuthSessionFromContext() ok = false, want true")
 		}
-		testingx.AssertDiff(t, gotUser, want)
+
+		testingx.AssertDiff(t, gotSess, want)
 	})
 }
 
@@ -201,7 +291,7 @@ func TestPermissionStreamInterceptor_error(t *testing.T) {
 		},
 		{
 			name:   "missing permission",
-			ctx:    mdl.ContextWithAuthUser(t.Context(), mdl.AuthUser{UserID: uuid.New()}),
+			ctx:    mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}),
 			method: "/theapp.v1.UserService/GetUser",
 			want:   codes.PermissionDenied,
 		},
@@ -220,7 +310,7 @@ func TestPermissionStreamInterceptor_error(t *testing.T) {
 	t.Run("unregistered method", func(t *testing.T) {
 		interceptor := permissionStreamInterceptor()
 
-		ctx := mdl.ContextWithAuthUser(t.Context(), mdl.AuthUser{UserID: uuid.New()})
+		ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}})
 		err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.UserService/NoSuchMethod"}, handler)
 		if err == nil {
 			t.Fatal("permissionStreamInterceptor() error = nil, want error")
@@ -230,4 +320,43 @@ func TestPermissionStreamInterceptor_error(t *testing.T) {
 			t.Errorf("permissionStreamInterceptor() error = %v, want a plain error, not a gRPC status error", err)
 		}
 	})
+}
+
+// validStreamAuthCtx returns a context carrying a validly signed JWT Bearer token in the gRPC
+// incoming metadata, for tests that need authStreamInterceptor's bearer check to succeed.
+func validStreamAuthCtx(t *testing.T) context.Context {
+	t.Helper()
+	claims := mdl.AuthClaims{
+		UserID: uuid.New(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    testJWTIssuer,
+			Audience:  jwt.ClaimStrings{testJWTAudience},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+		},
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(testJWTKey)
+	if err != nil {
+		t.Fatalf("sign JWT: %v", err)
+	}
+	return metadata.NewIncomingContext(t.Context(), metadata.Pairs("authorization", "Bearer "+token))
+}
+
+// fakeServerStream is a minimal grpc.ServerStream stub carrying only a context, sufficient
+// for interceptor tests that never send or receive a message.
+type fakeServerStream struct {
+	grpc.ServerStream
+
+	ctx context.Context //nolint:containedctx // test double, the whole point is to supply a fixed ctx.
+}
+
+func (s fakeServerStream) Context() context.Context {
+	return s.ctx
+}
+
+// withStreamProjectID returns a copy of ctx with the x-project-id metadata key set to id.
+func withStreamProjectID(ctx context.Context, id string) context.Context {
+	md, _ := metadata.FromIncomingContext(ctx)
+	md = md.Copy()
+	md.Set("x-project-id", id)
+	return metadata.NewIncomingContext(ctx, md)
 }

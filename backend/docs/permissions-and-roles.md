@@ -18,19 +18,24 @@ Organization membership and org-scoped role assignment are separate concepts, an
 
 ## AuthSession
 
-At request time, after validating the access token, the request is resolved into an `mdl.AuthSession` struct that is threaded through the call stack. `AuthUser.Permissions` is resolved from the database on each request rather than cached in the token itself — otherwise a revoked role would stay effective until the token expired, which for a normal access token TTL is far too long a window.
+At request time, after validating the access token, the request is resolved into an `mdl.AuthSession` struct that is threaded through the call stack. `ProjectID` and `OrgID` are pointers, nil together for a request with no project context (see below) — in that case `User.Permissions` is resolved from system-scope role assignments only. When `ProjectID` is non-nil, `OrgID` is always resolved alongside it (the organization `ProjectID` belongs to), and `User.Permissions` is resolved from project-, org-, and system-scope role assignments for that project. There's a single core method for this resolution, taking a `*int` project ID: non-nil triggers the project-scoped path (org lookup plus the three-way union); nil resolves system-scope permissions only and leaves `ProjectID`/`OrgID` unset.
 
-If per-request DB resolution ever becomes a bottleneck, the fix is a short-lived server-side cache keyed by `(user, project)`, on the order of 15-30 seconds, invalidated on role assignment/removal where practical and falling back to the TTL as a backstop otherwise — not caching in the token, which reintroduces the same staleness problem this section exists to avoid. Such a cache would only ever back the ordinary per-request `AuthUser.Permissions` resolution above; the privilege-escalation check (see "Privilege escalation" below) always resolves the actor's permissions fresh, since it's a comparatively rare, high-stakes operation where a 15-30 second staleness window is a meaningfully different tradeoff than it is for read-heavy request checks.
+A `ProjectID` that doesn't match any real project is rejected outright — the same `mdl.ErrNotFound` used for an unresolvable caller identity — rather than silently resolving a session with a meaningless `OrgID`. This matters because `OrgID` being non-nil is meant to mean "resolved," not merely "a lookup was attempted"; treating a nonexistent project as a resolvable session would hand back an `OrgID` pointing at nothing. A caller with a real project ID but no role assignment relevant to it is a different case entirely, and not an error at all: the session resolves normally, with an empty (or system-scope-only) permission set, which the permission-checking interceptor rejects on its own — the same way it rejects any other caller missing a required permission.
+
+`AuthUser.Permissions` is resolved from the database on each request rather than cached in the token itself — otherwise a revoked role would stay effective until the token expired, which for a normal access token TTL is far too long a window.
+
+If per-request DB resolution ever becomes a bottleneck, the fix is a short-lived server-side cache keyed by `(user, project)` when `ProjectID` is set or `(user)` otherwise, on the order of 15-30 seconds, invalidated on role assignment/removal where practical and falling back to the TTL as a backstop otherwise — not caching in the token, which reintroduces the same staleness problem this section exists to avoid. Such a cache would only ever back the ordinary per-request `AuthUser.Permissions` resolution above; the privilege-escalation check (see "Privilege escalation" below) always resolves the actor's permissions fresh, since it's a comparatively rare, high-stakes operation where a 15-30 second staleness window is a meaningfully different tradeoff than it is for read-heavy request checks.
 
 ```
 AuthSession {
     User      AuthUser
-    ProjectID int
+    ProjectID *int  // nil for a request with no project context
+    OrgID     *int  // the organization ProjectID belongs to; nil exactly when ProjectID is nil
 }
 
 AuthUser {
     UserID      uuid.UUID
-    Permissions []Permission  // distinct, resolved from all assigned roles, scoped to ProjectID
+    Permissions []Permission  // distinct, resolved from all assigned roles
 }
 ```
 
@@ -38,7 +43,7 @@ AuthUser {
 
 The per-request resolution above assumes a unary RPC, where every call is a fresh check. A server-streaming RPC that stays open resolves `AuthUser.Permissions` once at stream-open; a role change made mid-stream doesn't take effect until the stream ends and reconnects, which is a meaningfully longer staleness window than the per-request model this section otherwise guarantees. There are no long-lived streaming RPCs in the system today, so this doesn't need solving now, but if one is ever added it needs its own explicit re-check inside the stream loop rather than silently inheriting the unary assumption — that RPC's implementation should carry a code comment pointing back to this paragraph, since someone implementing it by reading the interceptor code alone would have no reason to suspect the assumption doesn't hold.
 
-The project ID is sent as request metadata rather than as a field on each RPC's request message, since every endpoint needs it and putting it on each message would mean threading it through every proto by hand. Project IDs are unique globally, not just within an organization, so the metadata value alone is enough to resolve the project without also needing an organization ID. The interceptor validates that this metadata is present by default, rejecting the call otherwise; endpoints that legitimately have no project context are added to an explicit exceptions list rather than opting out ad hoc. Note that most endpoints that might look project-less at first, such as creating an organization, still resolve to a project — org creation requires `org:create` in `theapp/control`, so it still sends that project's ID as metadata; the exceptions list is for the rarer case of an endpoint with no meaningful project at all.
+The project ID is sent as request metadata rather than as a field on each RPC's request message, since every project-scoped endpoint needs it and putting it on each message would mean threading it through every proto by hand. Project IDs are unique globally, not just within an organization, so the metadata value alone is enough to resolve the project without also needing an organization ID. The interceptor validates that this metadata is present by default, rejecting the call otherwise; endpoints that legitimately have no project context resolve a `nil` project ID instead, via an explicit exceptions list, rather than opting out ad hoc. Note that most endpoints that might look project-less at first, such as creating an organization, still resolve a project — org creation requires `org:create` in `theapp/control`, so it still sends that project's ID as metadata; the exceptions list is for the rarer case of an endpoint with no meaningful project at all. `UserService` is the current example: it's a system-wide user directory rather than a project- or org-scoped resource, so every one of its RPCs is on the exceptions list, and its permissions (`user:read`, `user:create`, `user:update`) can only be granted through a system-scope role assignment.
 
 ## Standard roles
 
@@ -153,6 +158,14 @@ Holding `org:create` isn't enough on its own, though: the caller must also actua
 When an organization is created, it is seeded with a default project — its name supplied explicitly alongside the organization's, rather than always matching it — so a newly created organization is immediately usable without a separate "create your first project" step.
 
 Once an organization exists, the internal user who created it (or whoever they designate) is assigned an admin role scoped to that organization — not to its default project. Org scope, not project scope, matters here: the same rationale as "Role assignment scope" above, an org's own admin needs access to every project under it, including ones created after this initial assignment, without being re-assigned each time a new project is created. That role holds the ordinary `project:create` permission; resolving it for a project-creation call anchors on the org's default project the same way `org:create` anchors on `theapp/control` — the `ProjectID` metadata sent is the default project's ID, which resolves to the org via the project→org lookup, and the org-scoped assignment grants `project:create` through that same three-way union used everywhere else.
+
+## Managing users within an organization
+
+`UserService` itself has no organization or project concept — it's a system-wide directory (see "AuthSession" above). Managing which users belong to which organization is a separate, org-scoped concern, exposed through `OrgService` rather than `UserService`.
+
+Creating a user and adding them to an organization is a single endpoint: given an email, it creates the user if none exists, then assigns them to the calling org — if the user already exists, only the org assignment happens. The endpoint is anchored on the org's control project, requiring the `x-project-id` metadata to be that project's ID (`org.projects.is_control = true`), the same way org creation itself anchors on `theapp/control` (see "Creating organizations and projects" above) — every org-level administrative action resolves through its control project rather than an arbitrary member project.
+
+Listing users scoped to an organization is a separate endpoint from `UserService.ListUsers`, for the same reason it's a distinct endpoint above: it's an org-level concern, not part of the user directory. It's likewise anchored on the org's control project via `x-project-id`. Unlike the create-or-assign endpoint, the project ID isn't only used for permission anchoring here — the request body also carries a project ID filter, letting the caller ask "which users have a role in project X", resolved through the same three-way union used for permission resolution everywhere else, rather than through `org_membership` (which only answers "belongs to the org," not "has a role in this specific project").
 
 ## Deleting organizations and projects
 
