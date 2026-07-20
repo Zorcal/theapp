@@ -6,21 +6,22 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
-func rolesQuery() pgdb.TypedQuery[Role] {
+// staticRolesQuery resolves every static role and the names of the permissions currently granted
+// to it.
+func staticRolesQuery() pgdb.TypedQuery[RoleStatic] {
 	const sql = `
 		SELECT
 			r.name,
-			r.is_static,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names
-		FROM rbac.roles AS r
-		LEFT JOIN rbac.role_permissions AS rp ON rp.role_id = r.id
+		FROM rbac.static_roles AS r
+		LEFT JOIN rbac.static_role_permissions AS rp ON rp.role_id = r.id
 		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
 		GROUP BY r.id
 		ORDER BY r.name`
 
-	return pgdb.TypedQuery[Role]{
+	return pgdb.TypedQuery[RoleStatic]{
 		SQL:    sql,
-		Scan:   pgx.RowToStructByName[Role],
+		Scan:   pgx.RowToStructByName[RoleStatic],
 		Expect: pgdb.ExpectMany,
 	}
 }
@@ -32,7 +33,7 @@ func systemPermissionsQuery(userID int) pgdb.TypedQuery[string] {
 	const sql = `
 		SELECT DISTINCT p.name
 		FROM rbac.system_role_assignments AS sra
-		JOIN rbac.role_permissions AS rp ON rp.role_id = sra.role_id
+		JOIN rbac.static_role_permissions AS rp ON rp.role_id = sra.role_id
 		JOIN rbac.permissions AS p ON p.id = rp.permission_id
 		WHERE sra.user_id = @user_id
 		ORDER BY p.name`
@@ -64,21 +65,21 @@ func projectPermissionsQuery(userID, projectID int) pgdb.TypedQuery[ProjectPermi
 		LEFT JOIN LATERAL (
 			SELECT rp.permission_id
 			FROM rbac.project_role_assignments AS pra
-			JOIN rbac.role_permissions AS rp ON rp.role_id = pra.role_id
+			JOIN rbac.custom_role_permissions AS rp ON rp.role_id = pra.role_id
 			WHERE pra.user_id = @user_id AND pra.project_id = proj.id
 
 			UNION
 
 			SELECT rp.permission_id
 			FROM rbac.org_role_assignments AS ora
-			JOIN rbac.role_permissions AS rp ON rp.role_id = ora.role_id
+			JOIN rbac.custom_role_permissions AS rp ON rp.role_id = ora.role_id
 			WHERE ora.user_id = @user_id AND ora.org_id = proj.org_id
 
 			UNION
 
 			SELECT rp.permission_id
 			FROM rbac.system_role_assignments AS sra
-			JOIN rbac.role_permissions AS rp ON rp.role_id = sra.role_id
+			JOIN rbac.static_role_permissions AS rp ON rp.role_id = sra.role_id
 			WHERE sra.user_id = @user_id
 		) AS granted ON true
 		LEFT JOIN rbac.permissions AS p ON p.id = granted.permission_id
@@ -93,12 +94,15 @@ func projectPermissionsQuery(userID, projectID int) pgdb.TypedQuery[ProjectPermi
 	}
 }
 
+// assignSystemRoleQuery grants userID the static role named roleName at system scope. role_id
+// resolves against rbac.static_roles specifically, so a name that only matches a custom role
+// yields zero rows rather than assigning the wrong kind of role at system scope.
 func assignSystemRoleQuery(userID int, roleName string) pgdb.TypedQuery[int] {
 	params := pgx.NamedArgs{"user_id": userID, "role_name": roleName}
 	const sql = `
 		INSERT INTO rbac.system_role_assignments (user_id, role_id)
 		SELECT @user_id, r.id
-		FROM rbac.roles AS r
+		FROM rbac.static_roles AS r
 		WHERE r.name = @role_name
 		RETURNING role_id`
 

@@ -23,8 +23,8 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			AssignSystemRoleFunc: func(ctx context.Context, userID int, roleName string) error {
 //				panic("mock out the AssignSystemRole method")
 //			},
-//			RolesFunc: func(ctx context.Context) ([]pgrbac.Role, error) {
-//				panic("mock out the Roles method")
+//			StaticRolesFunc: func(ctx context.Context) ([]pgrbac.RoleStatic, error) {
+//				panic("mock out the StaticRoles method")
 //			},
 //		}
 //
@@ -36,8 +36,8 @@ type MockedRoleStorer struct {
 	// AssignSystemRoleFunc mocks the AssignSystemRole method.
 	AssignSystemRoleFunc func(ctx context.Context, userID int, roleName string) error
 
-	// RolesFunc mocks the Roles method.
-	RolesFunc func(ctx context.Context) ([]pgrbac.Role, error)
+	// StaticRolesFunc mocks the StaticRoles method.
+	StaticRolesFunc func(ctx context.Context) ([]pgrbac.RoleStatic, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -50,14 +50,14 @@ type MockedRoleStorer struct {
 			// RoleName is the roleName argument value.
 			RoleName string
 		}
-		// Roles holds details about calls to the Roles method.
-		Roles []struct {
+		// StaticRoles holds details about calls to the StaticRoles method.
+		StaticRoles []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
 	}
 	lockAssignSystemRole sync.RWMutex
-	lockRoles            sync.RWMutex
+	lockStaticRoles      sync.RWMutex
 }
 
 // AssignSystemRole calls AssignSystemRoleFunc.
@@ -100,34 +100,34 @@ func (mock *MockedRoleStorer) AssignSystemRoleCalls() []struct {
 	return calls
 }
 
-// Roles calls RolesFunc.
-func (mock *MockedRoleStorer) Roles(ctx context.Context) ([]pgrbac.Role, error) {
-	if mock.RolesFunc == nil {
-		panic("MockedRoleStorer.RolesFunc: method is nil but RoleStorer.Roles was just called")
+// StaticRoles calls StaticRolesFunc.
+func (mock *MockedRoleStorer) StaticRoles(ctx context.Context) ([]pgrbac.RoleStatic, error) {
+	if mock.StaticRolesFunc == nil {
+		panic("MockedRoleStorer.StaticRolesFunc: method is nil but RoleStorer.StaticRoles was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
 	}{
 		Ctx: ctx,
 	}
-	mock.lockRoles.Lock()
-	mock.calls.Roles = append(mock.calls.Roles, callInfo)
-	mock.lockRoles.Unlock()
-	return mock.RolesFunc(ctx)
+	mock.lockStaticRoles.Lock()
+	mock.calls.StaticRoles = append(mock.calls.StaticRoles, callInfo)
+	mock.lockStaticRoles.Unlock()
+	return mock.StaticRolesFunc(ctx)
 }
 
-// RolesCalls gets all the calls that were made to Roles.
+// StaticRolesCalls gets all the calls that were made to StaticRoles.
 // Check the length with:
 //
-//	len(mockedRoleStorer.RolesCalls())
-func (mock *MockedRoleStorer) RolesCalls() []struct {
+//	len(mockedRoleStorer.StaticRolesCalls())
+func (mock *MockedRoleStorer) StaticRolesCalls() []struct {
 	Ctx context.Context
 } {
 	var calls []struct {
 		Ctx context.Context
 	}
-	mock.lockRoles.RLock()
-	calls = mock.calls.Roles
-	mock.lockRoles.RUnlock()
+	mock.lockStaticRoles.RLock()
+	calls = mock.calls.StaticRoles
+	mock.lockStaticRoles.RUnlock()
 	return calls
 }

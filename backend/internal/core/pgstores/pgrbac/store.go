@@ -18,16 +18,16 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
-// Roles returns every role and the names of the permissions currently granted to it, ordered by
-// role name.
-func (s *Store) Roles(ctx context.Context) ([]Role, error) {
-	var roles []Role
+// StaticRoles returns every static role and the names of the permissions currently granted to
+// it, ordered by role name.
+func (s *Store) StaticRoles(ctx context.Context) ([]RoleStatic, error) {
+	var roles []RoleStatic
 
-	q := rolesQuery()
+	q := staticRolesQuery()
 
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.QueueMany(ctx, b, &roles); err != nil {
-			return fmt.Errorf("roles: %w", err)
+			return fmt.Errorf("static roles: %w", err)
 		}
 		return nil
 	}
@@ -82,8 +82,8 @@ func (s *Store) ProjectPermissions(ctx context.Context, userID, projectID int) (
 	return perms, nil
 }
 
-// AssignSystemRole grants userID the role named roleName at system scope.
-// Returns [sql.ErrNoRows] if no role named roleName exists.
+// AssignSystemRole grants userID the static role named roleName at system scope.
+// Returns [sql.ErrNoRows] if no static role named roleName exists.
 func (s *Store) AssignSystemRole(ctx context.Context, userID int, roleName string) error {
 	var roleID int
 

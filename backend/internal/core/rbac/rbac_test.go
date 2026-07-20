@@ -27,16 +27,16 @@ func TestCore_integration(t *testing.T) {
 		cmpopts.SortSlices(func(a, b mdl.Permission) bool { return a < b }),
 	}
 
-	roles, err := core.Roles(ctx)
+	staticRoles, err := core.StaticRoles(ctx)
 	if err != nil {
-		t.Fatalf("Roles() error = %v", err)
+		t.Fatalf("StaticRoles() error = %v", err)
 	}
 
-	wantRoles := []mdl.Role{
-		{Name: "superadmin", IsStatic: true, Permissions: mdl.AllPermissions},
+	wantStaticRoles := []mdl.RoleStatic{
+		{Name: "superadmin", Permissions: mdl.AllPermissions},
 	}
 
-	testingx.AssertDiff(t, roles, wantRoles, diffOpts)
+	testingx.AssertDiff(t, staticRoles, wantStaticRoles, diffOpts)
 
 	usr, err := userStore.CreateUser(ctx, pguser.CreateUser{Email: "alice@test.com", Name: "Alice Smith"})
 	if err != nil {
@@ -48,41 +48,39 @@ func TestCore_integration(t *testing.T) {
 	}
 }
 
-func TestCore_Roles(t *testing.T) {
+func TestCore_StaticRoles(t *testing.T) {
 	roleStorer := &MockedRoleStorer{
-		RolesFunc: func(_ context.Context) ([]pgrbac.Role, error) {
-			return []pgrbac.Role{
-				{Name: "superadmin", IsStatic: true, PermissionNames: []string{"user:create", "user:read"}},
-				{Name: "user-viewer", IsStatic: false, PermissionNames: []string{"user:read"}},
+		StaticRolesFunc: func(_ context.Context) ([]pgrbac.RoleStatic, error) {
+			return []pgrbac.RoleStatic{
+				{Name: "superadmin", PermissionNames: []string{"user:create", "user:read"}},
 			}, nil
 		},
 	}
 	core := NewCore(roleStorer, &MockedUserStorer{})
 
-	got, err := core.Roles(t.Context())
+	got, err := core.StaticRoles(t.Context())
 	if err != nil {
-		t.Fatalf("Roles() error = %v", err)
+		t.Fatalf("StaticRoles() error = %v", err)
 	}
 
-	want := []mdl.Role{
-		{Name: "superadmin", IsStatic: true, Permissions: []mdl.Permission{mdl.PermissionUserCreate, mdl.PermissionUserRead}},
-		{Name: "user-viewer", IsStatic: false, Permissions: []mdl.Permission{mdl.PermissionUserRead}},
+	want := []mdl.RoleStatic{
+		{Name: "superadmin", Permissions: []mdl.Permission{mdl.PermissionUserCreate, mdl.PermissionUserRead}},
 	}
 
 	testingx.AssertDiff(t, got, want)
 }
 
-func TestCore_Roles_error(t *testing.T) {
+func TestCore_StaticRoles_error(t *testing.T) {
 	dbErr := errors.New("db error")
 
 	core := NewCore(&MockedRoleStorer{
-		RolesFunc: func(_ context.Context) ([]pgrbac.Role, error) {
+		StaticRolesFunc: func(_ context.Context) ([]pgrbac.RoleStatic, error) {
 			return nil, dbErr
 		},
 	}, &MockedUserStorer{})
 
-	if _, err := core.Roles(t.Context()); !errors.Is(err, dbErr) {
-		t.Errorf("Roles() error = %v, want %v", err, dbErr)
+	if _, err := core.StaticRoles(t.Context()); !errors.Is(err, dbErr) {
+		t.Errorf("StaticRoles() error = %v, want %v", err, dbErr)
 	}
 }
 

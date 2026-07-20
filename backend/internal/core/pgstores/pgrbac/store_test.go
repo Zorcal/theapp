@@ -15,54 +15,20 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
-func TestStore_Roles(t *testing.T) {
+func TestStore_StaticRoles(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	rbacStore := NewStore(pool)
 
-	seedRole(t, ctx, pool, "user-viewer", []string{"user:read"})
-	seedRole(t, ctx, pool, "role-with-no-permissions", nil)
-
-	got, err := rbacStore.Roles(ctx)
+	got, err := rbacStore.StaticRoles(ctx)
 	if err != nil {
-		t.Fatalf("Roles() error = %v", err)
+		t.Fatalf("StaticRoles() error = %v", err)
 	}
-	want := []Role{
-		{Name: "role-with-no-permissions", PermissionNames: []string{}},
-		{Name: "superadmin", IsStatic: true, PermissionNames: []string{"user:create", "user:read", "user:update"}},
-		{Name: "user-viewer", PermissionNames: []string{"user:read"}},
+	want := []RoleStatic{
+		{Name: "superadmin", PermissionNames: []string{"user:create", "user:read", "user:update"}},
 	}
 
 	testingx.AssertDiff(t, got, want)
-}
-
-func TestIsStaticTrigger(t *testing.T) {
-	tests := []struct {
-		name string
-		sql  string
-	}{
-		{
-			name: "update",
-			sql:  `UPDATE rbac.roles SET name = 'renamed' WHERE name = 'superadmin'`,
-		},
-		{
-			name: "delete",
-			sql:  `DELETE FROM rbac.roles WHERE name = 'superadmin'`,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			pool := pgtest.New(t, ctx)
-
-			_, err := pool.Exec(ctx, tt.sql)
-			if err == nil {
-				t.Fatalf("Exec(%q) error = nil, want error", tt.sql)
-			}
-
-			testingx.AssertErrContains(t, err, "cannot be updated or deleted")
-		})
-	}
 }
 
 func TestStore_SystemPermissions(t *testing.T) {
@@ -307,7 +273,10 @@ func TestStore_AssignSystemRole_error(t *testing.T) {
 		}
 	})
 
-	t.Run("non-static role", func(t *testing.T) {
+	// A name that only matches a custom role, not a static one, resolves the same as a name that
+	// matches nothing at all: assignSystemRoleQuery looks up rbac.static_roles specifically, so a
+	// custom role's name simply isn't there to find.
+	t.Run("name matches a custom role, not a static one", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
@@ -316,12 +285,9 @@ func TestStore_AssignSystemRole_error(t *testing.T) {
 		usr := seedUser(t, userStore, "alice@test.com")
 		seedRole(t, ctx, pool, "user-viewer", nil)
 
-		err := rbacStore.AssignSystemRole(ctx, usr.ID, "user-viewer")
-		if err == nil {
-			t.Fatal("AssignSystemRole() error = nil, want error")
+		if err := rbacStore.AssignSystemRole(ctx, usr.ID, "user-viewer"); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("AssignSystemRole() error = %v, want sql.ErrNoRows", err)
 		}
-
-		testingx.AssertErrContains(t, err, "only a static role can be assigned at system scope")
 	})
 }
 
@@ -339,18 +305,27 @@ func seedUser(t *testing.T, s *pguser.Store, email string) pguser.User {
 	return usr
 }
 
+// seedRole seeds a custom role, owned by a dedicated throwaway org (custom_roles.org_id is
+// NOT NULL, and the role's own owning org is irrelevant to what these tests exercise).
 func seedRole(t *testing.T, ctx context.Context, pool *pgxpool.Pool, name string, permissionNames []string) {
 	t.Helper()
 
-	roleParams := pgx.NamedArgs{"name": name}
-	const insertRole = `INSERT INTO rbac.roles (name, is_static, created_at) VALUES (@name, FALSE, NOW())`
+	org, err := pgorg.NewStore(pool).CreateOrganization(ctx, pgorg.CreateOrganization{Name: name + "-role-org", ControlProjectName: "control"})
+	if err != nil {
+		t.Fatalf("seed org for role %q: %v", name, err)
+	}
+
+	roleParams := pgx.NamedArgs{"name": name, "org_id": org.ID}
+	const insertRole = `
+		INSERT INTO rbac.custom_roles (external_id, org_id, name, created_at, etag)
+		VALUES (gen_random_uuid(), @org_id, @name, NOW(), gen_random_uuid())`
 	if _, err := pool.Exec(ctx, insertRole, roleParams); err != nil {
 		t.Fatalf("seed role %q: %v", name, err)
 	}
 
 	const grantPermission = `
-		INSERT INTO rbac.role_permissions (role_id, permission_id)
-		SELECT r.id, p.id FROM rbac.roles r, rbac.permissions p WHERE r.name = @role_name AND p.name = @permission_name`
+		INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
+		SELECT r.id, p.id FROM rbac.custom_roles r, rbac.permissions p WHERE r.name = @role_name AND p.name = @permission_name`
 	for _, p := range permissionNames {
 		grantParams := pgx.NamedArgs{"role_name": name, "permission_name": p}
 		if _, err := pool.Exec(ctx, grantPermission, grantParams); err != nil {
@@ -383,7 +358,7 @@ func seedProjectRoleAssignment(t *testing.T, ctx context.Context, pool *pgxpool.
 	params := pgx.NamedArgs{"user_id": userID, "role_name": roleName, "project_id": projectID}
 	const q = `
 		INSERT INTO rbac.project_role_assignments (user_id, role_id, project_id)
-		SELECT @user_id, r.id, @project_id FROM rbac.roles r WHERE r.name = @role_name`
+		SELECT @user_id, r.id, @project_id FROM rbac.custom_roles r WHERE r.name = @role_name`
 	if _, err := pool.Exec(ctx, q, params); err != nil {
 		t.Fatalf("seed project role assignment (user %d, role %q, project %d): %v", userID, roleName, projectID, err)
 	}
@@ -395,7 +370,7 @@ func seedOrgRoleAssignment(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 	params := pgx.NamedArgs{"user_id": userID, "role_name": roleName, "org_id": orgID}
 	const q = `
 		INSERT INTO rbac.org_role_assignments (user_id, role_id, org_id)
-		SELECT @user_id, r.id, @org_id FROM rbac.roles r WHERE r.name = @role_name`
+		SELECT @user_id, r.id, @org_id FROM rbac.custom_roles r WHERE r.name = @role_name`
 	if _, err := pool.Exec(ctx, q, params); err != nil {
 		t.Fatalf("seed org role assignment (user %d, role %q, org %d): %v", userID, roleName, orgID, err)
 	}

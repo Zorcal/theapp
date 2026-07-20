@@ -1,8 +1,8 @@
 package mdl
 
-// Role is a role and the permissions currently granted to it.
-type Role struct {
+// RoleStatic is a static role and the permissions currently granted to it. Static roles are seed
+// data — our system doesn't support mutating one directly.
+type RoleStatic struct {
 	Name        string
-	IsStatic    bool
 	Permissions []Permission
 }

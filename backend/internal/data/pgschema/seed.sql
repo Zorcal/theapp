@@ -9,13 +9,13 @@ INSERT INTO rbac.permissions (name) VALUES
     ('user:update')
 ON CONFLICT (name) DO NOTHING;
 
-INSERT INTO rbac.roles (name, is_static, created_at) VALUES
-    ('superadmin', TRUE, NOW())
-ON CONFLICT (name) DO NOTHING;
+INSERT INTO rbac.static_roles (external_id, name, created_at)
+SELECT gen_random_uuid(), 'superadmin', NOW()
+WHERE NOT EXISTS (SELECT 1 FROM rbac.static_roles WHERE name = 'superadmin');
 
-INSERT INTO rbac.role_permissions (role_id, permission_id)
+INSERT INTO rbac.static_role_permissions (role_id, permission_id)
 SELECT r.id, p.id
-FROM rbac.roles r
+FROM rbac.static_roles r
 CROSS JOIN rbac.permissions p
 WHERE r.name = 'superadmin'
 ON CONFLICT DO NOTHING;

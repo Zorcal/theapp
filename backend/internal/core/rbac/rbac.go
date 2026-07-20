@@ -18,10 +18,11 @@ import (
 
 // RoleStorer defines the database operations the Core requires.
 type RoleStorer interface {
-	// Roles returns every role and the names of the permissions currently granted to it.
-	Roles(ctx context.Context) ([]pgrbac.Role, error)
-	// AssignSystemRole grants userID the role named roleName at system scope.
-	// Returns [sql.ErrNoRows] if no role named roleName exists.
+	// StaticRoles returns every static role and the names of the permissions currently granted to
+	// it.
+	StaticRoles(ctx context.Context) ([]pgrbac.RoleStatic, error)
+	// AssignSystemRole grants userID the static role named roleName at system scope.
+	// Returns [sql.ErrNoRows] if no static role named roleName exists.
 	AssignSystemRole(ctx context.Context, userID int, roleName string) error
 }
 
@@ -45,18 +46,18 @@ func NewCore(rs RoleStorer, us UserStorer) *Core {
 	return &Core{roleStorer: rs, userStorer: us}
 }
 
-// Roles returns every role and the permissions currently granted to it.
-func (c *Core) Roles(ctx context.Context) ([]mdl.Role, error) {
-	rs, err := c.roleStorer.Roles(ctx)
+// StaticRoles returns every static role and the permissions currently granted to it.
+func (c *Core) StaticRoles(ctx context.Context) ([]mdl.RoleStatic, error) {
+	rs, err := c.roleStorer.StaticRoles(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("roles: %w", err)
+		return nil, fmt.Errorf("static roles: %w", err)
 	}
 
-	return rolesFromPg(rs), nil
+	return staticRolesFromPg(rs), nil
 }
 
 // AssignSystemRole grants userID the static role named roleName at system scope.
-// Returns [mdl.ErrNotFound] if no user with that ID, or no role named roleName, exists.
+// Returns [mdl.ErrNotFound] if no user with that ID, or no static role named roleName, exists.
 func (c *Core) AssignSystemRole(ctx context.Context, userID uuid.UUID, roleName string) error {
 	u, err := c.userStorer.UserByExternalID(ctx, userID)
 	if err != nil {
