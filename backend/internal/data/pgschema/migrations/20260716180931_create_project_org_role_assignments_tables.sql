@@ -1,7 +1,8 @@
 -- migrate:up
+
 CREATE TABLE rbac.project_role_assignments (
     user_id INTEGER NOT NULL REFERENCES useraccess.users (id)
-    , role_id INTEGER NOT NULL REFERENCES rbac.roles (id)
+    , role_id INTEGER NOT NULL REFERENCES rbac.custom_roles (id)
     , project_id INTEGER NOT NULL REFERENCES org.projects (id)
     , PRIMARY KEY (user_id, role_id, project_id)
 );
@@ -17,13 +18,14 @@ CREATE INDEX project_role_assignments_user_id_project_id_idx ON rbac.project_rol
 
 CREATE TABLE rbac.org_role_assignments (
     user_id INTEGER NOT NULL REFERENCES useraccess.users (id)
-    , role_id INTEGER NOT NULL REFERENCES rbac.roles (id)
+    , role_id INTEGER NOT NULL REFERENCES rbac.custom_roles (id)
     , org_id INTEGER NOT NULL REFERENCES org.organizations (id)
     , PRIMARY KEY (user_id, role_id, org_id)
 );
 
--- Same reasoning as project_role_assignments_user_id_project_id_idx above, for the
--- (user_id, org_id) filter used to resolve org-scope grants in the same query.
+-- org_role_assignments is filtered by (user_id, org_id) when resolving a caller's org-scope
+-- grants. role_id sits between those two columns in the primary key above, so it can't serve
+-- this filter as a direct index lookup without this index.
 CREATE INDEX org_role_assignments_user_id_org_id_idx ON rbac.org_role_assignments (user_id, org_id);
 
 

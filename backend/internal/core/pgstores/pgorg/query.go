@@ -51,8 +51,6 @@ func organizationByNameQuery(name string) pgdb.TypedQuery[Organization] {
 	}
 }
 
-// projectByNameQuery matches name case-insensitively, mirroring the org_id/lower(name) unique
-// index that enforces project name uniqueness within an org.
 func projectByNameQuery(orgID int, name string) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{"org_id": orgID, "name": name}
 	const sql = `
