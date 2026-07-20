@@ -119,7 +119,9 @@ func TestCalculate_error(t *testing.T) {
 
 This applies to inline code comments and to any other documentation — READMEs, design docs, everything — not just Go comments.
 
-- Don't restate what code already makes obvious. If removing the comment wouldn't confuse a reader, remove it.
+- Don't restate what code already makes obvious, including a fact already visible in the same declaration (a field the struct simply doesn't have, a case the switch doesn't handle). If removing the comment wouldn't confuse a reader, remove it.
+- Only compare one thing to another when the comparison itself is the non-obvious fact worth recording — e.g. two things that look alike but are deliberately handled differently. Don't reach for a comparison to state something that already stands on its own without one; that forces the reader to hold a second definition in mind for no payoff, and it's usually the first part to go wrong when either side changes later.
+- Don't cite a file path, doc path, or another function/test name as the reason something is true ("see foo.md", "see TestBar for why"). If the reasoning is worth having, state it inline. A citation rots the moment its target moves, renames, or changes, and it gives the reader nothing the fact itself doesn't already say.
 - Don't write comments that explain a decision by narrating the conversation that led to it ("we agreed to do X", "per your request", "as discussed, this is intentional"). State the constraint plainly, or let the code speak for itself.
 - When a correction (from the user, or your own re-check) changes what you believe is true, write the resulting text as if you'd known the correct fact from the start. The exchange that revealed it — what was assumed, what changed, why — is not part of the domain and must leave no trace in the doc. Narrating that exchange is the usual way this mistake shows up.
 - Avoid comments that go stale as soon as the code around them changes. Describe purpose, not the current shape of the code.
