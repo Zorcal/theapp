@@ -25,8 +25,10 @@ import (
 	"github.com/zorcal/theapp/backend/internal/clients/resend"
 	"github.com/zorcal/theapp/backend/internal/core/auth"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
+	"github.com/zorcal/theapp/backend/internal/core/rbac"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgschema"
@@ -251,6 +253,7 @@ func run(ctx context.Context, cfg Config) error {
 	pgUserStore := pguser.NewStore(pgPool)
 	pgAuthStore := pgauth.NewStore(pgPool)
 	pgRBACStore := pgrbac.NewStore(pgPool)
+	pgOrgStore := pgorg.NewStore(pgPool)
 
 	// Setup cores.
 
@@ -267,6 +270,7 @@ func run(ctx context.Context, cfg Config) error {
 		RefreshTokenTTL:    cfg.Auth.RefreshTokenTTL,
 	}
 	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdb.NewTransactor(pgPool), authCoreCfg)
+	roleCore := rbac.NewCore(pgRBACStore, pgUserStore, pgOrgStore, pgdb.NewTransactor(pgPool))
 
 	// Setup DBOS.
 
@@ -300,6 +304,8 @@ func run(ctx context.Context, cfg Config) error {
 		UserCore:         userCore,
 		AuthCore:         authCore,
 		WorkflowAuthCore: authWorkflowCore,
+		RoleCore:         roleCore,
+		SystemRoleCore:   roleCore,
 		JWTKey:           []byte(cfg.Auth.JWTSecret),
 		JWTIssuer:        cfg.Auth.JWTIssuer,
 		JWTAudience:      cfg.Auth.JWTAudience,

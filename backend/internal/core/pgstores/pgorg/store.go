@@ -106,6 +106,26 @@ func (s *Store) ProjectByID(ctx context.Context, id int) (Project, error) {
 	return project, nil
 }
 
+// IsOrgMember reports whether userID is a member of orgID.
+func (s *Store) IsOrgMember(ctx context.Context, userID, orgID int) (bool, error) {
+	var exists bool
+
+	q := isOrgMemberQuery(userID, orgID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &exists); err != nil {
+			return fmt.Errorf("is org member: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
+
 // ProjectByName returns the project named name owned by orgID.
 // Returns [sql.ErrNoRows] if no such project exists.
 func (s *Store) ProjectByName(ctx context.Context, orgID int, name string) (Project, error) {

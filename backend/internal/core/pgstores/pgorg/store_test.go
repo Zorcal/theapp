@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
 	"github.com/zorcal/theapp/backend/internal/testingx"
@@ -243,6 +244,52 @@ func TestStore_ProjectByName_error(t *testing.T) {
 
 	if _, err := orgStore.ProjectByName(ctx, org.ID, "widgets"); !errors.Is(err, sql.ErrNoRows) {
 		t.Errorf("ProjectByName() error = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestStore_IsOrgMember(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "acme")
+	usr, err := userStore.CreateUser(ctx, pguser.CreateUser{Email: "alice@test.com", Name: "Alice Smith"})
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `INSERT INTO org.org_membership (user_id, org_id) VALUES ($1, $2)`, usr.ID, org.ID); err != nil {
+		t.Fatalf("seed org membership: %v", err)
+	}
+
+	got, err := orgStore.IsOrgMember(ctx, usr.ID, org.ID)
+	if err != nil {
+		t.Fatalf("IsOrgMember() error = %v", err)
+	}
+	if !got {
+		t.Error("IsOrgMember() = false, want true")
+	}
+}
+
+func TestStore_IsOrgMember_notAMember(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "acme")
+	usr, err := userStore.CreateUser(ctx, pguser.CreateUser{Email: "alice@test.com", Name: "Alice Smith"})
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	got, err := orgStore.IsOrgMember(ctx, usr.ID, org.ID)
+	if err != nil {
+		t.Fatalf("IsOrgMember() error = %v", err)
+	}
+	if got {
+		t.Error("IsOrgMember() = true, want false")
 	}
 }
 

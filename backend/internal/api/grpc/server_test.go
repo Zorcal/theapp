@@ -43,10 +43,15 @@ var (
 // testProjectID is the fixed project ID authCtxForTestUser sends as x-project-id metadata.
 const testProjectID = "1"
 
+// testOrgID is the fixed org ID the default AuthCore mock resolves testProjectID to.
+const testOrgID = 1
+
 // ServerTest is a test harness for the gRPC server using mock cores. Use NewServerTest to construct one.
 type ServerTest struct {
-	userServiceClient pb.UserServiceClient
-	authServiceClient pb.AuthServiceClient
+	userServiceClient       pb.UserServiceClient
+	authServiceClient       pb.AuthServiceClient
+	roleServiceClient       pb.RoleServiceClient
+	systemRoleServiceClient pb.SystemRoleServiceClient
 }
 
 // NewServerTest starts a gRPC server with the given config over an in-memory transport and returns
@@ -63,13 +68,18 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 	if cfg.AuthCore == nil {
 		cfg.AuthCore = &MockedAuthCore{
 			AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
-				return mdl.AuthSession{
+				sess := mdl.AuthSession{
 					User: mdl.AuthUser{
 						UserID:      userID,
 						Permissions: mdl.AllPermissions,
 					},
 					ProjectID: projectID,
-				}, nil
+				}
+				if projectID != nil {
+					orgID := testOrgID
+					sess.OrgID = &orgID
+				}
+				return sess, nil
 			},
 		}
 	}
@@ -77,8 +87,10 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 	conn := newBufconnClientConn(t, cfg)
 
 	return ServerTest{
-		userServiceClient: pb.NewUserServiceClient(conn),
-		authServiceClient: pb.NewAuthServiceClient(conn),
+		userServiceClient:       pb.NewUserServiceClient(conn),
+		authServiceClient:       pb.NewAuthServiceClient(conn),
+		roleServiceClient:       pb.NewRoleServiceClient(conn),
+		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
 	}
 }
 

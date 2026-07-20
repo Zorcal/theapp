@@ -83,6 +83,24 @@ func projectByIDQuery(id int) pgdb.TypedQuery[Project] {
 	}
 }
 
+func isOrgMemberQuery(userID, orgID int) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID}
+	const sql = `
+		SELECT EXISTS (
+			SELECT 1 FROM org.org_membership WHERE user_id = @user_id AND org_id = @org_id
+		) AS exists`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (bool, error) {
+			var exists bool
+			return exists, row.Scan(&exists)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func createProjectQuery(cp CreateProject) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{"org_id": cp.OrgID, "name": cp.Name}
 

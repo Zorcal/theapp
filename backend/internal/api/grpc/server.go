@@ -20,6 +20,8 @@ type ServerConfig struct {
 	UserCore         UserCore
 	AuthCore         AuthCore
 	WorkflowAuthCore WorkflowAuthCore
+	RoleCore         RoleCore
+	SystemRoleCore   SystemRoleCore
 	// JWTKey is the HMAC secret used to validate access tokens.
 	JWTKey      []byte
 	JWTIssuer   string
@@ -63,6 +65,23 @@ var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},
 	"/theapp.v1.UserService/CreateUser": {mdl.PermissionUserCreate},
 	"/theapp.v1.UserService/UpdateUser": {mdl.PermissionUserUpdate},
+
+	"/theapp.v1.RoleService/CreateRole":                {mdl.PermissionRoleCreate},
+	"/theapp.v1.RoleService/UpdateRole":                {mdl.PermissionRoleUpdate},
+	"/theapp.v1.RoleService/ModifyRolePermissions":     {mdl.PermissionRoleUpdate},
+	"/theapp.v1.RoleService/DeleteRole":                {mdl.PermissionRoleDelete},
+	"/theapp.v1.RoleService/AssignRole":                {mdl.PermissionRoleAssign},
+	"/theapp.v1.RoleService/UnassignRole":              {mdl.PermissionRoleUnassign},
+	"/theapp.v1.RoleService/ListRoles":                 {mdl.PermissionRoleRead},
+	"/theapp.v1.RoleService/ListAssignablePermissions": {mdl.PermissionRoleRead},
+	"/theapp.v1.RoleService/ListRoleAssignments":       {mdl.PermissionRoleRead},
+	"/theapp.v1.RoleService/ListRolePermissions":       {mdl.PermissionRoleRead},
+
+	"/theapp.v1.SystemRoleService/AssignSystemRole":          {mdl.PermissionRoleAssignSystem},
+	"/theapp.v1.SystemRoleService/UnassignSystemRole":        {mdl.PermissionRoleUnassignSystem},
+	"/theapp.v1.SystemRoleService/ListSystemRoles":           {mdl.PermissionRoleReadSystem},
+	"/theapp.v1.SystemRoleService/ListSystemRolePermissions": {mdl.PermissionRoleReadSystem},
+	"/theapp.v1.SystemRoleService/ListSystemRoleAssignments": {mdl.PermissionRoleReadSystem},
 }
 
 // NewServer constructs the GRPC server.
@@ -100,6 +119,15 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	pb.RegisterAuthServiceServer(srv, &authService{
 		authCore:         cfg.AuthCore,
 		workflowAuthCore: cfg.WorkflowAuthCore,
+	})
+
+	pb.RegisterRoleServiceServer(srv, &roleService{
+		log:      cfg.Log,
+		roleCore: cfg.RoleCore,
+	})
+
+	pb.RegisterSystemRoleServiceServer(srv, &systemRoleService{
+		systemRoleCore: cfg.SystemRoleCore,
 	})
 
 	if cfg.Reflection {
