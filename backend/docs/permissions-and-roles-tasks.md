@@ -49,24 +49,24 @@ Also delivered in this phase, beyond the original task list: a `db migrate` comm
 
 ## Phase 3 — static roles and permission seeding — done
 
-5. Migration: `roles` table (`is_static`; `org_id` deferred to phase 11, added once organizations exist) and `role_permissions` join table. Depends on 4.
-6. `is_static` trigger (`prevent_static_role_mutation`, `BEFORE UPDATE OR DELETE`) on `roles`. Depends on 5.
+5. Migration: `roles` table (`is_static`; `org_id` deferred to phase 11, added once organizations exist) and `role_permissions` join table. Depends on 4. Restructured in phase 13 into separate `static_roles`/`custom_roles` tables, each with its own permission join table — see phase 13's checkpoint for the current shape.
+6. `is_static` trigger (`prevent_static_role_mutation`, `BEFORE UPDATE OR DELETE`) on `roles`. Depends on 5. Removed in phase 13: once static and custom roles live in separate tables, a static role's identity can't be reached by a write path aimed at a custom role, making the trigger unnecessary.
 7. `internal/data/pgschema/seed.sql` (its statements wrapped in a single `BEGIN`/`COMMIT`) plus `pgschema.Seed(ctx, pool)`, run wherever a pool is set up (`cmd/server`, test setup): idempotent (`ON CONFLICT ... DO NOTHING`) `INSERT`s for every permission, `superadmin`, and its grants. Depends on 3, 4, 5.
 8. Static role definitions: `superadmin` (every permission), seeded via 7. Depends on 5, 7.
 
 Permissions and static roles are rows inserted by `seed.sql`, not something any Go code reconciles at runtime or filters on read. Removing a permission or a static role is a manual step against the database after the code change deploys (see `internal/core/rbac/README.md`) — an accepted tradeoff given how rarely this is expected to happen; if that stops being true, this cleanup can move into a `cmd/cli` command instead of staying a hand-run SQL snippet. `useradmin`/`rolesadmin` are dropped for now — illustrative roles with no permissions of their own to hold yet, given only `user:*` permissions exist at this point; add them back once there's a real permission set for each to scope down to.
 
-**Checkpoint:** static roles exist in the DB with correct permission sets, proven by `TestCore_integration`. `pgschema.Seed`'s idempotency (`TestSeed`, asserting the total row count across every table is unchanged after a second call) and the `is_static` trigger (`TestIsStaticTrigger`) each have their own dedicated test. Met.
+**Checkpoint:** static roles exist in the DB with correct permission sets, proven by `TestCore_integration`. `pgschema.Seed`'s idempotency (`TestSeed`, asserting the total row count across every table is unchanged after a second call) was proven by a dedicated test, as was the `is_static` trigger (`TestIsStaticTrigger`) until phase 13 removed it. Met.
 
 ## Phase 4 — system-scope assignment and resolver — done
 
 9. Migration: `system_role_assignments` table (user, role — no project or org). Depends on 5.
-10. Trigger (`prevent_custom_role_system_assignment`, `BEFORE INSERT`) on `system_role_assignments` rejecting inserts where the target role isn't static. Depends on 5, 9.
+10. Trigger (`prevent_custom_role_system_assignment`, `BEFORE INSERT`) on `system_role_assignments` rejecting inserts where the target role isn't static. Depends on 5, 9. Removed in phase 13: `system_role_assignments.role_id` FKs to `static_roles` specifically once that table exists, so a custom role's id can't be inserted there at all.
 11. `mdl.AuthUser` struct, alongside existing `mdl/auth.go`. `mdl.AuthSession` isn't added yet — it pairs `AuthUser` with a `ProjectID` that has no meaning until request-time resolution exists, so it's deferred to phase 6, which is what actually assembles one.
 12. System-scope-only resolver: `auth.Core.AuthUser(ctx, userID)` resolves a user's identity and the permissions it holds from `system_role_assignments` alone (project/org legs added in phase 11), backed by a `PermissionStorer` interface implemented by `pgrbac.Store`. Depends on 8, 9, 11.
 13. `rbac.Core.AssignSystemRole(ctx, userID, roleName)` inserts a `system_role_assignments` row (no gRPC endpoint yet). Depends on 9, 10.
 
-**Checkpoint:** given a `system_role_assignments` row inserted via `AssignSystemRole`, `AuthUser` resolves the correct identity and permission set for that user, proven by `auth.TestCore_integration`. The `BEFORE INSERT` trigger rejecting a non-static role is proven by `TestStore_AssignSystemRole_error`. Met.
+**Checkpoint:** given a `system_role_assignments` row inserted via `AssignSystemRole`, `AuthUser` resolves the correct identity and permission set for that user, proven by `auth.TestCore_integration`. The `BEFORE INSERT` trigger rejecting a non-static role was proven by `TestStore_AssignSystemRole_error` until phase 13 removed the trigger; that test now proves the FK-based replacement instead. Met.
 
 ## Phase 5 — CLI: grant superadmin — done
 
@@ -108,8 +108,8 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 ## Phase 11 — project-scoped resolution — done
 
-22. Migration: `project_role_assignments`, `org_role_assignments` tables. Depends on 5, 17.
-23. Add `org_id` (nullable) to `roles`, now that organizations exist (edits phase 3's migration from task 5 in place). Depends on 5, 17.
+22. Migration: `project_role_assignments`, `org_role_assignments` tables. Depends on 5, 17. Their `role_id` FKs to `custom_roles` since phase 13's table split, not the original single `roles` table.
+23. Add `org_id` (nullable) to `roles`, now that organizations exist (edits phase 3's migration from task 5 in place). Depends on 5, 17. Superseded in phase 13: `org_id` moved to the new `custom_roles` table and became `NOT NULL` — every custom role has an owning org by construction, and a static role (the only kind that had no org) now lives in `static_roles` instead of `roles`.
 24. Three-way union resolver: extend 12 to also union `project_role_assignments` (direct) and `org_role_assignments` (via project→org). Depends on 12, 21, 22.
 25. Interceptor updated to resolve `mdl.AuthSession` via a single core method taking a `*int` project ID: non-nil triggers the full three-way resolver (24) plus an org lookup, setting `ProjectID`/`OrgID` on the session; nil (for a method in `noProjectMethods`) resolves system-scope permissions only, leaving `ProjectID`/`OrgID` unset, replacing the system-scope-only version from phase 6. Depends on 16, 24.
 
@@ -117,19 +117,28 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 
 ## Phase 12 — role service: CRUD and ownership
 
-26. Proto schema: `schemas/role.proto` (`RoleService` — create/update/delete a custom role, assign/unassign, list roles). Run `make generate`.
-27. Role service skeleton: create/edit/delete custom roles, rejecting any target with `is_static = true`. Depends on 23, 26.
-28. Role-org-ownership check on every role-service operation, matching role `org_id` to the assignment's target org. Depends on 27.
-29. Role listing filtered by caller's org (for the "assign a role" UI). Depends on 27.
+26. Proto schema: `schemas/role.proto` (`RoleService` — create/update/delete a custom role, assign/unassign, list roles) and `schemas/system_role.proto` (`SystemRoleService` — assign/unassign/list roles at system scope). Run `make generate`.
 
-**Checkpoint:** custom roles can be created, edited, deleted, and listed via the API, correctly scoped to the caller's org — no assignment yet.
+    Splitting these into two services, rather than folding a `system` scope option into `RoleService`'s assign/unassign, is a deliberate deviation from the original single-file plan: `RoleService` is customer-facing, and system-wide role assignment is structurally internal-only (see "Standard roles" and "Role assignment scope" above) — exposing it as just another oneof branch on the same request a customer integrates against would invite exactly the confusion the split avoids. None of `SystemRoleService`'s RPCs are implemented yet (all three fall through to `codes.Unimplemented`); wiring them up, anchored on `theapp`'s control project, remains unimplemented — phase 13 only wired up `RoleService`'s own assign/unassign, not `SystemRoleService`. `SystemRoleService` has no create/update/delete RPCs at all — a "system role" (this document's API-facing term for what the schema and Go code call a static role, given the two now name the same thing: a static role is only ever assignable at system scope, see "Role assignment scope" above) is seed data, not something an API mutates. `role:read-system` gates `ListSystemRoles`, distinct from the customer-facing `role:read`, mirroring `role:assign-system`/`role:unassign-system`.
+
+27. Role service skeleton: create/edit/delete custom roles, rejecting any target with `is_static = true` (`mdl.ErrStaticRole`). Depends on 23, 26. Phase 13's table split removed this check entirely: a static role's ID isn't a row in `custom_roles`, so the same lookup that resolves a custom role already can't find one, and returns `mdl.ErrNotFound` instead of the distinct `mdl.ErrStaticRole` this task originally introduced.
+28. Role-org-ownership check on every role-service operation: a new custom role is owned by the organization of the caller's current project (never caller-supplied), and editing or deleting an existing one matches its `org_id` against that same org — a mismatch surfaces as `mdl.ErrNotFound` (hidden, cross-tenant), the same distinction as project-scoped resource filtering elsewhere in this document. Depends on 27. (Originally a static role's `org_id`, always `NULL`, produced this same `mdl.ErrNotFound` rather than the visible `mdl.ErrStaticRole` task 27 used elsewhere; since phase 13, static roles have no `org_id` to fall back on at all — they're simply absent from the table this check queries.)
+29. Role listing filtered by caller's org (for the "assign a role" UI): `RoleService.ListRoles` returns only the caller's org's own custom roles, never a static role. Depends on 27.
+
+**Checkpoint:** custom roles can be created, edited, deleted, and listed via the API, correctly scoped to the caller's org — no assignment yet. Proven by `TestCore_integration` (`internal/core/rbac`) and `TestRoleService_*` (`internal/api/grpc`).
 
 ## Phase 13 — role service: assignment endpoints
 
-30. Assign/unassign endpoints writing to the three assignment tables, gated by the `org_membership` check (18) for org-scoped assignment. Depends on 18, 22, 27.
-31. Restrict `system` scope assignment to static roles in the role service (mirrors the DB trigger in 10). Depends on 30.
+30. `RoleService` assign/unassign endpoints (project/org scope only) writing to the two assignment tables, gated by the `org_membership` check (18) for org-scoped assignment. Depends on 18, 22, 27. A target role no longer needs an explicit `is_static = true` rejection (see task 27) — a static role's ID simply isn't resolvable as a custom role once the table split lands, below.
+31. `SystemRoleService` assign/unassign endpoints (system scope only, static roles only — mirrors the DB trigger in 10), anchored on `theapp`'s control project: `x-project-id` must be that exact project's ID, rejected otherwise. Depends on 26, 30. **Not implemented in this phase** — `SystemRoleService` still falls through to `codes.Unimplemented` for all three of its RPCs; deferred to a later phase.
 
-**Checkpoint:** roles can be assigned/unassigned via the API. Privilege-escalation and lockout checks aren't in place until phases 14-15 — don't expose this beyond trusted internal testing until those land, since as it stands any caller with `role:assign` can grant permissions beyond their own.
+Also delivered in this phase, beyond the original task list:
+
+- **Role scope conflict and promotion.** Assigning a role at org scope, when the user already holds that same role at project scope for one or more projects under the org, atomically deletes those project-scope rows and inserts the org-scope row in the same transaction, in `rbac.Core.AssignRole` — org scope already implies the role at every project under it, so the narrower grants become redundant, and this avoids the window a separate unassign-then-assign sequence would leave where the user holds neither. The reverse is a hard error (`mdl.ErrRoleScopeConflict`): assigning at project scope is rejected outright if an org-scope grant of the same role already exists for that org. Org-scope assignment is also gated on `org_membership` (`mdl.ErrNotOrgMember`), which task 30 didn't originally call out as a separate check from the org-membership gate on `org_role_assignments` itself.
+- **`ListRoleAssignments` and `ListRolePermissions` RPCs**, paginated the same way `ListRoles` already is: the former returns a user's role assignments tagged by scope, the latter a role's current permission set. `Role.permissions` was dropped from every read path in favor of `ListRolePermissions` — marked input-only in the proto, still accepted by `CreateRole`/`UpdateRole` — since a role-listing UI doesn't need every role's full permission set on every `ListRoles` call.
+- **Static and custom roles split into separate tables** (`rbac.static_roles`, `rbac.custom_roles`), replacing the single `roles` table's `is_static` column and `org_id` (tasks 5, 23), each with its own permission join table (`static_role_permissions`, `custom_role_permissions`) rather than one shared `role_permissions` table. `system_role_assignments.role_id` FKs to `static_roles`; `project_role_assignments`/`org_role_assignments.role_id` FK to `custom_roles`. This makes "a static role is only ever assignable at system scope, and vice versa" structurally true, so the `prevent_static_role_mutation` trigger (task 6), the `prevent_custom_role_system_assignment` trigger (task 10), and the role service's own `is_static`/`mdl.ErrStaticRole` checks (tasks 27, 28, 30) are all removed as unnecessary. `mdl.Role`/`pgrbac.Role` split into `RoleCustom`/`RoleStatic` to match: `custom_roles.org_id` is `NOT NULL` (every custom role has an owning org by construction), and `static_roles` has no `ETag` (never mutated through the role service). One consequence: resolving a role by external ID for any `RoleService` operation now only ever queries `custom_roles`, so a static role's ID surfaces as the same `mdl.ErrNotFound` as any other nonexistent or cross-org ID, not a distinct error — proven by `TestCore_resolveOwnedCustomRole_staticRoleID`.
+
+**Checkpoint:** custom roles can be assigned/unassigned at project and org scope via the API, including the scope-conflict/promotion rule, and a user's assignments and a role's permissions can each be listed, paginated. System-scope assignment (`SystemRoleService`, task 31) remains unimplemented. Privilege-escalation and lockout checks aren't in place until phases 14-15 — don't expose this beyond trusted internal testing until those land, since as it stands any caller with `role:assign` can grant permissions beyond their own.
 
 ## Phase 14 — role service: privilege escalation checks
 
