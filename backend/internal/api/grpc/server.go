@@ -102,6 +102,8 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 		workflowAuthCore: cfg.WorkflowAuthCore,
 	})
 
+	pb.RegisterSystemRoleServiceServer(srv, &systemRoleService{})
+
 	if cfg.Reflection {
 		reflection.Register(srv)
 	}
