@@ -104,7 +104,7 @@ func marshalRequest(req any) ([]byte, error) {
 // project ID from it first.
 func authUnaryInterceptor(jwtKey []byte, issuer, audience string, authCore AuthCore) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if _, public := publicMethods[info.FullMethod]; public {
+		if publicMethods.Contains(info.FullMethod) {
 			return handler(ctx, req)
 		}
 
@@ -114,7 +114,7 @@ func authUnaryInterceptor(jwtKey []byte, issuer, audience string, authCore AuthC
 		}
 
 		var projectID *int
-		if _, noProject := noProjectMethods[info.FullMethod]; !noProject {
+		if !noProjectMethods.Contains(info.FullMethod) {
 			id, err := parseProjectID(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("parse project id: %w", err)
@@ -171,7 +171,7 @@ func parseBearer(ctx context.Context, jwtKey []byte, issuer, audience string) (*
 // into ctx. Must run after authUnaryInterceptor.
 func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if _, public := publicMethods[info.FullMethod]; public {
+		if publicMethods.Contains(info.FullMethod) {
 			return handler(ctx, req)
 		}
 

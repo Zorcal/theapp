@@ -26,7 +26,7 @@ import (
 // authStreamInterceptor is the streaming counterpart of authUnaryInterceptor.
 func authStreamInterceptor(jwtKey []byte, issuer, audience string, authCore AuthCore) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		if _, public := publicMethods[info.FullMethod]; public {
+		if publicMethods.Contains(info.FullMethod) {
 			return handler(srv, ss)
 		}
 
@@ -36,7 +36,7 @@ func authStreamInterceptor(jwtKey []byte, issuer, audience string, authCore Auth
 		}
 
 		var projectID *int
-		if _, noProject := noProjectMethods[info.FullMethod]; !noProject {
+		if !noProjectMethods.Contains(info.FullMethod) {
 			id, err := parseProjectID(ss.Context())
 			if err != nil {
 				return fmt.Errorf("parse project id: %w", err)
@@ -60,7 +60,7 @@ func authStreamInterceptor(jwtKey []byte, issuer, audience string, authCore Auth
 // after authStreamInterceptor.
 func permissionStreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		if _, public := publicMethods[info.FullMethod]; public {
+		if publicMethods.Contains(info.FullMethod) {
 			return handler(srv, ss)
 		}
 

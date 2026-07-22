@@ -284,7 +284,7 @@ func TestPermissionRegistry_exhaustiveness(t *testing.T) {
 		for _, m := range info.Methods {
 			method := fmt.Sprintf("/%s/%s", serviceName, m.Name)
 
-			_, public := publicMethods[method]
+			public := publicMethods.Contains(method)
 			_, registered := permissionRegistry[method]
 
 			if !public && !registered {

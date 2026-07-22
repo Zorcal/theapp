@@ -12,6 +12,7 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/pkg/set"
 )
 
 // ServerConfig contains all the mandatory systems required by the GRPC server.
@@ -31,7 +32,7 @@ type ServerConfig struct {
 
 // publicMethods lists gRPC methods that do not require a valid JWT. All other
 // methods are authenticated by authUnaryInterceptor / authStreamInterceptor.
-var publicMethods = map[string]struct{}{
+var publicMethods = set.Set[string]{
 	"/theapp.v1.AuthService/RequestMagicLink":   {},
 	"/theapp.v1.AuthService/VerifyMagicLink":    {},
 	"/theapp.v1.AuthService/RefreshAccessToken": {},
@@ -41,7 +42,7 @@ var publicMethods = map[string]struct{}{
 // noProjectMethods lists protected (non-public, see publicMethods) gRPC methods that legitimately
 // have no project context, so they're exempt from requiring x-project-id metadata. All other
 // protected methods require it.
-var noProjectMethods = map[string]struct{}{
+var noProjectMethods = set.Set[string]{
 	"/theapp.v1.AuthService/RevokeAllSessions": {},
 
 	// UserService is a system-wide directory, not a project- or org-scoped resource.

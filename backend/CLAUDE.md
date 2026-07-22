@@ -146,6 +146,10 @@ type Storer interface {
 }
 ```
 
+## Sets
+
+Use pkg/set for sets instead of `map[string]struct{}`.
+
 ## Linting
 
 Run `golangci-lint run ./...` from `backend/` after finishing a change. Fix all issues before considering the task done.
