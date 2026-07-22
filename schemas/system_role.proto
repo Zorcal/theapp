@@ -1,0 +1,221 @@
+syntax = "proto3";
+
+package theapp.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
+
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "theapp System Role API"
+    version: "v1"
+  }
+  security_definitions: {
+    security: {
+      key: "BearerAuth"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "Authorization"
+        description: "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'"
+      }
+    }
+  }
+  security: {
+    security_requirement: {
+      key: "BearerAuth"
+      value: {}
+    }
+  }
+};
+
+// SystemRoleService assigns and unassigns system roles to users, and lists the system roles available to assign. System
+// roles are statically seeded rather than managed through an API. Every call is anchored on the "theapp" organization's
+// control project: x-project-id must be that project's ID.
+service SystemRoleService {
+  // Lists the system roles available to assign.
+  rpc ListSystemRoles(ListSystemRolesRequest) returns (ListSystemRolesResponse) {
+    option (google.api.http) = {
+      get: "/v1/system-roles"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the \"theapp\" organization's control project."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Lists the names of the permissions currently granted to a system role.
+  rpc ListSystemRolePermissions(ListSystemRolePermissionsRequest) returns (ListSystemRolePermissionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/system-roles/{role_name}:permissions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the \"theapp\" organization's control project."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Assigns a system role to a user.
+  rpc AssignSystemRole(AssignSystemRoleRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/system-roles:assign"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the \"theapp\" organization's control project."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Unassigns a system role from a user.
+  rpc UnassignSystemRole(UnassignSystemRoleRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/system-roles:unassign"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the \"theapp\" organization's control project."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Lists the system roles a user holds.
+  rpc ListSystemRoleAssignments(ListSystemRoleAssignmentsRequest) returns (ListSystemRoleAssignmentsResponse) {
+    option (google.api.http) = {
+      get: "/v1/system-role-assignments"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the \"theapp\" organization's control project."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+}
+
+// SystemRole represents a system wide role.
+message SystemRole {
+  // Name of the
+  string name = 1;
+}
+
+// Request message for listing system roles.
+message ListSystemRolesRequest {
+  // Maximum number of roles to return.
+  int32 page_size = 1;
+
+  // Token for fetching the next page of results.
+  string page_token = 2;
+}
+
+// Response message for listing system roles.
+message ListSystemRolesResponse {
+  // The system roles available to assign.
+  repeated SystemRole roles = 1;
+
+  // Total number of system roles.
+  int32 total_size = 2;
+
+  // Token for fetching the next page of results, if applicable.
+  string next_page_token = 3;
+}
+
+// Request message for listing a system role's permissions.
+message ListSystemRolePermissionsRequest {
+  // Name of the system role whose permissions to list.
+  string role_name = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Maximum number of permissions to return.
+  int32 page_size = 2;
+
+  // Token for fetching the next page of results.
+  string page_token = 3;
+}
+
+// Response message for listing a system role's permissions.
+message ListSystemRolePermissionsResponse {
+  // Names of the permissions currently granted to the system role.
+  repeated string permissions = 1;
+
+  // Total number of permissions currently granted to the system role.
+  int32 total_size = 2;
+
+  // Token for fetching the next page of results, if applicable.
+  string next_page_token = 3;
+}
+
+// Request message for assigning a system role to a user.
+message AssignSystemRoleRequest {
+  // Name of the system role to assign.
+  string role_name = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The ID of the user to assign the role to.
+  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Request message for unassigning a system role from a user.
+message UnassignSystemRoleRequest {
+  // Name of the system role to unassign.
+  string role_name = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The ID of the user to unassign the role from.
+  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Request message for listing a user's system role assignments.
+message ListSystemRoleAssignmentsRequest {
+  // The ID of the user whose system role assignments to list.
+  string user_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // Maximum number of assignments to return.
+  int32 page_size = 2;
+
+  // Token for fetching the next page of results.
+  string page_token = 3;
+}
+
+// Response message for listing a user's system role assignments.
+message ListSystemRoleAssignmentsResponse {
+  // Names of the system roles the user holds.
+  repeated string role_names = 1;
+
+  // Total number of system roles the user holds.
+  int32 total_size = 2;
+
+  // Token for fetching the next page of results, if applicable.
+  string next_page_token = 3;
+}

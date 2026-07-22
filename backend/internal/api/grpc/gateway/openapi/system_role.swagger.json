@@ -1,0 +1,415 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "theapp System Role API",
+    "version": "v1"
+  },
+  "tags": [
+    {
+      "name": "SystemRoleService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/system-role-assignments": {
+      "get": {
+        "summary": "Lists the system roles a user holds.",
+        "operationId": "SystemRoleService_ListSystemRoleAssignments",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListSystemRoleAssignmentsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "The ID of the user whose system role assignments to list.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Maximum number of assignments to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    },
+    "/v1/system-roles": {
+      "get": {
+        "summary": "Lists the system roles available to assign.",
+        "operationId": "SystemRoleService_ListSystemRoles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListSystemRolesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of roles to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    },
+    "/v1/system-roles/{roleName}:permissions": {
+      "get": {
+        "summary": "Lists the names of the permissions currently granted to a system role.",
+        "operationId": "SystemRoleService_ListSystemRolePermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListSystemRolePermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roleName",
+            "description": "Name of the system role whose permissions to list.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Maximum number of permissions to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    },
+    "/v1/system-roles:assign": {
+      "post": {
+        "summary": "Assigns a system role to a user.",
+        "operationId": "SystemRoleService_AssignSystemRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for assigning a system role to a user.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1AssignSystemRoleRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    },
+    "/v1/system-roles:unassign": {
+      "post": {
+        "summary": "Unassigns a system role from a user.",
+        "operationId": "SystemRoleService_UnassignSystemRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for unassigning a system role from a user.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1UnassignSystemRoleRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1AssignSystemRoleRequest": {
+      "type": "object",
+      "properties": {
+        "roleName": {
+          "type": "string",
+          "description": "Name of the system role to assign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user to assign the role to."
+        }
+      },
+      "description": "Request message for assigning a system role to a user.",
+      "required": [
+        "roleName",
+        "userId"
+      ]
+    },
+    "v1ListSystemRoleAssignmentsResponse": {
+      "type": "object",
+      "properties": {
+        "roleNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names of the system roles the user holds."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of system roles the user holds."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing a user's system role assignments."
+    },
+    "v1ListSystemRolePermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names of the permissions currently granted to the system role."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of permissions currently granted to the system role."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing a system role's permissions."
+    },
+    "v1ListSystemRolesResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1SystemRole"
+          },
+          "description": "The system roles available to assign."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of system roles."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing system roles."
+    },
+    "v1SystemRole": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Name of the"
+        }
+      },
+      "description": "SystemRole represents a system wide role."
+    },
+    "v1UnassignSystemRoleRequest": {
+      "type": "object",
+      "properties": {
+        "roleName": {
+          "type": "string",
+          "description": "Name of the system role to unassign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user to unassign the role from."
+        }
+      },
+      "description": "Request message for unassigning a system role from a user.",
+      "required": [
+        "roleName",
+        "userId"
+      ]
+    }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "description": "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}
