@@ -43,6 +43,28 @@ type AuthSession struct {
 	OrgID *int
 }
 
+// MustProjectID returns the project ID.
+//
+// It panics if the session has no project context. Use this only when the
+// caller has already established that the request is project-scoped.
+func (as AuthSession) MustProjectID() int {
+	if as.ProjectID == nil {
+		panic("MustProjectID called on an AuthSession without project context")
+	}
+	return *as.ProjectID
+}
+
+// MustOrgID returns the organization ID.
+//
+// It panics if the session has no project context. Use this only when the
+// caller has already established that the request is project-scoped.
+func (as AuthSession) MustOrgID() int {
+	if as.OrgID == nil {
+		panic("MustOrgID called on an AuthSession without project context")
+	}
+	return *as.OrgID
+}
+
 type contextKeyAuthSession struct{}
 
 // ContextWithAuthSession returns a copy of ctx carrying s as the current request's auth session.
