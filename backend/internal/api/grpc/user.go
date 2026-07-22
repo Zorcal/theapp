@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"slices"
 
 	"github.com/google/uuid"
@@ -23,7 +22,6 @@ import (
 type userService struct {
 	pb.UnimplementedUserServiceServer
 
-	log      *slog.Logger
 	userCore UserCore
 }
 

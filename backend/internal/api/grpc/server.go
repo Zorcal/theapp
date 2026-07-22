@@ -94,7 +94,6 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	)
 
 	pb.RegisterUserServiceServer(srv, &userService{
-		log:      cfg.Log,
 		userCore: cfg.UserCore,
 	})
 
