@@ -17,6 +17,23 @@ Quicklist:
   - Field masks: [AIP-161](https://google.aip.dev/161)
 - Delete: [AIP-135](https://google.aip.dev/135)
 
+### Resource identifiers
+
+A message's `id` field is never the resource's internal serial primary key. Expose an external UUID instead (`(google.api.field_info).format = UUID4`, `OUTPUT_ONLY`), generated separately from the primary key used for internal foreign keys and joins. This keeps the total number of rows in a table from being inferable by an API client, and means a resource's ID never has to change if its storage is ever repartitioned or migrated.
+
+### Optimistic concurrency (etag)
+
+Every updatable resource message carries an output-only `etag` field, regenerated on every write:
+
+```proto
+// The ETag for the current version of the user. Helps to prevent
+// simultaneous updates of a user from overwriting each other ("mid-air
+// collisions").
+//
+// If this is provided on update, it must match the server's ETag.
+string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+```
+
 ### Filtering
 
 AIP-160 specifies a free-form filter string that supports arbitrary boolean expressions, wildcards, and traversal into nested fields. Full compliance requires a parser, an AST, and ongoing work as new operators are needed — complexity that is rarely justified for internal APIs with a small, known set of filter fields.

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -25,10 +26,66 @@ func TestStore_StaticRoles(t *testing.T) {
 		t.Fatalf("StaticRoles() error = %v", err)
 	}
 	want := []RoleStatic{
-		{Name: "superadmin", PermissionNames: []string{"user:create", "user:read", "user:update"}},
+		{Name: "superadmin", PermissionNames: []string{
+			"role:assign", "role:assign-system", "role:create", "role:delete", "role:read", "role:read-system",
+			"role:unassign", "role:unassign-system", "role:update", "user:create", "user:read", "user:update",
+		}},
 	}
 
-	testingx.AssertDiff(t, got, want)
+	testingx.AssertDiff(t, got, want, cmpopts.IgnoreFields(RoleStatic{}, "ID", "ExternalID", "CreatedAt", "UpdatedAt"))
+}
+
+func TestStore_StaticRoleByName(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+
+	got, err := rbacStore.StaticRoleByName(ctx, "superadmin")
+	if err != nil {
+		t.Fatalf("StaticRoleByName() error = %v", err)
+	}
+
+	want := RoleStatic{Name: "superadmin", PermissionNames: []string{
+		"role:assign", "role:assign-system", "role:create", "role:delete", "role:read", "role:read-system",
+		"role:unassign", "role:unassign-system", "role:update", "user:create", "user:read", "user:update",
+	}}
+
+	testingx.AssertDiff(t, got, want, cmpopts.IgnoreFields(RoleStatic{}, "ID", "ExternalID", "CreatedAt", "UpdatedAt"))
+}
+
+func TestStore_StaticRoleByName_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+
+	if _, err := rbacStore.StaticRoleByName(ctx, "nonexistent"); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("StaticRoleByName() error = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestStore_SystemRoleAssignmentsForUser(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	usr := seedUser(t, userStore, "alice@test.com")
+
+	got, err := rbacStore.SystemRoleAssignmentsForUser(ctx, usr.ID)
+	if err != nil {
+		t.Fatalf("SystemRoleAssignmentsForUser() error = %v", err)
+	}
+	testingx.AssertDiff(t, got, []string{})
+
+	if err := rbacStore.AssignSystemRole(ctx, usr.ID, "superadmin"); err != nil {
+		t.Fatalf("AssignSystemRole() error = %v", err)
+	}
+
+	got, err = rbacStore.SystemRoleAssignmentsForUser(ctx, usr.ID)
+	if err != nil {
+		t.Fatalf("SystemRoleAssignmentsForUser() error = %v", err)
+	}
+	testingx.AssertDiff(t, got, []string{"superadmin"})
 }
 
 func TestStore_SystemPermissions(t *testing.T) {
@@ -49,6 +106,15 @@ func TestStore_SystemPermissions(t *testing.T) {
 		}
 
 		want := []string{
+			"role:assign",
+			"role:assign-system",
+			"role:create",
+			"role:delete",
+			"role:read",
+			"role:read-system",
+			"role:unassign",
+			"role:unassign-system",
+			"role:update",
 			"user:create",
 			"user:read",
 			"user:update",
@@ -99,7 +165,10 @@ func TestStore_ProjectPermissions(t *testing.T) {
 			t.Fatalf("ProjectPermissions() error = %v", err)
 		}
 
-		want := ProjectPermissions{OrgID: orgID, PermissionNames: []string{"user:create", "user:read", "user:update"}}
+		want := ProjectPermissions{OrgID: orgID, PermissionNames: []string{
+			"role:assign", "role:assign-system", "role:create", "role:delete", "role:read", "role:read-system",
+			"role:unassign", "role:unassign-system", "role:update", "user:create", "user:read", "user:update",
+		}}
 
 		testingx.AssertDiff(t, got, want)
 	})
@@ -167,7 +236,10 @@ func TestStore_ProjectPermissions(t *testing.T) {
 			t.Fatalf("ProjectPermissions() error = %v", err)
 		}
 
-		want := ProjectPermissions{OrgID: orgID, PermissionNames: []string{"user:create", "user:read", "user:update"}}
+		want := ProjectPermissions{OrgID: orgID, PermissionNames: []string{
+			"role:assign", "role:assign-system", "role:create", "role:delete", "role:read", "role:read-system",
+			"role:unassign", "role:unassign-system", "role:update", "user:create", "user:read", "user:update",
+		}}
 
 		testingx.AssertDiff(t, got, want)
 	})
@@ -289,6 +361,195 @@ func TestStore_AssignSystemRole_error(t *testing.T) {
 			t.Errorf("AssignSystemRole() error = %v, want sql.ErrNoRows", err)
 		}
 	})
+}
+
+func TestStore_AssignProjectRole(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	usr := seedUser(t, userStore, "alice@test.com")
+	seedRole(t, ctx, pool, "user-viewer", []string{"user:read"})
+	_, projectID := seedOrgAndProject(t, pool, "acme")
+	roleID := customRoleIDByName(t, ctx, pool, "user-viewer")
+
+	if err := rbacStore.AssignProjectRole(ctx, usr.ID, roleID, projectID); err != nil {
+		t.Fatalf("AssignProjectRole() error = %v", err)
+	}
+
+	// Assigning again is a no-op.
+	if err := rbacStore.AssignProjectRole(ctx, usr.ID, roleID, projectID); err != nil {
+		t.Fatalf("AssignProjectRole() again error = %v", err)
+	}
+
+	got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
+	if err != nil {
+		t.Fatalf("ProjectPermissions() error = %v", err)
+	}
+	testingx.AssertDiff(t, got.PermissionNames, []string{"user:read"})
+}
+
+func TestStore_AssignOrgRole(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	usr := seedUser(t, userStore, "alice@test.com")
+	seedRole(t, ctx, pool, "user-viewer", []string{"user:read"})
+	orgID, projectID := seedOrgAndProject(t, pool, "acme")
+	roleID := customRoleIDByName(t, ctx, pool, "user-viewer")
+
+	if err := rbacStore.AssignOrgRole(ctx, usr.ID, roleID, orgID); err != nil {
+		t.Fatalf("AssignOrgRole() error = %v", err)
+	}
+
+	got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
+	if err != nil {
+		t.Fatalf("ProjectPermissions() error = %v", err)
+	}
+	testingx.AssertDiff(t, got.PermissionNames, []string{"user:read"})
+}
+
+func TestStore_UnassignProjectRole(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	usr := seedUser(t, userStore, "alice@test.com")
+	seedRole(t, ctx, pool, "user-viewer", []string{"user:read"})
+	_, projectID := seedOrgAndProject(t, pool, "acme")
+	roleID := customRoleIDByName(t, ctx, pool, "user-viewer")
+	seedProjectRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", projectID)
+
+	if err := rbacStore.UnassignProjectRole(ctx, usr.ID, roleID, projectID); err != nil {
+		t.Fatalf("UnassignProjectRole() error = %v", err)
+	}
+
+	got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
+	if err != nil {
+		t.Fatalf("ProjectPermissions() error = %v", err)
+	}
+	testingx.AssertDiff(t, got.PermissionNames, []string{})
+
+	// Unassigning again (no such grant) is a no-op.
+	if err := rbacStore.UnassignProjectRole(ctx, usr.ID, roleID, projectID); err != nil {
+		t.Fatalf("UnassignProjectRole() again error = %v", err)
+	}
+}
+
+func TestStore_UnassignOrgRole(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	usr := seedUser(t, userStore, "alice@test.com")
+	seedRole(t, ctx, pool, "user-viewer", []string{"user:read"})
+	orgID, projectID := seedOrgAndProject(t, pool, "acme")
+	roleID := customRoleIDByName(t, ctx, pool, "user-viewer")
+	seedOrgRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", orgID)
+
+	if err := rbacStore.UnassignOrgRole(ctx, usr.ID, roleID, orgID); err != nil {
+		t.Fatalf("UnassignOrgRole() error = %v", err)
+	}
+
+	got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
+	if err != nil {
+		t.Fatalf("ProjectPermissions() error = %v", err)
+	}
+	testingx.AssertDiff(t, got.PermissionNames, []string{})
+}
+
+func TestStore_OrgAssignmentExists(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	usr := seedUser(t, userStore, "alice@test.com")
+	seedRole(t, ctx, pool, "user-viewer", []string{"user:read"})
+	orgID, _ := seedOrgAndProject(t, pool, "acme")
+	roleID := customRoleIDByName(t, ctx, pool, "user-viewer")
+
+	got, err := rbacStore.OrgAssignmentExists(ctx, usr.ID, roleID, orgID)
+	if err != nil {
+		t.Fatalf("OrgAssignmentExists() error = %v", err)
+	}
+	if got {
+		t.Error("OrgAssignmentExists() = true, want false")
+	}
+
+	seedOrgRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", orgID)
+
+	got, err = rbacStore.OrgAssignmentExists(ctx, usr.ID, roleID, orgID)
+	if err != nil {
+		t.Fatalf("OrgAssignmentExists() error = %v", err)
+	}
+	if !got {
+		t.Error("OrgAssignmentExists() = false, want true")
+	}
+}
+
+func TestStore_DeleteProjectAssignmentsForOrg(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	usr := seedUser(t, userStore, "alice@test.com")
+	seedRole(t, ctx, pool, "user-viewer", []string{"user:read"})
+	orgID, projectID := seedOrgAndProject(t, pool, "acme")
+	roleID := customRoleIDByName(t, ctx, pool, "user-viewer")
+	seedProjectRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", projectID)
+
+	if err := rbacStore.DeleteProjectAssignmentsForOrg(ctx, usr.ID, roleID, orgID); err != nil {
+		t.Fatalf("DeleteProjectAssignmentsForOrg() error = %v", err)
+	}
+
+	got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
+	if err != nil {
+		t.Fatalf("ProjectPermissions() error = %v", err)
+	}
+	testingx.AssertDiff(t, got.PermissionNames, []string{})
+}
+
+func TestStore_RoleAssignmentsForUser(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	usr := seedUser(t, userStore, "alice@test.com")
+	seedRole(t, ctx, pool, "project-role", []string{"user:read"})
+	seedRole(t, ctx, pool, "org-role", []string{"user:create"})
+	orgID, projectID := seedOrgAndProject(t, pool, "acme")
+	seedProjectRoleAssignment(t, ctx, pool, usr.ID, "project-role", projectID)
+	seedOrgRoleAssignment(t, ctx, pool, usr.ID, "org-role", orgID)
+
+	got, err := rbacStore.RoleAssignmentsForUser(ctx, usr.ID, orgID)
+	if err != nil {
+		t.Fatalf("RoleAssignmentsForUser() error = %v", err)
+	}
+
+	want := []RoleAssignment{
+		{RoleName: "org-role", OrgID: &orgID},
+		{RoleName: "project-role", ProjectID: &projectID},
+	}
+
+	testingx.AssertDiff(t, got, want, cmpopts.IgnoreFields(RoleAssignment{}, "RoleExternalID"))
+}
+
+func customRoleIDByName(t *testing.T, ctx context.Context, pool *pgxpool.Pool, name string) int {
+	t.Helper()
+
+	var id int
+	if err := pool.QueryRow(ctx, `SELECT id FROM rbac.custom_roles WHERE name = $1`, name).Scan(&id); err != nil {
+		t.Fatalf("custom role id by name %q: %v", name, err)
+	}
+	return id
 }
 
 func seedUser(t *testing.T, s *pguser.Store, email string) pguser.User {

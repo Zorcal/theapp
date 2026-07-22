@@ -69,7 +69,7 @@ func run(ctx context.Context) error {
 	pgRBACStore := pgrbac.NewStore(pgPool)
 	pgOrgStore := pgorg.NewStore(pgPool)
 	userCore := user.NewCore(pgUserStore)
-	rbacCore := rbac.NewCore(pgRBACStore, pgUserStore)
+	rbacCore := rbac.NewCore(pgRBACStore, pgUserStore, pgOrgStore, pgdb.NewTransactor(pgPool))
 	orgCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pgPool))
 
 	cmd := &cli.Command{

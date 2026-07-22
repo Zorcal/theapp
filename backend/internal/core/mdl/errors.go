@@ -29,6 +29,15 @@ var ErrValidation = errors.New("validation failed")
 // control project.
 var ErrControlProjectNameConflict = errors.New("project name conflicts with control project")
 
+// ErrNotOrgMember is returned when attempting an org-scoped role assignment for a user who isn't
+// a member of that organization.
+var ErrNotOrgMember = errors.New("not a member of the organization")
+
+// ErrRoleScopeConflict is returned when attempting a project-scoped role assignment for a
+// user/role that already holds an org-scope assignment of the same role for that project's
+// organization — the org-scope grant already covers every project under it, including this one.
+var ErrRoleScopeConflict = errors.New("role already assigned at org scope")
+
 // validationError wraps msg, a short field-level description, with ErrValidation.
 func validationError(msg string) error {
 	return fmt.Errorf("%s: %w", msg, ErrValidation)

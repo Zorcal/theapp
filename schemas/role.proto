@@ -1,0 +1,439 @@
+syntax = "proto3";
+
+package theapp.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/field_mask.proto";
+
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
+
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "theapp Role API"
+    version: "v1"
+  }
+  security_definitions: {
+    security: {
+      key: "BearerAuth"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "Authorization"
+        description: "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'"
+      }
+    }
+  }
+  security: {
+    security_requirement: {
+      key: "BearerAuth"
+      value: {}
+    }
+  }
+};
+
+// RoleService manages custom roles, scoped to the organization of the caller's current project,
+// and their assignment to users at project or organization scope.
+service RoleService {
+  // Creates a new custom role, owned by the organization of the caller's current project.
+  rpc CreateRole(CreateRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      post: "/v1/roles"
+      body: "role"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Updates a custom role.
+  rpc UpdateRole(UpdateRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      patch: "/v1/roles/{role.id}"
+      body: "role"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Adds and/or removes permissions from a custom role's permission set.
+  rpc ModifyRolePermissions(ModifyRolePermissionsRequest) returns (Role) {
+    option (google.api.http) = {
+      post: "/v1/roles/{id}:modifyPermissions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Deletes a custom role.
+  rpc DeleteRole(DeleteRoleRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/roles/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Assigns a role to a user, scoped to a project or an organization.
+  //
+  // Assigning at org scope, when the user already holds this role at project scope for one or
+  // more projects under that org, deletes those project-scope grants and inserts the org-scope
+  // grant in the same transaction — org scope already implies the role at every project under it,
+  // so the narrower grants become redundant.
+  //
+  // Assigning at project scope is rejected if the user already holds this role at the project's
+  // org scope: there's no legitimate reason to add a narrower grant when a broader one already
+  // covers it. Call this again with org_id set instead of project_id to promote an existing
+  // project-scope grant to org scope.
+  rpc AssignRole(AssignRoleRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/roles:assign"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Unassigns a role from a user.
+  rpc UnassignRole(UnassignRoleRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/roles:unassign"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Lists the custom roles owned by the organization of the caller's current project.
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (google.api.http) = {
+      get: "/v1/roles"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Lists the names of every permission that can be assigned to a custom role.
+  rpc ListAssignablePermissions(ListAssignablePermissionsRequest) returns (ListAssignablePermissionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/roles:assignablePermissions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Lists every role a user holds within the caller's organization, each tagged with the scope
+  // (project or org) it's held at.
+  rpc ListRoleAssignments(ListRoleAssignmentsRequest) returns (ListRoleAssignmentsResponse) {
+    option (google.api.http) = {
+      get: "/v1/roleAssignments"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Lists the names of the permissions currently granted to a custom role.
+  rpc ListRolePermissions(ListRolePermissionsRequest) returns (ListRolePermissionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/roles/{role_id}:permissions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project this request operates in."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+}
+
+// Role represents a custom role, owned by the caller's organization.
+message Role {
+  // Unique identifier for the role. Output only.
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+
+  // Name of the role.
+  string name = 2;
+
+  // Names of the permissions to grant this role on create or update. Input only — never
+  // populated on a Role returned by this service; see ListRolePermissions for reading a role's
+  // current permission set.
+  repeated string permissions = 3 [(google.api.field_behavior) = INPUT_ONLY];
+
+  // Timestamp when the role was created. Output only.
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Timestamp when the role was last updated. Output only.
+  google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // The ETag for the current version of the role. Helps to prevent
+  // simultaneous updates of a role from overwriting each other ("mid-air
+  // collisions").
+  //
+  // If this is provided on update, it must match the server's ETag.
+  string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+}
+
+// RoleAssignment is a role a user holds at a particular scope. Exactly one of project_id or
+// org_id is set, identifying the scope.
+message RoleAssignment {
+  // ID of the assigned role.
+  string role_id = 1 [(google.api.field_info).format = UUID4];
+
+  // Name of the assigned role.
+  string role_name = 2;
+
+  oneof scope {
+    // The role is held for a single project.
+    int32 project_id = 3;
+
+    // The role is held for every project under an organization.
+    int32 org_id = 4;
+  }
+}
+
+// Request message for creating a role.
+message CreateRoleRequest {
+  // The role to create.
+  Role role = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for updating a role. Updating permissions replaces the role's entire
+// permission set; see ModifyRolePermissionsRequest for an additive alternative that doesn't risk
+// clobbering a concurrent edit to a different permission.
+message UpdateRoleRequest {
+  // The role to update. The role's `id` identifies which role to update.
+  Role role = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The list of fields to update. When omitted, all populated fields are updated.
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+// Request message for adding and/or removing permissions from a role's permission set. Adding a
+// permission the role already has, or removing one it doesn't have, is a no-op.
+message ModifyRolePermissionsRequest {
+  // The ID of the role to modify.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // Permission names to add to the role's permission set. Must not overlap with
+  // remove_permissions.
+  repeated string add_permissions = 2;
+
+  // Permission names to remove from the role's permission set. Must not overlap with
+  // add_permissions.
+  repeated string remove_permissions = 3;
+}
+
+// Request message for deleting a role.
+message DeleteRoleRequest {
+  // The ID of the role to delete.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Request message for assigning a role to a user. Exactly one of project_id or org_id must be
+// set, selecting the scope the assignment applies to.
+message AssignRoleRequest {
+  // The ID of the role to assign.
+  string role_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // The ID of the user to assign the role to.
+  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  oneof scope {
+    // Assign the role for a single project.
+    int32 project_id = 3;
+
+    // Assign the role for every project under an organization.
+    int32 org_id = 4;
+  }
+}
+
+// Request message for unassigning a role from a user. Exactly one of project_id or org_id must
+// be set, selecting the scope the assignment applies to.
+message UnassignRoleRequest {
+  // The ID of the role to unassign.
+  string role_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // The ID of the user to unassign the role from.
+  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  oneof scope {
+    // Unassign the role for a single project.
+    int32 project_id = 3;
+
+    // Unassign the role for every project under an organization.
+    int32 org_id = 4;
+  }
+}
+
+// RoleFilter specifies criteria for filtering roles in a ListRoles request. Reserved for future
+// filter criteria; it has no fields yet.
+message RoleFilter {}
+
+// Request message for listing roles.
+message ListRolesRequest {
+  // Maximum number of roles to return.
+  int32 page_size = 1;
+
+  // Token for fetching the next page of results.
+  string page_token = 2;
+
+  // Filter criteria. All fields are optional; omitted fields match all roles.
+  RoleFilter filter = 3;
+}
+
+// Response message for listing roles.
+message ListRolesResponse {
+  // List of roles returned in the response.
+  repeated Role roles = 1;
+
+  // Total number of roles visible to the caller's organization.
+  int32 total_size = 2;
+
+  // Token for fetching the next page of results, if applicable.
+  string next_page_token = 3;
+}
+
+// Request message for listing assignable permissions.
+message ListAssignablePermissionsRequest {}
+
+// Response message for listing assignable permissions.
+message ListAssignablePermissionsResponse {
+  // Names of every permission that can be assigned to a custom role.
+  repeated string permissions = 1;
+}
+
+// RoleAssignmentFilter specifies criteria for filtering role assignments in a ListRoleAssignments
+// request. Reserved for future filter criteria; it has no fields yet.
+message RoleAssignmentFilter {}
+
+// Request message for listing a user's role assignments.
+message ListRoleAssignmentsRequest {
+  // The ID of the user whose role assignments to list.
+  string user_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // Maximum number of assignments to return.
+  int32 page_size = 2;
+
+  // Token for fetching the next page of results.
+  string page_token = 3;
+
+  // Filter criteria. All fields are optional; omitted fields match all assignments.
+  RoleAssignmentFilter filter = 4;
+}
+
+// Response message for listing a user's role assignments.
+message ListRoleAssignmentsResponse {
+  // List of role assignments returned in the response.
+  repeated RoleAssignment assignments = 1;
+
+  // Total number of role assignments the user holds within the caller's organization.
+  int32 total_size = 2;
+
+  // Token for fetching the next page of results, if applicable.
+  string next_page_token = 3;
+}
+
+// Request message for listing a role's permissions.
+message ListRolePermissionsRequest {
+  // The ID of the role whose permissions to list.
+  string role_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // Maximum number of permissions to return.
+  int32 page_size = 2;
+
+  // Token for fetching the next page of results.
+  string page_token = 3;
+}
+
+// Response message for listing a role's permissions.
+message ListRolePermissionsResponse {
+  // Names of the permissions currently granted to the role.
+  repeated string permissions = 1;
+
+  // Total number of permissions currently granted to the role.
+  int32 total_size = 2;
+
+  // Token for fetching the next page of results, if applicable.
+  string next_page_token = 3;
+}
