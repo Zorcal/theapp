@@ -27,7 +27,9 @@ const (
 type SystemRole struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unique name of the system role.
-	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Permissions granted to the system role.
+	Permissions   []string `protobuf:"bytes,2,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -67,6 +69,13 @@ func (x *SystemRole) GetName() string {
 		return x.Name
 	}
 	return ""
+}
+
+func (x *SystemRole) GetPermissions() []string {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
 }
 
 // Request message for listing system roles.
@@ -188,134 +197,6 @@ func (x *ListSystemRolesResponse) GetNextPageToken() string {
 	return ""
 }
 
-// Request message for listing a system role's permissions.
-type ListSystemRolePermissionsRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Name of the system role whose permissions to list.
-	RoleName string `protobuf:"bytes,1,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
-	// Maximum number of permissions to return.
-	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// Token for fetching the next page of results.
-	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListSystemRolePermissionsRequest) Reset() {
-	*x = ListSystemRolePermissionsRequest{}
-	mi := &file_system_role_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListSystemRolePermissionsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListSystemRolePermissionsRequest) ProtoMessage() {}
-
-func (x *ListSystemRolePermissionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_system_role_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListSystemRolePermissionsRequest.ProtoReflect.Descriptor instead.
-func (*ListSystemRolePermissionsRequest) Descriptor() ([]byte, []int) {
-	return file_system_role_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *ListSystemRolePermissionsRequest) GetRoleName() string {
-	if x != nil {
-		return x.RoleName
-	}
-	return ""
-}
-
-func (x *ListSystemRolePermissionsRequest) GetPageSize() int32 {
-	if x != nil {
-		return x.PageSize
-	}
-	return 0
-}
-
-func (x *ListSystemRolePermissionsRequest) GetPageToken() string {
-	if x != nil {
-		return x.PageToken
-	}
-	return ""
-}
-
-// Response message for listing a system role's permissions.
-type ListSystemRolePermissionsResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Names of the permissions currently granted to the system role.
-	Permissions []string `protobuf:"bytes,1,rep,name=permissions,proto3" json:"permissions,omitempty"`
-	// Total number of permissions currently granted to the system role.
-	TotalSize int32 `protobuf:"varint,2,opt,name=total_size,json=totalSize,proto3" json:"total_size,omitempty"`
-	// Token for fetching the next page of results, if applicable.
-	NextPageToken string `protobuf:"bytes,3,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ListSystemRolePermissionsResponse) Reset() {
-	*x = ListSystemRolePermissionsResponse{}
-	mi := &file_system_role_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ListSystemRolePermissionsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ListSystemRolePermissionsResponse) ProtoMessage() {}
-
-func (x *ListSystemRolePermissionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_system_role_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ListSystemRolePermissionsResponse.ProtoReflect.Descriptor instead.
-func (*ListSystemRolePermissionsResponse) Descriptor() ([]byte, []int) {
-	return file_system_role_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ListSystemRolePermissionsResponse) GetPermissions() []string {
-	if x != nil {
-		return x.Permissions
-	}
-	return nil
-}
-
-func (x *ListSystemRolePermissionsResponse) GetTotalSize() int32 {
-	if x != nil {
-		return x.TotalSize
-	}
-	return 0
-}
-
-func (x *ListSystemRolePermissionsResponse) GetNextPageToken() string {
-	if x != nil {
-		return x.NextPageToken
-	}
-	return ""
-}
-
 // Request message for assigning a system role to a user.
 type AssignSystemRoleRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -329,7 +210,7 @@ type AssignSystemRoleRequest struct {
 
 func (x *AssignSystemRoleRequest) Reset() {
 	*x = AssignSystemRoleRequest{}
-	mi := &file_system_role_proto_msgTypes[5]
+	mi := &file_system_role_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -341,7 +222,7 @@ func (x *AssignSystemRoleRequest) String() string {
 func (*AssignSystemRoleRequest) ProtoMessage() {}
 
 func (x *AssignSystemRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_system_role_proto_msgTypes[5]
+	mi := &file_system_role_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -354,7 +235,7 @@ func (x *AssignSystemRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignSystemRoleRequest.ProtoReflect.Descriptor instead.
 func (*AssignSystemRoleRequest) Descriptor() ([]byte, []int) {
-	return file_system_role_proto_rawDescGZIP(), []int{5}
+	return file_system_role_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AssignSystemRoleRequest) GetRoleName() string {
@@ -380,7 +261,7 @@ type AssignSystemRoleResponse struct {
 
 func (x *AssignSystemRoleResponse) Reset() {
 	*x = AssignSystemRoleResponse{}
-	mi := &file_system_role_proto_msgTypes[6]
+	mi := &file_system_role_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -392,7 +273,7 @@ func (x *AssignSystemRoleResponse) String() string {
 func (*AssignSystemRoleResponse) ProtoMessage() {}
 
 func (x *AssignSystemRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_system_role_proto_msgTypes[6]
+	mi := &file_system_role_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -405,7 +286,7 @@ func (x *AssignSystemRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignSystemRoleResponse.ProtoReflect.Descriptor instead.
 func (*AssignSystemRoleResponse) Descriptor() ([]byte, []int) {
-	return file_system_role_proto_rawDescGZIP(), []int{6}
+	return file_system_role_proto_rawDescGZIP(), []int{4}
 }
 
 // Request message for unassigning a system role from a user.
@@ -421,7 +302,7 @@ type UnassignSystemRoleRequest struct {
 
 func (x *UnassignSystemRoleRequest) Reset() {
 	*x = UnassignSystemRoleRequest{}
-	mi := &file_system_role_proto_msgTypes[7]
+	mi := &file_system_role_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -433,7 +314,7 @@ func (x *UnassignSystemRoleRequest) String() string {
 func (*UnassignSystemRoleRequest) ProtoMessage() {}
 
 func (x *UnassignSystemRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_system_role_proto_msgTypes[7]
+	mi := &file_system_role_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -446,7 +327,7 @@ func (x *UnassignSystemRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnassignSystemRoleRequest.ProtoReflect.Descriptor instead.
 func (*UnassignSystemRoleRequest) Descriptor() ([]byte, []int) {
-	return file_system_role_proto_rawDescGZIP(), []int{7}
+	return file_system_role_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UnassignSystemRoleRequest) GetRoleName() string {
@@ -472,7 +353,7 @@ type UnassignSystemRoleResponse struct {
 
 func (x *UnassignSystemRoleResponse) Reset() {
 	*x = UnassignSystemRoleResponse{}
-	mi := &file_system_role_proto_msgTypes[8]
+	mi := &file_system_role_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -484,7 +365,7 @@ func (x *UnassignSystemRoleResponse) String() string {
 func (*UnassignSystemRoleResponse) ProtoMessage() {}
 
 func (x *UnassignSystemRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_system_role_proto_msgTypes[8]
+	mi := &file_system_role_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -497,7 +378,7 @@ func (x *UnassignSystemRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnassignSystemRoleResponse.ProtoReflect.Descriptor instead.
 func (*UnassignSystemRoleResponse) Descriptor() ([]byte, []int) {
-	return file_system_role_proto_rawDescGZIP(), []int{8}
+	return file_system_role_proto_rawDescGZIP(), []int{6}
 }
 
 // Request message for listing a user's system role assignments.
@@ -515,7 +396,7 @@ type ListSystemRoleAssignmentsRequest struct {
 
 func (x *ListSystemRoleAssignmentsRequest) Reset() {
 	*x = ListSystemRoleAssignmentsRequest{}
-	mi := &file_system_role_proto_msgTypes[9]
+	mi := &file_system_role_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -527,7 +408,7 @@ func (x *ListSystemRoleAssignmentsRequest) String() string {
 func (*ListSystemRoleAssignmentsRequest) ProtoMessage() {}
 
 func (x *ListSystemRoleAssignmentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_system_role_proto_msgTypes[9]
+	mi := &file_system_role_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -540,7 +421,7 @@ func (x *ListSystemRoleAssignmentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSystemRoleAssignmentsRequest.ProtoReflect.Descriptor instead.
 func (*ListSystemRoleAssignmentsRequest) Descriptor() ([]byte, []int) {
-	return file_system_role_proto_rawDescGZIP(), []int{9}
+	return file_system_role_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListSystemRoleAssignmentsRequest) GetUserId() string {
@@ -579,7 +460,7 @@ type ListSystemRoleAssignmentsResponse struct {
 
 func (x *ListSystemRoleAssignmentsResponse) Reset() {
 	*x = ListSystemRoleAssignmentsResponse{}
-	mi := &file_system_role_proto_msgTypes[10]
+	mi := &file_system_role_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +472,7 @@ func (x *ListSystemRoleAssignmentsResponse) String() string {
 func (*ListSystemRoleAssignmentsResponse) ProtoMessage() {}
 
 func (x *ListSystemRoleAssignmentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_system_role_proto_msgTypes[10]
+	mi := &file_system_role_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +485,7 @@ func (x *ListSystemRoleAssignmentsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListSystemRoleAssignmentsResponse.ProtoReflect.Descriptor instead.
 func (*ListSystemRoleAssignmentsResponse) Descriptor() ([]byte, []int) {
-	return file_system_role_proto_rawDescGZIP(), []int{10}
+	return file_system_role_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListSystemRoleAssignmentsResponse) GetRoles() []*SystemRole {
@@ -632,26 +513,17 @@ var File_system_role_proto protoreflect.FileDescriptor
 
 const file_system_role_proto_rawDesc = "" +
 	"\n" +
-	"\x11system_role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"%\n" +
+	"\x11system_role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"L\n" +
 	"\n" +
 	"SystemRole\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\"T\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12%\n" +
+	"\vpermissions\x18\x02 \x03(\tB\x03\xe0A\x03R\vpermissions\"T\n" +
 	"\x16ListSystemRolesRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"\x8d\x01\n" +
 	"\x17ListSystemRolesResponse\x12+\n" +
 	"\x05roles\x18\x01 \x03(\v2\x15.theapp.v1.SystemRoleR\x05roles\x12\x1d\n" +
-	"\n" +
-	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken\"\x80\x01\n" +
-	" ListSystemRolePermissionsRequest\x12 \n" +
-	"\trole_name\x18\x01 \x01(\tB\x03\xe0A\x02R\broleName\x12\x1b\n" +
-	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
-	"\n" +
-	"page_token\x18\x03 \x01(\tR\tpageToken\"\x8c\x01\n" +
-	"!ListSystemRolePermissionsResponse\x12 \n" +
-	"\vpermissions\x18\x01 \x03(\tR\vpermissions\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
 	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken\"a\n" +
@@ -672,14 +544,11 @@ const file_system_role_proto_rawDesc = "" +
 	"\x05roles\x18\x01 \x03(\v2\x15.theapp.v1.SystemRoleR\x05roles\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xde\b\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xe6\x06\n" +
 	"\x11SystemRoleService\x12\xbf\x01\n" +
 	"\x0fListSystemRoles\x12!.theapp.v1.ListSystemRolesRequest\x1a\".theapp.v1.ListSystemRolesResponse\"e\x92AJrH\n" +
 	"F\n" +
-	"\fx-project-id\x122ID of the \"theapp\" organization's control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/system-roles\x12\xf5\x01\n" +
-	"\x19ListSystemRolePermissions\x12+.theapp.v1.ListSystemRolePermissionsRequest\x1a,.theapp.v1.ListSystemRolePermissionsResponse\"}\x92AJrH\n" +
-	"F\n" +
-	"\fx-project-id\x122ID of the \"theapp\" organization's control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02*\x12(/v1/system-roles/{role_name}:permissions\x12\xcc\x01\n" +
+	"\fx-project-id\x122ID of the \"theapp\" organization's control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/system-roles\x12\xcc\x01\n" +
 	"\x10AssignSystemRole\x12\".theapp.v1.AssignSystemRoleRequest\x1a#.theapp.v1.AssignSystemRoleResponse\"o\x92AJrH\n" +
 	"F\n" +
 	"\fx-project-id\x122ID of the \"theapp\" organization's control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/system-roles:assign\x12\xd4\x01\n" +
@@ -711,38 +580,34 @@ func file_system_role_proto_rawDescGZIP() []byte {
 	return file_system_role_proto_rawDescData
 }
 
-var file_system_role_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_system_role_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_system_role_proto_goTypes = []any{
 	(*SystemRole)(nil),                        // 0: theapp.v1.SystemRole
 	(*ListSystemRolesRequest)(nil),            // 1: theapp.v1.ListSystemRolesRequest
 	(*ListSystemRolesResponse)(nil),           // 2: theapp.v1.ListSystemRolesResponse
-	(*ListSystemRolePermissionsRequest)(nil),  // 3: theapp.v1.ListSystemRolePermissionsRequest
-	(*ListSystemRolePermissionsResponse)(nil), // 4: theapp.v1.ListSystemRolePermissionsResponse
-	(*AssignSystemRoleRequest)(nil),           // 5: theapp.v1.AssignSystemRoleRequest
-	(*AssignSystemRoleResponse)(nil),          // 6: theapp.v1.AssignSystemRoleResponse
-	(*UnassignSystemRoleRequest)(nil),         // 7: theapp.v1.UnassignSystemRoleRequest
-	(*UnassignSystemRoleResponse)(nil),        // 8: theapp.v1.UnassignSystemRoleResponse
-	(*ListSystemRoleAssignmentsRequest)(nil),  // 9: theapp.v1.ListSystemRoleAssignmentsRequest
-	(*ListSystemRoleAssignmentsResponse)(nil), // 10: theapp.v1.ListSystemRoleAssignmentsResponse
+	(*AssignSystemRoleRequest)(nil),           // 3: theapp.v1.AssignSystemRoleRequest
+	(*AssignSystemRoleResponse)(nil),          // 4: theapp.v1.AssignSystemRoleResponse
+	(*UnassignSystemRoleRequest)(nil),         // 5: theapp.v1.UnassignSystemRoleRequest
+	(*UnassignSystemRoleResponse)(nil),        // 6: theapp.v1.UnassignSystemRoleResponse
+	(*ListSystemRoleAssignmentsRequest)(nil),  // 7: theapp.v1.ListSystemRoleAssignmentsRequest
+	(*ListSystemRoleAssignmentsResponse)(nil), // 8: theapp.v1.ListSystemRoleAssignmentsResponse
 }
 var file_system_role_proto_depIdxs = []int32{
-	0,  // 0: theapp.v1.ListSystemRolesResponse.roles:type_name -> theapp.v1.SystemRole
-	0,  // 1: theapp.v1.ListSystemRoleAssignmentsResponse.roles:type_name -> theapp.v1.SystemRole
-	1,  // 2: theapp.v1.SystemRoleService.ListSystemRoles:input_type -> theapp.v1.ListSystemRolesRequest
-	3,  // 3: theapp.v1.SystemRoleService.ListSystemRolePermissions:input_type -> theapp.v1.ListSystemRolePermissionsRequest
-	5,  // 4: theapp.v1.SystemRoleService.AssignSystemRole:input_type -> theapp.v1.AssignSystemRoleRequest
-	7,  // 5: theapp.v1.SystemRoleService.UnassignSystemRole:input_type -> theapp.v1.UnassignSystemRoleRequest
-	9,  // 6: theapp.v1.SystemRoleService.ListSystemRoleAssignments:input_type -> theapp.v1.ListSystemRoleAssignmentsRequest
-	2,  // 7: theapp.v1.SystemRoleService.ListSystemRoles:output_type -> theapp.v1.ListSystemRolesResponse
-	4,  // 8: theapp.v1.SystemRoleService.ListSystemRolePermissions:output_type -> theapp.v1.ListSystemRolePermissionsResponse
-	6,  // 9: theapp.v1.SystemRoleService.AssignSystemRole:output_type -> theapp.v1.AssignSystemRoleResponse
-	8,  // 10: theapp.v1.SystemRoleService.UnassignSystemRole:output_type -> theapp.v1.UnassignSystemRoleResponse
-	10, // 11: theapp.v1.SystemRoleService.ListSystemRoleAssignments:output_type -> theapp.v1.ListSystemRoleAssignmentsResponse
-	7,  // [7:12] is the sub-list for method output_type
-	2,  // [2:7] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	0, // 0: theapp.v1.ListSystemRolesResponse.roles:type_name -> theapp.v1.SystemRole
+	0, // 1: theapp.v1.ListSystemRoleAssignmentsResponse.roles:type_name -> theapp.v1.SystemRole
+	1, // 2: theapp.v1.SystemRoleService.ListSystemRoles:input_type -> theapp.v1.ListSystemRolesRequest
+	3, // 3: theapp.v1.SystemRoleService.AssignSystemRole:input_type -> theapp.v1.AssignSystemRoleRequest
+	5, // 4: theapp.v1.SystemRoleService.UnassignSystemRole:input_type -> theapp.v1.UnassignSystemRoleRequest
+	7, // 5: theapp.v1.SystemRoleService.ListSystemRoleAssignments:input_type -> theapp.v1.ListSystemRoleAssignmentsRequest
+	2, // 6: theapp.v1.SystemRoleService.ListSystemRoles:output_type -> theapp.v1.ListSystemRolesResponse
+	4, // 7: theapp.v1.SystemRoleService.AssignSystemRole:output_type -> theapp.v1.AssignSystemRoleResponse
+	6, // 8: theapp.v1.SystemRoleService.UnassignSystemRole:output_type -> theapp.v1.UnassignSystemRoleResponse
+	8, // 9: theapp.v1.SystemRoleService.ListSystemRoleAssignments:output_type -> theapp.v1.ListSystemRoleAssignmentsResponse
+	6, // [6:10] is the sub-list for method output_type
+	2, // [2:6] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_system_role_proto_init() }
@@ -756,7 +621,7 @@ func file_system_role_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_system_role_proto_rawDesc), len(file_system_role_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

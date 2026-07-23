@@ -20,7 +20,6 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	SystemRoleService_ListSystemRoles_FullMethodName           = "/theapp.v1.SystemRoleService/ListSystemRoles"
-	SystemRoleService_ListSystemRolePermissions_FullMethodName = "/theapp.v1.SystemRoleService/ListSystemRolePermissions"
 	SystemRoleService_AssignSystemRole_FullMethodName          = "/theapp.v1.SystemRoleService/AssignSystemRole"
 	SystemRoleService_UnassignSystemRole_FullMethodName        = "/theapp.v1.SystemRoleService/UnassignSystemRole"
 	SystemRoleService_ListSystemRoleAssignments_FullMethodName = "/theapp.v1.SystemRoleService/ListSystemRoleAssignments"
@@ -37,8 +36,6 @@ const (
 type SystemRoleServiceClient interface {
 	// Lists the system roles available to assign.
 	ListSystemRoles(ctx context.Context, in *ListSystemRolesRequest, opts ...grpc.CallOption) (*ListSystemRolesResponse, error)
-	// Lists the names of the permissions currently granted to a system role.
-	ListSystemRolePermissions(ctx context.Context, in *ListSystemRolePermissionsRequest, opts ...grpc.CallOption) (*ListSystemRolePermissionsResponse, error)
 	// Assigns a system role to a user.
 	AssignSystemRole(ctx context.Context, in *AssignSystemRoleRequest, opts ...grpc.CallOption) (*AssignSystemRoleResponse, error)
 	// Unassigns a system role from a user.
@@ -59,16 +56,6 @@ func (c *systemRoleServiceClient) ListSystemRoles(ctx context.Context, in *ListS
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListSystemRolesResponse)
 	err := c.cc.Invoke(ctx, SystemRoleService_ListSystemRoles_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *systemRoleServiceClient) ListSystemRolePermissions(ctx context.Context, in *ListSystemRolePermissionsRequest, opts ...grpc.CallOption) (*ListSystemRolePermissionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListSystemRolePermissionsResponse)
-	err := c.cc.Invoke(ctx, SystemRoleService_ListSystemRolePermissions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +103,6 @@ func (c *systemRoleServiceClient) ListSystemRoleAssignments(ctx context.Context,
 type SystemRoleServiceServer interface {
 	// Lists the system roles available to assign.
 	ListSystemRoles(context.Context, *ListSystemRolesRequest) (*ListSystemRolesResponse, error)
-	// Lists the names of the permissions currently granted to a system role.
-	ListSystemRolePermissions(context.Context, *ListSystemRolePermissionsRequest) (*ListSystemRolePermissionsResponse, error)
 	// Assigns a system role to a user.
 	AssignSystemRole(context.Context, *AssignSystemRoleRequest) (*AssignSystemRoleResponse, error)
 	// Unassigns a system role from a user.
@@ -135,9 +120,6 @@ type UnimplementedSystemRoleServiceServer struct{}
 
 func (UnimplementedSystemRoleServiceServer) ListSystemRoles(context.Context, *ListSystemRolesRequest) (*ListSystemRolesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSystemRoles not implemented")
-}
-func (UnimplementedSystemRoleServiceServer) ListSystemRolePermissions(context.Context, *ListSystemRolePermissionsRequest) (*ListSystemRolePermissionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListSystemRolePermissions not implemented")
 }
 func (UnimplementedSystemRoleServiceServer) AssignSystemRole(context.Context, *AssignSystemRoleRequest) (*AssignSystemRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AssignSystemRole not implemented")
@@ -182,24 +164,6 @@ func _SystemRoleService_ListSystemRoles_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SystemRoleServiceServer).ListSystemRoles(ctx, req.(*ListSystemRolesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SystemRoleService_ListSystemRolePermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListSystemRolePermissionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SystemRoleServiceServer).ListSystemRolePermissions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SystemRoleService_ListSystemRolePermissions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SystemRoleServiceServer).ListSystemRolePermissions(ctx, req.(*ListSystemRolePermissionsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -268,10 +232,6 @@ var SystemRoleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListSystemRoles",
 			Handler:    _SystemRoleService_ListSystemRoles_Handler,
-		},
-		{
-			MethodName: "ListSystemRolePermissions",
-			Handler:    _SystemRoleService_ListSystemRolePermissions_Handler,
 		},
 		{
 			MethodName: "AssignSystemRole",

@@ -56,23 +56,6 @@ service SystemRoleService {
     };
   }
 
-  // Lists the names of the permissions currently granted to a system role.
-  rpc ListSystemRolePermissions(ListSystemRolePermissionsRequest) returns (ListSystemRolePermissionsResponse) {
-    option (google.api.http) = {
-      get: "/v1/system-roles/{role_name}:permissions"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      parameters: {
-        headers: {
-          name: "x-project-id"
-          description: "ID of the \"theapp\" organization's control project."
-          type: INTEGER
-          required: true
-        }
-      }
-    };
-  }
-
   // Assigns a system role to a user.
   rpc AssignSystemRole(AssignSystemRoleRequest) returns (AssignSystemRoleResponse) {
     option (google.api.http) = {
@@ -131,6 +114,9 @@ service SystemRoleService {
 message SystemRole {
   // Unique name of the system role.
   string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Permissions granted to the system role.
+  repeated string permissions = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Request message for listing system roles.
@@ -148,30 +134,6 @@ message ListSystemRolesResponse {
   repeated SystemRole roles = 1;
 
   // Total number of system roles.
-  int32 total_size = 2;
-
-  // Token for fetching the next page of results, if applicable.
-  string next_page_token = 3;
-}
-
-// Request message for listing a system role's permissions.
-message ListSystemRolePermissionsRequest {
-  // Name of the system role whose permissions to list.
-  string role_name = 1 [(google.api.field_behavior) = REQUIRED];
-
-  // Maximum number of permissions to return.
-  int32 page_size = 2;
-
-  // Token for fetching the next page of results.
-  string page_token = 3;
-}
-
-// Response message for listing a system role's permissions.
-message ListSystemRolePermissionsResponse {
-  // Names of the permissions currently granted to the system role.
-  repeated string permissions = 1;
-
-  // Total number of permissions currently granted to the system role.
   int32 total_size = 2;
 
   // Token for fetching the next page of results, if applicable.

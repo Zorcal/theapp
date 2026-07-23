@@ -111,7 +111,9 @@ The auth service exposes an endpoint that returns the authenticated caller's ID,
 
 ## System role management
 
-`SystemRoleService` is the API for the seeded, ownerless roles in `system_roles`. It lists system roles, lists the permissions granted to one, assigns or unassigns one for a user, and lists a user's current system-role assignments. It cannot create, edit, or delete system roles; those definitions remain seed data.
+`SystemRoleService` is the API for the seeded, ownerless roles in `system_roles`. It lists system roles with their permissions, assigns or unassigns one for a user, and lists a user's current system-role assignments. It cannot create, edit, or delete system roles; those definitions remain seed data.
+
+Permissions are part of the `SystemRole` resource rather than exposed through a per-role list endpoint. The administrative UI needs a role and its grants together when displaying or selecting it; embedding them avoids a follow-up request for every row. System roles and permission sets are small seed data, so independently paginating one role's permissions would add API and client complexity without a practical payload benefit. A user's assignment list also returns `SystemRole` resources, so it has the same complete shape.
 
 Every system-role RPC is anchored on the `theapp` organization's control project. Its permission namespace is distinct from custom-role management: reads require `system-role:read`, assignment requires `system-role:assign`, and unassignment requires `system-role:unassign`. A future custom-role permission must not satisfy one of these checks merely because both APIs deal with roles.
 
@@ -124,6 +126,8 @@ Unassigning also preserves a recovery path at system scope: the last assignment 
 Custom roles are managed through a separate `RoleService`: creating, editing, and deleting organization-owned role definitions, and assigning or unassigning them at project or org scope. This is kept separate from the user service because role assignment is a many-to-many mutation; folding it into the user service's field-mask-based update would mean replacing a user's entire role list on every write, silently dropping concurrent assignments made by other admins. It is also separate from `SystemRoleService`: custom roles never enter `system_role_assignments`, and system roles never enter project/org assignment tables.
 
 Custom-role endpoints use their own `custom-role:*` permission namespace. Definition operations use `custom-role:create`, `custom-role:read`, `custom-role:update`, and `custom-role:delete`; assignment operations use `custom-role:assign` and `custom-role:unassign`. These permissions are introduced with `RoleService`, not predeclared by the system-role phase.
+
+A custom `Role` likewise embeds its permissions. They are editable state covered by the role's ETag and are created or updated atomically with the role rather than managed as permission subresources. A separate permission-catalog endpoint may later list all permissions available for selection in the editor; that is distinct from listing the permissions already assigned to one role.
 
 Because role assignment is scoped to a project, assigning or unassigning a role also requires a project ID, and the exposed auth data for a client (see above) needs to be resolved for the project the client is currently working in, not just for the user.
 

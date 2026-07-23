@@ -17,10 +17,6 @@ func (systemRoleService) ListSystemRoles(context.Context, *pb.ListSystemRolesReq
 	return nil, status.Error(codes.Unimplemented, "method ListSystemRoles not implemented")
 }
 
-func (systemRoleService) ListSystemRolePermissions(context.Context, *pb.ListSystemRolePermissionsRequest) (*pb.ListSystemRolePermissionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListSystemRolePermissions not implemented")
-}
-
 func (systemRoleService) AssignSystemRole(context.Context, *pb.AssignSystemRoleRequest) (*pb.AssignSystemRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AssignSystemRole not implemented")
 }

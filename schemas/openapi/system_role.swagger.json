@@ -117,60 +117,6 @@
         ]
       }
     },
-    "/v1/system-roles/{roleName}:permissions": {
-      "get": {
-        "summary": "Lists the names of the permissions currently granted to a system role.",
-        "operationId": "SystemRoleService_ListSystemRolePermissions",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1ListSystemRolePermissionsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "roleName",
-            "description": "Name of the system role whose permissions to list.",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "pageSize",
-            "description": "Maximum number of permissions to return.",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int32"
-          },
-          {
-            "name": "pageToken",
-            "description": "Token for fetching the next page of results.",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "x-project-id",
-            "description": "ID of the \"theapp\" organization's control project.",
-            "in": "header",
-            "required": true,
-            "type": "integer"
-          }
-        ],
-        "tags": [
-          "SystemRoleService"
-        ]
-      }
-    },
     "/v1/system-roles:assign": {
       "post": {
         "summary": "Assigns a system role to a user.",
@@ -328,28 +274,6 @@
       },
       "description": "Response message for listing a user's system role assignments."
     },
-    "v1ListSystemRolePermissionsResponse": {
-      "type": "object",
-      "properties": {
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Names of the permissions currently granted to the system role."
-        },
-        "totalSize": {
-          "type": "integer",
-          "format": "int32",
-          "description": "Total number of permissions currently granted to the system role."
-        },
-        "nextPageToken": {
-          "type": "string",
-          "description": "Token for fetching the next page of results, if applicable."
-        }
-      },
-      "description": "Response message for listing a system role's permissions."
-    },
     "v1ListSystemRolesResponse": {
       "type": "object",
       "properties": {
@@ -379,6 +303,14 @@
         "name": {
           "type": "string",
           "description": "Unique name of the system role.",
+          "readOnly": true
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Permissions granted to the system role.",
           "readOnly": true
         }
       },
