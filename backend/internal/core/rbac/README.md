@@ -28,9 +28,13 @@ Every assignment mutation takes the same per-user advisory lock, including boots
 Actor and target locks are acquired in UUID order to prevent deadlocks. The locks work even when a
 user has no assignments and are released when the transaction ends.
 
+Unassignments also take a system-role-management advisory lock before the user locks. If the role
+carries `system-role:assign` or `system-role:unassign`, each permission must remain available
+through another system-role assignment.
+
 ## Seed data
 
-`internal/data/pgschema/seed.sql` inserts permissions and system roles. `AllPermissions` in
+`internal/data/pgschema/seed.sql` inserts permissions and system roles. `AllPermissions()` in
 `internal/core/mdl/permission.go` must stay in sync. The seed only inserts, so removing an entry
 does not delete existing database rows.
 

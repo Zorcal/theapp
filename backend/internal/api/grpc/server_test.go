@@ -66,7 +66,7 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 				return mdl.AuthSession{
 					User: mdl.AuthUser{
 						UserID:      userID,
-						Permissions: mdl.AllPermissions,
+						Permissions: mdl.AllPermissions(),
 					},
 					ProjectID: projectID,
 				}, nil

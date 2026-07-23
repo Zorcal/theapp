@@ -3,7 +3,7 @@ package mdl
 import "github.com/zorcal/theapp/backend/pkg/set"
 
 // The full set of permissions defined by the system. Every protected endpoint's required permissions are drawn from
-// this list. This list and AllPermissions below must stay in sync with what's seeded into the database.
+// this list. This list and AllPermissions() below must stay in sync with what's seeded into the database.
 
 // Permission is a single named capability an endpoint can require the caller to hold.
 type Permission string
@@ -23,14 +23,25 @@ const (
 	PermissionSystemRoleUnassign Permission = "system-role:unassign"
 )
 
-// AllPermissions lists all permissions.
-var AllPermissions = []Permission{
-	PermissionUserRead,
-	PermissionUserCreate,
-	PermissionUserUpdate,
-	PermissionSystemRoleRead,
-	PermissionSystemRoleAssign,
-	PermissionSystemRoleUnassign,
+// AllPermissions returns all permissions.
+func AllPermissions() []Permission {
+	return []Permission{
+		PermissionUserRead,
+		PermissionUserCreate,
+		PermissionUserUpdate,
+		PermissionSystemRoleRead,
+		PermissionSystemRoleAssign,
+		PermissionSystemRoleUnassign,
+	}
+}
+
+// SystemRoleManagementPermissions returns the permissions required to manage system-role
+// assignments.
+func SystemRoleManagementPermissions() []Permission {
+	return []Permission{
+		PermissionSystemRoleAssign,
+		PermissionSystemRoleUnassign,
+	}
 }
 
 // IsPermissionSuperset reports whether held contains every permission in required.

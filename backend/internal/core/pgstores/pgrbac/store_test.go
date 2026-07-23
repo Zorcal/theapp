@@ -39,6 +39,21 @@ func TestStore_LockSystemRoleUser(t *testing.T) {
 	}
 }
 
+func TestStore_LockSystemRoleManagement(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+
+	if err := pgdb.NewTransactor(pool).RunTx(ctx, func(ctx context.Context) error {
+		if err := rbacStore.LockSystemRoleManagement(ctx); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("LockSystemRoleManagement() error = %v", err)
+	}
+}
+
 func TestStore_SystemRoles(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
@@ -474,6 +489,52 @@ func TestStore_UnassignSystemRole(t *testing.T) {
 	want := []SystemRole{}
 
 	testingx.AssertDiff(t, got, want)
+}
+
+func TestStore_SystemPermissionsRemainAfterUnassign(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	perms := []string{"system-role:assign", "system-role:unassign"}
+
+	manager := seedUser(t, userStore, "manager@test.com")
+	otherManager := seedUser(t, userStore, "other-manager@test.com")
+
+	seedSystemRoleAssignment(t, ctx, pool, manager.ID, "superadmin")
+
+	got, err := rbacStore.SystemPermissionsRemainAfterUnassign(ctx, manager.ExternalID, "superadmin", perms)
+	if err != nil {
+		t.Fatalf("SystemPermissionsRemainAfterUnassign() before second assignment error = %v", err)
+	}
+	if got {
+		t.Error("SystemPermissionsRemainAfterUnassign() before second assignment = true, want false")
+	}
+
+	seedSystemRoleAssignment(t, ctx, pool, otherManager.ID, "superadmin")
+
+	got, err = rbacStore.SystemPermissionsRemainAfterUnassign(ctx, manager.ExternalID, "superadmin", perms)
+	if err != nil {
+		t.Fatalf("SystemPermissionsRemainAfterUnassign() after second assignment error = %v", err)
+	}
+	if !got {
+		t.Error("SystemPermissionsRemainAfterUnassign() after second assignment = false, want true")
+	}
+}
+
+func TestStore_SystemPermissionsRemainAfterUnassign_error(t *testing.T) {
+	t.Run("assignment not found", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		rbacStore := NewStore(pool)
+		userStore := pguser.NewStore(pool)
+		usr := seedUser(t, userStore, "no-assignment@test.com")
+
+		if _, err := rbacStore.SystemPermissionsRemainAfterUnassign(ctx, usr.ExternalID, "superadmin", []string{"system-role:assign"}); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("SystemPermissionsRemainAfterUnassign() error = %v, want sql.ErrNoRows", err)
+		}
+	})
 }
 
 func TestStore_UnassignSystemRole_error(t *testing.T) {

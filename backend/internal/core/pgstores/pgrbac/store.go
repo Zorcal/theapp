@@ -19,6 +19,16 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
+// LockSystemRoleManagement serializes system-role revokes that could remove management access.
+// It must be called within a transaction.
+func (s *Store) LockSystemRoleManagement(ctx context.Context) error {
+	if err := pgdb.RunExec(ctx, s.pool, "SELECT pg_advisory_xact_lock(hashtext('rbac.system-role-management'), 0)"); err != nil {
+		return fmt.Errorf("lock system-role management: %w", err)
+	}
+
+	return nil
+}
+
 // LockSystemRoleUser acquires a transaction-level advisory lock that serializes system-role
 // assignment changes for userID. It must be called within a transaction.
 func (s *Store) LockSystemRoleUser(ctx context.Context, userID uuid.UUID) error {
@@ -155,6 +165,32 @@ func (s *Store) UserSystemPermissionsByExternalID(ctx context.Context, userID uu
 	}
 
 	return names, nil
+}
+
+// SystemPermissionsRemainAfterUnassign reports whether every permission in permissionNames is
+// carried by another system-role assignment.
+// Returns [sql.ErrNoRows] if the assignment does not exist.
+func (s *Store) SystemPermissionsRemainAfterUnassign(
+	ctx context.Context,
+	userID uuid.UUID,
+	roleName string,
+	permissionNames []string,
+) (bool, error) {
+	q := systemPermissionsRemainAfterUnassignQuery(userID, roleName, permissionNames)
+
+	var remain bool
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &remain); err != nil {
+			return fmt.Errorf("system permissions remain after unassign: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return remain, nil
 }
 
 // ProjectPermissions returns projectID's org and the names of the permissions userID holds for

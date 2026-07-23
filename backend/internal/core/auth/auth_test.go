@@ -119,7 +119,7 @@ func TestCore_integration(t *testing.T) {
 	wantSess := mdl.AuthSession{
 		User: mdl.AuthUser{
 			UserID:      aliceUser.ExternalID,
-			Permissions: mdl.AllPermissions,
+			Permissions: mdl.AllPermissions(),
 		},
 	}
 
@@ -162,7 +162,7 @@ func TestCore_MagicLinkToken(t *testing.T) {
 			},
 		}
 
-		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 		tok, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"})
 		if err != nil {
@@ -184,7 +184,7 @@ func TestCore_MagicLinkToken(t *testing.T) {
 			},
 		}
 
-		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 		tok, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "new@test.com"})
 		if err != nil {
@@ -208,7 +208,7 @@ func TestCore_MagicLinkToken(t *testing.T) {
 			},
 		}
 
-		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "Alice@Test.COM"}); err != nil {
 			t.Fatalf("MagicLinkToken() error = %v", err)
@@ -225,7 +225,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("invalid input", func(t *testing.T) {
-		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: ""}); !errors.Is(err, mdl.ErrValidation) {
 			t.Errorf("MagicLinkToken() error = %v, want mdl.ErrValidation", err)
@@ -245,7 +245,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 			&MockedAuthStorer{},
 			userStorerMock,
 			&MockedPermissionStorer{},
-			noopTransactor{},
+			immediateTransactor{},
 			testConfig(),
 		)
 
@@ -277,7 +277,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 
 		cfg := testConfig()
 		cfg.MagicLinkRateLimit = time.Minute
-		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, noopTransactor{}, cfg)
+		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, immediateTransactor{}, cfg)
 
 		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"}); !errors.Is(err, rateLimitErr) {
 			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, rateLimitErr)
@@ -305,7 +305,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 
 		cfg := testConfig()
 		cfg.MagicLinkRateLimit = time.Minute
-		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, noopTransactor{}, cfg)
+		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, immediateTransactor{}, cfg)
 
 		tok, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"})
 		if !errors.Is(err, mdl.ErrRateLimited) {
@@ -341,7 +341,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 			},
 		}
 
-		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"}); !errors.Is(err, invalidateErr) {
 			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, invalidateErr)
@@ -379,7 +379,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 			authStorerMock,
 			userStorerMock,
 			&MockedPermissionStorer{},
-			noopTransactor{},
+			immediateTransactor{},
 			testConfig(),
 		)
 		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"}); !errors.Is(err, tokenErr) {
@@ -424,7 +424,7 @@ func TestCore_VerifyMagicLink(t *testing.T) {
 			MarkEmailVerifiedFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 		},
 		&MockedPermissionStorer{},
-		noopTransactor{},
+		immediateTransactor{},
 		testConfig(),
 	)
 
@@ -464,7 +464,7 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 	dbErr := errors.New("db error")
 
 	t.Run("invalid input", func(t *testing.T) {
-		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 		if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: ""}); !errors.Is(err, mdl.ErrValidation) {
 			t.Errorf("VerifyMagicLink() error = %v, want mdl.ErrValidation", err)
@@ -498,7 +498,7 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 				authStorerMock,
 				&MockedUserStorer{},
 				&MockedPermissionStorer{},
-				noopTransactor{},
+				immediateTransactor{},
 				testConfig(),
 			)
 			if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
@@ -531,7 +531,7 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 			authStorerMock,
 			&MockedUserStorer{},
 			&MockedPermissionStorer{},
-			noopTransactor{},
+			immediateTransactor{},
 			testConfig(),
 		)
 
@@ -565,7 +565,7 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 			authStorerMock,
 			&MockedUserStorer{},
 			&MockedPermissionStorer{},
-			noopTransactor{},
+			immediateTransactor{},
 			testConfig(),
 		)
 
@@ -604,7 +604,7 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 				MarkEmailVerifiedFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 			},
 			&MockedPermissionStorer{},
-			noopTransactor{},
+			immediateTransactor{},
 			testConfig(),
 		)
 
@@ -646,7 +646,7 @@ func TestCore_RefreshAccessToken(t *testing.T) {
 		authStorerMock,
 		&MockedUserStorer{},
 		&MockedPermissionStorer{},
-		noopTransactor{},
+		immediateTransactor{},
 		testConfig(),
 	)
 
@@ -667,7 +667,7 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 	dbErr := errors.New("db error")
 
 	t.Run("invalid input", func(t *testing.T) {
-		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 		if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: ""}); !errors.Is(err, mdl.ErrValidation) {
 			t.Errorf("RefreshAccessToken() error = %v, want mdl.ErrValidation", err)
@@ -701,7 +701,7 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 				authStorerMock,
 				&MockedUserStorer{},
 				&MockedPermissionStorer{},
-				noopTransactor{},
+				immediateTransactor{},
 				testConfig(),
 			)
 			if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
@@ -736,7 +736,7 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 			authStorerMock,
 			&MockedUserStorer{},
 			&MockedPermissionStorer{},
-			noopTransactor{},
+			immediateTransactor{},
 			testConfig(),
 		)
 
@@ -769,7 +769,7 @@ func TestCore_RevokeRefreshToken(t *testing.T) {
 		authStorerMock,
 		&MockedUserStorer{},
 		&MockedPermissionStorer{},
-		noopTransactor{},
+		immediateTransactor{},
 		testConfig(),
 	)
 
@@ -783,7 +783,7 @@ func TestCore_RevokeRefreshToken_error(t *testing.T) {
 	dbErr := errors.New("db error")
 
 	t.Run("invalid input", func(t *testing.T) {
-		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+		core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 		if err := core.RevokeRefreshToken(ctx, mdl.RefreshToken{Token: ""}); !errors.Is(err, mdl.ErrValidation) {
 			t.Errorf("RevokeRefreshToken() error = %v, want mdl.ErrValidation", err)
@@ -817,7 +817,7 @@ func TestCore_RevokeRefreshToken_error(t *testing.T) {
 				authStorerMock,
 				&MockedUserStorer{},
 				&MockedPermissionStorer{},
-				noopTransactor{},
+				immediateTransactor{},
 				testConfig(),
 			)
 			if err := core.RevokeRefreshToken(ctx, mdl.RefreshToken{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
@@ -839,7 +839,7 @@ func TestCore_RevokeAllUserRefreshTokens(t *testing.T) {
 		},
 	}
 
-	core := NewCore(authStorerMock, &MockedUserStorer{}, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+	core := NewCore(authStorerMock, &MockedUserStorer{}, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 	if err := core.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
 		t.Fatalf("RevokeAllUserRefreshTokens() error = %v", err)
@@ -859,7 +859,7 @@ func TestCore_RevokeAllUserRefreshTokens_error(t *testing.T) {
 		},
 	}
 
-	core := NewCore(authStorerMock, &MockedUserStorer{}, &MockedPermissionStorer{}, noopTransactor{}, testConfig())
+	core := NewCore(authStorerMock, &MockedUserStorer{}, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
 	if err := core.RevokeAllUserRefreshTokens(ctx, uuid.New()); !errors.Is(err, dbErr) {
 		t.Errorf("RevokeAllUserRefreshTokens() error = %v, want wrapping %v", err, dbErr)
@@ -880,7 +880,7 @@ func TestCore_AuthSession(t *testing.T) {
 				return []string{"user:create", "user:read"}, nil
 			},
 		}
-		core := NewCore(&MockedAuthStorer{}, userStorer, permissionStorer, noopTransactor{}, testConfig())
+		core := NewCore(&MockedAuthStorer{}, userStorer, permissionStorer, immediateTransactor{}, testConfig())
 
 		got, err := core.AuthSession(t.Context(), id, nil)
 		if err != nil {
@@ -908,7 +908,7 @@ func TestCore_AuthSession(t *testing.T) {
 				return pgrbac.ProjectPermissions{OrgID: 5, PermissionNames: []string{"user:create", "user:read"}}, nil
 			},
 		}
-		core := NewCore(&MockedAuthStorer{}, userStorer, permissionStorer, noopTransactor{}, testConfig())
+		core := NewCore(&MockedAuthStorer{}, userStorer, permissionStorer, immediateTransactor{}, testConfig())
 
 		projectID := 42
 		got, err := core.AuthSession(t.Context(), id, &projectID)
@@ -1008,7 +1008,7 @@ func TestCore_AuthSession_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(&MockedAuthStorer{}, tt.userStorer, tt.permissionStorer, noopTransactor{}, testConfig())
+			core := NewCore(&MockedAuthStorer{}, tt.userStorer, tt.permissionStorer, immediateTransactor{}, testConfig())
 
 			if _, err := core.AuthSession(t.Context(), uuid.New(), tt.projectID); !errors.Is(err, tt.want) {
 				t.Errorf("AuthSession() error = %v, want %v", err, tt.want)
@@ -1103,9 +1103,9 @@ func TestCore_txRollback(t *testing.T) {
 	})
 }
 
-type noopTransactor struct{}
+type immediateTransactor struct{}
 
-func (noopTransactor) RunTx(ctx context.Context, fn func(context.Context) error) error {
+func (immediateTransactor) RunTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }
 

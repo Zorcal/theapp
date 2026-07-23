@@ -132,6 +132,53 @@ func userSystemPermissionsByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[st
 	}
 }
 
+func systemPermissionsRemainAfterUnassignQuery(
+	userID uuid.UUID,
+	roleName string,
+	permissionNames []string,
+) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{
+		"user_id":          userID,
+		"role_name":        roleName,
+		"permission_names": permissionNames,
+	}
+	const sql = `
+		WITH excluded_assignment AS (
+			SELECT sra.user_id, sra.role_id
+			FROM rbac.system_role_assignments AS sra
+			JOIN useraccess.users AS u ON u.id = sra.user_id
+			JOIN rbac.system_roles AS r ON r.id = sra.role_id
+			WHERE u.external_id = @user_id
+				AND r.name = @role_name
+		)
+		SELECT NOT EXISTS (
+			SELECT 1
+			FROM unnest(@permission_names::text[]) AS required(name)
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM rbac.system_role_assignments AS sra
+				JOIN rbac.system_role_permissions AS rp ON rp.role_id = sra.role_id
+				JOIN rbac.permissions AS p ON p.id = rp.permission_id
+				WHERE p.name = required.name
+					AND (sra.user_id, sra.role_id) != (
+						excluded_assignment.user_id,
+						excluded_assignment.role_id
+					)
+			)
+		)
+		FROM excluded_assignment`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (bool, error) {
+			var remain bool
+			return remain, row.Scan(&remain)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func assignSystemRoleQuery(userID uuid.UUID, roleName string) pgdb.TypedQuery[int] {
 	params := pgx.NamedArgs{"user_id": userID, "role_name": roleName}
 	const sql = `

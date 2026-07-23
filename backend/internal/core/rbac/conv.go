@@ -20,3 +20,7 @@ func systemRolesFromPg(rs []pgrbac.SystemRole) []mdl.SystemRole {
 func permissionsFromPg(names []string) []mdl.Permission {
 	return slicesx.Map(names, func(n string) mdl.Permission { return mdl.Permission(n) })
 }
+
+func permissionsToPg(permissions []mdl.Permission) []string {
+	return slicesx.Map(permissions, func(permission mdl.Permission) string { return string(permission) })
+}

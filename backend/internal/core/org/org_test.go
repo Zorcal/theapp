@@ -115,7 +115,7 @@ func TestCore_CreateOrganization(t *testing.T) {
 			return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
 		},
 	}
-	core := NewCore(orgStorer, noopTransactor{})
+	core := NewCore(orgStorer, immediateTransactor{})
 
 	got, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{Name: "acme", ProjectName: "acme"})
 	if err != nil {
@@ -178,7 +178,7 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.orgStorer, noopTransactor{})
+			core := NewCore(tt.orgStorer, immediateTransactor{})
 
 			if _, err := core.CreateOrganization(t.Context(), tt.in); !errors.Is(err, tt.want) {
 				t.Errorf("CreateOrganization(%+v) error = %v, want %v", tt.in, err, tt.want)
@@ -193,7 +193,7 @@ func TestCore_CreateProject(t *testing.T) {
 			return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
 		},
 	}
-	core := NewCore(orgStorer, noopTransactor{})
+	core := NewCore(orgStorer, immediateTransactor{})
 
 	got, err := core.CreateProject(t.Context(), mdl.CreateProject{OrgID: 7, Name: "widgets"})
 	if err != nil {
@@ -253,7 +253,7 @@ func TestCore_CreateProject_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.orgStorer, noopTransactor{})
+			core := NewCore(tt.orgStorer, immediateTransactor{})
 
 			if _, err := core.CreateProject(t.Context(), tt.in); !errors.Is(err, tt.want) {
 				t.Errorf("CreateProject(%+v) error = %v, want %v", tt.in, err, tt.want)
@@ -268,7 +268,7 @@ func TestCore_OrganizationByName(t *testing.T) {
 			return pgorg.Organization{ID: 1, Name: name}, nil
 		},
 	}
-	core := NewCore(orgStorer, noopTransactor{})
+	core := NewCore(orgStorer, immediateTransactor{})
 
 	got, err := core.OrganizationByName(t.Context(), "acme")
 	if err != nil {
@@ -305,7 +305,7 @@ func TestCore_OrganizationByName_error(t *testing.T) {
 				OrganizationByNameFunc: func(_ context.Context, _ string) (pgorg.Organization, error) {
 					return pgorg.Organization{}, tt.mockErr
 				},
-			}, noopTransactor{})
+			}, immediateTransactor{})
 
 			if _, err := core.OrganizationByName(t.Context(), "acme"); !errors.Is(err, tt.want) {
 				t.Errorf("OrganizationByName() error = %v, want %v", err, tt.want)
@@ -320,7 +320,7 @@ func TestCore_ProjectByName(t *testing.T) {
 			return pgorg.Project{ID: 1, OrgID: orgID, Name: name}, nil
 		},
 	}
-	core := NewCore(orgStorer, noopTransactor{})
+	core := NewCore(orgStorer, immediateTransactor{})
 
 	got, err := core.ProjectByName(t.Context(), 7, "control")
 	if err != nil {
@@ -357,7 +357,7 @@ func TestCore_ProjectByName_error(t *testing.T) {
 				ProjectByNameFunc: func(_ context.Context, _ int, _ string) (pgorg.Project, error) {
 					return pgorg.Project{}, tt.mockErr
 				},
-			}, noopTransactor{})
+			}, immediateTransactor{})
 
 			if _, err := core.ProjectByName(t.Context(), 7, "control"); !errors.Is(err, tt.want) {
 				t.Errorf("ProjectByName() error = %v, want %v", err, tt.want)
@@ -366,8 +366,8 @@ func TestCore_ProjectByName_error(t *testing.T) {
 	}
 }
 
-type noopTransactor struct{}
+type immediateTransactor struct{}
 
-func (noopTransactor) RunTx(ctx context.Context, fn func(context.Context) error) error {
+func (immediateTransactor) RunTx(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }

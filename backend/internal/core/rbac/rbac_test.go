@@ -93,6 +93,12 @@ func TestCore_integration_systemRoleAssignmentLifecycle(t *testing.T) {
 	wantUnassignedRoles := []mdl.SystemRole{}
 
 	testingx.AssertDiff(t, gotUnassignedRoles, wantUnassignedRoles)
+
+	// Preserve the final system-role management assignment.
+
+	if err := core.UnassignSystemRole(actorCtx, actor.ExternalID, "superadmin"); !errors.Is(err, mdl.ErrLastRoleManager) {
+		t.Errorf("UnassignSystemRole() last manager error = %v, want mdl.ErrLastRoleManager", err)
+	}
 }
 
 // TestCore_integration_systemRoleChangesRequireSystemScope verifies that permissions granted
@@ -345,6 +351,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 		{
 			name: "target not found",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
@@ -360,6 +367,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 		{
 			name: "role not found",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, sql.ErrNoRows
 				},
@@ -369,6 +377,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 		{
 			name: "actor permission subset",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{PermissionNames: []string{"user:read", "user:update"}}, nil
 				},
@@ -381,6 +390,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 		{
 			name: "role already assigned",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
@@ -396,6 +406,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 		{
 			name: "actor permissions store error",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
@@ -408,6 +419,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 		{
 			name: "role assignment store error",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
@@ -423,11 +435,6 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.roleStorer.LockSystemRoleUserFunc == nil {
-				tt.roleStorer.LockSystemRoleUserFunc = func(_ context.Context, _ uuid.UUID) error {
-					return nil
-				}
-			}
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 			ctx := contextWithAuthUser(t.Context(), uuid.New())
 
@@ -440,6 +447,9 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 
 func TestCore_UnassignSystemRole(t *testing.T) {
 	roleStorer := &MockedRoleStorer{
+		LockSystemRoleManagementFunc: func(_ context.Context) error {
+			return nil
+		},
 		LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error {
 			return nil
 		},
@@ -478,8 +488,29 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 		want       error
 	}{
 		{
+			name: "last role manager",
+			roleStorer: &MockedRoleStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
+				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
+					return pgrbac.SystemRole{
+						PermissionNames: []string{"system-role:assign", "system-role:unassign"},
+					}, nil
+				},
+				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+					return []string{"system-role:assign", "system-role:unassign"}, nil
+				},
+				SystemPermissionsRemainAfterUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string, _ []string) (bool, error) {
+					return false, nil
+				},
+			},
+			want: mdl.ErrLastRoleManager,
+		},
+		{
 			name: "role not found",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, sql.ErrNoRows
 				},
@@ -489,6 +520,8 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 		{
 			name: "assignment not found",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
@@ -504,6 +537,8 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 		{
 			name: "actor permission subset",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{PermissionNames: []string{"user:read", "user:update"}}, nil
 				},
@@ -516,6 +551,8 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 		{
 			name: "actor permissions store error",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
@@ -528,6 +565,8 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 		{
 			name: "role unassignment store error",
 			roleStorer: &MockedRoleStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
@@ -543,11 +582,6 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.roleStorer.LockSystemRoleUserFunc == nil {
-				tt.roleStorer.LockSystemRoleUserFunc = func(_ context.Context, _ uuid.UUID) error {
-					return nil
-				}
-			}
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 			ctx := contextWithAuthUser(t.Context(), uuid.New())
 
@@ -570,7 +604,7 @@ func contextWithAuthUser(ctx context.Context, userID uuid.UUID) context.Context 
 
 func seededSystemRoles() []mdl.SystemRole {
 	return []mdl.SystemRole{
-		{Name: "superadmin", Permissions: mdl.AllPermissions},
+		{Name: "superadmin", Permissions: mdl.AllPermissions()},
 	}
 }
 
