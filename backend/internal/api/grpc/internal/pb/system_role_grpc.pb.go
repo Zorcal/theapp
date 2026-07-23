@@ -32,7 +32,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // SystemRoleService assigns and unassigns system roles to users, and lists the system roles available to assign. System
-// roles are statically seeded rather than managed through an API. Every call is anchored on the "theapp" organization's
+// roles are seeded by the system rather than managed through an API. Every call is anchored on the "theapp" organization's
 // control project: x-project-id must be that project's ID.
 type SystemRoleServiceClient interface {
 	// Lists the system roles available to assign.
@@ -110,7 +110,7 @@ func (c *systemRoleServiceClient) ListSystemRoleAssignments(ctx context.Context,
 // for forward compatibility.
 //
 // SystemRoleService assigns and unassigns system roles to users, and lists the system roles available to assign. System
-// roles are statically seeded rather than managed through an API. Every call is anchored on the "theapp" organization's
+// roles are seeded by the system rather than managed through an API. Every call is anchored on the "theapp" organization's
 // control project: x-project-id must be that project's ID.
 type SystemRoleServiceServer interface {
 	// Lists the system roles available to assign.

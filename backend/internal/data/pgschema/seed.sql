@@ -6,7 +6,10 @@ BEGIN;
 INSERT INTO rbac.permissions (name) VALUES
     ('user:read'),
     ('user:create'),
-    ('user:update')
+    ('user:update'),
+    ('system-role:read'),
+    ('system-role:assign'),
+    ('system-role:unassign')
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO rbac.system_roles (external_id, name, created_at)

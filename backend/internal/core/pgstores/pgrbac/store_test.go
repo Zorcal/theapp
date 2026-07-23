@@ -29,6 +29,9 @@ func TestStore_SystemRoles(t *testing.T) {
 		{
 			Name: "superadmin",
 			PermissionNames: []string{
+				"system-role:assign",
+				"system-role:read",
+				"system-role:unassign",
 				"user:create",
 				"user:read",
 				"user:update",
@@ -58,6 +61,9 @@ func TestStore_SystemPermissions(t *testing.T) {
 		}
 
 		want := []string{
+			"system-role:assign",
+			"system-role:read",
+			"system-role:unassign",
 			"user:create",
 			"user:read",
 			"user:update",
@@ -113,6 +119,9 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		want := ProjectPermissions{
 			OrgID: orgID,
 			PermissionNames: []string{
+				"system-role:assign",
+				"system-role:read",
+				"system-role:unassign",
 				"user:create",
 				"user:read",
 				"user:update",
@@ -195,6 +204,9 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		want := ProjectPermissions{
 			OrgID: orgID,
 			PermissionNames: []string{
+				"system-role:assign",
+				"system-role:read",
+				"system-role:unassign",
 				"user:create",
 				"user:read",
 				"user:update",

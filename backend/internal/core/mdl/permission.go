@@ -14,9 +14,19 @@ const (
 	PermissionUserUpdate Permission = "user:update"
 )
 
+// All system role service permissions.
+const (
+	PermissionSystemRoleRead     Permission = "system-role:read"
+	PermissionSystemRoleAssign   Permission = "system-role:assign"
+	PermissionSystemRoleUnassign Permission = "system-role:unassign"
+)
+
 // AllPermissions lists all permissions.
 var AllPermissions = []Permission{
 	PermissionUserRead,
 	PermissionUserCreate,
 	PermissionUserUpdate,
+	PermissionSystemRoleRead,
+	PermissionSystemRoleAssign,
+	PermissionSystemRoleUnassign,
 }

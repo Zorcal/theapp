@@ -64,6 +64,12 @@ var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},
 	"/theapp.v1.UserService/CreateUser": {mdl.PermissionUserCreate},
 	"/theapp.v1.UserService/UpdateUser": {mdl.PermissionUserUpdate},
+
+	"/theapp.v1.SystemRoleService/ListSystemRoles":           {mdl.PermissionSystemRoleRead},
+	"/theapp.v1.SystemRoleService/ListSystemRolePermissions": {mdl.PermissionSystemRoleRead},
+	"/theapp.v1.SystemRoleService/AssignSystemRole":          {mdl.PermissionSystemRoleAssign},
+	"/theapp.v1.SystemRoleService/UnassignSystemRole":        {mdl.PermissionSystemRoleUnassign},
+	"/theapp.v1.SystemRoleService/ListSystemRoleAssignments": {mdl.PermissionSystemRoleRead},
 }
 
 // NewServer constructs the GRPC server.

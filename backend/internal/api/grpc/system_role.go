@@ -3,10 +3,11 @@ package grpc
 import (
 	"context"
 
-	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 )
 
 type systemRoleService struct {

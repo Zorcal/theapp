@@ -36,7 +36,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 // SystemRoleService assigns and unassigns system roles to users, and lists the system roles available to assign. System
-// roles are statically seeded rather than managed through an API. Every call is anchored on the "theapp" organization's
+// roles are seeded by the system rather than managed through an API. Every call is anchored on the "theapp" organization's
 // control project: x-project-id must be that project's ID.
 service SystemRoleService {
   // Lists the system roles available to assign.
