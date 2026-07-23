@@ -53,6 +53,9 @@ Avoid import aliases. Only alias an import when two imported packages would othe
 
 ## Testing conventions
 
+Always run the full test suite with `make test` from `backend/`, including when verifying a change isolated to one
+package. Do not run package-specific or test-specific commands.
+
 ### Subtests
 
 - The subtest name describes only what differentiates the case — assume the function under test is known. Inside a `TestFoo_error` function every subtest already produces an error, so don't restate that in the name (`"bar returns ErrBar"`, `"baz fails"`, `"qux errors out"`) — name it after only the differentiating cause (`"bar"`, `"baz"`, `"qux"`).

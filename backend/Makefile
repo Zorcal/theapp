@@ -6,6 +6,10 @@ DBMATE_SCHEMA_DIR=$(shell pwd)/internal/data/pgschema
 DBMATE_IMAGE=ghcr.io/amacneil/dbmate:2.33.0
 PG_IMAGE=postgres:17.10
 
+.PHONY: test
+test:
+	go test -p 4 ./...
+
 .PHONY: seed-dev-operator
 seed-dev-operator:
 	./scripts/seed-dev-operator.sh
