@@ -76,6 +76,10 @@ Table tests are a subtest structured as a data-driven loop; the naming rule abov
 - Use `t.Fatalf` only when the test cannot meaningfully continue — typically failed setup or an unexpected error that leaves no result to check.
 - Outside table tests, declare `got` and `want` together — `if got, want := f(x), y; got != want { t.Errorf("f(%v) = %v, want %v", x, got, want) }` — and use `want` in the message instead of hardcoding the expected value again.
 
+### Mocks
+
+- Use mock callbacks to provide configured results and errors. Don't assert arguments inside them merely to verify that values were forwarded; prefer assertions on observable behavior and integration tests. Assert mock arguments only when the interaction itself is part of the contract.
+
 ```go
 // Good
 func TestCalculate(t *testing.T) {

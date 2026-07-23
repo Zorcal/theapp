@@ -23,8 +23,20 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			AssignSystemRoleFunc: func(ctx context.Context, userID int, roleName string) error {
 //				panic("mock out the AssignSystemRole method")
 //			},
-//			SystemRolesFunc: func(ctx context.Context) ([]pgrbac.SystemRole, error) {
+//			SystemRoleCountFunc: func(ctx context.Context) (int, error) {
+//				panic("mock out the SystemRoleCount method")
+//			},
+//			SystemRolesFunc: func(ctx context.Context, pageSize int, pageOffset int) ([]pgrbac.SystemRole, error) {
 //				panic("mock out the SystemRoles method")
+//			},
+//			UnassignSystemRoleFunc: func(ctx context.Context, userID int, roleName string) error {
+//				panic("mock out the UnassignSystemRole method")
+//			},
+//			UserSystemRoleCountFunc: func(ctx context.Context, userID int) (int, error) {
+//				panic("mock out the UserSystemRoleCount method")
+//			},
+//			UserSystemRolesFunc: func(ctx context.Context, userID int, pageSize int, pageOffset int) ([]pgrbac.SystemRole, error) {
+//				panic("mock out the UserSystemRoles method")
 //			},
 //		}
 //
@@ -36,8 +48,20 @@ type MockedRoleStorer struct {
 	// AssignSystemRoleFunc mocks the AssignSystemRole method.
 	AssignSystemRoleFunc func(ctx context.Context, userID int, roleName string) error
 
+	// SystemRoleCountFunc mocks the SystemRoleCount method.
+	SystemRoleCountFunc func(ctx context.Context) (int, error)
+
 	// SystemRolesFunc mocks the SystemRoles method.
-	SystemRolesFunc func(ctx context.Context) ([]pgrbac.SystemRole, error)
+	SystemRolesFunc func(ctx context.Context, pageSize int, pageOffset int) ([]pgrbac.SystemRole, error)
+
+	// UnassignSystemRoleFunc mocks the UnassignSystemRole method.
+	UnassignSystemRoleFunc func(ctx context.Context, userID int, roleName string) error
+
+	// UserSystemRoleCountFunc mocks the UserSystemRoleCount method.
+	UserSystemRoleCountFunc func(ctx context.Context, userID int) (int, error)
+
+	// UserSystemRolesFunc mocks the UserSystemRoles method.
+	UserSystemRolesFunc func(ctx context.Context, userID int, pageSize int, pageOffset int) ([]pgrbac.SystemRole, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -50,14 +74,54 @@ type MockedRoleStorer struct {
 			// RoleName is the roleName argument value.
 			RoleName string
 		}
+		// SystemRoleCount holds details about calls to the SystemRoleCount method.
+		SystemRoleCount []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// SystemRoles holds details about calls to the SystemRoles method.
 		SystemRoles []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// PageSize is the pageSize argument value.
+			PageSize int
+			// PageOffset is the pageOffset argument value.
+			PageOffset int
+		}
+		// UnassignSystemRole holds details about calls to the UnassignSystemRole method.
+		UnassignSystemRole []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID int
+			// RoleName is the roleName argument value.
+			RoleName string
+		}
+		// UserSystemRoleCount holds details about calls to the UserSystemRoleCount method.
+		UserSystemRoleCount []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID int
+		}
+		// UserSystemRoles holds details about calls to the UserSystemRoles method.
+		UserSystemRoles []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID int
+			// PageSize is the pageSize argument value.
+			PageSize int
+			// PageOffset is the pageOffset argument value.
+			PageOffset int
 		}
 	}
-	lockAssignSystemRole sync.RWMutex
-	lockSystemRoles      sync.RWMutex
+	lockAssignSystemRole    sync.RWMutex
+	lockSystemRoleCount     sync.RWMutex
+	lockSystemRoles         sync.RWMutex
+	lockUnassignSystemRole  sync.RWMutex
+	lockUserSystemRoleCount sync.RWMutex
+	lockUserSystemRoles     sync.RWMutex
 }
 
 // AssignSystemRole calls AssignSystemRoleFunc.
@@ -100,20 +164,56 @@ func (mock *MockedRoleStorer) AssignSystemRoleCalls() []struct {
 	return calls
 }
 
-// SystemRoles calls SystemRolesFunc.
-func (mock *MockedRoleStorer) SystemRoles(ctx context.Context) ([]pgrbac.SystemRole, error) {
-	if mock.SystemRolesFunc == nil {
-		panic("MockedRoleStorer.SystemRolesFunc: method is nil but RoleStorer.SystemRoles was just called")
+// SystemRoleCount calls SystemRoleCountFunc.
+func (mock *MockedRoleStorer) SystemRoleCount(ctx context.Context) (int, error) {
+	if mock.SystemRoleCountFunc == nil {
+		panic("MockedRoleStorer.SystemRoleCountFunc: method is nil but RoleStorer.SystemRoleCount was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
 	}{
 		Ctx: ctx,
 	}
+	mock.lockSystemRoleCount.Lock()
+	mock.calls.SystemRoleCount = append(mock.calls.SystemRoleCount, callInfo)
+	mock.lockSystemRoleCount.Unlock()
+	return mock.SystemRoleCountFunc(ctx)
+}
+
+// SystemRoleCountCalls gets all the calls that were made to SystemRoleCount.
+// Check the length with:
+//
+//	len(mockedRoleStorer.SystemRoleCountCalls())
+func (mock *MockedRoleStorer) SystemRoleCountCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockSystemRoleCount.RLock()
+	calls = mock.calls.SystemRoleCount
+	mock.lockSystemRoleCount.RUnlock()
+	return calls
+}
+
+// SystemRoles calls SystemRolesFunc.
+func (mock *MockedRoleStorer) SystemRoles(ctx context.Context, pageSize int, pageOffset int) ([]pgrbac.SystemRole, error) {
+	if mock.SystemRolesFunc == nil {
+		panic("MockedRoleStorer.SystemRolesFunc: method is nil but RoleStorer.SystemRoles was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		PageSize   int
+		PageOffset int
+	}{
+		Ctx:        ctx,
+		PageSize:   pageSize,
+		PageOffset: pageOffset,
+	}
 	mock.lockSystemRoles.Lock()
 	mock.calls.SystemRoles = append(mock.calls.SystemRoles, callInfo)
 	mock.lockSystemRoles.Unlock()
-	return mock.SystemRolesFunc(ctx)
+	return mock.SystemRolesFunc(ctx, pageSize, pageOffset)
 }
 
 // SystemRolesCalls gets all the calls that were made to SystemRoles.
@@ -121,13 +221,137 @@ func (mock *MockedRoleStorer) SystemRoles(ctx context.Context) ([]pgrbac.SystemR
 //
 //	len(mockedRoleStorer.SystemRolesCalls())
 func (mock *MockedRoleStorer) SystemRolesCalls() []struct {
-	Ctx context.Context
+	Ctx        context.Context
+	PageSize   int
+	PageOffset int
 } {
 	var calls []struct {
-		Ctx context.Context
+		Ctx        context.Context
+		PageSize   int
+		PageOffset int
 	}
 	mock.lockSystemRoles.RLock()
 	calls = mock.calls.SystemRoles
 	mock.lockSystemRoles.RUnlock()
+	return calls
+}
+
+// UnassignSystemRole calls UnassignSystemRoleFunc.
+func (mock *MockedRoleStorer) UnassignSystemRole(ctx context.Context, userID int, roleName string) error {
+	if mock.UnassignSystemRoleFunc == nil {
+		panic("MockedRoleStorer.UnassignSystemRoleFunc: method is nil but RoleStorer.UnassignSystemRole was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		UserID   int
+		RoleName string
+	}{
+		Ctx:      ctx,
+		UserID:   userID,
+		RoleName: roleName,
+	}
+	mock.lockUnassignSystemRole.Lock()
+	mock.calls.UnassignSystemRole = append(mock.calls.UnassignSystemRole, callInfo)
+	mock.lockUnassignSystemRole.Unlock()
+	return mock.UnassignSystemRoleFunc(ctx, userID, roleName)
+}
+
+// UnassignSystemRoleCalls gets all the calls that were made to UnassignSystemRole.
+// Check the length with:
+//
+//	len(mockedRoleStorer.UnassignSystemRoleCalls())
+func (mock *MockedRoleStorer) UnassignSystemRoleCalls() []struct {
+	Ctx      context.Context
+	UserID   int
+	RoleName string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		UserID   int
+		RoleName string
+	}
+	mock.lockUnassignSystemRole.RLock()
+	calls = mock.calls.UnassignSystemRole
+	mock.lockUnassignSystemRole.RUnlock()
+	return calls
+}
+
+// UserSystemRoleCount calls UserSystemRoleCountFunc.
+func (mock *MockedRoleStorer) UserSystemRoleCount(ctx context.Context, userID int) (int, error) {
+	if mock.UserSystemRoleCountFunc == nil {
+		panic("MockedRoleStorer.UserSystemRoleCountFunc: method is nil but RoleStorer.UserSystemRoleCount was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+	}
+	mock.lockUserSystemRoleCount.Lock()
+	mock.calls.UserSystemRoleCount = append(mock.calls.UserSystemRoleCount, callInfo)
+	mock.lockUserSystemRoleCount.Unlock()
+	return mock.UserSystemRoleCountFunc(ctx, userID)
+}
+
+// UserSystemRoleCountCalls gets all the calls that were made to UserSystemRoleCount.
+// Check the length with:
+//
+//	len(mockedRoleStorer.UserSystemRoleCountCalls())
+func (mock *MockedRoleStorer) UserSystemRoleCountCalls() []struct {
+	Ctx    context.Context
+	UserID int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID int
+	}
+	mock.lockUserSystemRoleCount.RLock()
+	calls = mock.calls.UserSystemRoleCount
+	mock.lockUserSystemRoleCount.RUnlock()
+	return calls
+}
+
+// UserSystemRoles calls UserSystemRolesFunc.
+func (mock *MockedRoleStorer) UserSystemRoles(ctx context.Context, userID int, pageSize int, pageOffset int) ([]pgrbac.SystemRole, error) {
+	if mock.UserSystemRolesFunc == nil {
+		panic("MockedRoleStorer.UserSystemRolesFunc: method is nil but RoleStorer.UserSystemRoles was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		UserID     int
+		PageSize   int
+		PageOffset int
+	}{
+		Ctx:        ctx,
+		UserID:     userID,
+		PageSize:   pageSize,
+		PageOffset: pageOffset,
+	}
+	mock.lockUserSystemRoles.Lock()
+	mock.calls.UserSystemRoles = append(mock.calls.UserSystemRoles, callInfo)
+	mock.lockUserSystemRoles.Unlock()
+	return mock.UserSystemRolesFunc(ctx, userID, pageSize, pageOffset)
+}
+
+// UserSystemRolesCalls gets all the calls that were made to UserSystemRoles.
+// Check the length with:
+//
+//	len(mockedRoleStorer.UserSystemRolesCalls())
+func (mock *MockedRoleStorer) UserSystemRolesCalls() []struct {
+	Ctx        context.Context
+	UserID     int
+	PageSize   int
+	PageOffset int
+} {
+	var calls []struct {
+		Ctx        context.Context
+		UserID     int
+		PageSize   int
+		PageOffset int
+	}
+	mock.lockUserSystemRoles.RLock()
+	calls = mock.calls.UserSystemRoles
+	mock.lockUserSystemRoles.RUnlock()
 	return calls
 }

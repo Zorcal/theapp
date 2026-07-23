@@ -6,7 +6,8 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
-func systemRolesQuery() pgdb.TypedQuery[SystemRole] {
+func systemRolesQuery(pageSize, pageOffset int) pgdb.TypedQuery[SystemRole] {
+	params := pgx.NamedArgs{"page_size": pageSize, "page_offset": pageOffset}
 	const sql = `
 		SELECT
 			r.name,
@@ -15,12 +16,72 @@ func systemRolesQuery() pgdb.TypedQuery[SystemRole] {
 		LEFT JOIN rbac.system_role_permissions AS rp ON rp.role_id = r.id
 		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
 		GROUP BY r.id
-		ORDER BY r.name`
+		ORDER BY r.name
+		LIMIT @page_size OFFSET @page_offset`
 
 	return pgdb.TypedQuery[SystemRole]{
 		SQL:    sql,
+		Args:   params,
 		Scan:   pgx.RowToStructByName[SystemRole],
 		Expect: pgdb.ExpectMany,
+	}
+}
+
+func systemRoleCountQuery() pgdb.TypedQuery[int] {
+	const sql = `SELECT COUNT(*) FROM rbac.system_roles`
+
+	return pgdb.TypedQuery[int]{
+		SQL: sql,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var count int
+			return count, row.Scan(&count)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func userSystemRolesQuery(userID, pageSize, pageOffset int) pgdb.TypedQuery[SystemRole] {
+	params := pgx.NamedArgs{
+		"user_id":     userID,
+		"page_size":   pageSize,
+		"page_offset": pageOffset,
+	}
+	const sql = `
+		SELECT
+			r.name,
+			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names
+		FROM rbac.system_role_assignments AS sra
+		JOIN rbac.system_roles AS r ON r.id = sra.role_id
+		LEFT JOIN rbac.system_role_permissions AS rp ON rp.role_id = r.id
+		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
+		WHERE sra.user_id = @user_id
+		GROUP BY r.id
+		ORDER BY r.name
+		LIMIT @page_size OFFSET @page_offset`
+
+	return pgdb.TypedQuery[SystemRole]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[SystemRole],
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func userSystemRoleCountQuery(userID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"user_id": userID}
+	const sql = `
+		SELECT COUNT(*)
+		FROM rbac.system_role_assignments
+		WHERE user_id = @user_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var count int
+			return count, row.Scan(&count)
+		},
+		Expect: pgdb.ExpectOne,
 	}
 }
 
@@ -42,6 +103,47 @@ func systemPermissionsQuery(userID int) pgdb.TypedQuery[string] {
 			return name, row.Scan(&name)
 		},
 		Expect: pgdb.ExpectMany,
+	}
+}
+
+func assignSystemRoleQuery(userID int, roleName string) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"user_id": userID, "role_name": roleName}
+	const sql = `
+		INSERT INTO rbac.system_role_assignments (user_id, role_id)
+		SELECT @user_id, r.id
+		FROM rbac.system_roles AS r
+		WHERE r.name = @role_name
+		RETURNING role_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func unassignSystemRoleQuery(userID int, roleName string) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"user_id": userID, "role_name": roleName}
+	const sql = `
+		DELETE FROM rbac.system_role_assignments AS sra
+		USING rbac.system_roles AS r
+		WHERE sra.user_id = @user_id
+			AND sra.role_id = r.id
+			AND r.name = @role_name
+		RETURNING sra.role_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
 	}
 }
 
@@ -86,26 +188,6 @@ func projectPermissionsQuery(userID, projectID int) pgdb.TypedQuery[ProjectPermi
 		SQL:    sql,
 		Args:   params,
 		Scan:   pgx.RowToStructByName[ProjectPermissions],
-		Expect: pgdb.ExpectOne,
-	}
-}
-
-func assignSystemRoleQuery(userID int, roleName string) pgdb.TypedQuery[int] {
-	params := pgx.NamedArgs{"user_id": userID, "role_name": roleName}
-	const sql = `
-		INSERT INTO rbac.system_role_assignments (user_id, role_id)
-		SELECT @user_id, r.id
-		FROM rbac.system_roles AS r
-		WHERE r.name = @role_name
-		RETURNING role_id`
-
-	return pgdb.TypedQuery[int]{
-		SQL:  sql,
-		Args: params,
-		Scan: func(row pgx.CollectableRow) (int, error) {
-			var id int
-			return id, row.Scan(&id)
-		},
 		Expect: pgdb.ExpectOne,
 	}
 }

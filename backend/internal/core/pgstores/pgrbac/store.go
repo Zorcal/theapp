@@ -18,12 +18,11 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
-// SystemRoles returns every system role and the names of the permissions currently granted to
-// it, ordered by role name.
-func (s *Store) SystemRoles(ctx context.Context) ([]SystemRole, error) {
+// SystemRoles returns a page of system roles and their permissions, ordered by role name.
+func (s *Store) SystemRoles(ctx context.Context, pageSize, pageOffset int) ([]SystemRole, error) {
 	var roles []SystemRole
 
-	q := systemRolesQuery()
+	q := systemRolesQuery(pageSize, pageOffset)
 
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.QueueMany(ctx, b, &roles); err != nil {
@@ -37,6 +36,66 @@ func (s *Store) SystemRoles(ctx context.Context) ([]SystemRole, error) {
 	}
 
 	return roles, nil
+}
+
+// SystemRoleCount returns the number of system roles.
+func (s *Store) SystemRoleCount(ctx context.Context) (int, error) {
+	var count int
+
+	q := systemRoleCountQuery()
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &count); err != nil {
+			return fmt.Errorf("system role count: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// UserSystemRoles returns a page of system roles assigned to userID, ordered by role name.
+func (s *Store) UserSystemRoles(ctx context.Context, userID, pageSize, pageOffset int) ([]SystemRole, error) {
+	var roles []SystemRole
+
+	q := userSystemRolesQuery(userID, pageSize, pageOffset)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.QueueMany(ctx, b, &roles); err != nil {
+			return fmt.Errorf("user system roles: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return nil, err
+	}
+
+	return roles, nil
+}
+
+// UserSystemRoleCount returns the number of system roles assigned to userID.
+func (s *Store) UserSystemRoleCount(ctx context.Context, userID int) (int, error) {
+	var count int
+
+	q := userSystemRoleCountQuery(userID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &count); err != nil {
+			return fmt.Errorf("user system role count: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 // SystemPermissions returns the names of the permissions userID holds through system-scope role
@@ -84,6 +143,7 @@ func (s *Store) ProjectPermissions(ctx context.Context, userID, projectID int) (
 
 // AssignSystemRole grants userID the system role named roleName at system scope.
 // Returns [sql.ErrNoRows] if no system role named roleName exists.
+// Returns [pgdb.ErrAlreadyExists] if userID already has the system role.
 func (s *Store) AssignSystemRole(ctx context.Context, userID int, roleName string) error {
 	var roleID int
 
@@ -92,6 +152,27 @@ func (s *Store) AssignSystemRole(ctx context.Context, userID int, roleName strin
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &roleID); err != nil {
 			return fmt.Errorf("assign system role: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UnassignSystemRole revokes the system role named roleName from userID.
+// Returns [sql.ErrNoRows] if userID does not have that system role.
+func (s *Store) UnassignSystemRole(ctx context.Context, userID int, roleName string) error {
+	var roleID int
+
+	q := unassignSystemRoleQuery(userID, roleName)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &roleID); err != nil {
+			return fmt.Errorf("unassign system role: %w", err)
 		}
 		return nil
 	}
