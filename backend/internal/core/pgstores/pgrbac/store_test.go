@@ -15,17 +15,17 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
-func TestStore_StaticRoles(t *testing.T) {
+func TestStore_SystemRoles(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	rbacStore := NewStore(pool)
 
-	got, err := rbacStore.StaticRoles(ctx)
+	got, err := rbacStore.SystemRoles(ctx)
 	if err != nil {
-		t.Fatalf("StaticRoles() error = %v", err)
+		t.Fatalf("SystemRoles() error = %v", err)
 	}
 
-	want := []RoleStatic{
+	want := []SystemRole{
 		{
 			Name: "superadmin",
 			PermissionNames: []string{
@@ -308,7 +308,7 @@ func TestStore_AssignSystemRole_error(t *testing.T) {
 		}
 	})
 
-	t.Run("name matches a custom role, not a static one", func(t *testing.T) {
+	t.Run("name matches a custom role, not a system one", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)

@@ -24,7 +24,7 @@ func NewRoleCommand(userCore *user.Core, rbacCore *rbac.Core) *cli.Command {
 func newRoleAssignSystemCommand(userCore *user.Core, rbacCore *rbac.Core) *cli.Command {
 	return &cli.Command{
 		Name:  "assign-system",
-		Usage: "Assign a static role to a user at system scope",
+		Usage: "Assign a system role to a user",
 		Flags: []cli.Flag{
 			operatorFlag(),
 			&cli.StringFlag{
@@ -34,7 +34,7 @@ func newRoleAssignSystemCommand(userCore *user.Core, rbacCore *rbac.Core) *cli.C
 			},
 			&cli.StringFlag{
 				Name:     "role",
-				Usage:    "name of the static role to assign, e.g. superadmin",
+				Usage:    "name of the system role to assign, e.g. superadmin",
 				Required: true,
 			},
 		},

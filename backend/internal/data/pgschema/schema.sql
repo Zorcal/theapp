@@ -260,20 +260,20 @@ CREATE TABLE rbac.project_role_assignments (
 
 
 --
--- Name: static_role_permissions; Type: TABLE; Schema: rbac; Owner: -
+-- Name: system_role_permissions; Type: TABLE; Schema: rbac; Owner: -
 --
 
-CREATE TABLE rbac.static_role_permissions (
+CREATE TABLE rbac.system_role_permissions (
     role_id integer NOT NULL,
     permission_id integer NOT NULL
 );
 
 
 --
--- Name: static_roles; Type: TABLE; Schema: rbac; Owner: -
+-- Name: system_roles; Type: TABLE; Schema: rbac; Owner: -
 --
 
-CREATE TABLE rbac.static_roles (
+CREATE TABLE rbac.system_roles (
     id integer NOT NULL,
     external_id uuid NOT NULL,
     name text NOT NULL,
@@ -283,10 +283,10 @@ CREATE TABLE rbac.static_roles (
 
 
 --
--- Name: static_roles_id_seq; Type: SEQUENCE; Schema: rbac; Owner: -
+-- Name: system_roles_id_seq; Type: SEQUENCE; Schema: rbac; Owner: -
 --
 
-CREATE SEQUENCE rbac.static_roles_id_seq
+CREATE SEQUENCE rbac.system_roles_id_seq
     AS integer
     START WITH 1
     INCREMENT BY 1
@@ -296,10 +296,10 @@ CREATE SEQUENCE rbac.static_roles_id_seq
 
 
 --
--- Name: static_roles_id_seq; Type: SEQUENCE OWNED BY; Schema: rbac; Owner: -
+-- Name: system_roles_id_seq; Type: SEQUENCE OWNED BY; Schema: rbac; Owner: -
 --
 
-ALTER SEQUENCE rbac.static_roles_id_seq OWNED BY rbac.static_roles.id;
+ALTER SEQUENCE rbac.system_roles_id_seq OWNED BY rbac.system_roles.id;
 
 
 --
@@ -443,10 +443,10 @@ ALTER TABLE ONLY rbac.permissions ALTER COLUMN id SET DEFAULT nextval('rbac.perm
 
 
 --
--- Name: static_roles id; Type: DEFAULT; Schema: rbac; Owner: -
+-- Name: system_roles id; Type: DEFAULT; Schema: rbac; Owner: -
 --
 
-ALTER TABLE ONLY rbac.static_roles ALTER COLUMN id SET DEFAULT nextval('rbac.static_roles_id_seq'::regclass);
+ALTER TABLE ONLY rbac.system_roles ALTER COLUMN id SET DEFAULT nextval('rbac.system_roles_id_seq'::regclass);
 
 
 --
@@ -583,35 +583,35 @@ ALTER TABLE ONLY rbac.project_role_assignments
 
 
 --
--- Name: static_role_permissions static_role_permissions_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+-- Name: system_role_permissions system_role_permissions_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
 --
 
-ALTER TABLE ONLY rbac.static_role_permissions
-    ADD CONSTRAINT static_role_permissions_pkey PRIMARY KEY (role_id, permission_id);
-
-
---
--- Name: static_roles static_roles_external_id_key; Type: CONSTRAINT; Schema: rbac; Owner: -
---
-
-ALTER TABLE ONLY rbac.static_roles
-    ADD CONSTRAINT static_roles_external_id_key UNIQUE (external_id);
+ALTER TABLE ONLY rbac.system_role_permissions
+    ADD CONSTRAINT system_role_permissions_pkey PRIMARY KEY (role_id, permission_id);
 
 
 --
--- Name: static_roles static_roles_name_key; Type: CONSTRAINT; Schema: rbac; Owner: -
+-- Name: system_roles system_roles_external_id_key; Type: CONSTRAINT; Schema: rbac; Owner: -
 --
 
-ALTER TABLE ONLY rbac.static_roles
-    ADD CONSTRAINT static_roles_name_key UNIQUE (name);
+ALTER TABLE ONLY rbac.system_roles
+    ADD CONSTRAINT system_roles_external_id_key UNIQUE (external_id);
 
 
 --
--- Name: static_roles static_roles_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+-- Name: system_roles system_roles_name_key; Type: CONSTRAINT; Schema: rbac; Owner: -
 --
 
-ALTER TABLE ONLY rbac.static_roles
-    ADD CONSTRAINT static_roles_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY rbac.system_roles
+    ADD CONSTRAINT system_roles_name_key UNIQUE (name);
+
+
+--
+-- Name: system_roles system_roles_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
+--
+
+ALTER TABLE ONLY rbac.system_roles
+    ADD CONSTRAINT system_roles_pkey PRIMARY KEY (id);
 
 
 --
@@ -860,19 +860,19 @@ ALTER TABLE ONLY rbac.project_role_assignments
 
 
 --
--- Name: static_role_permissions static_role_permissions_permission_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+-- Name: system_role_permissions system_role_permissions_permission_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
 --
 
-ALTER TABLE ONLY rbac.static_role_permissions
-    ADD CONSTRAINT static_role_permissions_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES rbac.permissions(id);
+ALTER TABLE ONLY rbac.system_role_permissions
+    ADD CONSTRAINT system_role_permissions_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES rbac.permissions(id);
 
 
 --
--- Name: static_role_permissions static_role_permissions_role_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
+-- Name: system_role_permissions system_role_permissions_role_id_fkey; Type: FK CONSTRAINT; Schema: rbac; Owner: -
 --
 
-ALTER TABLE ONLY rbac.static_role_permissions
-    ADD CONSTRAINT static_role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.static_roles(id);
+ALTER TABLE ONLY rbac.system_role_permissions
+    ADD CONSTRAINT system_role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.system_roles(id);
 
 
 --
@@ -880,7 +880,7 @@ ALTER TABLE ONLY rbac.static_role_permissions
 --
 
 ALTER TABLE ONLY rbac.system_role_assignments
-    ADD CONSTRAINT system_role_assignments_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.static_roles(id);
+    ADD CONSTRAINT system_role_assignments_role_id_fkey FOREIGN KEY (role_id) REFERENCES rbac.system_roles(id);
 
 
 --

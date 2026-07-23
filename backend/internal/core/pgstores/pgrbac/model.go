@@ -1,7 +1,7 @@
 package pgrbac
 
-// RoleStatic is a static role and the names of every permission currently granted to it.
-type RoleStatic struct {
+// SystemRole is a system role and the names of every permission currently granted to it.
+type SystemRole struct {
 	Name            string   `db:"name"`
 	PermissionNames []string `db:"permission_names"`
 }

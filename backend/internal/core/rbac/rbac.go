@@ -18,11 +18,11 @@ import (
 
 // RoleStorer defines the database operations the Core requires.
 type RoleStorer interface {
-	// StaticRoles returns every static role and the names of the permissions currently granted to
+	// SystemRoles returns every system role and the names of the permissions currently granted to
 	// it.
-	StaticRoles(ctx context.Context) ([]pgrbac.RoleStatic, error)
-	// AssignSystemRole grants userID the static role named roleName at system scope.
-	// Returns [sql.ErrNoRows] if no static role named roleName exists.
+	SystemRoles(ctx context.Context) ([]pgrbac.SystemRole, error)
+	// AssignSystemRole grants userID the system role named roleName at system scope.
+	// Returns [sql.ErrNoRows] if no system role named roleName exists.
 	AssignSystemRole(ctx context.Context, userID int, roleName string) error
 }
 
@@ -46,18 +46,18 @@ func NewCore(rs RoleStorer, us UserStorer) *Core {
 	return &Core{roleStorer: rs, userStorer: us}
 }
 
-// StaticRoles returns every static role and the permissions currently granted to it.
-func (c *Core) StaticRoles(ctx context.Context) ([]mdl.RoleStatic, error) {
-	rs, err := c.roleStorer.StaticRoles(ctx)
+// SystemRoles returns every system role and the permissions currently granted to it.
+func (c *Core) SystemRoles(ctx context.Context) ([]mdl.SystemRole, error) {
+	rs, err := c.roleStorer.SystemRoles(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("static roles: %w", err)
+		return nil, fmt.Errorf("system roles: %w", err)
 	}
 
-	return staticRolesFromPg(rs), nil
+	return systemRolesFromPg(rs), nil
 }
 
-// AssignSystemRole grants userID the static role named roleName at system scope.
-// Returns [mdl.ErrNotFound] if no user with that ID, or no static role named roleName, exists.
+// AssignSystemRole grants userID the system role named roleName at system scope.
+// Returns [mdl.ErrNotFound] if no user with that ID, or no system role named roleName, exists.
 func (c *Core) AssignSystemRole(ctx context.Context, userID uuid.UUID, roleName string) error {
 	u, err := c.userStorer.UserByExternalID(ctx, userID)
 	if err != nil {

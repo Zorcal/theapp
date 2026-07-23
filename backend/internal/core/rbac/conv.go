@@ -6,15 +6,15 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
-func staticRoleFromPg(r pgrbac.RoleStatic) mdl.RoleStatic {
-	return mdl.RoleStatic{
+func systemRoleFromPg(r pgrbac.SystemRole) mdl.SystemRole {
+	return mdl.SystemRole{
 		Name:        r.Name,
 		Permissions: permissionsFromPg(r.PermissionNames),
 	}
 }
 
-func staticRolesFromPg(rs []pgrbac.RoleStatic) []mdl.RoleStatic {
-	return slicesx.Map(rs, staticRoleFromPg)
+func systemRolesFromPg(rs []pgrbac.SystemRole) []mdl.SystemRole {
+	return slicesx.Map(rs, systemRoleFromPg)
 }
 
 func permissionsFromPg(names []string) []mdl.Permission {

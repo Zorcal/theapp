@@ -47,30 +47,30 @@ Also delivered in this phase, beyond the original task list: a `db migrate` comm
 
 **Checkpoint:** the type compiles and the migration runs; the table exists (empty until phase 3 seeds it — there's no role yet to reference a permission by ID). Met.
 
-## Phase 3 — static roles and permission seeding — done
+## Phase 3 — system roles and permission seeding — done
 
-5. Migration: `roles` table (`is_static`; `org_id` deferred to phase 11, added once organizations exist) and `role_permissions` join table. Depends on 4.
-6. `is_static` trigger (`prevent_static_role_mutation`, `BEFORE UPDATE OR DELETE`) on `roles`. Depends on 5.
+5. Migration: separate `system_roles` and `custom_roles` tables, each with its own permission join table. Depends on 4.
+6. System roles are structurally protected from custom-role mutation because they live in a separate table. Depends on 5.
 7. `internal/data/pgschema/seed.sql` (its statements wrapped in a single `BEGIN`/`COMMIT`) plus `pgschema.Seed(ctx, pool)`, run wherever a pool is set up (`cmd/server`, test setup): idempotent (`ON CONFLICT ... DO NOTHING`) `INSERT`s for every permission, `superadmin`, and its grants. Depends on 3, 4, 5.
-8. Static role definitions: `superadmin` (every permission), seeded via 7. Depends on 5, 7.
+8. System role definitions: `superadmin` (every permission), seeded via 7. Depends on 5, 7.
 
-Permissions and static roles are rows inserted by `seed.sql`, not something any Go code reconciles at runtime or filters on read. Removing a permission or a static role is a manual step against the database after the code change deploys (see `internal/core/rbac/README.md`) — an accepted tradeoff given how rarely this is expected to happen; if that stops being true, this cleanup can move into a `cmd/cli` command instead of staying a hand-run SQL snippet. `useradmin`/`rolesadmin` are dropped for now — illustrative roles with no permissions of their own to hold yet, given only `user:*` permissions exist at this point; add them back once there's a real permission set for each to scope down to.
+Permissions and system roles are rows inserted by `seed.sql`, not something any Go code reconciles at runtime or filters on read. Removing a permission or a system role is a manual step against the database after the code change deploys (see `internal/core/rbac/README.md`) — an accepted tradeoff given how rarely this is expected to happen; if that stops being true, this cleanup can move into a `cmd/cli` command instead of staying a hand-run SQL snippet. `useradmin`/`rolesadmin` are dropped for now — illustrative roles with no permissions of their own to hold yet, given only `user:*` permissions exist at this point; add them back once there's a real permission set for each to scope down to.
 
-**Checkpoint:** static roles exist in the DB with correct permission sets, proven by `TestCore_integration`. `pgschema.Seed`'s idempotency (`TestSeed`, asserting the total row count across every table is unchanged after a second call) and the `is_static` trigger (`TestIsStaticTrigger`) each have their own dedicated test. Met.
+**Checkpoint:** system roles exist in the DB with correct permission sets, proven by `TestCore_integration`. `pgschema.Seed`'s idempotency (`TestSeed`, asserting the total row count across every table is unchanged after a second call) has its own dedicated test. Met.
 
 ## Phase 4 — system-scope assignment and resolver — done
 
 9. Migration: `system_role_assignments` table (user, role — no project or org). Depends on 5.
-10. Trigger (`prevent_custom_role_system_assignment`, `BEFORE INSERT`) on `system_role_assignments` rejecting inserts where the target role isn't static. Depends on 5, 9.
+10. The `system_role_assignments.role_id` foreign key targets `system_roles`, structurally rejecting custom roles. Depends on 5, 9.
 11. `mdl.AuthUser` struct, alongside existing `mdl/auth.go`. `mdl.AuthSession` isn't added yet — it pairs `AuthUser` with a `ProjectID` that has no meaning until request-time resolution exists, so it's deferred to phase 6, which is what actually assembles one.
 12. System-scope-only resolver: `auth.Core.AuthUser(ctx, userID)` resolves a user's identity and the permissions it holds from `system_role_assignments` alone (project/org legs added in phase 11), backed by a `PermissionStorer` interface implemented by `pgrbac.Store`. Depends on 8, 9, 11.
 13. `rbac.Core.AssignSystemRole(ctx, userID, roleName)` inserts a `system_role_assignments` row (no gRPC endpoint yet). Depends on 9, 10.
 
-**Checkpoint:** given a `system_role_assignments` row inserted via `AssignSystemRole`, `AuthUser` resolves the correct identity and permission set for that user, proven by `auth.TestCore_integration`. The `BEFORE INSERT` trigger rejecting a non-static role is proven by `TestStore_AssignSystemRole_error`. Met.
+**Checkpoint:** given a `system_role_assignments` row inserted via `AssignSystemRole`, `AuthUser` resolves the correct identity and permission set for that user, proven by `auth.TestCore_integration`. Rejection of a custom role is proven by `TestStore_AssignSystemRole_error`. Met.
 
 ## Phase 5 — CLI: grant superadmin — done
 
-14. `role assign-system` command (takes `--role` rather than being superadmin-specific, since 13 itself assigns any static role by name), wired to 13, using the scaffold from phase 1. Depends on 1, 13.
+14. `role assign-system` command (takes `--role` rather than being superadmin-specific, since 13 itself assigns any system role by name), wired to 13, using the scaffold from phase 1. Depends on 1, 13.
 
 **Checkpoint:** an operator can grant `superadmin` to a user via the CLI. Verified manually against a local dev database (`role assign-system --role superadmin`, then confirmed the `system_role_assignments` row).
 
@@ -118,7 +118,7 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 ## Phase 12 — role service: CRUD and ownership
 
 26. Proto schema: `schemas/role.proto` (`RoleService` — create/update/delete a custom role, assign/unassign, list roles). Run `make generate`.
-27. Role service skeleton: create/edit/delete custom roles, rejecting any target with `is_static = true`. Depends on 23, 26.
+27. Role service skeleton: create/edit/delete custom roles; system roles are exposed through a separate service and table. Depends on 23, 26.
 28. Role-org-ownership check on every role-service operation, matching role `org_id` to the assignment's target org. Depends on 27.
 29. Role listing filtered by caller's org (for the "assign a role" UI). Depends on 27.
 
@@ -127,7 +127,7 @@ Permissions and static roles are rows inserted by `seed.sql`, not something any 
 ## Phase 13 — role service: assignment endpoints
 
 30. Assign/unassign endpoints writing to the three assignment tables, gated by the `org_membership` check (18) for org-scoped assignment. Depends on 18, 22, 27.
-31. Restrict `system` scope assignment to static roles in the role service (mirrors the DB trigger in 10). Depends on 30.
+31. Restrict `system` scope assignment to system roles in the role service (mirrors the database constraint in 10). Depends on 30.
 
 **Checkpoint:** roles can be assigned/unassigned via the API. Privilege-escalation and lockout checks aren't in place until phases 14-15 — don't expose this beyond trusted internal testing until those land, since as it stands any caller with `role:assign` can grant permissions beyond their own.
 

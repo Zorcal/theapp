@@ -27,16 +27,16 @@ func TestCore_integration(t *testing.T) {
 		cmpopts.SortSlices(func(a, b mdl.Permission) bool { return a < b }),
 	}
 
-	staticRoles, err := core.StaticRoles(ctx)
+	systemRoles, err := core.SystemRoles(ctx)
 	if err != nil {
-		t.Fatalf("StaticRoles() error = %v", err)
+		t.Fatalf("SystemRoles() error = %v", err)
 	}
 
-	wantStaticRoles := []mdl.RoleStatic{
+	wantSystemRoles := []mdl.SystemRole{
 		{Name: "superadmin", Permissions: mdl.AllPermissions},
 	}
 
-	testingx.AssertDiff(t, staticRoles, wantStaticRoles, diffOpts)
+	testingx.AssertDiff(t, systemRoles, wantSystemRoles, diffOpts)
 
 	usr, err := userStore.CreateUser(ctx, pguser.CreateUser{Email: "alice@test.com", Name: "Alice Smith"})
 	if err != nil {
@@ -48,39 +48,39 @@ func TestCore_integration(t *testing.T) {
 	}
 }
 
-func TestCore_StaticRoles(t *testing.T) {
+func TestCore_SystemRoles(t *testing.T) {
 	roleStorer := &MockedRoleStorer{
-		StaticRolesFunc: func(_ context.Context) ([]pgrbac.RoleStatic, error) {
-			return []pgrbac.RoleStatic{
+		SystemRolesFunc: func(_ context.Context) ([]pgrbac.SystemRole, error) {
+			return []pgrbac.SystemRole{
 				{Name: "superadmin", PermissionNames: []string{"user:create", "user:read"}},
 			}, nil
 		},
 	}
 	core := NewCore(roleStorer, &MockedUserStorer{})
 
-	got, err := core.StaticRoles(t.Context())
+	got, err := core.SystemRoles(t.Context())
 	if err != nil {
-		t.Fatalf("StaticRoles() error = %v", err)
+		t.Fatalf("SystemRoles() error = %v", err)
 	}
 
-	want := []mdl.RoleStatic{
+	want := []mdl.SystemRole{
 		{Name: "superadmin", Permissions: []mdl.Permission{mdl.PermissionUserCreate, mdl.PermissionUserRead}},
 	}
 
 	testingx.AssertDiff(t, got, want)
 }
 
-func TestCore_StaticRoles_error(t *testing.T) {
+func TestCore_SystemRoles_error(t *testing.T) {
 	dbErr := errors.New("db error")
 
 	core := NewCore(&MockedRoleStorer{
-		StaticRolesFunc: func(_ context.Context) ([]pgrbac.RoleStatic, error) {
+		SystemRolesFunc: func(_ context.Context) ([]pgrbac.SystemRole, error) {
 			return nil, dbErr
 		},
 	}, &MockedUserStorer{})
 
-	if _, err := core.StaticRoles(t.Context()); !errors.Is(err, dbErr) {
-		t.Errorf("StaticRoles() error = %v, want %v", err, dbErr)
+	if _, err := core.SystemRoles(t.Context()); !errors.Is(err, dbErr) {
+		t.Errorf("SystemRoles() error = %v, want %v", err, dbErr)
 	}
 }
 

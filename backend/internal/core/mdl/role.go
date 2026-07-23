@@ -1,8 +1,8 @@
 package mdl
 
-// RoleStatic is a static role and the permissions currently granted to it. Static roles are seed
-// data — our system doesn't support mutating one directly.
-type RoleStatic struct {
+// SystemRole is a system role and the permissions currently granted to it. System roles are seed
+// data and cannot be mutated directly.
+type SystemRole struct {
 	Name        string
 	Permissions []Permission
 }

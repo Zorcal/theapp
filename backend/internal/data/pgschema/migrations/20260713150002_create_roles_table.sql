@@ -1,6 +1,6 @@
 -- migrate:up
 
-CREATE TABLE rbac.static_roles (
+CREATE TABLE rbac.system_roles (
     id SERIAL PRIMARY KEY
     , external_id UUID UNIQUE NOT NULL
     , name TEXT UNIQUE NOT NULL
@@ -18,8 +18,8 @@ CREATE TABLE rbac.custom_roles (
     , etag UUID UNIQUE NOT NULL
 );
 
-CREATE TABLE rbac.static_role_permissions (
-    role_id INTEGER NOT NULL REFERENCES rbac.static_roles (id)
+CREATE TABLE rbac.system_role_permissions (
+    role_id INTEGER NOT NULL REFERENCES rbac.system_roles (id)
     , permission_id INTEGER NOT NULL REFERENCES rbac.permissions (id)
     , PRIMARY KEY (role_id, permission_id)
 );
@@ -33,6 +33,6 @@ CREATE TABLE rbac.custom_role_permissions (
 
 -- migrate:down
 DROP TABLE rbac.custom_role_permissions;
-DROP TABLE rbac.static_role_permissions;
+DROP TABLE rbac.system_role_permissions;
 DROP TABLE rbac.custom_roles;
-DROP TABLE rbac.static_roles;
+DROP TABLE rbac.system_roles;
