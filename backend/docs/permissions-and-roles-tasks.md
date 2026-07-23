@@ -63,13 +63,13 @@ Permissions and system roles are rows inserted by `seed.sql`, not something any 
 10. The `system_role_assignments.role_id` foreign key targets `system_roles`, structurally rejecting custom roles. Depends on 5, 9.
 11. `mdl.AuthUser` struct, alongside existing `mdl/auth.go`. `mdl.AuthSession` isn't added yet — it pairs `AuthUser` with a `ProjectID` that has no meaning until request-time resolution exists, so it's deferred to phase 6, which is what actually assembles one.
 12. System-scope-only resolver: `auth.Core.AuthUser(ctx, userID)` resolves a user's identity and the permissions it holds from `system_role_assignments` alone (project/org legs added in phase 11), backed by a `PermissionStorer` interface implemented by `pgrbac.Store`. Depends on 8, 9, 11.
-13. `rbac.Core.AssignSystemRole(ctx, userID, roleName)` inserts a `system_role_assignments` row (no gRPC endpoint yet). Depends on 9, 10.
+13. The RBAC core's bootstrap system-role assignment operation inserts a `system_role_assignments` row (no gRPC endpoint yet). Phase 12 keeps this unchecked path explicitly named and reserved for the bootstrap CLI, while its ordinary API-facing assignment operation requires an actor and enforces the system-scope superset rule. Depends on 9, 10.
 
 **Checkpoint:** given a `system_role_assignments` row inserted via `AssignSystemRole`, `AuthUser` resolves the correct identity and permission set for that user, proven by `auth.TestCore_integration`. Rejection of a custom role is proven by `TestStore_AssignSystemRole_error`. Met.
 
 ## Phase 5 — CLI: grant superadmin — done
 
-14. `role assign-system` command (takes `--role` rather than being superadmin-specific, since 13 itself assigns any system role by name), wired to 13, using the scaffold from phase 1. Depends on 1, 13.
+14. `role assign-system` command (takes `--role` rather than being superadmin-specific, since 13 itself assigns any system role by name), wired to the explicitly named bootstrap operation from 13, using the scaffold from phase 1. Depends on 1, 13.
 
 **Checkpoint:** an operator can grant `superadmin` to a user via the CLI. Verified manually against a local dev database (`role assign-system --role superadmin`, then confirmed the `system_role_assignments` row).
 
@@ -118,8 +118,8 @@ Permissions and system roles are rows inserted by `seed.sql`, not something any 
 
 26. Finalize `schemas/system_role.proto` and its generated gRPC/gateway/OpenAPI artifacts: list system roles with their permissions, assign/unassign a system role, and list a user's system-role assignments. `SystemRole.permissions` is embedded so list and assignment responses carry the complete role definition without a per-role follow-up request. Every method is anchored on `theapp`'s control project. The schema and unimplemented handler scaffold already exist; finish field documentation and confirm request/response shapes before implementing them.
 27. Seed `system-role:read`, `system-role:assign`, and `system-role:unassign`; add their `mdl.Permission` constants and register every `SystemRoleService` method in `permissionRegistry`. List operations require `system-role:read`, assign requires `system-role:assign`, and unassign requires `system-role:unassign`. This part is already complete. Depends on 7, 15, 26.
-28. Add paginated store/core read operations for system roles (including their permissions) and a user's system-role assignments; add `UnassignSystemRole` alongside the existing `AssignSystemRole`. Depends on 9, 13, 26.
-29. Enforce the system-scope superset rule inside the same transaction as assign and unassign: the actor's authority must be resolved only from its own `system_role_assignments`, never from project- or org-scoped grants. Depends on 12, 28.
+28. Add paginated store/core read operations for system roles (including their permissions) and a user's system-role assignments; add `UnassignSystemRole` alongside the existing `AssignSystemRole`. This part is complete. Depends on 9, 13, 26.
+29. Enforce the system-scope superset rule inside the same transaction as assign and unassign: the actor's authority must be resolved only from its own `system_role_assignments`, never from project- or org-scoped grants. The ordinary core operations read the actor's ID from the authenticated session in context, resolve and lock the actor's system assignments in the write transaction, and return `mdl.ErrPermissionDenied` when the actor lacks any permission carried by the target role. A missing auth session is treated as a programming error because the transport must authenticate these operations before calling the core. The bootstrap CLI uses a separately named unchecked operation so it can establish the first system administrator. This part is complete. Depends on 12, 28.
 30. Reject unassigning the last system-scope assignment that carries the system-role management permissions being removed, then wire and validate all four gRPC handlers with unit and integration coverage. Handler validation includes proving that `x-project-id` resolves specifically to `theapp`'s control project, not merely to any valid project. Depends on 20, 27, 29.
 
 The service is deliberately separate from custom-role management. It can read and assign seeded

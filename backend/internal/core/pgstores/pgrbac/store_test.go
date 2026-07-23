@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -15,6 +17,27 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
+
+func TestStore_LockSystemRoleUser(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	userStore := pguser.NewStore(pool)
+	rbacStore := NewStore(pool)
+
+	usr, err := userStore.CreateUser(ctx, pguser.CreateUser{Email: "lock-system-role@test.com", Name: "Lock User"})
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	if err := pgdb.NewTransactor(pool).RunTx(ctx, func(ctx context.Context) error {
+		if err := rbacStore.LockSystemRoleUser(ctx, usr.ExternalID); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("LockSystemRoleUser() error = %v", err)
+	}
+}
 
 func TestStore_SystemRoles(t *testing.T) {
 	ctx := context.Background()
@@ -26,19 +49,7 @@ func TestStore_SystemRoles(t *testing.T) {
 		t.Fatalf("SystemRoles() error = %v", err)
 	}
 
-	wantFirstPage := []SystemRole{
-		{
-			Name: "superadmin",
-			PermissionNames: []string{
-				"system-role:assign",
-				"system-role:read",
-				"system-role:unassign",
-				"user:create",
-				"user:read",
-				"user:update",
-			},
-		},
-	}
+	wantFirstPage := seededSystemRoles()
 
 	testingx.AssertDiff(t, gotFirstPage, wantFirstPage)
 
@@ -46,8 +57,8 @@ func TestStore_SystemRoles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SystemRoleCount() error = %v", err)
 	}
-	if count != len(wantFirstPage) {
-		t.Errorf("SystemRoleCount() = %d, want 1", count)
+	if wantCount := len(wantFirstPage); count != wantCount {
+		t.Errorf("SystemRoleCount() = %d, want %d", count, wantCount)
 	}
 
 	gotSecondPage, err := rbacStore.SystemRoles(ctx, 50, 1)
@@ -60,16 +71,41 @@ func TestStore_SystemRoles(t *testing.T) {
 	testingx.AssertDiff(t, gotSecondPage, wantSecondPage)
 }
 
-func TestStore_UserSystemRoles(t *testing.T) {
+func TestStore_SystemRoleByName(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+
+	got, err := rbacStore.SystemRoleByName(ctx, "superadmin")
+	if err != nil {
+		t.Fatalf("SystemRoleByName() error = %v", err)
+	}
+
+	want := seededSystemRole(t, "superadmin")
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestStore_SystemRoleByName_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+
+	if _, err := rbacStore.SystemRoleByName(ctx, "nonexistent"); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("SystemRoleByName() error = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestStore_UserSystemRolesByExternalID(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	rbacStore := NewStore(pool)
 	userStore := pguser.NewStore(pool)
 	usr := seedUser(t, userStore, "alice@test.com")
 
-	gotBeforeAssignment, err := rbacStore.UserSystemRoles(ctx, usr.ID, 50, 0)
+	gotBeforeAssignment, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
 	if err != nil {
-		t.Fatalf("UserSystemRoles() before assignment error = %v", err)
+		t.Fatalf("UserSystemRolesByExternalID() before assignment error = %v", err)
 	}
 
 	wantBeforeAssignment := []SystemRole{}
@@ -78,37 +114,37 @@ func TestStore_UserSystemRoles(t *testing.T) {
 
 	seedSystemRoleAssignment(t, ctx, pool, usr.ID, "superadmin")
 
-	gotAfterAssignment, err := rbacStore.UserSystemRoles(ctx, usr.ID, 50, 0)
+	gotAfterAssignment, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
 	if err != nil {
-		t.Fatalf("UserSystemRoles() error = %v", err)
+		t.Fatalf("UserSystemRolesByExternalID() error = %v", err)
 	}
 
-	wantAfterAssignment := []SystemRole{
-		{
-			Name: "superadmin",
-			PermissionNames: []string{
-				"system-role:assign",
-				"system-role:read",
-				"system-role:unassign",
-				"user:create",
-				"user:read",
-				"user:update",
-			},
-		},
-	}
+	wantAfterAssignment := seededSystemRoles()
 
 	testingx.AssertDiff(t, gotAfterAssignment, wantAfterAssignment)
 
-	gotCount, err := rbacStore.UserSystemRoleCount(ctx, usr.ID)
+	gotCount, err := rbacStore.UserSystemRoleCountByExternalID(ctx, usr.ExternalID)
 	if err != nil {
-		t.Fatalf("UserSystemRoleCount() error = %v", err)
+		t.Fatalf("UserSystemRoleCountByExternalID() error = %v", err)
 	}
 	if wantCount := 1; gotCount != wantCount {
-		t.Errorf("UserSystemRoleCount() = %d, want %d", gotCount, wantCount)
+		t.Errorf("UserSystemRoleCountByExternalID() = %d, want %d", gotCount, wantCount)
 	}
 }
 
-func TestStore_SystemPermissions(t *testing.T) {
+func TestStore_UserSystemRoleCountByExternalID_error(t *testing.T) {
+	t.Run("user not found", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		rbacStore := NewStore(pool)
+
+		if _, err := rbacStore.UserSystemRoleCountByExternalID(ctx, uuid.New()); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UserSystemRoleCountByExternalID() error = %v, want sql.ErrNoRows", err)
+		}
+	})
+}
+
+func TestStore_UserSystemPermissionsByExternalID(t *testing.T) {
 	t.Run("system scope", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
@@ -119,9 +155,9 @@ func TestStore_SystemPermissions(t *testing.T) {
 
 		seedSystemRoleAssignment(t, ctx, pool, usr.ID, "superadmin")
 
-		got, err := rbacStore.SystemPermissions(ctx, usr.ID)
+		got, err := rbacStore.UserSystemPermissionsByExternalID(ctx, usr.ExternalID)
 		if err != nil {
-			t.Fatalf("SystemPermissions() error = %v", err)
+			t.Fatalf("UserSystemPermissionsByExternalID() error = %v", err)
 		}
 
 		want := []string{
@@ -148,14 +184,14 @@ func TestStore_SystemPermissions(t *testing.T) {
 		seedProjectRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", projectID)
 		seedOrgRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", orgID)
 
-		got, err := rbacStore.SystemPermissions(ctx, usr.ID)
+		got, err := rbacStore.UserSystemPermissionsByExternalID(ctx, usr.ExternalID)
 		if err != nil {
-			t.Fatalf("SystemPermissions() error = %v", err)
+			t.Fatalf("UserSystemPermissionsByExternalID() error = %v", err)
 		}
 
 		// User was assigned a project role but not a system role.
 		if len(got) != 0 {
-			t.Errorf("SystemPermissions() = %v, want empty", got)
+			t.Errorf("UserSystemPermissionsByExternalID() = %v, want empty", got)
 		}
 	})
 }
@@ -365,6 +401,16 @@ func TestStore_ProjectPermissions_error(t *testing.T) {
 }
 
 func TestStore_AssignSystemRole_error(t *testing.T) {
+	t.Run("user not found", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		rbacStore := NewStore(pool)
+
+		if err := rbacStore.AssignSystemRole(ctx, uuid.New(), "superadmin"); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("AssignSystemRole() error = %v, want sql.ErrNoRows", err)
+		}
+	})
+
 	t.Run("role not found", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
@@ -373,7 +419,7 @@ func TestStore_AssignSystemRole_error(t *testing.T) {
 
 		usr := seedUser(t, userStore, "alice@test.com")
 
-		if err := rbacStore.AssignSystemRole(ctx, usr.ID, "nonexistent"); !errors.Is(err, sql.ErrNoRows) {
+		if err := rbacStore.AssignSystemRole(ctx, usr.ExternalID, "nonexistent"); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("AssignSystemRole() error = %v, want sql.ErrNoRows", err)
 		}
 	})
@@ -387,7 +433,7 @@ func TestStore_AssignSystemRole_error(t *testing.T) {
 		usr := seedUser(t, userStore, "alice@test.com")
 		seedCustomRole(t, ctx, pool, "some-project-role", nil)
 
-		if err := rbacStore.AssignSystemRole(ctx, usr.ID, "some-project-role"); !errors.Is(err, sql.ErrNoRows) {
+		if err := rbacStore.AssignSystemRole(ctx, usr.ExternalID, "some-project-role"); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("AssignSystemRole() error = %v, want sql.ErrNoRows", err)
 		}
 	})
@@ -401,7 +447,7 @@ func TestStore_AssignSystemRole_error(t *testing.T) {
 		usr := seedUser(t, userStore, "alice@test.com")
 		seedSystemRoleAssignment(t, ctx, pool, usr.ID, "superadmin")
 
-		if err := rbacStore.AssignSystemRole(ctx, usr.ID, "superadmin"); !errors.Is(err, pgdb.ErrAlreadyExists) {
+		if err := rbacStore.AssignSystemRole(ctx, usr.ExternalID, "superadmin"); !errors.Is(err, pgdb.ErrAlreadyExists) {
 			t.Errorf("AssignSystemRole() error = %v, want pgdb.ErrAlreadyExists", err)
 		}
 	})
@@ -416,13 +462,13 @@ func TestStore_UnassignSystemRole(t *testing.T) {
 	usr := seedUser(t, userStore, "alice@test.com")
 	seedSystemRoleAssignment(t, ctx, pool, usr.ID, "superadmin")
 
-	if err := rbacStore.UnassignSystemRole(ctx, usr.ID, "superadmin"); err != nil {
+	if err := rbacStore.UnassignSystemRole(ctx, usr.ExternalID, "superadmin"); err != nil {
 		t.Fatalf("UnassignSystemRole() error = %v", err)
 	}
 
-	got, err := rbacStore.UserSystemRoles(ctx, usr.ID, 50, 0)
+	got, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
 	if err != nil {
-		t.Fatalf("UserSystemRoles() error = %v", err)
+		t.Fatalf("UserSystemRolesByExternalID() error = %v", err)
 	}
 
 	want := []SystemRole{}
@@ -431,6 +477,16 @@ func TestStore_UnassignSystemRole(t *testing.T) {
 }
 
 func TestStore_UnassignSystemRole_error(t *testing.T) {
+	t.Run("user not found", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		rbacStore := NewStore(pool)
+
+		if err := rbacStore.UnassignSystemRole(ctx, uuid.New(), "superadmin"); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UnassignSystemRole() error = %v, want sql.ErrNoRows", err)
+		}
+	})
+
 	t.Run("assignment not found", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
@@ -439,7 +495,7 @@ func TestStore_UnassignSystemRole_error(t *testing.T) {
 
 		usr := seedUser(t, userStore, "alice@test.com")
 
-		if err := rbacStore.UnassignSystemRole(ctx, usr.ID, "superadmin"); !errors.Is(err, sql.ErrNoRows) {
+		if err := rbacStore.UnassignSystemRole(ctx, usr.ExternalID, "superadmin"); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("UnassignSystemRole() error = %v, want sql.ErrNoRows", err)
 		}
 	})
@@ -453,7 +509,7 @@ func TestStore_UnassignSystemRole_error(t *testing.T) {
 		usr := seedUser(t, userStore, "alice@test.com")
 		seedCustomRole(t, ctx, pool, "some-project-role", nil)
 
-		if err := rbacStore.UnassignSystemRole(ctx, usr.ID, "some-project-role"); !errors.Is(err, sql.ErrNoRows) {
+		if err := rbacStore.UnassignSystemRole(ctx, usr.ExternalID, "some-project-role"); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("UnassignSystemRole() error = %v, want sql.ErrNoRows", err)
 		}
 	})
@@ -471,6 +527,35 @@ func seedUser(t *testing.T, s *pguser.Store, email string) pguser.User {
 	}
 
 	return usr
+}
+
+func seededSystemRoles() []SystemRole {
+	return []SystemRole{
+		{
+			Name: "superadmin",
+			PermissionNames: []string{
+				"system-role:assign",
+				"system-role:read",
+				"system-role:unassign",
+				"user:create",
+				"user:read",
+				"user:update",
+			},
+		},
+	}
+}
+
+func seededSystemRole(t *testing.T, name string) SystemRole {
+	t.Helper()
+
+	roles := seededSystemRoles()
+
+	roleIdx := slices.IndexFunc(roles, func(role SystemRole) bool { return role.Name == name })
+	if roleIdx == -1 {
+		t.Fatalf("slices.IndexFunc(seededSystemRoles(), %q) = -1, want an index", name)
+	}
+
+	return roles[roleIdx]
 }
 
 func seedSystemRoleAssignment(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID int, roleName string) {

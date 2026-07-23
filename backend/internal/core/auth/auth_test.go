@@ -107,7 +107,7 @@ func TestCore_integration(t *testing.T) {
 	}
 
 	// AuthSession — resolves the permissions granted through a system-scope role assignment.
-	if err := rbacStore.AssignSystemRole(ctx, aliceUser.ID, "superadmin"); err != nil {
+	if err := rbacStore.AssignSystemRole(ctx, aliceUser.ExternalID, "superadmin"); err != nil {
 		t.Fatalf("AssignSystemRole() error = %v", err)
 	}
 
@@ -876,7 +876,7 @@ func TestCore_AuthSession(t *testing.T) {
 			},
 		}
 		permissionStorer := &MockedPermissionStorer{
-			SystemPermissionsFunc: func(_ context.Context, _ int) ([]string, error) {
+			UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 				return []string{"user:create", "user:read"}, nil
 			},
 		}
@@ -984,7 +984,7 @@ func TestCore_AuthSession_error(t *testing.T) {
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{
-				SystemPermissionsFunc: func(_ context.Context, _ int) ([]string, error) {
+				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, dbErr
 				},
 			},

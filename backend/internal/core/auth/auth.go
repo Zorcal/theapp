@@ -75,9 +75,9 @@ type UserStorer interface {
 
 // PermissionStorer defines the permission database operations required by Core.
 type PermissionStorer interface {
-	// SystemPermissions returns the names of the permissions userID holds through system-scope role
-	// assignments only.
-	SystemPermissions(ctx context.Context, userID int) ([]string, error)
+	// UserSystemPermissionsByExternalID returns the names of the permissions userID holds through
+	// system-scope role assignments only.
+	UserSystemPermissionsByExternalID(ctx context.Context, userID uuid.UUID) ([]string, error)
 	// ProjectPermissions returns projectID's org and the names of the permissions userID holds for
 	// projectID, resolved from project-, org-, and system-scope role assignments.
 	// Returns [sql.ErrNoRows] if no such project exists.
@@ -308,7 +308,7 @@ func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int
 	}
 
 	if projectID == nil {
-		perms, err := c.permissionStorer.SystemPermissions(ctx, u.ID)
+		perms, err := c.permissionStorer.UserSystemPermissionsByExternalID(ctx, userID)
 		if err != nil {
 			return mdl.AuthSession{}, fmt.Errorf("system permissions: %w", err)
 		}

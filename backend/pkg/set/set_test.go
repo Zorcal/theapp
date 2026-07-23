@@ -6,6 +6,37 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestFromSlice(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []int
+		want Set[int]
+	}{
+		{
+			name: "empty",
+			in:   []int{},
+			want: Set[int]{},
+		},
+		{
+			name: "values",
+			in:   []int{1, 2, 3},
+			want: Set[int]{1: {}, 2: {}, 3: {}},
+		},
+		{
+			name: "duplicates",
+			in:   []int{1, 2, 1},
+			want: Set[int]{1: {}, 2: {}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if diff := cmp.Diff(FromSlice(tt.in), tt.want); diff != "" {
+				t.Errorf("FromSlice(%v) mismatch (-got +want):\n%s", tt.in, diff)
+			}
+		})
+	}
+}
+
 func TestAdd(t *testing.T) {
 	tests := []struct {
 		name string
@@ -124,6 +155,53 @@ func TestContains(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.set.Contains(tt.in); got != tt.want {
 				t.Errorf("Contains(%d) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsSuperset(t *testing.T) {
+	tests := []struct {
+		name  string
+		set   Set[int]
+		other Set[int]
+		want  bool
+	}{
+		{
+			name:  "equal sets",
+			set:   Set[int]{1: {}, 2: {}},
+			other: Set[int]{1: {}, 2: {}},
+			want:  true,
+		},
+		{
+			name:  "strict superset",
+			set:   Set[int]{1: {}, 2: {}, 3: {}},
+			other: Set[int]{1: {}, 2: {}},
+			want:  true,
+		},
+		{
+			name:  "missing element",
+			set:   Set[int]{1: {}},
+			other: Set[int]{1: {}, 2: {}},
+			want:  false,
+		},
+		{
+			name:  "empty other",
+			set:   Set[int]{1: {}},
+			other: Set[int]{},
+			want:  true,
+		},
+		{
+			name:  "empty set",
+			set:   Set[int]{},
+			other: Set[int]{1: {}},
+			want:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.set.IsSuperset(tt.other); got != tt.want {
+				t.Errorf("IsSuperset(%v, %v) = %t, want %t", tt.set, tt.other, got, tt.want)
 			}
 		})
 	}

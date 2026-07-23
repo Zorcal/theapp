@@ -55,7 +55,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserByEmail() error = %v", err)
 	}
-	if err := srv.rbacStore.AssignSystemRole(ctx, aliceUser.ID, "superadmin"); err != nil {
+	if err := srv.rbacStore.AssignSystemRole(ctx, aliceUser.ExternalID, "superadmin"); err != nil {
 		t.Fatalf("AssignSystemRole() error = %v", err)
 	}
 

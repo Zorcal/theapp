@@ -9,6 +9,15 @@ func New[T comparable]() Set[T] {
 	return Set[T]{}
 }
 
+// FromSlice returns a set containing the values in vs.
+func FromSlice[T comparable](vs []T) Set[T] {
+	s := make(Set[T], len(vs))
+	for _, v := range vs {
+		s.Add(v)
+	}
+	return s
+}
+
 // Add inserts v into the set and returns the set.
 func (s Set[T]) Add(v T) Set[T] {
 	s[v] = struct{}{}
@@ -30,6 +39,16 @@ func (s Set[T]) Len() int {
 func (s Set[T]) Contains(v T) bool {
 	_, ok := s[v]
 	return ok
+}
+
+// IsSuperset reports whether s contains every element in other.
+func (s Set[T]) IsSuperset(other Set[T]) bool {
+	for v := range other {
+		if !s.Contains(v) {
+			return false
+		}
+	}
+	return true
 }
 
 // Values returns the elements of the set in unspecified order.

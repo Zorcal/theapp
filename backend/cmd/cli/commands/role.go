@@ -50,7 +50,7 @@ func newRoleAssignSystemCommand(userCore *user.Core, rbacCore *rbac.Core) *cli.C
 			}
 
 			roleName := cmd.String("role")
-			if err := rbacCore.AssignSystemRole(ctx, u.ID, roleName); err != nil {
+			if err := rbacCore.BootstrapAssignSystemRole(ctx, u.ID, roleName); err != nil {
 				return fmt.Errorf("assign system role: %w", err)
 			}
 

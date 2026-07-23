@@ -1,5 +1,7 @@
 package mdl
 
+import "github.com/zorcal/theapp/backend/pkg/set"
+
 // The full set of permissions defined by the system. Every protected endpoint's required permissions are drawn from
 // this list. This list and AllPermissions below must stay in sync with what's seeded into the database.
 
@@ -29,4 +31,9 @@ var AllPermissions = []Permission{
 	PermissionSystemRoleRead,
 	PermissionSystemRoleAssign,
 	PermissionSystemRoleUnassign,
+}
+
+// IsPermissionSuperset reports whether held contains every permission in required.
+func IsPermissionSuperset(held, required []Permission) bool {
+	return set.FromSlice(held).IsSuperset(set.FromSlice(required))
 }

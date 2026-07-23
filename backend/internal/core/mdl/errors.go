@@ -12,6 +12,9 @@ var ErrNotFound = errors.New("not found")
 // conflicts with an existing one (e.g. duplicate email).
 var ErrAlreadyExists = errors.New("already exists")
 
+// ErrPermissionDenied is returned when the actor is not authorized to perform an operation.
+var ErrPermissionDenied = errors.New("permission denied")
+
 // ErrTokenInvalid is returned when a magic-link or refresh token is expired,
 // consumed, revoked, or not found. A single sentinel avoids leaking which
 // condition applies.
