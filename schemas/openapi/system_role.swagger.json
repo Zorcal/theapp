@@ -179,8 +179,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "type": "object",
-              "properties": {}
+              "$ref": "#/definitions/v1AssignSystemRoleResponse"
             }
           },
           "default": {
@@ -221,8 +220,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "type": "object",
-              "properties": {}
+              "$ref": "#/definitions/v1UnassignSystemRoleResponse"
             }
           },
           "default": {
@@ -303,20 +301,25 @@
         "userId"
       ]
     },
+    "v1AssignSystemRoleResponse": {
+      "type": "object",
+      "description": "Response message for assigning a system role."
+    },
     "v1ListSystemRoleAssignmentsResponse": {
       "type": "object",
       "properties": {
-        "roleNames": {
+        "roles": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "$ref": "#/definitions/v1SystemRole"
           },
-          "description": "Names of the system roles the user holds."
+          "description": "System roles assigned to the user."
         },
         "totalSize": {
           "type": "integer",
           "format": "int32",
-          "description": "Total number of system roles the user holds."
+          "description": "Total number of system roles assigned to the user."
         },
         "nextPageToken": {
           "type": "string",
@@ -375,10 +378,11 @@
       "properties": {
         "name": {
           "type": "string",
-          "title": "Name of the"
+          "description": "Unique name of the system role.",
+          "readOnly": true
         }
       },
-      "description": "SystemRole represents a system wide role."
+      "description": "SystemRole represents a seeded, system-wide role."
     },
     "v1UnassignSystemRoleRequest": {
       "type": "object",
@@ -397,6 +401,10 @@
         "roleName",
         "userId"
       ]
+    },
+    "v1UnassignSystemRoleResponse": {
+      "type": "object",
+      "description": "Response message for unassigning a system role."
     }
   },
   "securityDefinitions": {

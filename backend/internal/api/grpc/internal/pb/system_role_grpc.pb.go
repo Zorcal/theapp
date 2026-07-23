@@ -11,7 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -31,8 +30,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// SystemRoleService assigns and unassigns system roles to users, and lists the system roles available to assign. System
-// roles are seeded by the system rather than managed through an API. Every call is anchored on the "theapp" organization's
+// SystemRoleService lists seeded system roles and manages their user
+// assignments. System-role definitions cannot be created, updated, or deleted
+// through the API. Every call is anchored on the "theapp" organization's
 // control project: x-project-id must be that project's ID.
 type SystemRoleServiceClient interface {
 	// Lists the system roles available to assign.
@@ -40,9 +40,9 @@ type SystemRoleServiceClient interface {
 	// Lists the names of the permissions currently granted to a system role.
 	ListSystemRolePermissions(ctx context.Context, in *ListSystemRolePermissionsRequest, opts ...grpc.CallOption) (*ListSystemRolePermissionsResponse, error)
 	// Assigns a system role to a user.
-	AssignSystemRole(ctx context.Context, in *AssignSystemRoleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	AssignSystemRole(ctx context.Context, in *AssignSystemRoleRequest, opts ...grpc.CallOption) (*AssignSystemRoleResponse, error)
 	// Unassigns a system role from a user.
-	UnassignSystemRole(ctx context.Context, in *UnassignSystemRoleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	UnassignSystemRole(ctx context.Context, in *UnassignSystemRoleRequest, opts ...grpc.CallOption) (*UnassignSystemRoleResponse, error)
 	// Lists the system roles a user holds.
 	ListSystemRoleAssignments(ctx context.Context, in *ListSystemRoleAssignmentsRequest, opts ...grpc.CallOption) (*ListSystemRoleAssignmentsResponse, error)
 }
@@ -75,9 +75,9 @@ func (c *systemRoleServiceClient) ListSystemRolePermissions(ctx context.Context,
 	return out, nil
 }
 
-func (c *systemRoleServiceClient) AssignSystemRole(ctx context.Context, in *AssignSystemRoleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *systemRoleServiceClient) AssignSystemRole(ctx context.Context, in *AssignSystemRoleRequest, opts ...grpc.CallOption) (*AssignSystemRoleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(AssignSystemRoleResponse)
 	err := c.cc.Invoke(ctx, SystemRoleService_AssignSystemRole_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -85,9 +85,9 @@ func (c *systemRoleServiceClient) AssignSystemRole(ctx context.Context, in *Assi
 	return out, nil
 }
 
-func (c *systemRoleServiceClient) UnassignSystemRole(ctx context.Context, in *UnassignSystemRoleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *systemRoleServiceClient) UnassignSystemRole(ctx context.Context, in *UnassignSystemRoleRequest, opts ...grpc.CallOption) (*UnassignSystemRoleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(UnassignSystemRoleResponse)
 	err := c.cc.Invoke(ctx, SystemRoleService_UnassignSystemRole_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -109,8 +109,9 @@ func (c *systemRoleServiceClient) ListSystemRoleAssignments(ctx context.Context,
 // All implementations should embed UnimplementedSystemRoleServiceServer
 // for forward compatibility.
 //
-// SystemRoleService assigns and unassigns system roles to users, and lists the system roles available to assign. System
-// roles are seeded by the system rather than managed through an API. Every call is anchored on the "theapp" organization's
+// SystemRoleService lists seeded system roles and manages their user
+// assignments. System-role definitions cannot be created, updated, or deleted
+// through the API. Every call is anchored on the "theapp" organization's
 // control project: x-project-id must be that project's ID.
 type SystemRoleServiceServer interface {
 	// Lists the system roles available to assign.
@@ -118,9 +119,9 @@ type SystemRoleServiceServer interface {
 	// Lists the names of the permissions currently granted to a system role.
 	ListSystemRolePermissions(context.Context, *ListSystemRolePermissionsRequest) (*ListSystemRolePermissionsResponse, error)
 	// Assigns a system role to a user.
-	AssignSystemRole(context.Context, *AssignSystemRoleRequest) (*emptypb.Empty, error)
+	AssignSystemRole(context.Context, *AssignSystemRoleRequest) (*AssignSystemRoleResponse, error)
 	// Unassigns a system role from a user.
-	UnassignSystemRole(context.Context, *UnassignSystemRoleRequest) (*emptypb.Empty, error)
+	UnassignSystemRole(context.Context, *UnassignSystemRoleRequest) (*UnassignSystemRoleResponse, error)
 	// Lists the system roles a user holds.
 	ListSystemRoleAssignments(context.Context, *ListSystemRoleAssignmentsRequest) (*ListSystemRoleAssignmentsResponse, error)
 }
@@ -138,10 +139,10 @@ func (UnimplementedSystemRoleServiceServer) ListSystemRoles(context.Context, *Li
 func (UnimplementedSystemRoleServiceServer) ListSystemRolePermissions(context.Context, *ListSystemRolePermissionsRequest) (*ListSystemRolePermissionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSystemRolePermissions not implemented")
 }
-func (UnimplementedSystemRoleServiceServer) AssignSystemRole(context.Context, *AssignSystemRoleRequest) (*emptypb.Empty, error) {
+func (UnimplementedSystemRoleServiceServer) AssignSystemRole(context.Context, *AssignSystemRoleRequest) (*AssignSystemRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AssignSystemRole not implemented")
 }
-func (UnimplementedSystemRoleServiceServer) UnassignSystemRole(context.Context, *UnassignSystemRoleRequest) (*emptypb.Empty, error) {
+func (UnimplementedSystemRoleServiceServer) UnassignSystemRole(context.Context, *UnassignSystemRoleRequest) (*UnassignSystemRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UnassignSystemRole not implemented")
 }
 func (UnimplementedSystemRoleServiceServer) ListSystemRoleAssignments(context.Context, *ListSystemRoleAssignmentsRequest) (*ListSystemRoleAssignmentsResponse, error) {

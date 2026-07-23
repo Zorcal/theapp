@@ -5,7 +5,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 )
@@ -22,11 +21,11 @@ func (systemRoleService) ListSystemRolePermissions(context.Context, *pb.ListSyst
 	return nil, status.Error(codes.Unimplemented, "method ListSystemRolePermissions not implemented")
 }
 
-func (systemRoleService) AssignSystemRole(context.Context, *pb.AssignSystemRoleRequest) (*emptypb.Empty, error) {
+func (systemRoleService) AssignSystemRole(context.Context, *pb.AssignSystemRoleRequest) (*pb.AssignSystemRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AssignSystemRole not implemented")
 }
 
-func (systemRoleService) UnassignSystemRole(context.Context, *pb.UnassignSystemRoleRequest) (*emptypb.Empty, error) {
+func (systemRoleService) UnassignSystemRole(context.Context, *pb.UnassignSystemRoleRequest) (*pb.UnassignSystemRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UnassignSystemRole not implemented")
 }
 
