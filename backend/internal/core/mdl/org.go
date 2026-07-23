@@ -2,9 +2,8 @@ package mdl
 
 import "time"
 
-// BootstrapOrgName is the name of the well-known bootstrap organization, guaranteed to exist by
-// the CLI's "org bootstrap" command.
-const BootstrapOrgName = "theapp"
+// SystemOrgName is the name of the well-known organization that anchors system administration.
+const SystemOrgName = "theapp"
 
 // Organization represents a tenant.
 type Organization struct {

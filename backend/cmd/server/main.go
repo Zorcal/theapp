@@ -24,9 +24,12 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/gateway"
 	"github.com/zorcal/theapp/backend/internal/clients/resend"
 	"github.com/zorcal/theapp/backend/internal/core/auth"
+	"github.com/zorcal/theapp/backend/internal/core/org"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
+	"github.com/zorcal/theapp/backend/internal/core/rbac"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgschema"
@@ -250,11 +253,14 @@ func run(ctx context.Context, cfg Config) error {
 
 	pgUserStore := pguser.NewStore(pgPool)
 	pgAuthStore := pgauth.NewStore(pgPool)
+	pgOrgStore := pgorg.NewStore(pgPool)
 	pgRBACStore := pgrbac.NewStore(pgPool)
 
 	// Setup cores.
 
 	userCore := user.NewCore(pgUserStore)
+	systemRoleCore := rbac.NewCore(pgRBACStore, pgdb.NewTransactor(pgPool))
+	orgCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pgPool))
 	authCoreCfg := auth.Config{
 		JWTKey:             []byte(cfg.Auth.JWTSecret),
 		JWTIssuer:          cfg.Auth.JWTIssuer,
@@ -296,14 +302,16 @@ func run(ctx context.Context, cfg Config) error {
 	defer log.InfoContext(ctx, "gRPC server stopped")
 
 	srv := grpc.NewServer(grpc.ServerConfig{
-		Log:              log,
-		UserCore:         userCore,
-		AuthCore:         authCore,
-		WorkflowAuthCore: authWorkflowCore,
-		JWTKey:           []byte(cfg.Auth.JWTSecret),
-		JWTIssuer:        cfg.Auth.JWTIssuer,
-		JWTAudience:      cfg.Auth.JWTAudience,
-		Reflection:       cfg.IsLocalEnvironment(),
+		Log:                        log,
+		UserCore:                   userCore,
+		AuthCore:                   authCore,
+		SystemRoleCore:             systemRoleCore,
+		SystemRoleOrganizationCore: orgCore,
+		WorkflowAuthCore:           authWorkflowCore,
+		JWTKey:                     []byte(cfg.Auth.JWTSecret),
+		JWTIssuer:                  cfg.Auth.JWTIssuer,
+		JWTAudience:                cfg.Auth.JWTAudience,
+		Reflection:                 cfg.IsLocalEnvironment(),
 	})
 
 	// Setup HTTP gateway server.

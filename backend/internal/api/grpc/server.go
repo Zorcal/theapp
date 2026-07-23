@@ -17,10 +17,12 @@ import (
 
 // ServerConfig contains all the mandatory systems required by the GRPC server.
 type ServerConfig struct {
-	Log              *slog.Logger
-	UserCore         UserCore
-	AuthCore         AuthCore
-	WorkflowAuthCore WorkflowAuthCore
+	Log                        *slog.Logger
+	UserCore                   UserCore
+	AuthCore                   AuthCore
+	SystemRoleCore             SystemRoleCore
+	SystemRoleOrganizationCore SystemRoleOrganizationCore
+	WorkflowAuthCore           WorkflowAuthCore
 	// JWTKey is the HMAC secret used to validate access tokens.
 	JWTKey      []byte
 	JWTIssuer   string
@@ -107,7 +109,10 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 		workflowAuthCore: cfg.WorkflowAuthCore,
 	})
 
-	pb.RegisterSystemRoleServiceServer(srv, &systemRoleService{})
+	pb.RegisterSystemRoleServiceServer(srv, &systemRoleService{
+		systemRoleCore:             cfg.SystemRoleCore,
+		systemRoleOrganizationCore: cfg.SystemRoleOrganizationCore,
+	})
 
 	if cfg.Reflection {
 		reflection.Register(srv)

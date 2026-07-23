@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -45,7 +46,11 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// A freshly created user holds no role yet, so a protected endpoint denies them.
-	authedCtx := metadata.AppendToOutgoingContext(authCtxWithToken(ctx, pair.GetAccessToken()), "x-project-id", testProjectID)
+	authedCtx := metadata.AppendToOutgoingContext(
+		authCtxWithToken(ctx, pair.GetAccessToken()),
+		"x-project-id",
+		strconv.Itoa(testProjectID),
+	)
 	if _, err := srv.userServiceClient.ListUsers(authedCtx, &pb.ListUsersRequest{}); status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("ListUsers() before role assignment code = %v, want %v", status.Code(err), codes.PermissionDenied)
 	}

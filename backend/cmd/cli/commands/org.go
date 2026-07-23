@@ -28,7 +28,7 @@ func NewOrgCommand(userCore *user.Core, orgCore *org.Core) *cli.Command {
 func newOrgBootstrapCommand(userCore *user.Core, orgCore *org.Core) *cli.Command {
 	return &cli.Command{
 		Name:  "bootstrap",
-		Usage: fmt.Sprintf("Ensure the %s organization, its %s project, and its control project exist", mdl.BootstrapOrgName, bootstrapDevProjectName),
+		Usage: fmt.Sprintf("Ensure the %s organization, its %s project, and its control project exist", mdl.SystemOrgName, bootstrapDevProjectName),
 		Flags: []cli.Flag{
 			operatorFlag(),
 		},
@@ -37,7 +37,7 @@ func newOrgBootstrapCommand(userCore *user.Core, orgCore *org.Core) *cli.Command
 				return fmt.Errorf("resolve operator: %w", err)
 			}
 
-			theapp, err := ensureOrganization(ctx, orgCore, mdl.BootstrapOrgName, bootstrapDevProjectName)
+			theapp, err := ensureOrganization(ctx, orgCore, mdl.SystemOrgName, bootstrapDevProjectName)
 			if err != nil {
 				return fmt.Errorf("ensure organization: %w", err)
 			}

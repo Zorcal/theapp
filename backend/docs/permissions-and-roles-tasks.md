@@ -1,10 +1,9 @@
 # Permissions and roles — implementation tasks
 
-Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–11
-are complete. They established users/auth, organizations/projects, the RBAC schema, system roles,
-permission resolution, the bootstrap CLI, and project-scoped enforcement. Phase 12 is the current
-phase: finish the system-role API that has already been scaffolded in `schemas/system_role.proto`
-before beginning custom-role management.
+Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–12
+are complete. They established users/auth, organizations/projects, the RBAC schema, permission
+resolution, the bootstrap CLI, project-scoped enforcement, and the system-role API. Phase 13 is
+next: custom-role management.
 
 ## Working process
 
@@ -116,11 +115,11 @@ Permissions and system roles are rows inserted by `seed.sql`, not something any 
 
 ## Phase 12 — system role service
 
-26. Finalize `schemas/system_role.proto` and its generated gRPC/gateway/OpenAPI artifacts: list system roles with their permissions, assign/unassign a system role, and list a user's system-role assignments. `SystemRole.permissions` is embedded so list and assignment responses carry the complete role definition without a per-role follow-up request. Every method is anchored on `theapp`'s control project. The schema and unimplemented handler scaffold already exist; finish field documentation and confirm request/response shapes before implementing them.
+26. Finalize `schemas/system_role.proto` and its generated gRPC/gateway/OpenAPI artifacts: list system roles with their permissions, assign/unassign a system role, and list a user's system-role assignments. `SystemRole.permissions` is embedded so list and assignment responses carry the complete role definition without a per-role follow-up request. Every method is anchored on `theapp`'s control project. This part is complete.
 27. Seed `system-role:read`, `system-role:assign`, and `system-role:unassign`; add their `mdl.Permission` constants and register every `SystemRoleService` method in `permissionRegistry`. List operations require `system-role:read`, assign requires `system-role:assign`, and unassign requires `system-role:unassign`. This part is already complete. Depends on 7, 15, 26.
 28. Add paginated store/core read operations for system roles (including their permissions) and a user's system-role assignments; add `UnassignSystemRole` alongside the existing `AssignSystemRole`. This part is complete. Depends on 9, 13, 26.
 29. Enforce the system-scope superset rule inside the same transaction as assign and unassign: the actor's authority must be resolved only from its own `system_role_assignments`, never from project- or org-scoped grants. The ordinary core operations read the actor's ID from the authenticated session in context, acquire transaction-level advisory locks for the actor and target in UUID order, resolve the actor's system permissions, and return `mdl.ErrPermissionDenied` when the actor lacks any permission carried by the target role. A missing auth session is treated as a programming error because the transport must authenticate these operations before calling the core. The bootstrap CLI uses a separately named unchecked operation so it can establish the first system administrator. This part is complete. Depends on 12, 28.
-30. Reject unassigning the last system-scope assignment that carries the system-role management permissions being removed, then wire and validate all four gRPC handlers with unit and integration coverage. Handler validation includes proving that `x-project-id` resolves specifically to `theapp`'s control project, not merely to any valid project. Depends on 20, 27, 29.
+30. Reject unassigning the last system-scope assignment that carries the system-role management permissions being removed, then wire and validate all four gRPC handlers with unit and integration coverage. Handler validation proves that `x-project-id` resolves specifically to `theapp`'s control project, not merely to any valid project. This part is complete. Depends on 20, 27, 29.
 
 The service is deliberately separate from custom-role management. It can read and assign seeded
 system roles, but it cannot create, edit, or delete them. Custom roles never enter
@@ -161,7 +160,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 ## Phase 17 — org creation endpoint
 
 41. Proto schema: `schemas/organization.proto` (create/delete org). Run `make generate`.
-42. Org creation gRPC endpoint: wires 19 behind `org:create` scoped to `theapp/control`, plus the `theapp` org-membership check. The membership check resolves the `theapp` org by `mdl.BootstrapOrgName` — at that point, rename the constant to drop the `Bootstrap` prefix (it's no longer just a CLI-seeding detail but a permission-anchoring concept referenced from endpoint code too, the same as `mdl.ControlProjectName`). Depends on 25, 35, 41.
+42. Org creation gRPC endpoint: wires 19 behind `org:create` scoped to `theapp/control`, plus the `theapp` org-membership check. The membership check resolves the `theapp` org by `mdl.SystemOrgName`, the same permanent authorization anchor used by system-role management. Depends on 25, 35, 41.
 43. Org creation request carries the default project's name (`CreateOrganization.ProjectName`), passed through to 19's `CreateOrganization`, which creates the organization, its control project, and the named default project. Depends on 42.
 44. Org creator assigned an admin role at org scope (see permissions-and-roles.md, "Creating organizations and projects"). Depends on 35, 42.
 

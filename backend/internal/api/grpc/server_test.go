@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,9 +22,12 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/auth"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/core/org"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
+	"github.com/zorcal/theapp/backend/internal/core/rbac"
 	"github.com/zorcal/theapp/backend/internal/core/user"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
@@ -41,12 +45,13 @@ var (
 )
 
 // testProjectID is the fixed project ID authCtxForTestUser sends as x-project-id metadata.
-const testProjectID = "1"
+const testProjectID = 1
 
 // ServerTest is a test harness for the gRPC server using mock cores. Use NewServerTest to construct one.
 type ServerTest struct {
-	userServiceClient pb.UserServiceClient
-	authServiceClient pb.AuthServiceClient
+	userServiceClient       pb.UserServiceClient
+	authServiceClient       pb.AuthServiceClient
+	systemRoleServiceClient pb.SystemRoleServiceClient
 }
 
 // NewServerTest starts a gRPC server with the given config over an in-memory transport and returns
@@ -63,13 +68,22 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 	if cfg.AuthCore == nil {
 		cfg.AuthCore = &MockedAuthCore{
 			AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+				orgID := 1
 				return mdl.AuthSession{
 					User: mdl.AuthUser{
 						UserID:      userID,
 						Permissions: mdl.AllPermissions(),
 					},
 					ProjectID: projectID,
+					OrgID:     &orgID,
 				}, nil
+			},
+		}
+	}
+	if cfg.SystemRoleOrganizationCore == nil {
+		cfg.SystemRoleOrganizationCore = &MockedSystemRoleOrganizationCore{
+			OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
+				return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 			},
 		}
 	}
@@ -77,19 +91,22 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 	conn := newBufconnClientConn(t, cfg)
 
 	return ServerTest{
-		userServiceClient: pb.NewUserServiceClient(conn),
-		authServiceClient: pb.NewAuthServiceClient(conn),
+		userServiceClient:       pb.NewUserServiceClient(conn),
+		authServiceClient:       pb.NewAuthServiceClient(conn),
+		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
 	}
 }
 
 // ServerIntegrationTest is a test harness for the gRPC server using real cores backed by a real
 // PostgreSQL database. Use NewServerIntegrationTest to construct one.
 type ServerIntegrationTest struct {
-	userServiceClient pb.UserServiceClient
-	authServiceClient pb.AuthServiceClient
-	emailSender       *testingx.CaptureEmailSender
-	userStore         *pguser.Store
-	rbacStore         *pgrbac.Store
+	userServiceClient       pb.UserServiceClient
+	authServiceClient       pb.AuthServiceClient
+	systemRoleServiceClient pb.SystemRoleServiceClient
+	emailSender             *testingx.CaptureEmailSender
+	userStore               *pguser.Store
+	orgStore                *pgorg.Store
+	rbacStore               *pgrbac.Store
 }
 
 // NewServerIntegrationTest starts a gRPC server over an in-memory transport wired to real cores
@@ -105,6 +122,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 
 	pgUserStore := pguser.NewStore(pool)
 	pgAuthStore := pgauth.NewStore(pool)
+	pgOrgStore := pgorg.NewStore(pool)
 	pgRBACStore := pgrbac.NewStore(pool)
 
 	emailSender := &testingx.CaptureEmailSender{}
@@ -123,6 +141,8 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 
 	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdb.NewTransactor(pool), authCoreCfg)
 	userCore := user.NewCore(pgUserStore)
+	systemRoleCore := rbac.NewCore(pgRBACStore, pgdb.NewTransactor(pool))
+	systemRoleOrganizationCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pool))
 
 	dbosCtx := dbostest.New(t, context.Background(), pool)
 
@@ -131,21 +151,25 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 	dbostest.Launch(t, dbosCtx)
 
 	conn := newBufconnClientConn(t, ServerConfig{
-		Log:              log,
-		UserCore:         userCore,
-		AuthCore:         authCore,
-		WorkflowAuthCore: workflowAuthCore,
-		JWTKey:           testJWTKey,
-		JWTIssuer:        testJWTIssuer,
-		JWTAudience:      testJWTAudience,
+		Log:                        log,
+		UserCore:                   userCore,
+		AuthCore:                   authCore,
+		SystemRoleCore:             systemRoleCore,
+		SystemRoleOrganizationCore: systemRoleOrganizationCore,
+		WorkflowAuthCore:           workflowAuthCore,
+		JWTKey:                     testJWTKey,
+		JWTIssuer:                  testJWTIssuer,
+		JWTAudience:                testJWTAudience,
 	})
 
 	return ServerIntegrationTest{
-		userServiceClient: pb.NewUserServiceClient(conn),
-		authServiceClient: pb.NewAuthServiceClient(conn),
-		emailSender:       emailSender,
-		userStore:         pgUserStore,
-		rbacStore:         pgRBACStore,
+		userServiceClient:       pb.NewUserServiceClient(conn),
+		authServiceClient:       pb.NewAuthServiceClient(conn),
+		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
+		emailSender:             emailSender,
+		userStore:               pgUserStore,
+		orgStore:                pgOrgStore,
+		rbacStore:               pgRBACStore,
 	}
 }
 
@@ -153,13 +177,24 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 // in the gRPC outgoing metadata. Use it for calls to any protected endpoint in tests.
 func authCtxForTestUser(t *testing.T, ctx context.Context) context.Context {
 	t.Helper()
-	ctx = metadata.AppendToOutgoingContext(ctx, "x-project-id", testProjectID)
+	return authCtxForUserAtProject(
+		t,
+		ctx,
+		uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		testProjectID,
+	)
+}
+
+// authCtxForUserAtProject returns ctx with a valid JWT for userID and projectID metadata.
+func authCtxForUserAtProject(t *testing.T, ctx context.Context, userID uuid.UUID, projectID int) context.Context {
+	t.Helper()
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-project-id", strconv.Itoa(projectID))
 	return authCtxWithClaims(t, ctx, mdl.AuthClaims{
-		UserID: uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    testJWTIssuer,
 			Audience:  jwt.ClaimStrings{testJWTAudience},
-			Subject:   "00000000-0000-0000-0000-000000000001",
+			Subject:   userID.String(),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 		},
