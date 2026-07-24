@@ -132,9 +132,9 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 31. Proto schema: `schemas/role.proto` (`RoleService` — create/update/delete a custom role, atomically modify its permissions, and list custom roles). `ModifyRolePermissions` accepts permission names to add and remove and returns the complete updated role. Adding an existing permission or removing an absent permission is a no-op; including the same permission in both lists is invalid. Add the `custom-role:create`, `custom-role:read`, `custom-role:update`, and `custom-role:delete` permissions and run `make generate`. Custom-role names are unique case-insensitively within their owning organization, rather than globally. This part is complete.
 32. Custom-role service skeleton: create/edit/delete custom roles and modify their permissions. System roles are not accepted by this service and live behind `SystemRoleService`. Reject every permission classified by `mdl.SystemOnlyPermissions()` on create, update, and permission modification so system-wide permissions can only be granted through system-scope role assignments. Cover every mutation path with integration tests. Depends on 23, 31.
 33. Role-org-ownership check on every custom-role operation, matching the role's `org_id` to the caller's resolved org. Depends on 32.
-34. Role listing filtered by the caller's org (for the "assign a role" UI). Depends on 32.
+34. Role listing filtered by the caller's org (for the "assign a role" UI). Add `schemas/permission.proto` with a static `Permission` enum used by every API field that exposes permissions, including `SystemRole`, `Role`, permission-modification requests, the permission catalog, and the later auth-data endpoint. Treat enum values as public API identifiers and add exhaustive bidirectional conversion tests between the protobuf enum and `mdl.Permission`. The same schema defines a read-only `PermissionService` whose catalog contains only custom-role-assignable permissions; system-only permissions remain present in the enum and authorized system-role responses but are omitted from the customer role editor's catalog. Generated frontend clients use the enum for authorization checks, while the custom-role editor uses the catalog instead of hardcoding names. Depends on 32.
 
-**Checkpoint:** custom roles can be created, edited, deleted, listed, and have their permissions atomically modified via the API, correctly scoped to the caller's org — no custom-role assignment yet.
+**Checkpoint:** custom roles can be created, edited, deleted, listed, and have their permissions atomically modified via the API, correctly scoped to the caller's org. The permission catalog identifies which permissions may be included in those roles. There is no custom-role assignment yet.
 
 ## Phase 14 — custom role service: assignment endpoints
 
@@ -265,6 +265,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 70. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 21.
 71. Periodic sweep job for soft-deleted users' assignment rows past retention. Depends on 54, existing DBOS workflow infra (`internal/workflows`).
+72. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
 
 ## Notes
 
