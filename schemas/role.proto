@@ -1,0 +1,205 @@
+syntax = "proto3";
+
+package theapp.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "theapp Role API"
+    version: "v1"
+  }
+  security_definitions: {
+    security: {
+      key: "BearerAuth"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "Authorization"
+        description: "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'"
+      }
+    }
+  }
+  security: {
+    security_requirement: {
+      key: "BearerAuth"
+      value: {}
+    }
+  }
+};
+
+// RoleService manages custom roles owned by the caller's organization.
+service RoleService {
+  // Creates a custom role.
+  rpc CreateRole(CreateRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      post: "/v1/roles"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the role's organization."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Lists custom roles owned by the caller's organization.
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (google.api.http) = {
+      get: "/v1/roles"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the role's organization."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Updates a custom role.
+  rpc UpdateRole(UpdateRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      patch: "/v1/roles/{role.id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the role's organization."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Modifies a custom role's permissions.
+  rpc ModifyRolePermissions(ModifyRolePermissionsRequest) returns (Role) {
+    option (google.api.http) = {
+      post: "/v1/roles/{id}:modifyPermissions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the role's organization."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Deletes a custom role.
+  rpc DeleteRole(DeleteRoleRequest) returns (DeleteRoleResponse) {
+    option (google.api.http) = {
+      delete: "/v1/roles/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the role's organization."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+}
+
+// Role is a custom role owned by an organization.
+message Role {
+  // Unique identifier for the role.
+  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+
+  // Name of the role.
+  string name = 2;
+
+  // Permissions granted to the role.
+  repeated string permissions = 3;
+
+  // Timestamp when the role was created.
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Timestamp when the role was last updated.
+  google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // ETag for the current version of the role.
+  string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+}
+
+// Request message for creating a custom role.
+message CreateRoleRequest {
+  // The role to create.
+  Role role = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for listing custom roles.
+message ListRolesRequest {
+  // Maximum number of roles to return.
+  int32 page_size = 1;
+
+  // Token for fetching the next page.
+  string page_token = 2;
+}
+
+// Response message for listing custom roles.
+message ListRolesResponse {
+  // Custom roles owned by the caller's organization.
+  repeated Role roles = 1;
+
+  // Total number of matching roles.
+  int32 total_size = 2;
+
+  // Token for fetching the next page.
+  string next_page_token = 3;
+}
+
+// Request message for updating a custom role.
+message UpdateRoleRequest {
+  // The role to update.
+  Role role = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // Fields to update.
+  google.protobuf.FieldMask update_mask = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for modifying a custom role's permissions.
+message ModifyRolePermissionsRequest {
+  // ID of the role to modify.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // Permission names to add to the role.
+  repeated string add_permissions = 2;
+
+  // Permission names to remove from the role.
+  repeated string remove_permissions = 3;
+}
+
+// Request message for deleting a custom role.
+message DeleteRoleRequest {
+  // ID of the role to delete.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Response message for deleting a custom role.
+message DeleteRoleResponse {}

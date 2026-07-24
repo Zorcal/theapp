@@ -175,14 +175,7 @@ func TestStore_UserSystemPermissionsByExternalID(t *testing.T) {
 			t.Fatalf("UserSystemPermissionsByExternalID() error = %v", err)
 		}
 
-		want := []string{
-			"system-role:assign",
-			"system-role:read",
-			"system-role:unassign",
-			"user:create",
-			"user:read",
-			"user:update",
-		}
+		want := seededSystemRole(t, "superadmin").PermissionNames
 
 		testingx.AssertDiff(t, got, want)
 	})
@@ -230,15 +223,8 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		}
 
 		want := ProjectPermissions{
-			OrgID: orgID,
-			PermissionNames: []string{
-				"system-role:assign",
-				"system-role:read",
-				"system-role:unassign",
-				"user:create",
-				"user:read",
-				"user:update",
-			},
+			OrgID:           orgID,
+			PermissionNames: seededSystemRole(t, "superadmin").PermissionNames,
 		}
 
 		testingx.AssertDiff(t, got, want)
@@ -313,15 +299,8 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		}
 
 		want := ProjectPermissions{
-			OrgID: orgID,
-			PermissionNames: []string{
-				"system-role:assign",
-				"system-role:read",
-				"system-role:unassign",
-				"user:create",
-				"user:read",
-				"user:update",
-			},
+			OrgID:           orgID,
+			PermissionNames: seededSystemRole(t, "superadmin").PermissionNames,
 		}
 
 		testingx.AssertDiff(t, got, want)
@@ -595,6 +574,10 @@ func seededSystemRoles() []SystemRole {
 		{
 			Name: "superadmin",
 			PermissionNames: []string{
+				"custom-role:create",
+				"custom-role:delete",
+				"custom-role:read",
+				"custom-role:update",
 				"system-role:assign",
 				"system-role:read",
 				"system-role:unassign",

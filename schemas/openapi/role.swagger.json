@@ -1,0 +1,430 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "theapp Role API",
+    "version": "v1"
+  },
+  "tags": [
+    {
+      "name": "RoleService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/roles": {
+      "get": {
+        "summary": "Lists custom roles owned by the caller's organization.",
+        "operationId": "RoleService_ListRoles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListRolesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of roles to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      },
+      "post": {
+        "summary": "Creates a custom role.",
+        "operationId": "RoleService_CreateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for creating a custom role.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateRoleRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles/{id}": {
+      "delete": {
+        "summary": "Deletes a custom role.",
+        "operationId": "RoleService_DeleteRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DeleteRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "ID of the role to delete.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles/{id}:modifyPermissions": {
+      "post": {
+        "summary": "Modifies a custom role's permissions.",
+        "operationId": "RoleService_ModifyRolePermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "ID of the role to modify.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RoleServiceModifyRolePermissionsBody"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles/{role.id}": {
+      "patch": {
+        "summary": "Updates a custom role.",
+        "operationId": "RoleService_UpdateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "role.id",
+            "description": "Unique identifier for the role.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RoleServiceUpdateRoleBody"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "RoleServiceModifyRolePermissionsBody": {
+      "type": "object",
+      "properties": {
+        "addPermissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Permission names to add to the role."
+        },
+        "removePermissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Permission names to remove from the role."
+        }
+      },
+      "description": "Request message for modifying a custom role's permissions."
+    },
+    "RoleServiceUpdateRoleBody": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the role."
+            },
+            "permissions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Permissions granted to the role."
+            },
+            "createTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the role was created.",
+              "readOnly": true
+            },
+            "updateTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the role was last updated.",
+              "readOnly": true
+            },
+            "etag": {
+              "type": "string",
+              "description": "ETag for the current version of the role.",
+              "readOnly": true
+            }
+          },
+          "description": "The role to update.",
+          "title": "The role to update."
+        },
+        "updateMask": {
+          "type": "string",
+          "description": "Fields to update."
+        }
+      },
+      "description": "Request message for updating a custom role.",
+      "required": [
+        "role",
+        "updateMask"
+      ]
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1CreateRoleRequest": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "$ref": "#/definitions/v1Role",
+          "description": "The role to create."
+        }
+      },
+      "description": "Request message for creating a custom role.",
+      "required": [
+        "role"
+      ]
+    },
+    "v1DeleteRoleResponse": {
+      "type": "object",
+      "description": "Response message for deleting a custom role."
+    },
+    "v1ListRolesResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Role"
+          },
+          "description": "Custom roles owned by the caller's organization."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of matching roles."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page."
+        }
+      },
+      "description": "Response message for listing custom roles."
+    },
+    "v1Role": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the role.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the role."
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Permissions granted to the role."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the role was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the role was last updated.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "ETag for the current version of the role.",
+          "readOnly": true
+        }
+      },
+      "description": "Role is a custom role owned by an organization."
+    }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "description": "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}

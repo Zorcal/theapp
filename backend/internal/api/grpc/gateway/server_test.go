@@ -59,6 +59,15 @@ func TestNewServer(t *testing.T) {
 			},
 		},
 		{
+			name:       "role openapi spec",
+			method:     http.MethodGet,
+			path:       "/v1/openapi/role.json",
+			wantStatus: http.StatusOK,
+			wantHeaders: map[string]string{
+				"Content-Type": "application/json",
+			},
+		},
+		{
 			name:       "unknown route",
 			method:     http.MethodGet,
 			path:       "/unknown",

@@ -129,12 +129,12 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Phase 13 — custom role service: CRUD and ownership
 
-31. Proto schema: `schemas/role.proto` (`RoleService` — create/update/delete a custom role and list custom roles). Add the `custom-role:create`, `custom-role:read`, `custom-role:update`, and `custom-role:delete` permissions and run `make generate`. Custom-role names are unique case-insensitively within their owning organization, rather than globally. This part is complete.
-32. Custom-role service skeleton: create/edit/delete custom roles. System roles are not accepted by this service and live behind `SystemRoleService`. Depends on 23, 31.
+31. Proto schema: `schemas/role.proto` (`RoleService` — create/update/delete a custom role, atomically modify its permissions, and list custom roles). `ModifyRolePermissions` accepts permission names to add and remove and returns the complete updated role. Adding an existing permission or removing an absent permission is a no-op; including the same permission in both lists is invalid. Add the `custom-role:create`, `custom-role:read`, `custom-role:update`, and `custom-role:delete` permissions and run `make generate`. Custom-role names are unique case-insensitively within their owning organization, rather than globally. This part is complete.
+32. Custom-role service skeleton: create/edit/delete custom roles and modify their permissions. System roles are not accepted by this service and live behind `SystemRoleService`. Depends on 23, 31.
 33. Role-org-ownership check on every custom-role operation, matching the role's `org_id` to the caller's resolved org. Depends on 32.
 34. Role listing filtered by the caller's org (for the "assign a role" UI). Depends on 32.
 
-**Checkpoint:** custom roles can be created, edited, deleted, and listed via the API, correctly scoped to the caller's org — no custom-role assignment yet.
+**Checkpoint:** custom roles can be created, edited, deleted, listed, and have their permissions atomically modified via the API, correctly scoped to the caller's org — no custom-role assignment yet.
 
 ## Phase 14 — custom role service: assignment endpoints
 
@@ -254,10 +254,17 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
 
+## Phase 31 — optimistic concurrency with ETags
+
+68. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
+69. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 68.
+
+**Checkpoint:** mutable resources use one consistent ETag contract, and stale mutations cannot overwrite newer state.
+
 ## Ongoing / cross-cutting
 
-68. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 21.
-69. Periodic sweep job for soft-deleted users' assignment rows past retention. Depends on 54, existing DBOS workflow infra (`internal/workflows`).
+70. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 21.
+71. Periodic sweep job for soft-deleted users' assignment rows past retention. Depends on 54, existing DBOS workflow infra (`internal/workflows`).
 
 ## Notes
 

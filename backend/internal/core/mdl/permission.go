@@ -23,6 +23,14 @@ const (
 	PermissionSystemRoleUnassign Permission = "system-role:unassign"
 )
 
+// All custom role service permissions.
+const (
+	PermissionCustomRoleCreate Permission = "custom-role:create"
+	PermissionCustomRoleRead   Permission = "custom-role:read"
+	PermissionCustomRoleUpdate Permission = "custom-role:update"
+	PermissionCustomRoleDelete Permission = "custom-role:delete"
+)
+
 // AllPermissions returns all permissions.
 func AllPermissions() []Permission {
 	return []Permission{
@@ -32,6 +40,10 @@ func AllPermissions() []Permission {
 		PermissionSystemRoleRead,
 		PermissionSystemRoleAssign,
 		PermissionSystemRoleUnassign,
+		PermissionCustomRoleCreate,
+		PermissionCustomRoleRead,
+		PermissionCustomRoleUpdate,
+		PermissionCustomRoleDelete,
 	}
 }
 
