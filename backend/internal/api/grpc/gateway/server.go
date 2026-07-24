@@ -15,7 +15,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 )
 
-//go:embed openapi/auth.swagger.json openapi/user.swagger.json
+//go:embed openapi/auth.swagger.json openapi/system_role.swagger.json openapi/user.swagger.json
 var openapiFiles embed.FS
 
 // ServerConfig contains the dependencies for the HTTP gateway server.
@@ -56,15 +56,20 @@ func NewServer(cfg ServerConfig) (h http.Handler, teardown func(), retErr error)
 	if err := pb.RegisterAuthServiceHandler(context.Background(), mux, conn); err != nil {
 		return nil, nil, fmt.Errorf("register auth service handler: %w", err)
 	}
+	if err := pb.RegisterSystemRoleServiceHandler(context.Background(), mux, conn); err != nil {
+		return nil, nil, fmt.Errorf("register system role service handler: %w", err)
+	}
 
 	allSpecs := []swaggerUISpec{
 		{Name: "Auth API", URL: "/v1/openapi/auth.json"},
+		{Name: "System Role API", URL: "/v1/openapi/system-role.json"},
 		{Name: "User API", URL: "/v1/openapi/user.json"},
 	}
 
 	httpMux := http.NewServeMux()
 	httpMux.Handle("/", mux)
 	httpMux.HandleFunc("/v1/openapi/auth.json", openapiHandler("openapi/auth.swagger.json"))
+	httpMux.HandleFunc("/v1/openapi/system-role.json", openapiHandler("openapi/system_role.swagger.json"))
 	httpMux.HandleFunc("/v1/openapi/user.json", openapiHandler("openapi/user.swagger.json"))
 	httpMux.HandleFunc("/docs", swaggerUIHandler("theapp API", "Auth API", allSpecs))
 
