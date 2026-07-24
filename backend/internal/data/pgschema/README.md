@@ -1,10 +1,14 @@
 # pgschema
 
-Contains the Postgres database schema and migrations for the application. Migrations are applied automatically at startup.
+Contains the Postgres database schema, static seed file and migrations for the application.
 
-New migration files are created with `make new-pg-migration name=<name>` from `backend/`.
+# Migratios
+
+Migrations are applied automatically at startup. New migration files are created with `make new-pg-migration name=<name>` from `backend/`. After a migrations change, run `make dump-pg-schema`.
 
 Never use `ON DELETE CASCADE` (or `CASCADE` on any other DDL statement) in a migration. Dependent-row cleanup is always explicit application code, not a database cascade.
+
+Add a short comment above each index explaining why the index is needed.
 
 ## seed.sql
 

@@ -3,7 +3,7 @@
 Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–12
 are complete. They established users/auth, organizations/projects, the RBAC schema, permission
 resolution, the bootstrap CLI, project-scoped enforcement, and the system-role API. Phase 13 is
-next: custom-role management.
+current: custom-role management.
 
 ## Working process
 
@@ -129,7 +129,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Phase 13 — custom role service: CRUD and ownership
 
-31. Proto schema: `schemas/role.proto` (`RoleService` — create/update/delete a custom role and list custom roles). Add the `custom-role:create`, `custom-role:read`, `custom-role:update`, and `custom-role:delete` permissions and run `make generate`.
+31. Proto schema: `schemas/role.proto` (`RoleService` — create/update/delete a custom role and list custom roles). Add the `custom-role:create`, `custom-role:read`, `custom-role:update`, and `custom-role:delete` permissions and run `make generate`. Custom-role names are unique case-insensitively within their owning organization, rather than globally. This part is complete.
 32. Custom-role service skeleton: create/edit/delete custom roles. System roles are not accepted by this service and live behind `SystemRoleService`. Depends on 23, 31.
 33. Role-org-ownership check on every custom-role operation, matching the role's `org_id` to the caller's resolved org. Depends on 32.
 34. Role listing filtered by the caller's org (for the "assign a role" UI). Depends on 32.

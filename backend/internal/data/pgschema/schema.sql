@@ -535,14 +535,6 @@ ALTER TABLE ONLY rbac.custom_roles
 
 
 --
--- Name: custom_roles custom_roles_name_key; Type: CONSTRAINT; Schema: rbac; Owner: -
---
-
-ALTER TABLE ONLY rbac.custom_roles
-    ADD CONSTRAINT custom_roles_name_key UNIQUE (name);
-
-
---
 -- Name: custom_roles custom_roles_pkey; Type: CONSTRAINT; Schema: rbac; Owner: -
 --
 
@@ -698,6 +690,13 @@ CREATE UNIQUE INDEX projects_org_id_control_key ON org.projects USING btree (org
 --
 
 CREATE UNIQUE INDEX projects_org_id_lower_name_key ON org.projects USING btree (org_id, lower(name));
+
+
+--
+-- Name: custom_roles_org_id_lower_name_key; Type: INDEX; Schema: rbac; Owner: -
+--
+
+CREATE UNIQUE INDEX custom_roles_org_id_lower_name_key ON rbac.custom_roles USING btree (org_id, lower(name));
 
 
 --
