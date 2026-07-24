@@ -16,14 +16,16 @@ const (
 	PermissionUserUpdate Permission = "user:update"
 )
 
-// All system role service permissions.
+// All system role service permissions. System role permissions are system-wide rather than
+// project- or org-scoped — they can only be granted through a system-scope role assignment.
 const (
 	PermissionSystemRoleRead     Permission = "system-role:read"
 	PermissionSystemRoleAssign   Permission = "system-role:assign"
 	PermissionSystemRoleUnassign Permission = "system-role:unassign"
 )
 
-// All custom role service permissions.
+// All custom role service permissions. They authorize role management only within the organization
+// resolved from the request's project context.
 const (
 	PermissionCustomRoleCreate Permission = "custom-role:create"
 	PermissionCustomRoleRead   Permission = "custom-role:read"
@@ -44,6 +46,19 @@ func AllPermissions() []Permission {
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
 		PermissionCustomRoleDelete,
+	}
+}
+
+// SystemOnlyPermissions returns permissions that may only be granted through system-scope role
+// assignments.
+func SystemOnlyPermissions() []Permission {
+	return []Permission{
+		PermissionUserRead,
+		PermissionUserCreate,
+		PermissionUserUpdate,
+		PermissionSystemRoleRead,
+		PermissionSystemRoleAssign,
+		PermissionSystemRoleUnassign,
 	}
 }
 
