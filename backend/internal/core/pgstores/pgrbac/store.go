@@ -19,6 +19,89 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
+// CreateCustomRole inserts an organization-owned role and its permissions.
+// Returns [sql.ErrNoRows] if the organization or any permission does not exist.
+// Returns [pgdb.ErrAlreadyExists] if the organization already has a role with that name.
+func (s *Store) CreateCustomRole(ctx context.Context, cr CreateCustomRole) (CustomRole, error) {
+	var role CustomRole
+
+	q := createCustomRoleQuery(cr)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &role); err != nil {
+			return fmt.Errorf("create custom role: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatchTx(ctx, s.pool, doInBatch); err != nil {
+		return CustomRole{}, err
+	}
+
+	return role, nil
+}
+
+// CustomRoles returns a page of an organization's custom roles and their permissions.
+func (s *Store) CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]CustomRole, error) {
+	var roles []CustomRole
+
+	q := customRolesQuery(orgID, pageSize, pageOffset)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.QueueMany(ctx, b, &roles); err != nil {
+			return fmt.Errorf("custom roles: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return nil, err
+	}
+
+	return roles, nil
+}
+
+// CustomRoleByExternalID returns an organization's custom role with the given external ID.
+// Returns [sql.ErrNoRows] if the organization does not own such a role.
+func (s *Store) CustomRoleByExternalID(ctx context.Context, orgID int, roleID uuid.UUID) (CustomRole, error) {
+	var role CustomRole
+
+	q := customRoleByExternalIDQuery(orgID, roleID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &role); err != nil {
+			return fmt.Errorf("custom role: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return CustomRole{}, err
+	}
+
+	return role, nil
+}
+
+// CustomRoleCount returns the number of custom roles owned by an organization.
+func (s *Store) CustomRoleCount(ctx context.Context, orgID int) (int, error) {
+	var count int
+
+	q := customRoleCountQuery(orgID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &count); err != nil {
+			return fmt.Errorf("custom role count: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 // LockSystemRoleManagement serializes system-role revokes that could remove management access.
 // It must be called within a transaction.
 func (s *Store) LockSystemRoleManagement(ctx context.Context) error {

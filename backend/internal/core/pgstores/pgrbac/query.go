@@ -7,6 +7,148 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
+func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
+	params := pgx.NamedArgs{
+		"org_id":           cr.OrgID,
+		"name":             cr.Name,
+		"permission_names": cr.PermissionNames,
+	}
+
+	// Execution returns sql.ErrNoRows when the organization or any requested permission does not
+	// exist, and pgdb.ErrAlreadyExists when the organization already has the role name.
+	const sql = `
+		WITH
+			-- Convert the input array into a deduplicated set of permission names.
+			requested_permissions AS (
+				SELECT DISTINCT name
+				FROM unnest(@permission_names::text[]) AS requested(name)
+			),
+			-- Resolve requested names to the permission IDs used by the join table.
+			valid_permissions AS (
+				SELECT p.id, p.name
+				FROM rbac.permissions AS p
+				JOIN requested_permissions AS requested ON requested.name = p.name
+			),
+			-- Insert only when the organization and every requested permission exist.
+			new_role AS (
+				INSERT INTO rbac.custom_roles (external_id, org_id, name, created_at, etag)
+				SELECT gen_random_uuid(), o.id, @name, NOW(), gen_random_uuid()
+				FROM org.organizations AS o
+				WHERE o.id = @org_id
+					AND NOT EXISTS (
+						SELECT 1
+						FROM requested_permissions AS requested
+						LEFT JOIN valid_permissions AS valid ON valid.name = requested.name
+						WHERE valid.id IS NULL
+					)
+				RETURNING id, external_id, org_id, name, created_at, updated_at, etag
+			),
+			-- Grant every validated permission to the new role.
+			inserted_permissions AS (
+				INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
+				SELECT new_role.id, valid_permissions.id
+				FROM new_role
+				CROSS JOIN valid_permissions
+				RETURNING permission_id
+			)
+		-- Return the role with the permission rows that were actually inserted.
+		SELECT
+			new_role.id,
+			new_role.external_id,
+			new_role.name,
+			COALESCE(
+				(
+					SELECT array_agg(valid_permissions.name ORDER BY valid_permissions.name)
+					FROM inserted_permissions
+					JOIN valid_permissions
+						ON valid_permissions.id = inserted_permissions.permission_id
+				),
+				'{}'
+			) AS permission_names,
+			new_role.created_at,
+			new_role.updated_at,
+			new_role.etag
+		FROM new_role`
+
+	return pgdb.TypedQuery[CustomRole]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[CustomRole],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func customRolesQuery(orgID, pageSize, pageOffset int) pgdb.TypedQuery[CustomRole] {
+	params := pgx.NamedArgs{
+		"org_id":      orgID,
+		"page_size":   pageSize,
+		"page_offset": pageOffset,
+	}
+	const sql = `
+		SELECT
+			r.id,
+			r.external_id,
+			r.name,
+			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names,
+			r.created_at,
+			r.updated_at,
+			r.etag
+		FROM rbac.custom_roles AS r
+		LEFT JOIN rbac.custom_role_permissions AS rp ON rp.role_id = r.id
+		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
+		WHERE r.org_id = @org_id
+		GROUP BY r.id
+		ORDER BY r.name
+		LIMIT @page_size OFFSET @page_offset`
+
+	return pgdb.TypedQuery[CustomRole]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[CustomRole],
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func customRoleByExternalIDQuery(orgID int, roleID uuid.UUID) pgdb.TypedQuery[CustomRole] {
+	params := pgx.NamedArgs{"org_id": orgID, "role_id": roleID}
+	const sql = `
+		SELECT
+			r.id,
+			r.external_id,
+			r.name,
+			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names,
+			r.created_at,
+			r.updated_at,
+			r.etag
+		FROM rbac.custom_roles AS r
+		LEFT JOIN rbac.custom_role_permissions AS rp ON rp.role_id = r.id
+		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
+		WHERE r.org_id = @org_id AND r.external_id = @role_id
+		GROUP BY r.id`
+
+	return pgdb.TypedQuery[CustomRole]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[CustomRole],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func customRoleCountQuery(orgID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"org_id": orgID}
+	const sql = `SELECT COUNT(*) FROM rbac.custom_roles WHERE org_id = @org_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var count int
+			return count, row.Scan(&count)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func systemRolesQuery(pageSize, pageOffset int) pgdb.TypedQuery[SystemRole] {
 	params := pgx.NamedArgs{"page_size": pageSize, "page_offset": pageOffset}
 	const sql = `
