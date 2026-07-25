@@ -6,6 +6,51 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
+func customRoleFromPg(r pgrbac.CustomRole) mdl.CustomRole {
+	return mdl.CustomRole{
+		ID:          r.ExternalID,
+		Name:        r.Name,
+		Permissions: permissionsFromPg(r.PermissionNames),
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+		ETag:        r.ETag.String(),
+	}
+}
+
+func customRolesFromPg(rs []pgrbac.CustomRole) []mdl.CustomRole {
+	return slicesx.Map(rs, customRoleFromPg)
+}
+
+func createCustomRoleToPg(cr mdl.CreateCustomRole, orgID int) pgrbac.CreateCustomRole {
+	return pgrbac.CreateCustomRole{
+		OrgID:           orgID,
+		Name:            cr.Name,
+		PermissionNames: permissionsToPg(cr.Permissions),
+	}
+}
+
+func updateCustomRoleToPg(ur mdl.UpdateCustomRole, orgID int) pgrbac.UpdateCustomRole {
+	return pgrbac.UpdateCustomRole{
+		OrgID:      orgID,
+		ExternalID: ur.ID,
+		Fields: pgrbac.CustomRoleUpdateFields{
+			Name:            ur.Fields.Name,
+			PermissionNames: ur.Fields.Permissions,
+		},
+		Name:            ur.Name,
+		PermissionNames: permissionsToPg(ur.Permissions),
+	}
+}
+
+func modifyCustomRolePermissionsToPg(mrp mdl.ModifyCustomRolePermissions, orgID int) pgrbac.ModifyCustomRolePermissions {
+	return pgrbac.ModifyCustomRolePermissions{
+		OrgID:                 orgID,
+		ExternalID:            mrp.ID,
+		AddPermissionNames:    permissionsToPg(mrp.AddPermissions),
+		RemovePermissionNames: permissionsToPg(mrp.RemovePermissions),
+	}
+}
+
 func systemRoleFromPg(r pgrbac.SystemRole) mdl.SystemRole {
 	return mdl.SystemRole{
 		Name:        r.Name,

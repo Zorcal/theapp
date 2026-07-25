@@ -20,6 +20,28 @@ import (
 
 // RoleStorer defines the database operations the Core requires.
 type RoleStorer interface {
+	// CreateCustomRole inserts an organization-owned role and its permissions.
+	// Returns [sql.ErrNoRows] if the organization or any permission does not exist.
+	// Returns [pgdb.ErrAlreadyExists] if the organization already has a role with that name.
+	CreateCustomRole(ctx context.Context, cr pgrbac.CreateCustomRole) (pgrbac.CustomRole, error)
+	// UpdateCustomRole updates selected fields on an organization-owned role.
+	// Returns [sql.ErrNoRows] if the organization does not own the role or any selected permission
+	// does not exist.
+	// Returns [pgdb.ErrAlreadyExists] if the organization already has a role with that name.
+	UpdateCustomRole(ctx context.Context, ur pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error)
+	// ModifyCustomRolePermissions atomically changes selected permissions on an organization-owned role.
+	// Returns [sql.ErrNoRows] if the organization does not own the role or any permission does not exist.
+	ModifyCustomRolePermissions(ctx context.Context, mp pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error)
+	// DeleteCustomRole deletes an organization-owned role and its assignments.
+	// Returns [sql.ErrNoRows] if the organization does not own the role.
+	DeleteCustomRole(ctx context.Context, orgID int, roleID uuid.UUID) error
+	// CustomRoleByExternalID returns an organization's role with the given external ID.
+	// Returns [sql.ErrNoRows] if the organization does not own such a role.
+	CustomRoleByExternalID(ctx context.Context, orgID int, roleID uuid.UUID) (pgrbac.CustomRole, error)
+	// CustomRoles returns a page of an organization's custom roles.
+	CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, error)
+	// CustomRoleCount returns the number of custom roles owned by an organization.
+	CustomRoleCount(ctx context.Context, orgID int) (int, error)
 	// LockSystemRoleManagement serializes system-role revokes that could remove management access.
 	LockSystemRoleManagement(ctx context.Context) error
 	// LockSystemRoleUser acquires a transaction-level lock that serializes system-role assignment
@@ -103,6 +125,166 @@ func (c *Core) UserSystemRoles(ctx context.Context, userID uuid.UUID, pageSize, 
 	return systemRolesFromPg(rs), count, nil
 }
 
+// CustomRoles returns a page of custom roles owned by the caller's organization, along with the total count.
+func (c *Core) CustomRoles(ctx context.Context, pageSize, pageOffset int) ([]mdl.CustomRole, int, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return nil, 0, errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return nil, 0, errors.New("organization context missing")
+	}
+
+	rs, err := c.roleStorer.CustomRoles(ctx, *sess.OrgID, pageSize, pageOffset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("custom roles: %w", err)
+	}
+
+	count, err := c.roleStorer.CustomRoleCount(ctx, *sess.OrgID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("custom role count: %w", err)
+	}
+
+	return customRolesFromPg(rs), count, nil
+}
+
+// CustomRoleByID returns a custom role owned by the caller's organization.
+// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
+func (c *Core) CustomRoleByID(ctx context.Context, roleID uuid.UUID) (mdl.CustomRole, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return mdl.CustomRole{}, errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return mdl.CustomRole{}, errors.New("organization context missing")
+	}
+
+	role, err := c.roleStorer.CustomRoleByExternalID(ctx, *sess.OrgID, roleID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.CustomRole{}, mdl.ErrNotFound
+		}
+		return mdl.CustomRole{}, fmt.Errorf("custom role: %w", err)
+	}
+
+	return customRoleFromPg(role), nil
+}
+
+// CreateCustomRole creates a custom role in the caller's organization.
+// Returns [mdl.ErrValidation] if the input is invalid or contains a system-only permission.
+// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
+func (c *Core) CreateCustomRole(ctx context.Context, cr mdl.CreateCustomRole) (mdl.CustomRole, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return mdl.CustomRole{}, errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return mdl.CustomRole{}, errors.New("organization context missing")
+	}
+
+	if err := cr.Validate(); err != nil {
+		return mdl.CustomRole{}, fmt.Errorf("validate: %w", err)
+	}
+
+	role, err := c.roleStorer.CreateCustomRole(ctx, createCustomRoleToPg(cr, *sess.OrgID))
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return mdl.CustomRole{}, fmt.Errorf("create custom role: %w", mdl.ErrNotFound)
+		case errors.Is(err, pgdb.ErrAlreadyExists):
+			return mdl.CustomRole{}, fmt.Errorf("create custom role: %w", mdl.ErrAlreadyExists)
+		case errors.Is(err, pgdb.ErrCheckConstraintViolated):
+			return mdl.CustomRole{}, fmt.Errorf("create custom role: %w", mdl.ErrValidation)
+		default:
+			return mdl.CustomRole{}, fmt.Errorf("create custom role: %w", err)
+		}
+	}
+
+	return customRoleFromPg(role), nil
+}
+
+// UpdateCustomRole updates selected fields on a custom role in the caller's organization.
+// Returns [mdl.ErrNotFound] if the role is not owned by the caller's organization.
+// Returns [mdl.ErrValidation] if the input is invalid or contains a system-only permission.
+// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
+func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return mdl.CustomRole{}, errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return mdl.CustomRole{}, errors.New("organization context missing")
+	}
+
+	if err := ur.Validate(); err != nil {
+		return mdl.CustomRole{}, fmt.Errorf("validate: %w", err)
+	}
+
+	role, err := c.roleStorer.UpdateCustomRole(ctx, updateCustomRoleToPg(ur, *sess.OrgID))
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return mdl.CustomRole{}, fmt.Errorf("update custom role: %w", mdl.ErrNotFound)
+		case errors.Is(err, pgdb.ErrAlreadyExists):
+			return mdl.CustomRole{}, fmt.Errorf("update custom role: %w", mdl.ErrAlreadyExists)
+		case errors.Is(err, pgdb.ErrCheckConstraintViolated):
+			return mdl.CustomRole{}, fmt.Errorf("update custom role: %w", mdl.ErrValidation)
+		default:
+			return mdl.CustomRole{}, fmt.Errorf("update custom role: %w", err)
+		}
+	}
+
+	return customRoleFromPg(role), nil
+}
+
+// ModifyCustomRolePermissions atomically changes permissions on a custom role in the caller's organization.
+// Returns [mdl.ErrNotFound] if the role is not owned by the caller's organization.
+// Returns [mdl.ErrValidation] if the input contains overlapping or system-only permissions.
+func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return mdl.CustomRole{}, errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return mdl.CustomRole{}, errors.New("organization context missing")
+	}
+
+	if err := mrp.Validate(); err != nil {
+		return mdl.CustomRole{}, fmt.Errorf("validate: %w", err)
+	}
+
+	role, err := c.roleStorer.ModifyCustomRolePermissions(ctx, modifyCustomRolePermissionsToPg(mrp, *sess.OrgID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.CustomRole{}, fmt.Errorf("modify custom role permissions: %w", mdl.ErrNotFound)
+		}
+		return mdl.CustomRole{}, fmt.Errorf("modify custom role permissions: %w", err)
+	}
+
+	return customRoleFromPg(role), nil
+}
+
+// DeleteCustomRole deletes a custom role in the caller's organization.
+// Returns [mdl.ErrNotFound] if the role is not owned by the caller's organization.
+func (c *Core) DeleteCustomRole(ctx context.Context, roleID uuid.UUID) error {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return errors.New("organization context missing")
+	}
+
+	if err := c.roleStorer.DeleteCustomRole(ctx, *sess.OrgID, roleID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("delete custom role: %w", mdl.ErrNotFound)
+		}
+		return fmt.Errorf("delete custom role: %w", err)
+	}
+
+	return nil
+}
+
 // AssignSystemRole grants targetUserID the system role named roleName at system scope.
 // The actor is read from the auth session in ctx.
 // Returns [mdl.ErrNotFound] if the target user or system role does not exist.
@@ -111,7 +293,7 @@ func (c *Core) UserSystemRoles(ctx context.Context, userID uuid.UUID, pageSize, 
 func (c *Core) AssignSystemRole(ctx context.Context, targetUserID uuid.UUID, roleName string) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
-		return errors.New("assign system role: auth session missing")
+		return errors.New("auth session missing")
 	}
 
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
@@ -143,7 +325,7 @@ func (c *Core) AssignSystemRole(ctx context.Context, targetUserID uuid.UUID, rol
 func (c *Core) UnassignSystemRole(ctx context.Context, targetUserID uuid.UUID, roleName string) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
-		return errors.New("unassign system role: auth session missing")
+		return errors.New("auth session missing")
 	}
 
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
