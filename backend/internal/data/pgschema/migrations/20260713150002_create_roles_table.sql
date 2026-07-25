@@ -16,6 +16,7 @@ CREATE TABLE rbac.custom_roles (
     , created_at TIMESTAMPTZ NOT NULL
     , updated_at TIMESTAMPTZ
     , etag UUID UNIQUE NOT NULL
+    , CONSTRAINT custom_roles_name_check CHECK (name <> '' AND name = btrim(name))
 );
 
 -- Custom role names are unique within an organization, regardless of case.

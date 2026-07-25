@@ -37,6 +37,8 @@ Input types implement `Validate() error`. Core methods call it before touching a
 
 Update input types (e.g. `UpdateUser`) pair with a companion `UserUpdateFields` struct whose boolean fields declare which values should be written. A field absent from `UserUpdateFields` is left unchanged, regardless of its value in the input type.
 
+The endpoint layer rejects an update request whose field mask selects no fields. Core and store update inputs therefore do not need to validate that at least one field flag is true; they only validate the values of fields that are selected.
+
 This is preferred over pointer fields (`*string`) because a pointer cannot distinguish "leave this field alone" from "clear this field to its zero value" — they both map to `nil`.
 
 The `pgstores` layer mirrors the same struct, and the dynamic SQL is built from the flags at query time.

@@ -1,6 +1,9 @@
 package pgrbac
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
@@ -43,7 +46,8 @@ func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
 					)
 				RETURNING id, external_id, org_id, name, created_at, updated_at, etag
 			),
-			-- Grant every validated permission to the new role.
+			-- Pair the new role with every validated permission. The CROSS JOIN produces no rows
+			-- when new_role is empty, preserving the organization and permission validation gate.
 			inserted_permissions AS (
 				INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
 				SELECT new_role.id, valid_permissions.id
@@ -75,6 +79,286 @@ func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
 		Args:   params,
 		Scan:   pgx.RowToStructByName[CustomRole],
 		Expect: pgdb.ExpectOne,
+	}
+}
+
+// updateCustomRoleQuery updates fields stored on the custom role row. Its caller must validate and
+// replace selected permission names with separate queries in the same transaction.
+func updateCustomRoleQuery(ur UpdateCustomRole) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{
+		"org_id":  ur.OrgID,
+		"role_id": ur.ExternalID,
+	}
+	var setClauses []string
+
+	if ur.Fields.Name {
+		setClauses = append(setClauses, "name = @name")
+		params["name"] = ur.Name
+	}
+
+	setClauses = append(setClauses, "updated_at = NOW()", "etag = gen_random_uuid()")
+
+	// Execution returns sql.ErrNoRows when the organization does not own the role and
+	// pgdb.ErrAlreadyExists when the organization already has the role name.
+	sql := fmt.Sprintf(
+		`UPDATE rbac.custom_roles
+		SET %[1]s
+		WHERE org_id = @org_id
+			AND external_id = @role_id
+		RETURNING id`,
+		strings.Join(setClauses, ", "),
+	)
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func validateCustomRolePermsQuery(orgID int, roleID uuid.UUID, permNames []string) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{
+		"org_id":           orgID,
+		"role_id":          roleID,
+		"permission_names": permNames,
+	}
+
+	// Execution returns sql.ErrNoRows when the organization does not own the role or any requested
+	// permission does not exist.
+	const sql = `
+		WITH
+			-- Deduplicate the complete replacement permission set before validating it.
+			requested_permissions AS (
+				SELECT DISTINCT name
+				FROM unnest(@permission_names::text[]) AS requested(name)
+			),
+			-- Resolve every requested permission name against the permission registry.
+			valid_permissions AS (
+				SELECT p.name
+				FROM rbac.permissions AS p
+				JOIN requested_permissions AS requested ON requested.name = p.name
+			)
+		-- Return the role id only when it belongs to the organization and every permission exists.
+		SELECT r.id
+		FROM rbac.custom_roles AS r
+		WHERE r.org_id = @org_id
+			AND r.external_id = @role_id
+			AND NOT EXISTS (
+				SELECT 1
+				FROM requested_permissions AS requested
+				LEFT JOIN valid_permissions AS valid ON valid.name = requested.name
+				WHERE valid.name IS NULL
+			)`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func insertCustomRolePermissionsQuery(roleID uuid.UUID, permNames []string) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"role_id": roleID, "permission_names": permNames}
+	const sql = `
+		INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
+		SELECT r.id, p.id
+		FROM rbac.custom_roles AS r
+		CROSS JOIN rbac.permissions AS p
+		WHERE r.external_id = @role_id
+			AND p.name = ANY(@permission_names::text[])
+		RETURNING permission_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func modifyCustomRolePermissionsQuery(mp ModifyCustomRolePermissions) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{
+		"org_id":                  mp.OrgID,
+		"role_id":                 mp.ExternalID,
+		"add_permission_names":    mp.AddPermissionNames,
+		"remove_permission_names": mp.RemovePermissionNames,
+	}
+
+	// Resolving and validating permission names in this statement keeps validation and mutation
+	// atomic: an unknown name prevents every requested change instead of allowing a partial update.
+	// Execution returns sql.ErrNoRows when the organization does not own the role or any requested
+	// permission does not exist.
+	const sql = `
+		WITH
+			-- Combine the add/remove arrays solely to validate every requested permission name.
+			-- This is not a replacement permission set for the role.
+			requested_permissions AS (
+				SELECT DISTINCT name
+				FROM unnest(
+					@add_permission_names::text[] || @remove_permission_names::text[]
+				) AS requested(name)
+			),
+			-- Resolve every requested permission name to the permission ID used by the join table.
+			valid_permissions AS (
+				SELECT p.id, p.name
+				FROM rbac.permissions AS p
+				JOIN requested_permissions AS requested ON requested.name = p.name
+			),
+			-- Gate every mutation behind role ownership and permission validation. An empty
+			-- target_role prevents all subsequent permission and metadata changes.
+			target_role AS (
+				SELECT r.id
+				FROM rbac.custom_roles AS r
+				WHERE r.org_id = @org_id
+					AND r.external_id = @role_id
+					AND NOT EXISTS (
+						SELECT 1
+						FROM requested_permissions AS requested
+						LEFT JOIN valid_permissions AS valid ON valid.name = requested.name
+						WHERE valid.id IS NULL
+					)
+			),
+			-- Removing a permission the role does not hold produces no row.
+			removed_permissions AS (
+				DELETE FROM rbac.custom_role_permissions
+				WHERE role_id = (SELECT id FROM target_role)
+					AND permission_id IN (
+						SELECT id
+						FROM valid_permissions
+						WHERE name = ANY(@remove_permission_names::text[])
+					)
+				RETURNING permission_id
+			),
+			-- Pair the single target role with every permission to add. The CROSS JOIN produces
+			-- no rows when target_role is empty, preserving the ownership and validation gate.
+			-- ON CONFLICT makes adding an existing permission a no-op.
+			added_permissions AS (
+				INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
+				SELECT target_role.id, valid_permissions.id
+				FROM target_role
+				CROSS JOIN valid_permissions
+				WHERE valid_permissions.name = ANY(@add_permission_names::text[])
+				ON CONFLICT DO NOTHING
+				RETURNING permission_id
+			),
+			-- Change role metadata only when the permission set changed.
+			updated_role AS (
+				UPDATE rbac.custom_roles
+				SET updated_at = NOW(), etag = gen_random_uuid()
+				WHERE id = (SELECT id FROM target_role)
+					AND (
+						EXISTS (SELECT 1 FROM removed_permissions)
+						OR EXISTS (SELECT 1 FROM added_permissions)
+				)
+				RETURNING id
+			)
+		-- Returning the target ID makes a missing role or permission surface as sql.ErrNoRows.
+		SELECT id
+		FROM target_role`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func deleteCustomRoleQuery(orgID int, roleID uuid.UUID) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"org_id": orgID, "role_id": roleID}
+	const sql = `
+		DELETE FROM rbac.custom_roles
+		WHERE org_id = @org_id AND external_id = @role_id
+		RETURNING id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func deleteCustomRolePermissionsQuery(orgID int, roleID uuid.UUID) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"org_id": orgID, "role_id": roleID}
+	const sql = `
+		DELETE FROM rbac.custom_role_permissions
+		WHERE role_id = (
+			SELECT id
+			FROM rbac.custom_roles
+			WHERE org_id = @org_id AND external_id = @role_id
+		)
+		RETURNING permission_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func deleteCustomRoleProjectAssignmentsQuery(orgID int, roleID uuid.UUID) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"org_id": orgID, "role_id": roleID}
+	const sql = `
+		DELETE FROM rbac.project_role_assignments
+		WHERE role_id = (
+			SELECT id
+			FROM rbac.custom_roles
+			WHERE org_id = @org_id AND external_id = @role_id
+		)
+		RETURNING user_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func deleteCustomRoleOrgAssignmentsQuery(orgID int, roleID uuid.UUID) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"org_id": orgID, "role_id": roleID}
+	const sql = `
+		DELETE FROM rbac.org_role_assignments
+		WHERE role_id = (
+			SELECT id
+			FROM rbac.custom_roles
+			WHERE org_id = @org_id AND external_id = @role_id
+		)
+		RETURNING user_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectMany,
 	}
 }
 
@@ -277,15 +561,18 @@ func userSystemPermissionsByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[st
 func systemPermissionsRemainAfterUnassignQuery(
 	userID uuid.UUID,
 	roleName string,
-	permissionNames []string,
+	permNames []string,
 ) pgdb.TypedQuery[bool] {
 	params := pgx.NamedArgs{
 		"user_id":          userID,
 		"role_name":        roleName,
-		"permission_names": permissionNames,
+		"permission_names": permNames,
 	}
 	const sql = `
-		WITH excluded_assignment AS (
+		WITH
+			-- Identify the exact assignment being considered for removal. Anchoring the final
+			-- result on this row makes a missing user, role, or assignment return sql.ErrNoRows.
+			excluded_assignment AS (
 			SELECT sra.user_id, sra.role_id
 			FROM rbac.system_role_assignments AS sra
 			JOIN useraccess.users AS u ON u.id = sra.user_id

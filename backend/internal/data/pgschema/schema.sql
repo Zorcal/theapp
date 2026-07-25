@@ -183,7 +183,8 @@ CREATE TABLE rbac.custom_roles (
     org_id integer NOT NULL,
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone,
-    etag uuid NOT NULL
+    etag uuid NOT NULL,
+    CONSTRAINT custom_roles_name_check CHECK (((name <> ''::text) AND (name = btrim(name))))
 );
 
 

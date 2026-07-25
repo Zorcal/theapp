@@ -27,7 +27,7 @@ func TestStore_CreateCustomRole(t *testing.T) {
 	orgStore := pgorg.NewStore(pool)
 	rbacStore := NewStore(pool)
 
-	org := seedOrganization(t, orgStore, "custom-role-org")
+	org := seedOrg(t, orgStore, "custom-role-org")
 
 	got, err := rbacStore.CreateCustomRole(ctx, CreateCustomRole{
 		OrgID:           org.ID,
@@ -66,7 +66,7 @@ func TestStore_CreateCustomRole_error(t *testing.T) {
 	orgStore := pgorg.NewStore(pool)
 	rbacStore := NewStore(pool)
 
-	org := seedOrganization(t, orgStore, "custom-role-error-org")
+	org := seedOrg(t, orgStore, "custom-role-error-org")
 
 	// Establish the existing name used by the duplicate-name case.
 	if _, err := rbacStore.CreateCustomRole(ctx, CreateCustomRole{OrgID: org.ID, Name: "project manager"}); err != nil {
@@ -103,6 +103,29 @@ func TestStore_CreateCustomRole_error(t *testing.T) {
 			},
 			want: sql.ErrNoRows,
 		},
+		{
+			name: "empty name",
+			in: CreateCustomRole{
+				OrgID: org.ID,
+			},
+			want: pgdb.ErrCheckConstraintViolated,
+		},
+		{
+			name: "leading whitespace in name",
+			in: CreateCustomRole{
+				OrgID: org.ID,
+				Name:  " project manager",
+			},
+			want: pgdb.ErrCheckConstraintViolated,
+		},
+		{
+			name: "trailing whitespace in name",
+			in: CreateCustomRole{
+				OrgID: org.ID,
+				Name:  "project manager ",
+			},
+			want: pgdb.ErrCheckConstraintViolated,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -113,23 +136,289 @@ func TestStore_CreateCustomRole_error(t *testing.T) {
 	}
 }
 
+func TestStore_UpdateCustomRole(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := NewStore(pool)
+
+	org := seedOrg(t, orgStore, "update-custom-role-org")
+	seeded := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: org.ID, Name: "reader", PermissionNames: []string{"custom-role:read"}})
+
+	in := UpdateCustomRole{
+		OrgID:           org.ID,
+		ExternalID:      seeded.ExternalID,
+		Fields:          CustomRoleUpdateFields{Name: true, PermissionNames: true},
+		Name:            "editor",
+		PermissionNames: []string{"custom-role:delete", "custom-role:update"},
+	}
+	got, err := rbacStore.UpdateCustomRole(ctx, in)
+	if err != nil {
+		t.Fatalf("UpdateCustomRole() error = %v", err)
+	}
+
+	want := seeded
+	want.Name = in.Name
+	want.PermissionNames = in.PermissionNames
+
+	testingx.AssertDiff(t, got, want, cmp.Options{
+		cmpopts.IgnoreFields(CustomRole{}, "UpdatedAt", "ETag"),
+	})
+
+	if got.UpdatedAt == nil {
+		t.Error("UpdateCustomRole() UpdatedAt = nil, want non-nil")
+	}
+	if got.ETag == seeded.ETag {
+		t.Error("UpdateCustomRole() ETag unchanged, want new ETag")
+	}
+
+	gotIgnored, err := rbacStore.UpdateCustomRole(ctx, UpdateCustomRole{
+		OrgID:           org.ID,
+		ExternalID:      seeded.ExternalID,
+		Name:            "ignored",
+		PermissionNames: []string{"permission:unknown"},
+	})
+	if err != nil {
+		t.Fatalf("UpdateCustomRole() with no selected fields error = %v", err)
+	}
+
+	testingx.AssertDiff(t, gotIgnored, got, cmp.Options{
+		cmpopts.IgnoreFields(CustomRole{}, "UpdatedAt", "ETag"),
+	})
+}
+
+func TestStore_UpdateCustomRole_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := NewStore(pool)
+
+	firstOrg := seedOrg(t, orgStore, "first-update-custom-role-org")
+	secondOrg := seedOrg(t, orgStore, "second-update-custom-role-org")
+	role := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "reader"})
+	seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "editor"})
+
+	tests := []struct {
+		name string
+		in   UpdateCustomRole
+		want error
+	}{
+		{
+			name: "role belongs to another organization",
+			in: UpdateCustomRole{
+				OrgID:      secondOrg.ID,
+				ExternalID: role.ExternalID,
+				Fields:     CustomRoleUpdateFields{Name: true},
+				Name:       "renamed",
+			},
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "unknown permission",
+			in: UpdateCustomRole{
+				OrgID:           firstOrg.ID,
+				ExternalID:      role.ExternalID,
+				Fields:          CustomRoleUpdateFields{PermissionNames: true},
+				Name:            "renamed",
+				PermissionNames: []string{"permission:unknown"},
+			},
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "duplicate name",
+			in: UpdateCustomRole{
+				OrgID:      firstOrg.ID,
+				ExternalID: role.ExternalID,
+				Fields:     CustomRoleUpdateFields{Name: true},
+				Name:       "EDITOR",
+			},
+			want: pgdb.ErrAlreadyExists,
+		},
+		{
+			name: "empty name",
+			in: UpdateCustomRole{
+				OrgID:      firstOrg.ID,
+				ExternalID: role.ExternalID,
+				Fields:     CustomRoleUpdateFields{Name: true},
+			},
+			want: pgdb.ErrCheckConstraintViolated,
+		},
+		{
+			name: "leading whitespace in name",
+			in: UpdateCustomRole{
+				OrgID:      firstOrg.ID,
+				ExternalID: role.ExternalID,
+				Fields:     CustomRoleUpdateFields{Name: true},
+				Name:       " renamed",
+			},
+			want: pgdb.ErrCheckConstraintViolated,
+		},
+		{
+			name: "trailing whitespace in name",
+			in: UpdateCustomRole{
+				OrgID:      firstOrg.ID,
+				ExternalID: role.ExternalID,
+				Fields:     CustomRoleUpdateFields{Name: true},
+				Name:       "renamed ",
+			},
+			want: pgdb.ErrCheckConstraintViolated,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := rbacStore.UpdateCustomRole(ctx, tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("UpdateCustomRole(%+v) error = %v, want %v", tt.in, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestStore_ModifyCustomRolePermissions(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := NewStore(pool)
+
+	org := seedOrg(t, orgStore, "modify-custom-role-permissions-org")
+	seeded := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: org.ID, Name: "role manager", PermissionNames: []string{"custom-role:read", "custom-role:update"}})
+
+	in := ModifyCustomRolePermissions{
+		OrgID:                 org.ID,
+		ExternalID:            seeded.ExternalID,
+		AddPermissionNames:    []string{"custom-role:delete"},
+		RemovePermissionNames: []string{"custom-role:read"},
+	}
+	got, err := rbacStore.ModifyCustomRolePermissions(ctx, in)
+	if err != nil {
+		t.Fatalf("ModifyCustomRolePermissions() error = %v", err)
+	}
+
+	want := seeded
+	want.PermissionNames = slices.Concat(in.AddPermissionNames, []string{"custom-role:update"})
+
+	testingx.AssertDiff(t, got, want, cmp.Options{
+		cmpopts.IgnoreFields(CustomRole{}, "UpdatedAt", "ETag"),
+	})
+
+	if got.UpdatedAt == nil {
+		t.Error("ModifyCustomRolePermissions() UpdatedAt = nil, want non-nil")
+	}
+	if got.ETag == seeded.ETag {
+		t.Error("ModifyCustomRolePermissions() ETag unchanged, want new ETag")
+	}
+
+	gotNoOp, err := rbacStore.ModifyCustomRolePermissions(ctx, in)
+	if err != nil {
+		t.Fatalf("ModifyCustomRolePermissions() no-op error = %v", err)
+	}
+
+	testingx.AssertDiff(t, gotNoOp, got)
+}
+
+func TestStore_ModifyCustomRolePermissions_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := NewStore(pool)
+
+	firstOrg := seedOrg(t, orgStore, "first-modify-custom-role-org")
+	secondOrg := seedOrg(t, orgStore, "second-modify-custom-role-org")
+	role := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "reader"})
+
+	tests := []struct {
+		name string
+		in   ModifyCustomRolePermissions
+	}{
+		{
+			name: "role belongs to another organization",
+			in: ModifyCustomRolePermissions{
+				OrgID:              secondOrg.ID,
+				ExternalID:         role.ExternalID,
+				AddPermissionNames: []string{"custom-role:read"},
+			},
+		},
+		{
+			name: "unknown permission",
+			in: ModifyCustomRolePermissions{
+				OrgID:              firstOrg.ID,
+				ExternalID:         role.ExternalID,
+				AddPermissionNames: []string{"permission:unknown"},
+			},
+		},
+		{
+			name: "unknown permission to remove",
+			in: ModifyCustomRolePermissions{
+				OrgID:                 firstOrg.ID,
+				ExternalID:            role.ExternalID,
+				RemovePermissionNames: []string{"permission:unknown"},
+			},
+		},
+		{
+			name: "role not found",
+			in: ModifyCustomRolePermissions{
+				OrgID:              firstOrg.ID,
+				ExternalID:         uuid.New(),
+				AddPermissionNames: []string{"custom-role:read"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := rbacStore.ModifyCustomRolePermissions(ctx, tt.in); !errors.Is(err, sql.ErrNoRows) {
+				t.Errorf("ModifyCustomRolePermissions(%+v) error = %v, want sql.ErrNoRows", tt.in, err)
+			}
+		})
+	}
+}
+
+func TestStore_DeleteCustomRole(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "delete-custom-role-org")
+	project := seedProject(t, orgStore, org.ID, "project")
+	user := seedUser(t, userStore, "delete-custom-role@test.com")
+	role := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: org.ID, Name: "reader", PermissionNames: []string{"custom-role:read"}})
+	seedProjectRoleAssignment(t, ctx, pool, user.ID, role.Name, project.ID)
+	seedOrgRoleAssignment(t, ctx, pool, user.ID, role.Name, org.ID)
+
+	if err := rbacStore.DeleteCustomRole(ctx, org.ID, role.ExternalID); err != nil {
+		t.Fatalf("DeleteCustomRole() error = %v", err)
+	}
+
+	if _, err := rbacStore.CustomRoleByExternalID(ctx, org.ID, role.ExternalID); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("CustomRoleByExternalID() after delete error = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestStore_DeleteCustomRole_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := NewStore(pool)
+
+	firstOrg := seedOrg(t, orgStore, "first-delete-custom-role-org")
+	secondOrg := seedOrg(t, orgStore, "second-delete-custom-role-org")
+	role := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "reader"})
+
+	if err := rbacStore.DeleteCustomRole(ctx, secondOrg.ID, role.ExternalID); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("DeleteCustomRole() error = %v, want sql.ErrNoRows", err)
+	}
+}
+
 func TestStore_CustomRoles(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	orgStore := pgorg.NewStore(pool)
 	rbacStore := NewStore(pool)
 
-	firstOrg := seedOrganization(t, orgStore, "first-custom-role-org")
-	secondOrg := seedOrganization(t, orgStore, "second-custom-role-org")
-	firstRole := seedCustomRole(t, rbacStore, CreateCustomRole{
-		OrgID:           firstOrg.ID,
-		Name:            "reader",
-		PermissionNames: []string{"custom-role:read"},
-	})
-	seedCustomRole(t, rbacStore, CreateCustomRole{
-		OrgID: secondOrg.ID,
-		Name:  "other org role",
-	})
+	firstOrg := seedOrg(t, orgStore, "first-custom-role-org")
+	secondOrg := seedOrg(t, orgStore, "second-custom-role-org")
+	firstRole := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "reader", PermissionNames: []string{"custom-role:read"}})
+	seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: secondOrg.ID, Name: "other org role"})
 
 	gotFirstPage, err := rbacStore.CustomRoles(ctx, firstOrg.ID, 50, 0)
 	if err != nil {
@@ -156,8 +445,8 @@ func TestStore_CustomRoleCount(t *testing.T) {
 	orgStore := pgorg.NewStore(pool)
 	rbacStore := NewStore(pool)
 
-	firstOrg := seedOrganization(t, orgStore, "first-custom-role-count-org")
-	secondOrg := seedOrganization(t, orgStore, "second-custom-role-count-org")
+	firstOrg := seedOrg(t, orgStore, "first-custom-role-count-org")
+	secondOrg := seedOrg(t, orgStore, "second-custom-role-count-org")
 	seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "reader"})
 	seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "editor"})
 	seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: secondOrg.ID, Name: "other org role"})
@@ -178,7 +467,7 @@ func TestStore_CustomRoleByExternalID(t *testing.T) {
 	orgStore := pgorg.NewStore(pool)
 	rbacStore := NewStore(pool)
 
-	org := seedOrganization(t, orgStore, "custom-role-by-id-org")
+	org := seedOrg(t, orgStore, "custom-role-by-id-org")
 	want := seedCustomRole(t, rbacStore, CreateCustomRole{
 		OrgID: org.ID,
 		Name:  "reader",
@@ -198,8 +487,8 @@ func TestStore_CustomRoleByExternalID_error(t *testing.T) {
 	orgStore := pgorg.NewStore(pool)
 	rbacStore := NewStore(pool)
 
-	firstOrg := seedOrganization(t, orgStore, "first-role-lookup-org")
-	secondOrg := seedOrganization(t, orgStore, "second-role-lookup-org")
+	firstOrg := seedOrg(t, orgStore, "first-role-lookup-org")
+	secondOrg := seedOrg(t, orgStore, "second-role-lookup-org")
 	role := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "reader"})
 
 	if _, err := rbacStore.CustomRoleByExternalID(ctx, secondOrg.ID, role.ExternalID); !errors.Is(err, sql.ErrNoRows) {
@@ -312,6 +601,7 @@ func TestStore_UserSystemRolesByExternalID(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	rbacStore := NewStore(pool)
 	userStore := pguser.NewStore(pool)
+
 	usr := seedUser(t, userStore, "alice@test.com")
 
 	gotBeforeAssignment, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
@@ -363,7 +653,6 @@ func TestStore_UserSystemPermissionsByExternalID(t *testing.T) {
 		userStore := pguser.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-
 		seedSystemRoleAssignment(t, rbacStore, usr.ExternalID, "superadmin")
 
 		got, err := rbacStore.UserSystemPermissionsByExternalID(ctx, usr.ExternalID)
@@ -381,14 +670,13 @@ func TestStore_UserSystemPermissionsByExternalID(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		orgID, projectID := seedOrgAndProject(t, pool, "acme")
-		seedCustomRole(t, rbacStore, CreateCustomRole{
-			OrgID:           orgID,
-			Name:            "user-viewer",
-			PermissionNames: []string{"user:read"},
-		})
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "acme-project")
+		orgID, projectID := org.ID, project.ID
+		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: orgID, Name: "user-viewer", PermissionNames: []string{"user:read"}})
 		seedProjectRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", projectID)
 		seedOrgRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", orgID)
 
@@ -410,12 +698,13 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-
 		seedSystemRoleAssignment(t, rbacStore, usr.ExternalID, "superadmin")
-
-		orgID, projectID := seedOrgAndProject(t, pool, "acme")
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "acme-project")
+		orgID, projectID := org.ID, project.ID
 
 		got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
 		if err != nil {
@@ -435,14 +724,13 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		orgID, projectID := seedOrgAndProject(t, pool, "acme")
-		seedCustomRole(t, rbacStore, CreateCustomRole{
-			OrgID:           orgID,
-			Name:            "user-viewer",
-			PermissionNames: []string{"user:read"},
-		})
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "acme-project")
+		orgID, projectID := org.ID, project.ID
+		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: orgID, Name: "user-viewer", PermissionNames: []string{"user:read"}})
 		seedProjectRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", projectID)
 
 		got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
@@ -463,14 +751,13 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		orgID, projectID := seedOrgAndProject(t, pool, "acme")
-		seedCustomRole(t, rbacStore, CreateCustomRole{
-			OrgID:           orgID,
-			Name:            "user-viewer",
-			PermissionNames: []string{"user:read"},
-		})
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "acme-project")
+		orgID, projectID := org.ID, project.ID
+		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: orgID, Name: "user-viewer", PermissionNames: []string{"user:read"}})
 		seedOrgRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", orgID)
 
 		got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
@@ -491,19 +778,14 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		orgID, projectID := seedOrgAndProject(t, pool, "acme")
-		seedCustomRole(t, rbacStore, CreateCustomRole{
-			OrgID:           orgID,
-			Name:            "project-role",
-			PermissionNames: []string{"user:read"},
-		})
-		seedCustomRole(t, rbacStore, CreateCustomRole{
-			OrgID:           orgID,
-			Name:            "org-role",
-			PermissionNames: []string{"user:read", "user:create"},
-		})
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "acme-project")
+		orgID, projectID := org.ID, project.ID
+		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: orgID, Name: "project-role", PermissionNames: []string{"user:read"}})
+		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: orgID, Name: "org-role", PermissionNames: []string{"user:read", "user:create"}})
 		seedProjectRoleAssignment(t, ctx, pool, usr.ID, "project-role", projectID)
 		seedOrgRoleAssignment(t, ctx, pool, usr.ID, "org-role", orgID)
 
@@ -527,19 +809,14 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		orgID, projectID := seedOrgAndProject(t, pool, "acme")
-		seedCustomRole(t, rbacStore, CreateCustomRole{
-			OrgID:           orgID,
-			Name:            "project-role",
-			PermissionNames: []string{"user:read"},
-		})
-		seedCustomRole(t, rbacStore, CreateCustomRole{
-			OrgID:           orgID,
-			Name:            "org-role",
-			PermissionNames: []string{"user:create"},
-		})
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "acme-project")
+		orgID, projectID := org.ID, project.ID
+		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: orgID, Name: "project-role", PermissionNames: []string{"user:read"}})
+		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: orgID, Name: "org-role", PermissionNames: []string{"user:create"}})
 		seedProjectRoleAssignment(t, ctx, pool, usr.ID, "project-role", projectID)
 		seedOrgRoleAssignment(t, ctx, pool, usr.ID, "org-role", orgID)
 
@@ -561,9 +838,12 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		orgID, projectID := seedOrgAndProject(t, pool, "acme")
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "acme-project")
+		orgID, projectID := org.ID, project.ID
 
 		got, err := rbacStore.ProjectPermissions(ctx, usr.ID, projectID)
 		if err != nil {
@@ -580,20 +860,16 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		orgID, projectID := seedOrgAndProject(t, pool, "acme")
-		seedCustomRole(t, rbacStore, CreateCustomRole{
-			OrgID:           orgID,
-			Name:            "user-viewer",
-			PermissionNames: []string{"user:read"},
-		})
+		org := seedOrg(t, orgStore, "acme")
+		project := seedProject(t, orgStore, org.ID, "acme-project")
+		orgID, projectID := org.ID, project.ID
+		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: orgID, Name: "user-viewer", PermissionNames: []string{"user:read"}})
 		seedProjectRoleAssignment(t, ctx, pool, usr.ID, "user-viewer", projectID)
 
-		otherProject, err := pgorg.NewStore(pool).CreateProject(ctx, pgorg.CreateProject{OrgID: orgID, Name: "other"})
-		if err != nil {
-			t.Fatalf("seed other project: %v", err)
-		}
+		otherProject := seedProject(t, orgStore, orgID, "other")
 
 		got, err := rbacStore.ProjectPermissions(ctx, usr.ID, otherProject.ID)
 		if err != nil {
@@ -653,7 +929,7 @@ func TestStore_AssignSystemRole_error(t *testing.T) {
 		userStore := pguser.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		org := seedOrganization(t, pgorg.NewStore(pool), "assign-system-role-custom-role-org")
+		org := seedOrg(t, pgorg.NewStore(pool), "assign-system-role-custom-role-org")
 		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: org.ID, Name: "some-project-role"})
 
 		if err := rbacStore.AssignSystemRole(ctx, usr.ExternalID, "some-project-role"); !errors.Is(err, sql.ErrNoRows) {
@@ -737,6 +1013,7 @@ func TestStore_SystemPermissionsRemainAfterUnassign_error(t *testing.T) {
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 		userStore := pguser.NewStore(pool)
+
 		usr := seedUser(t, userStore, "no-assignment@test.com")
 
 		if _, err := rbacStore.SystemPermissionsRemainAfterUnassign(ctx, usr.ExternalID, "superadmin", []string{"system-role:assign"}); !errors.Is(err, sql.ErrNoRows) {
@@ -776,7 +1053,7 @@ func TestStore_UnassignSystemRole_error(t *testing.T) {
 		userStore := pguser.NewStore(pool)
 
 		usr := seedUser(t, userStore, "alice@test.com")
-		org := seedOrganization(t, pgorg.NewStore(pool), "unassign-system-role-custom-role-org")
+		org := seedOrg(t, pgorg.NewStore(pool), "unassign-system-role-custom-role-org")
 		seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: org.ID, Name: "some-project-role"})
 
 		if err := rbacStore.UnassignSystemRole(ctx, usr.ExternalID, "some-project-role"); !errors.Is(err, sql.ErrNoRows) {
@@ -851,22 +1128,29 @@ func seedSystemRoleAssignment(t *testing.T, rbacStore *Store, userID uuid.UUID, 
 	}
 }
 
-func seedOrgAndProject(t *testing.T, pool *pgxpool.Pool, name string) (orgID, projectID int) {
+func seedOrg(t *testing.T, orgStore *pgorg.Store, name string) pgorg.Organization {
 	t.Helper()
 
-	orgStore := pgorg.NewStore(pool)
-
-	org, err := orgStore.CreateOrganization(t.Context(), pgorg.CreateOrganization{Name: name, ControlProjectName: "control"})
+	org, err := orgStore.CreateOrganization(t.Context(), pgorg.CreateOrganization{
+		Name:               name,
+		ControlProjectName: "control",
+	})
 	if err != nil {
-		t.Fatalf("seed org %q: %v", name, err)
+		t.Fatalf("seed organization %q: %v", name, err)
 	}
 
-	project, err := orgStore.CreateProject(t.Context(), pgorg.CreateProject{OrgID: org.ID, Name: name + "-project"})
+	return org
+}
+
+func seedProject(t *testing.T, orgStore *pgorg.Store, orgID int, name string) pgorg.Project {
+	t.Helper()
+
+	project, err := orgStore.CreateProject(t.Context(), pgorg.CreateProject{OrgID: orgID, Name: name})
 	if err != nil {
-		t.Fatalf("seed project for org %q: %v", name, err)
+		t.Fatalf("seed project %q: %v", name, err)
 	}
 
-	return org.ID, project.ID
+	return project
 }
 
 func seedProjectRoleAssignment(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID int, roleName string, projectID int) {
@@ -891,18 +1175,4 @@ func seedOrgRoleAssignment(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 	if _, err := pool.Exec(ctx, q, params); err != nil {
 		t.Fatalf("seed org role assignment (user %d, role %q, org %d): %v", userID, roleName, orgID, err)
 	}
-}
-
-func seedOrganization(t *testing.T, orgStore *pgorg.Store, name string) pgorg.Organization {
-	t.Helper()
-
-	org, err := orgStore.CreateOrganization(t.Context(), pgorg.CreateOrganization{
-		Name:               name,
-		ControlProjectName: "control",
-	})
-	if err != nil {
-		t.Fatalf("seed organization %q: %v", name, err)
-	}
-
-	return org
 }

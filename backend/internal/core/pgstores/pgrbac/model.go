@@ -24,6 +24,31 @@ type CreateCustomRole struct {
 	PermissionNames []string
 }
 
+// UpdateCustomRole holds the fields to update on a custom role.
+// Fields controls which fields are applied; fields not listed are left unchanged.
+type UpdateCustomRole struct {
+	OrgID           int
+	ExternalID      uuid.UUID
+	Fields          CustomRoleUpdateFields
+	Name            string
+	PermissionNames []string
+}
+
+// CustomRoleUpdateFields specifies which fields on an UpdateCustomRole should be applied.
+type CustomRoleUpdateFields struct {
+	Name            bool
+	PermissionNames bool
+}
+
+// ModifyCustomRolePermissions holds permission-set changes for a custom role. AddPermissionNames
+// and RemovePermissionNames must not overlap.
+type ModifyCustomRolePermissions struct {
+	OrgID                 int
+	ExternalID            uuid.UUID
+	AddPermissionNames    []string
+	RemovePermissionNames []string
+}
+
 // SystemRole is a system role and the names of every permission currently granted to it.
 type SystemRole struct {
 	Name            string   `db:"name"`
