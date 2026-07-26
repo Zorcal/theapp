@@ -1,0 +1,1135 @@
+package rbac
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
+
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
+	"github.com/zorcal/theapp/backend/internal/data/pgdb"
+	"github.com/zorcal/theapp/backend/internal/data/pgtest"
+	"github.com/zorcal/theapp/backend/internal/testingx"
+)
+
+// TestCore_integration_customRoleLifecycle exercises custom-role validation and persistence
+// through the core and PostgreSQL store layers.
+func TestCore_integration_customRoleLifecycle(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	roleStore := pgrbac.NewStore(pool)
+	core := NewCore(roleStore, pgdb.NewTransactor(pool))
+
+	diffOpts := cmp.Options{
+		cmpopts.IgnoreFields(mdl.CustomRole{}, "ID", "CreatedAt", "UpdatedAt", "ETag"),
+	}
+
+	org := seedOrg(t, orgStore, "custom-role-integration-org")
+	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{OrgID: &org.ID})
+
+	// Create roles with organization-scoped permissions.
+
+	firstRole, err := core.CreateCustomRole(roleCtx, mdl.CreateCustomRole{
+		Name:        "first role",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleCreate},
+	})
+	if err != nil {
+		t.Fatalf("CreateCustomRole() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, firstRole, mdl.CustomRole{
+		Name:        "first role",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleCreate},
+	}, diffOpts)
+
+	secondRole, err := core.CreateCustomRole(roleCtx, mdl.CreateCustomRole{
+		Name:        "second role",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+	})
+	if err != nil {
+		t.Fatalf("CreateCustomRole() second role error = %v", err)
+	}
+
+	// Fetch the second created role by ID.
+
+	secondRoleFetched, err := core.CustomRoleByID(roleCtx, secondRole.ID)
+	if err != nil {
+		t.Fatalf("CustomRoleByID() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, secondRoleFetched, secondRole)
+
+	// Update the first created role's name and replace its permission set.
+
+	firstRoleUpdated, err := core.UpdateCustomRole(roleCtx, mdl.UpdateCustomRole{
+		ID: firstRole.ID,
+		Fields: mdl.CustomRoleUpdateFields{
+			Name:        true,
+			Permissions: true,
+		},
+		Name:        "first role updated",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleUpdate},
+	})
+	if err != nil {
+		t.Fatalf("UpdateCustomRole() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, firstRoleUpdated, mdl.CustomRole{
+		Name:        "first role updated",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleUpdate},
+	}, diffOpts)
+
+	// Modify the first role's permission set incrementally.
+
+	firstRoleModified, err := core.ModifyCustomRolePermissions(roleCtx, mdl.ModifyCustomRolePermissions{
+		ID:             firstRole.ID,
+		AddPermissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+	})
+	if err != nil {
+		t.Fatalf("ModifyCustomRolePermissions() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, firstRoleModified, mdl.CustomRole{
+		Name: "first role updated",
+		Permissions: []mdl.Permission{
+			mdl.PermissionCustomRoleRead,
+			mdl.PermissionCustomRoleUpdate,
+		},
+	}, diffOpts)
+
+	// Delete the second role.
+
+	if err := core.DeleteCustomRole(roleCtx, secondRole.ID); err != nil {
+		t.Fatalf("DeleteCustomRole() error = %v", err)
+	}
+
+	// List the organization's roles after deleting the role under test.
+
+	gotRoles, gotCount, err := core.CustomRoles(roleCtx, 50, 0)
+	if err != nil {
+		t.Fatalf("CustomRoles() after deletion error = %v", err)
+	}
+
+	if wantCount := 1; gotCount != wantCount {
+		t.Errorf("CustomRoles() after deletion total count = %d, want %d", gotCount, wantCount)
+	}
+
+	testingx.AssertDiff(t, gotRoles, []mdl.CustomRole{firstRoleModified}, diffOpts)
+}
+
+// TestCore_integration_customRoleAssignmentLifecycle exercises project- and organization-scoped
+// custom-role assignments through the core and PostgreSQL store layers.
+func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+	roleStore := pgrbac.NewStore(pool)
+	core := NewCore(roleStore, pgdb.NewTransactor(pool))
+
+	org := seedOrg(t, orgStore, "custom-role-assignment-integration-org")
+	firstProject := seedProject(t, ctx, orgStore, org.ID, "first")
+	secondProject := seedProject(t, ctx, orgStore, org.ID, "second")
+	user := seedUser(t, ctx, userStore, "custom-role-assignment@test.com", "Target User")
+	seedOrgMembership(t, ctx, pool, user.ID, org.ID)
+	role := seedCustomRole(t, ctx, roleStore, org.ID, "reader", []mdl.Permission{mdl.PermissionCustomRoleRead})
+	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{ProjectID: &firstProject.ID, OrgID: &org.ID})
+
+	assertProjectPermNames := func(projectID int, want []string) {
+		t.Helper()
+
+		projectPerms, err := roleStore.ProjectPermissions(ctx, user.ID, projectID)
+		if err != nil {
+			t.Fatalf("ProjectPermissions(%d) error = %v", projectID, err)
+		}
+
+		testingx.AssertDiff(t, projectPerms.PermissionNames, want, cmpopts.EquateEmpty())
+	}
+
+	// Assign and unassign the role in one project.
+
+	if err := core.AssignCustomRoleToProject(roleCtx, user.ExternalID, role.ExternalID); err != nil {
+		t.Fatalf("AssignCustomRoleToProject() error = %v", err)
+	}
+
+	assertProjectPermNames(firstProject.ID, []string{"custom-role:read"})
+
+	if err := core.UnassignCustomRoleFromProject(roleCtx, user.ExternalID, role.ExternalID); err != nil {
+		t.Fatalf("UnassignCustomRoleFromProject() error = %v", err)
+	}
+
+	assertProjectPermNames(firstProject.ID, nil)
+
+	// Assign and unassign the role across the organization.
+
+	if err := core.AssignCustomRoleToOrg(roleCtx, user.ExternalID, role.ExternalID); err != nil {
+		t.Fatalf("AssignCustomRoleToOrg() error = %v", err)
+	}
+
+	assertProjectPermNames(firstProject.ID, []string{"custom-role:read"})
+	assertProjectPermNames(secondProject.ID, []string{"custom-role:read"})
+
+	if err := core.UnassignCustomRoleFromOrg(roleCtx, user.ExternalID, role.ExternalID); err != nil {
+		t.Fatalf("UnassignCustomRoleFromOrg() error = %v", err)
+	}
+
+	assertProjectPermNames(firstProject.ID, nil)
+	assertProjectPermNames(secondProject.ID, nil)
+}
+
+func TestCore_CustomRoles(t *testing.T) {
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	mockOutput := pgrbac.CustomRole{
+		ID:              1,
+		ExternalID:      uuid.New(),
+		Name:            "project manager",
+		PermissionNames: []string{"custom-role:read"},
+		CreatedAt:       time.Now(),
+		ETag:            uuid.New(),
+	}
+	roleStorer := &MockedRoleStorer{
+		CustomRolesFunc: func(_ context.Context, _, _, _ int) ([]pgrbac.CustomRole, error) {
+			return []pgrbac.CustomRole{mockOutput}, nil
+		},
+		CustomRoleCountFunc: func(_ context.Context, _ int) (int, error) {
+			return 3, nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+
+	got, count, err := core.CustomRoles(ctx, 25, 5)
+	if err != nil {
+		t.Fatalf("CustomRoles() error = %v", err)
+	}
+
+	if wantCount := 3; count != wantCount {
+		t.Errorf("CustomRoles() total count = %d, want %d", count, wantCount)
+	}
+
+	testingx.AssertDiff(t, got, []mdl.CustomRole{
+		{
+			ID:          mockOutput.ExternalID,
+			Name:        mockOutput.Name,
+			Permissions: permissionsFromPg(mockOutput.PermissionNames),
+			CreatedAt:   mockOutput.CreatedAt,
+			UpdatedAt:   mockOutput.UpdatedAt,
+			ETag:        mockOutput.ETag.String(),
+		},
+	})
+}
+
+func TestCore_CustomRoles_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "roles store error",
+			roleStorer: &MockedRoleStorer{
+				CustomRolesFunc: func(_ context.Context, _, _, _ int) ([]pgrbac.CustomRole, error) {
+					return nil, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "role count store error",
+			roleStorer: &MockedRoleStorer{
+				CustomRolesFunc: func(_ context.Context, _, _, _ int) ([]pgrbac.CustomRole, error) {
+					return nil, nil
+				},
+				CustomRoleCountFunc: func(_ context.Context, _ int) (int, error) {
+					return 0, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+
+			if _, _, err := core.CustomRoles(ctx, 25, 0); !errors.Is(err, tt.want) {
+				t.Errorf("CustomRoles() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if _, _, err := core.CustomRoles(tt.ctx, 25, 0); err == nil {
+					t.Error("CustomRoles() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_CustomRoleByID(t *testing.T) {
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	mockOutput := pgrbac.CustomRole{
+		ID:              1,
+		ExternalID:      uuid.New(),
+		Name:            "project manager",
+		PermissionNames: []string{"custom-role:read"},
+		CreatedAt:       time.Now(),
+		ETag:            uuid.New(),
+	}
+	roleStorer := &MockedRoleStorer{
+		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+			return mockOutput, nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+
+	got, err := core.CustomRoleByID(ctx, mockOutput.ExternalID)
+	if err != nil {
+		t.Fatalf("CustomRoleByID() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, got, mdl.CustomRole{
+		ID:          mockOutput.ExternalID,
+		Name:        mockOutput.Name,
+		Permissions: permissionsFromPg(mockOutput.PermissionNames),
+		CreatedAt:   mockOutput.CreatedAt,
+		UpdatedAt:   mockOutput.UpdatedAt,
+		ETag:        mockOutput.ETag.String(),
+	})
+}
+
+func TestCore_CustomRoleByID_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "role not found",
+			roleStorer: &MockedRoleStorer{
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "role store error",
+			roleStorer: &MockedRoleStorer{
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+
+			if _, err := core.CustomRoleByID(ctx, uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("CustomRoleByID() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if _, err := core.CustomRoleByID(tt.ctx, uuid.New()); err == nil {
+					t.Error("CustomRoleByID() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_CreateCustomRole(t *testing.T) {
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	mockOutput := pgrbac.CustomRole{
+		ID:              1,
+		ExternalID:      uuid.New(),
+		Name:            "project manager",
+		PermissionNames: []string{"custom-role:read"},
+		CreatedAt:       time.Now(),
+		ETag:            uuid.New(),
+	}
+	roleStorer := &MockedRoleStorer{
+		CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
+			return mockOutput, nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+
+	got, err := core.CreateCustomRole(ctx, mdl.CreateCustomRole{
+		Name:        "project manager",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+	})
+	if err != nil {
+		t.Fatalf("CreateCustomRole() error = %v", err)
+	}
+
+	want := mdl.CustomRole{
+		ID:          mockOutput.ExternalID,
+		Name:        mockOutput.Name,
+		Permissions: permissionsFromPg(mockOutput.PermissionNames),
+		CreatedAt:   mockOutput.CreatedAt,
+		UpdatedAt:   mockOutput.UpdatedAt,
+		ETag:        mockOutput.ETag.String(),
+	}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_CreateCustomRole_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		in         mdl.CreateCustomRole
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "model validation error",
+			in: mdl.CreateCustomRole{
+				Name:        "project manager",
+				Permissions: []mdl.Permission{mdl.PermissionUserRead},
+			},
+			roleStorer: &MockedRoleStorer{},
+			want:       mdl.ErrValidation,
+		},
+		{
+			name: "role already exists",
+			in:   mdl.CreateCustomRole{Name: "project manager"},
+			roleStorer: &MockedRoleStorer{
+				CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, pgdb.ErrAlreadyExists
+				},
+			},
+			want: mdl.ErrAlreadyExists,
+		},
+		{
+			name: "name constraint violated",
+			in:   mdl.CreateCustomRole{Name: "project manager"},
+			roleStorer: &MockedRoleStorer{
+				CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, pgdb.ErrCheckConstraintViolated
+				},
+			},
+			want: mdl.ErrValidation,
+		},
+		{
+			name: "organization not found",
+			in:   mdl.CreateCustomRole{Name: "project manager"},
+			roleStorer: &MockedRoleStorer{
+				CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "store error",
+			in:   mdl.CreateCustomRole{Name: "project manager"},
+			roleStorer: &MockedRoleStorer{
+				CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+
+			if _, err := core.CreateCustomRole(ctx, tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("CreateCustomRole() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if _, err := core.CreateCustomRole(tt.ctx, mdl.CreateCustomRole{Name: "project manager"}); err == nil {
+					t.Error("CreateCustomRole() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_UpdateCustomRole(t *testing.T) {
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	mockOutput := pgrbac.CustomRole{
+		ID:              1,
+		ExternalID:      uuid.New(),
+		Name:            "project manager",
+		PermissionNames: []string{"custom-role:read"},
+		CreatedAt:       time.Now(),
+		ETag:            uuid.New(),
+	}
+	roleStorer := &MockedRoleStorer{
+		UpdateCustomRoleFunc: func(ctx context.Context, ur pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+			return mockOutput, nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+
+	got, err := core.UpdateCustomRole(ctx, mdl.UpdateCustomRole{
+		ID: uuid.New(),
+		Fields: mdl.CustomRoleUpdateFields{
+			Name:        true,
+			Permissions: true,
+		},
+		Name:        "project lead",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleCreate},
+	})
+	if err != nil {
+		t.Fatalf("UpdateCustomRole() error = %v", err)
+	}
+
+	want := mdl.CustomRole{
+		ID:          mockOutput.ExternalID,
+		Name:        mockOutput.Name,
+		Permissions: permissionsFromPg(mockOutput.PermissionNames),
+		CreatedAt:   mockOutput.CreatedAt,
+		UpdatedAt:   mockOutput.UpdatedAt,
+		ETag:        mockOutput.ETag.String(),
+	}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_UpdateCustomRole_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		in         mdl.UpdateCustomRole
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "model validation error",
+			in: mdl.UpdateCustomRole{
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionSystemRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{},
+			want:       mdl.ErrValidation,
+		},
+		{
+			name: "role not found",
+			in:   mdl.UpdateCustomRole{},
+			roleStorer: &MockedRoleStorer{
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "store error",
+			in:   mdl.UpdateCustomRole{},
+			roleStorer: &MockedRoleStorer{
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+
+			if _, err := core.UpdateCustomRole(ctx, tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("UpdateCustomRole() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if _, err := core.UpdateCustomRole(tt.ctx, mdl.UpdateCustomRole{}); err == nil {
+					t.Error("UpdateCustomRole() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_ModifyCustomRolePermissions(t *testing.T) {
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	mockOutput := pgrbac.CustomRole{
+		ID:              1,
+		ExternalID:      uuid.New(),
+		Name:            "project manager",
+		PermissionNames: []string{"custom-role:read"},
+		CreatedAt:       time.Now(),
+		ETag:            uuid.New(),
+	}
+	roleStorer := &MockedRoleStorer{
+		ModifyCustomRolePermissionsFunc: func(ctx context.Context, mp pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
+			return mockOutput, nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+
+	got, err := core.ModifyCustomRolePermissions(ctx, mdl.ModifyCustomRolePermissions{
+		ID:                uuid.New(),
+		AddPermissions:    []mdl.Permission{mdl.PermissionCustomRoleRead},
+		RemovePermissions: []mdl.Permission{mdl.PermissionCustomRoleDelete},
+	})
+	if err != nil {
+		t.Fatalf("ModifyCustomRolePermissions() error = %v", err)
+	}
+
+	want := mdl.CustomRole{
+		ID:          mockOutput.ExternalID,
+		Name:        mockOutput.Name,
+		Permissions: permissionsFromPg(mockOutput.PermissionNames),
+		CreatedAt:   mockOutput.CreatedAt,
+		UpdatedAt:   mockOutput.UpdatedAt,
+		ETag:        mockOutput.ETag.String(),
+	}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		in         mdl.ModifyCustomRolePermissions
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "model validation error",
+			in: mdl.ModifyCustomRolePermissions{
+				AddPermissions: []mdl.Permission{mdl.PermissionUserCreate},
+			},
+			roleStorer: &MockedRoleStorer{},
+			want:       mdl.ErrValidation,
+		},
+		{
+			name: "role not found",
+			in:   mdl.ModifyCustomRolePermissions{},
+			roleStorer: &MockedRoleStorer{
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "store error",
+			in:   mdl.ModifyCustomRolePermissions{},
+			roleStorer: &MockedRoleStorer{
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+
+			if _, err := core.ModifyCustomRolePermissions(ctx, tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("ModifyCustomRolePermissions() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if _, err := core.ModifyCustomRolePermissions(tt.ctx, mdl.ModifyCustomRolePermissions{}); err == nil {
+					t.Error("ModifyCustomRolePermissions() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_DeleteCustomRole(t *testing.T) {
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	roleStorer := &MockedRoleStorer{
+		DeleteCustomRoleFunc: func(_ context.Context, _ int, _ uuid.UUID) error {
+			return nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+
+	if err := core.DeleteCustomRole(ctx, uuid.New()); err != nil {
+		t.Errorf("DeleteCustomRole() error = %v", err)
+	}
+}
+
+func TestCore_DeleteCustomRole_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "role not found",
+			roleStorer: &MockedRoleStorer{
+				DeleteCustomRoleFunc: func(_ context.Context, _ int, _ uuid.UUID) error {
+					return sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "store error",
+			roleStorer: &MockedRoleStorer{
+				DeleteCustomRoleFunc: func(_ context.Context, _ int, _ uuid.UUID) error {
+					return dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+
+			if err := core.DeleteCustomRole(ctx, uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("DeleteCustomRole() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if err := core.DeleteCustomRole(tt.ctx, uuid.New()); err == nil {
+					t.Error("DeleteCustomRole() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_AssignCustomRoleToProject(t *testing.T) {
+	roleStorer := &MockedRoleStorer{
+		AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error { return nil },
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+
+	if err := core.AssignCustomRoleToProject(ctx, uuid.New(), uuid.New()); err != nil {
+		t.Fatalf("AssignCustomRoleToProject() error = %v", err)
+	}
+}
+
+func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "not found",
+			roleStorer: &MockedRoleStorer{AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return sql.ErrNoRows
+			}},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "already assigned",
+			roleStorer: &MockedRoleStorer{AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return pgdb.ErrAlreadyExists
+			}},
+			want: mdl.ErrAlreadyExists,
+		},
+		{
+			name: "store",
+			roleStorer: &MockedRoleStorer{AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return dbErr
+			}},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+
+			if err := core.AssignCustomRoleToProject(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("AssignCustomRoleToProject() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "project context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if err := core.AssignCustomRoleToProject(tt.ctx, uuid.New(), uuid.New()); err == nil {
+					t.Error("AssignCustomRoleToProject() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_UnassignCustomRoleFromProject(t *testing.T) {
+	roleStorer := &MockedRoleStorer{
+		UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error { return nil },
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+
+	if err := core.UnassignCustomRoleFromProject(ctx, uuid.New(), uuid.New()); err != nil {
+		t.Fatalf("UnassignCustomRoleFromProject() error = %v", err)
+	}
+}
+
+func TestCore_UnassignCustomRoleFromProject_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "not found",
+			roleStorer: &MockedRoleStorer{UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return sql.ErrNoRows
+			}},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "store",
+			roleStorer: &MockedRoleStorer{UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return dbErr
+			}},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+
+			if err := core.UnassignCustomRoleFromProject(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("UnassignCustomRoleFromProject() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "project context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if err := core.UnassignCustomRoleFromProject(tt.ctx, uuid.New(), uuid.New()); err == nil {
+					t.Error("UnassignCustomRoleFromProject() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_AssignCustomRoleToOrg(t *testing.T) {
+	roleStorer := &MockedRoleStorer{
+		AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error { return nil },
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+
+	if err := core.AssignCustomRoleToOrg(ctx, uuid.New(), uuid.New()); err != nil {
+		t.Fatalf("AssignCustomRoleToOrg() error = %v", err)
+	}
+}
+
+func TestCore_AssignCustomRoleToOrg_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "not found",
+			roleStorer: &MockedRoleStorer{AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return sql.ErrNoRows
+			}},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "already assigned",
+			roleStorer: &MockedRoleStorer{AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return pgdb.ErrAlreadyExists
+			}},
+			want: mdl.ErrAlreadyExists,
+		},
+		{
+			name: "store",
+			roleStorer: &MockedRoleStorer{AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return dbErr
+			}},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+
+			if err := core.AssignCustomRoleToOrg(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("AssignCustomRoleToOrg() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if err := core.AssignCustomRoleToOrg(tt.ctx, uuid.New(), uuid.New()); err == nil {
+					t.Error("AssignCustomRoleToOrg() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_UnassignCustomRoleFromOrg(t *testing.T) {
+	roleStorer := &MockedRoleStorer{
+		UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error { return nil },
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+
+	if err := core.UnassignCustomRoleFromOrg(ctx, uuid.New(), uuid.New()); err != nil {
+		t.Fatalf("UnassignCustomRoleFromOrg() error = %v", err)
+	}
+}
+
+func TestCore_UnassignCustomRoleFromOrg_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "not found",
+			roleStorer: &MockedRoleStorer{UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return sql.ErrNoRows
+			}},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "store",
+			roleStorer: &MockedRoleStorer{UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+				return dbErr
+			}},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+
+			if err := core.UnassignCustomRoleFromOrg(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("UnassignCustomRoleFromOrg() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if err := core.UnassignCustomRoleFromOrg(tt.ctx, uuid.New(), uuid.New()); err == nil {
+					t.Error("UnassignCustomRoleFromOrg() error = nil, want error")
+				}
+			})
+		}
+	})
+}
