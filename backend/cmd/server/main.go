@@ -259,7 +259,7 @@ func run(ctx context.Context, cfg Config) error {
 	// Setup cores.
 
 	userCore := user.NewCore(pgUserStore)
-	systemRoleCore := rbac.NewCore(pgRBACStore, pgdb.NewTransactor(pgPool))
+	rbacCore := rbac.NewCore(pgRBACStore, pgdb.NewTransactor(pgPool))
 	orgCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pgPool))
 	authCoreCfg := auth.Config{
 		JWTKey:             []byte(cfg.Auth.JWTSecret),
@@ -305,8 +305,9 @@ func run(ctx context.Context, cfg Config) error {
 		Log:                        log,
 		UserCore:                   userCore,
 		AuthCore:                   authCore,
-		SystemRoleCore:             systemRoleCore,
+		SystemRoleCore:             rbacCore,
 		SystemRoleOrganizationCore: orgCore,
+		CustomRoleCore:             rbacCore,
 		WorkflowAuthCore:           authWorkflowCore,
 		JWTKey:                     []byte(cfg.Auth.JWTSecret),
 		JWTIssuer:                  cfg.Auth.JWTIssuer,

@@ -22,6 +22,7 @@ type ServerConfig struct {
 	AuthCore                   AuthCore
 	SystemRoleCore             SystemRoleCore
 	SystemRoleOrganizationCore SystemRoleOrganizationCore
+	CustomRoleCore             CustomRoleCore
 	WorkflowAuthCore           WorkflowAuthCore
 	// JWTKey is the HMAC secret used to validate access tokens.
 	JWTKey      []byte
@@ -121,7 +122,9 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 		systemRoleOrganizationCore: cfg.SystemRoleOrganizationCore,
 	})
 
-	pb.RegisterRoleServiceServer(srv, &roleService{})
+	pb.RegisterRoleServiceServer(srv, &customRoleService{
+		customRoleCore: cfg.CustomRoleCore,
+	})
 
 	if cfg.Reflection {
 		reflection.Register(srv)

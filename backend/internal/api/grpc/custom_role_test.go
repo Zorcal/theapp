@@ -1,0 +1,1077 @@
+package grpc
+
+import (
+	"context"
+	"errors"
+	"slices"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
+	"github.com/zorcal/theapp/backend/internal/testingx"
+)
+
+// TestRoleService_Integration exercises every custom-role RPC through the real core and database,
+// including reads, field updates, permission changes, and deletion in the caller's organization.
+func TestRoleService_Integration(t *testing.T) {
+	srv := NewServerIntegrationTest(t)
+	ctx := t.Context()
+
+	// Seed the organizations used to verify role ownership.
+
+	org, err := srv.orgStore.CreateOrganization(ctx, pgorg.CreateOrganization{
+		Name:               "role-service-org",
+		ControlProjectName: "control",
+	})
+	if err != nil {
+		t.Fatalf("CreateOrganization() error = %v", err)
+	}
+
+	otherOrg, err := srv.orgStore.CreateOrganization(ctx, pgorg.CreateOrganization{
+		Name:               "other-role-service-org",
+		ControlProjectName: "control",
+	})
+	if err != nil {
+		t.Fatalf("CreateOrganization() error = %v", err)
+	}
+
+	// Seed an actor with authority to manage every custom role.
+
+	actor, err := srv.userStore.CreateUser(ctx, pguser.CreateUser{
+		Email: "role-service-actor@test.com",
+		Name:  "Role Service Actor",
+	})
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	if err := srv.rbacStore.AssignSystemRole(ctx, actor.ExternalID, "superadmin"); err != nil {
+		t.Fatalf("AssignSystemRole() error = %v", err)
+	}
+
+	// Authenticate the actor through the owning organization's control project.
+
+	authCtx := authCtxForUserAtProject(t, ctx, actor.ExternalID, org.ControlProjectID)
+	otherAuthCtx := authCtxForUserAtProject(t, ctx, actor.ExternalID, otherOrg.ControlProjectID)
+
+	// Create a custom role in the caller's organization.
+
+	created, err := srv.customRoleServiceClient.CreateRole(authCtx, &pb.CreateRoleRequest{
+		Role: &pb.Role{
+			Name:        "role manager",
+			Permissions: []string{string(mdl.PermissionCustomRoleRead)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateRole() error = %v", err)
+	}
+
+	// Read the role by id.
+
+	got, err := srv.customRoleServiceClient.GetRole(authCtx, &pb.GetRoleRequest{Id: created.GetId()})
+	if err != nil {
+		t.Fatalf("GetRole() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, got, created, defaultDiffOpts())
+
+	// List roles.
+
+	list, err := srv.customRoleServiceClient.ListRoles(authCtx, &pb.ListRolesRequest{PageSize: 1})
+	if err != nil {
+		t.Fatalf("ListRoles() error = %v", err)
+	}
+
+	wantRoles := []*pb.Role{created}
+
+	testingx.AssertDiff(t, list.GetRoles(), wantRoles, defaultDiffOpts())
+
+	if got, want := list.GetTotalSize(), int32(1); got != want {
+		t.Errorf("ListRoles() total size = %d, want %d", got, want)
+	}
+
+	// Update the role's selected resource fields.
+
+	updated, err := srv.customRoleServiceClient.UpdateRole(authCtx, &pb.UpdateRoleRequest{
+		Role: &pb.Role{
+			Id:          created.GetId(),
+			Name:        "custom role manager",
+			Permissions: []string{string(mdl.PermissionCustomRoleDelete)},
+		},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name", "permissions"}},
+	})
+	if err != nil {
+		t.Fatalf("UpdateRole() error = %v", err)
+	}
+
+	if got, want := updated.GetName(), "custom role manager"; got != want {
+		t.Errorf("UpdateRole() name = %q, want %q", got, want)
+	}
+
+	if got, want := updated.GetPermissions(), []string{string(mdl.PermissionCustomRoleDelete)}; !slices.Equal(got, want) {
+		t.Errorf("UpdateRole() permissions = %v, want %v", got, want)
+	}
+
+	// Atomically add and remove permissions.
+
+	modified, err := srv.customRoleServiceClient.ModifyRolePermissions(authCtx, &pb.ModifyRolePermissionsRequest{
+		Id:                created.GetId(),
+		AddPermissions:    []string{string(mdl.PermissionCustomRoleUpdate)},
+		RemovePermissions: []string{string(mdl.PermissionCustomRoleDelete)},
+	})
+	if err != nil {
+		t.Fatalf("ModifyRolePermissions() error = %v", err)
+	}
+
+	if got, want := modified.GetPermissions(), []string{string(mdl.PermissionCustomRoleUpdate)}; !slices.Equal(got, want) {
+		t.Errorf("ModifyRolePermissions() permissions = %v, want %v", got, want)
+	}
+
+	// Verify the role is inaccessible through another organization.
+
+	if _, err := srv.customRoleServiceClient.UpdateRole(otherAuthCtx, &pb.UpdateRoleRequest{
+		Role:       &pb.Role{Id: created.GetId(), Name: "other role manager"},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+	}); status.Code(err) != codes.NotFound {
+		t.Errorf("UpdateRole() through another organization code = %v, want %v", status.Code(err), codes.NotFound)
+	}
+
+	// Delete the role and verify it is no longer directly readable.
+
+	if _, err := srv.customRoleServiceClient.DeleteRole(authCtx, &pb.DeleteRoleRequest{Id: created.GetId()}); err != nil {
+		t.Fatalf("DeleteRole() error = %v", err)
+	}
+
+	// Verify the deleted role no longer appears in the organization's collection.
+
+	list, err = srv.customRoleServiceClient.ListRoles(authCtx, &pb.ListRolesRequest{})
+	if err != nil {
+		t.Fatalf("ListRoles() after delete error = %v", err)
+	}
+
+	wantRoles = []*pb.Role{}
+
+	testingx.AssertDiff(t, list.GetRoles(), wantRoles, append(defaultDiffOpts(), cmpopts.EquateEmpty())...)
+
+	if got, want := list.GetTotalSize(), int32(0); got != want {
+		t.Errorf("ListRoles() after delete total size = %d, want %d", got, want)
+	}
+}
+
+func TestRoleService_CreateRole(t *testing.T) {
+	mockedRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "role manager",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+		CreatedAt:   time.Now(),
+		UpdatedAt:   new(time.Now().Add(time.Minute)),
+		ETag:        uuid.NewString(),
+	}
+	customRoleCore := &MockedCustomRoleCore{
+		CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
+			return mockedRole, nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.CreateRole(
+		authCtxForTestUser(t, t.Context()),
+		&pb.CreateRoleRequest{
+			Role: &pb.Role{Name: mockedRole.Name, Permissions: []string{string(mdl.PermissionCustomRoleRead)}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("CreateRole() error = %v", err)
+	}
+
+	want := &pb.Role{
+		Id:          mockedRole.ID.String(),
+		Name:        mockedRole.Name,
+		Permissions: []string{string(mdl.PermissionCustomRoleRead)},
+		CreateTime:  timestamppb.New(mockedRole.CreatedAt),
+		UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
+		Etag:        mockedRole.ETag,
+	}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_CreateRole_error(t *testing.T) {
+	invalidArgWithViolation := func(field, desc string) *status.Status {
+		st, err := status.New(codes.InvalidArgument, codes.InvalidArgument.String()).WithDetails(
+			&errdetails.BadRequest{FieldViolations: []*errdetails.BadRequest_FieldViolation{
+				{Field: field, Description: desc},
+			}},
+		)
+		if err != nil {
+			t.Fatalf("invalidArgWithViolation(%q, %q) build status error = %v", field, desc, err)
+		}
+		return st
+	}
+
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.CreateRoleRequest
+		want           *status.Status
+	}{
+		{
+			name:           "missing role field",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.CreateRoleRequest{},
+			want:           invalidArgWithViolation("role", "required"),
+		},
+		{
+			name:           "whitespace-only name",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.CreateRoleRequest{Role: &pb.Role{Name: " \t"}},
+			want:           invalidArgWithViolation("role.name", "required"),
+		},
+		{
+			name:           "surrounding whitespace",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.CreateRoleRequest{Role: &pb.Role{Name: " role manager "}},
+			want:           invalidArgWithViolation("role.name", "must not have leading or trailing whitespace"),
+		},
+		{
+			name:           "system-only permission",
+			customRoleCore: &MockedCustomRoleCore{},
+			in: &pb.CreateRoleRequest{Role: &pb.Role{
+				Name:        "role manager",
+				Permissions: []string{string(mdl.PermissionUserRead)},
+			}},
+			want: invalidArgWithViolation("role.permissions[0]", `"user:read" is system-only`),
+		},
+		{
+			name: "already exists",
+			customRoleCore: &MockedCustomRoleCore{
+				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrAlreadyExists
+				},
+			},
+			in:   &pb.CreateRoleRequest{Role: &pb.Role{Name: "role manager"}},
+			want: invalidArgWithViolation("role.name", "a role with this name already exists"),
+		},
+		{
+			name: "invalid role",
+			customRoleCore: &MockedCustomRoleCore{
+				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrValidation
+				},
+			},
+			in:   &pb.CreateRoleRequest{Role: &pb.Role{Name: "role manager"}},
+			want: status.New(codes.InvalidArgument, "invalid role"),
+		},
+		{
+			name: "organization or permission not found",
+			customRoleCore: &MockedCustomRoleCore{
+				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.CreateRoleRequest{Role: &pb.Role{Name: "role manager"}},
+			want: status.New(codes.NotFound, "organization or permission not found"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, errors.New("boom")
+				},
+			},
+			in:   &pb.CreateRoleRequest{Role: &pb.Role{Name: "role manager"}},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.CreateRole(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("CreateRole() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("CreateRole() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_GetRole(t *testing.T) {
+	mockedRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "role manager",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+		CreatedAt:   time.Now(),
+		UpdatedAt:   new(time.Now().Add(time.Minute)),
+		ETag:        uuid.NewString(),
+	}
+	customRoleCore := &MockedCustomRoleCore{
+		CustomRoleByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.CustomRole, error) {
+			return mockedRole, nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.GetRole(
+		authCtxForTestUser(t, t.Context()),
+		&pb.GetRoleRequest{Id: mockedRole.ID.String()},
+	)
+	if err != nil {
+		t.Fatalf("GetRole() error = %v", err)
+	}
+
+	want := &pb.Role{
+		Id:          mockedRole.ID.String(),
+		Name:        mockedRole.Name,
+		Permissions: []string{string(mdl.PermissionCustomRoleRead)},
+		CreateTime:  timestamppb.New(mockedRole.CreatedAt),
+		UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
+		Etag:        mockedRole.ETag,
+	}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_GetRole_error(t *testing.T) {
+	invalidArgWithViolation := func(field, desc string) *status.Status {
+		st, err := status.New(codes.InvalidArgument, codes.InvalidArgument.String()).WithDetails(
+			&errdetails.BadRequest{FieldViolations: []*errdetails.BadRequest_FieldViolation{
+				{Field: field, Description: desc},
+			}},
+		)
+		if err != nil {
+			t.Fatalf("invalidArgWithViolation(%q, %q) build status error = %v", field, desc, err)
+		}
+		return st
+	}
+
+	roleID := uuid.New()
+
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.GetRoleRequest
+		want           *status.Status
+	}{
+		{
+			name:           "invalid id",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.GetRoleRequest{Id: "bad"},
+			want:           invalidArgWithViolation("id", "must be a valid UUID"),
+		},
+		{
+			name: "missing role",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRoleByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.GetRoleRequest{Id: roleID.String()},
+			want: status.New(codes.NotFound, `role "`+roleID.String()+`" not found`),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRoleByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, errors.New("boom")
+				},
+			},
+			in:   &pb.GetRoleRequest{Id: roleID.String()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.GetRole(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("GetRole() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("GetRole() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_ListRoles(t *testing.T) {
+	diffOpts := defaultDiffOpts()
+
+	now := time.Now()
+
+	firstRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "role reader",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+		CreatedAt:   now.Add(-3 * time.Hour),
+		ETag:        uuid.NewString(),
+	}
+	secondRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "role editor",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead, mdl.PermissionCustomRoleUpdate},
+		CreatedAt:   now.Add(-2 * time.Hour),
+		UpdatedAt:   new(now.Add(-time.Hour)),
+		ETag:        uuid.NewString(),
+	}
+	thirdRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "role administrator",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleCreate, mdl.PermissionCustomRoleDelete},
+		CreatedAt:   now,
+		ETag:        uuid.NewString(),
+	}
+
+	pbFirstRole := &pb.Role{
+		Id:          firstRole.ID.String(),
+		Name:        firstRole.Name,
+		Permissions: []string{string(mdl.PermissionCustomRoleRead)},
+		CreateTime:  timestamppb.New(firstRole.CreatedAt),
+		Etag:        firstRole.ETag,
+	}
+	pbSecondRole := &pb.Role{
+		Id:          secondRole.ID.String(),
+		Name:        secondRole.Name,
+		Permissions: []string{string(mdl.PermissionCustomRoleRead), string(mdl.PermissionCustomRoleUpdate)},
+		CreateTime:  timestamppb.New(secondRole.CreatedAt),
+		UpdateTime:  timestamppb.New(*secondRole.UpdatedAt),
+		Etag:        secondRole.ETag,
+	}
+	pbThirdRole := &pb.Role{
+		Id:          thirdRole.ID.String(),
+		Name:        thirdRole.Name,
+		Permissions: []string{string(mdl.PermissionCustomRoleCreate), string(mdl.PermissionCustomRoleDelete)},
+		CreateTime:  timestamppb.New(thirdRole.CreatedAt),
+		Etag:        thirdRole.ETag,
+	}
+
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.ListRolesRequest
+		want           *pb.ListRolesResponse
+	}{
+		{
+			name: "empty request",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRolesFunc: func(_ context.Context, _, _ int) ([]mdl.CustomRole, int, error) {
+					return []mdl.CustomRole{firstRole, secondRole, thirdRole}, 15, nil
+				},
+			},
+			in: &pb.ListRolesRequest{},
+			want: &pb.ListRolesResponse{
+				Roles:     []*pb.Role{pbFirstRole, pbSecondRole, pbThirdRole},
+				TotalSize: 15,
+			},
+		},
+		{
+			name: "empty result",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRolesFunc: func(_ context.Context, _, _ int) ([]mdl.CustomRole, int, error) {
+					return nil, 0, nil
+				},
+			},
+			in:   &pb.ListRolesRequest{},
+			want: &pb.ListRolesResponse{},
+		},
+		{
+			name: "first page returns next_page_token when more results exist",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRolesFunc: func(_ context.Context, _, _ int) ([]mdl.CustomRole, int, error) {
+					return []mdl.CustomRole{firstRole, secondRole}, 5, nil
+				},
+			},
+			in: &pb.ListRolesRequest{PageSize: 2},
+			want: &pb.ListRolesResponse{
+				Roles:         []*pb.Role{pbFirstRole, pbSecondRole},
+				TotalSize:     5,
+				NextPageToken: "eyJvIjoyfQ==",
+			},
+		},
+		{
+			name: "single page returns no next_page_token",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRolesFunc: func(_ context.Context, _, _ int) ([]mdl.CustomRole, int, error) {
+					return []mdl.CustomRole{firstRole, secondRole, thirdRole}, 3, nil
+				},
+			},
+			in: &pb.ListRolesRequest{PageSize: 10},
+			want: &pb.ListRolesResponse{
+				Roles:     []*pb.Role{pbFirstRole, pbSecondRole, pbThirdRole},
+				TotalSize: 3,
+			},
+		},
+		{
+			name: "page_token offset is honored",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRolesFunc: func(_ context.Context, _, _ int) ([]mdl.CustomRole, int, error) {
+					return []mdl.CustomRole{thirdRole}, 10, nil
+				},
+			},
+			in: &pb.ListRolesRequest{
+				PageSize:  2,
+				PageToken: "eyJvIjoyfQ==",
+			},
+			want: &pb.ListRolesResponse{
+				Roles:         []*pb.Role{pbThirdRole},
+				TotalSize:     10,
+				NextPageToken: "eyJvIjo0fQ==",
+			},
+		},
+		{
+			name: "last page exactly fills page size",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRolesFunc: func(_ context.Context, _, _ int) ([]mdl.CustomRole, int, error) {
+					return []mdl.CustomRole{firstRole, secondRole, thirdRole}, 3, nil
+				},
+			},
+			in: &pb.ListRolesRequest{PageSize: 3},
+			want: &pb.ListRolesResponse{
+				Roles:     []*pb.Role{pbFirstRole, pbSecondRole, pbThirdRole},
+				TotalSize: 3,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			got, err := srvTest.customRoleServiceClient.ListRoles(authCtxForTestUser(t, t.Context()), tt.in)
+			if err != nil {
+				t.Fatalf("ListRoles() error = %q, want no error", err)
+			}
+
+			testingx.AssertDiff(t, got.GetRoles(), tt.want.GetRoles(), diffOpts)
+
+			if got.GetTotalSize() != tt.want.GetTotalSize() {
+				t.Errorf("ListRoles() total_size = %d, want %d", got.GetTotalSize(), tt.want.GetTotalSize())
+			}
+
+			if got.GetNextPageToken() != tt.want.GetNextPageToken() {
+				t.Errorf("ListRoles() next_page_token = %q, want %q", got.GetNextPageToken(), tt.want.GetNextPageToken())
+			}
+		})
+	}
+}
+
+func TestRoleService_ListRoles_error(t *testing.T) {
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.ListRolesRequest
+		want           *status.Status
+	}{
+		{
+			name:           "invalid page token",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.ListRolesRequest{PageToken: "bad"},
+			want:           status.New(codes.InvalidArgument, "invalid page_token"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				CustomRolesFunc: func(_ context.Context, _, _ int) ([]mdl.CustomRole, int, error) {
+					return nil, 0, errors.New("boom")
+				},
+			},
+			in:   &pb.ListRolesRequest{},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.ListRoles(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("ListRoles() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("ListRoles() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_UpdateRole(t *testing.T) {
+	mockedRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "updated role",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleUpdate},
+		CreatedAt:   time.Now(),
+		UpdatedAt:   new(time.Now().Add(time.Minute)),
+		ETag:        uuid.NewString(),
+	}
+	customRoleCore := &MockedCustomRoleCore{
+		UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+			return mockedRole, nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.UpdateRole(
+		authCtxForTestUser(t, t.Context()),
+		&pb.UpdateRoleRequest{
+			Role:       &pb.Role{Id: mockedRole.ID.String(), Name: mockedRole.Name},
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpdateRole() error = %v", err)
+	}
+
+	want := &pb.Role{
+		Id:          mockedRole.ID.String(),
+		Name:        mockedRole.Name,
+		Permissions: []string{string(mdl.PermissionCustomRoleUpdate)},
+		CreateTime:  timestamppb.New(mockedRole.CreatedAt),
+		UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
+		Etag:        mockedRole.ETag,
+	}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_UpdateRole_error(t *testing.T) {
+	invalidArgWithViolation := func(field, desc string) *status.Status {
+		st, err := status.New(codes.InvalidArgument, codes.InvalidArgument.String()).WithDetails(
+			&errdetails.BadRequest{FieldViolations: []*errdetails.BadRequest_FieldViolation{
+				{Field: field, Description: desc},
+			}},
+		)
+		if err != nil {
+			t.Fatalf("invalidArgWithViolation(%q, %q) build status error = %v", field, desc, err)
+		}
+		return st
+	}
+
+	roleID := uuid.New()
+
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.UpdateRoleRequest
+		want           *status.Status
+	}{
+		{
+			name:           "missing role field",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.UpdateRoleRequest{},
+			want:           invalidArgWithViolation("role", "required"),
+		},
+		{
+			name:           "invalid id",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.UpdateRoleRequest{Role: &pb.Role{Id: "bad"}},
+			want:           invalidArgWithViolation("role.id", "must be a valid UUID"),
+		},
+		{
+			name:           "no mask",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.UpdateRoleRequest{Role: &pb.Role{Id: roleID.String()}},
+			want:           status.New(codes.InvalidArgument, "update_mask is required"),
+		},
+		{
+			name:           "unknown mask field",
+			customRoleCore: &MockedCustomRoleCore{},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String()},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"etag"}},
+			},
+			want: invalidArgWithViolation("update_mask", `field "etag" is not updatable`),
+		},
+		{
+			name:           "whitespace-only name",
+			customRoleCore: &MockedCustomRoleCore{},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: " \t"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: invalidArgWithViolation("role.name", "required"),
+		},
+		{
+			name:           "surrounding whitespace",
+			customRoleCore: &MockedCustomRoleCore{},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: " updated role"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: invalidArgWithViolation("role.name", "must not have leading or trailing whitespace"),
+		},
+		{
+			name:           "system-only permission",
+			customRoleCore: &MockedCustomRoleCore{},
+			in: &pb.UpdateRoleRequest{
+				Role: &pb.Role{
+					Id:          roleID.String(),
+					Permissions: []string{string(mdl.PermissionSystemRoleRead)},
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"permissions"}},
+			},
+			want: invalidArgWithViolation("role.permissions[0]", `"system-role:read" is system-only`),
+		},
+		{
+			name: "role not found",
+			customRoleCore: &MockedCustomRoleCore{
+				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrNotFound
+				},
+			},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.NotFound, `role "`+roleID.String()+`" not found`),
+		},
+		{
+			name: "invalid role",
+			customRoleCore: &MockedCustomRoleCore{
+				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrValidation
+				},
+			},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.InvalidArgument, "invalid role"),
+		},
+		{
+			name: "already exists",
+			customRoleCore: &MockedCustomRoleCore{
+				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrAlreadyExists
+				},
+			},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: invalidArgWithViolation("role.name", "a role with this name already exists"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, errors.New("boom")
+				},
+			},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.UpdateRole(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("UpdateRole() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("UpdateRole() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_ModifyRolePermissions(t *testing.T) {
+	mockedRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "role manager",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleUpdate},
+		CreatedAt:   time.Now(),
+		UpdatedAt:   new(time.Now().Add(time.Minute)),
+		ETag:        uuid.NewString(),
+	}
+	customRoleCore := &MockedCustomRoleCore{
+		ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
+			return mockedRole, nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.ModifyRolePermissions(
+		authCtxForTestUser(t, t.Context()),
+		&pb.ModifyRolePermissionsRequest{
+			Id:             mockedRole.ID.String(),
+			AddPermissions: []string{string(mdl.PermissionCustomRoleUpdate)},
+		},
+	)
+	if err != nil {
+		t.Fatalf("ModifyRolePermissions() error = %v", err)
+	}
+
+	want := &pb.Role{
+		Id:          mockedRole.ID.String(),
+		Name:        mockedRole.Name,
+		Permissions: []string{string(mdl.PermissionCustomRoleUpdate)},
+		CreateTime:  timestamppb.New(mockedRole.CreatedAt),
+		UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
+		Etag:        mockedRole.ETag,
+	}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
+	invalidArgWithViolation := func(field, desc string) *status.Status {
+		st, err := status.New(codes.InvalidArgument, codes.InvalidArgument.String()).WithDetails(
+			&errdetails.BadRequest{FieldViolations: []*errdetails.BadRequest_FieldViolation{
+				{Field: field, Description: desc},
+			}},
+		)
+		if err != nil {
+			t.Fatalf("invalidArgWithViolation(%q, %q) build status error = %v", field, desc, err)
+		}
+		return st
+	}
+
+	roleID := uuid.New()
+
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.ModifyRolePermissionsRequest
+		want           *status.Status
+	}{
+		{
+			name:           "invalid id",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.ModifyRolePermissionsRequest{Id: "bad"},
+			want:           invalidArgWithViolation("id", "must be a valid UUID"),
+		},
+		{
+			name:           "system-only permission",
+			customRoleCore: &MockedCustomRoleCore{},
+			in: &pb.ModifyRolePermissionsRequest{
+				Id:             roleID.String(),
+				AddPermissions: []string{string(mdl.PermissionUserRead)},
+			},
+			want: invalidArgWithViolation("add_permissions[0]", `"user:read" is system-only`),
+		},
+		{
+			name:           "system-only permission removal",
+			customRoleCore: &MockedCustomRoleCore{},
+			in: &pb.ModifyRolePermissionsRequest{
+				Id:                roleID.String(),
+				RemovePermissions: []string{string(mdl.PermissionUserRead)},
+			},
+			want: invalidArgWithViolation("remove_permissions[0]", `"user:read" is system-only`),
+		},
+		{
+			name:           "overlapping permission",
+			customRoleCore: &MockedCustomRoleCore{},
+			in: &pb.ModifyRolePermissionsRequest{
+				Id:                roleID.String(),
+				AddPermissions:    []string{string(mdl.PermissionCustomRoleRead)},
+				RemovePermissions: []string{string(mdl.PermissionCustomRoleRead)},
+			},
+			want: invalidArgWithViolation("add_permissions[0]", "must not also appear in remove_permissions"),
+		},
+		{
+			name: "missing role",
+			customRoleCore: &MockedCustomRoleCore{
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			want: status.New(codes.NotFound, `role "`+roleID.String()+`" or permission not found`),
+		},
+		{
+			name: "invalid permission changes",
+			customRoleCore: &MockedCustomRoleCore{
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrValidation
+				},
+			},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			want: status.New(codes.InvalidArgument, "invalid permission changes"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, errors.New("boom")
+				},
+			},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.ModifyRolePermissions(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("ModifyRolePermissions() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("ModifyRolePermissions() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_DeleteRole(t *testing.T) {
+	customRoleCore := &MockedCustomRoleCore{
+		DeleteCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error {
+			return nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.DeleteRole(
+		authCtxForTestUser(t, t.Context()),
+		&pb.DeleteRoleRequest{Id: uuid.NewString()},
+	)
+	if err != nil {
+		t.Fatalf("DeleteRole() error = %v", err)
+	}
+
+	want := &pb.DeleteRoleResponse{}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_DeleteRole_error(t *testing.T) {
+	invalidArgWithViolation := func(field, desc string) *status.Status {
+		st, err := status.New(codes.InvalidArgument, codes.InvalidArgument.String()).WithDetails(
+			&errdetails.BadRequest{FieldViolations: []*errdetails.BadRequest_FieldViolation{
+				{Field: field, Description: desc},
+			}},
+		)
+		if err != nil {
+			t.Fatalf("invalidArgWithViolation(%q, %q) build status error = %v", field, desc, err)
+		}
+		return st
+	}
+
+	roleID := uuid.New()
+
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.DeleteRoleRequest
+		want           *status.Status
+	}{
+		{
+			name:           "invalid id",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.DeleteRoleRequest{Id: "bad"},
+			want:           invalidArgWithViolation("id", "must be a valid UUID"),
+		},
+		{
+			name: "missing role",
+			customRoleCore: &MockedCustomRoleCore{
+				DeleteCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error {
+					return mdl.ErrNotFound
+				},
+			},
+			in:   &pb.DeleteRoleRequest{Id: roleID.String()},
+			want: status.New(codes.NotFound, `role "`+roleID.String()+`" not found`),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				DeleteCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error {
+					return errors.New("boom")
+				},
+			},
+			in:   &pb.DeleteRoleRequest{Id: roleID.String()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.DeleteRole(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("DeleteRole() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("DeleteRole() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}

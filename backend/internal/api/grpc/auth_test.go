@@ -24,6 +24,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	ctx := t.Context()
 
 	// Request a magic link. The auth core creates the user automatically.
+
 	if _, err := srv.authServiceClient.RequestMagicLink(ctx, &pb.RequestMagicLinkRequest{
 		Email: "alice@test.com",
 	}); err != nil {
@@ -31,6 +32,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// Extract the token from the captured email and verify it.
+
 	token := srv.emailSender.MagicLinkToken(t)
 	pair, err := srv.authServiceClient.VerifyMagicLink(ctx, &pb.VerifyMagicLinkRequest{
 		Token: token,
@@ -46,6 +48,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// A freshly created user holds no role yet, so a protected endpoint denies them.
+
 	authedCtx := metadata.AppendToOutgoingContext(
 		authCtxWithToken(ctx, pair.GetAccessToken()),
 		"x-project-id",
@@ -56,6 +59,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// Access token grants access to protected endpoints, once granted the permission it requires.
+
 	aliceUser, err := srv.userStore.UserByEmail(ctx, "alice@test.com")
 	if err != nil {
 		t.Fatalf("UserByEmail() error = %v", err)
@@ -69,6 +73,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// Refreshing rotates the refresh token.
+
 	newPair, err := srv.authServiceClient.RefreshAccessToken(ctx, &pb.RefreshAccessTokenRequest{
 		RefreshToken: pair.GetRefreshToken(),
 	})
@@ -80,6 +85,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// Consumed refresh token cannot be reused.
+
 	_, err = srv.authServiceClient.RefreshAccessToken(ctx, &pb.RefreshAccessTokenRequest{
 		RefreshToken: pair.GetRefreshToken(),
 	})
@@ -88,6 +94,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// Revoking the current refresh token ends the session.
+
 	if _, err := srv.authServiceClient.RevokeRefreshToken(ctx, &pb.RevokeRefreshTokenRequest{
 		RefreshToken: newPair.GetRefreshToken(),
 	}); err != nil {
@@ -95,6 +102,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	}
 
 	// Revoked token cannot be used to obtain new tokens.
+
 	_, err = srv.authServiceClient.RefreshAccessToken(ctx, &pb.RefreshAccessTokenRequest{
 		RefreshToken: newPair.GetRefreshToken(),
 	})
