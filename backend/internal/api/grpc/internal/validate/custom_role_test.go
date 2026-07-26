@@ -267,3 +267,235 @@ func TestDeleteRole_error(t *testing.T) {
 	)
 	runValidationErrorTests(t, "DeleteRole", DeleteRole, tests)
 }
+
+func TestAssignRoleToProject(t *testing.T) {
+	if err := AssignRoleToProject(&pb.AssignRoleToProjectRequest{
+		RoleId: uuid.NewString(),
+		UserId: uuid.NewString(),
+	}); err != nil {
+		t.Errorf("AssignRoleToProject() error = %v, want nil", err)
+	}
+}
+
+func TestAssignRoleToProject_error(t *testing.T) {
+	tests := []validationTest[*pb.AssignRoleToProjectRequest]{
+		{
+			name: "nil request",
+			in:   nil,
+			want: wantInvalidArgument(
+				codes.InvalidArgument.String(),
+				violation{field: "role_id", description: "required"},
+				violation{field: "user_id", description: "required"},
+			),
+		},
+		{
+			name: "invalid role id",
+			in: &pb.AssignRoleToProjectRequest{
+				RoleId: "bad",
+				UserId: uuid.NewString(),
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "role_id",
+				description: "must be a valid UUID",
+			}),
+		},
+		{
+			name: "invalid user id",
+			in: &pb.AssignRoleToProjectRequest{
+				RoleId: uuid.NewString(),
+				UserId: "bad",
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "user_id",
+				description: "must be a valid UUID",
+			}),
+		},
+		{
+			name: "invalid ids",
+			in: &pb.AssignRoleToProjectRequest{
+				RoleId: "bad",
+				UserId: "also-bad",
+			},
+			want: wantInvalidArgument(
+				codes.InvalidArgument.String(),
+				violation{field: "role_id", description: "must be a valid UUID"},
+				violation{field: "user_id", description: "must be a valid UUID"},
+			),
+		},
+	}
+	runValidationErrorTests(t, "AssignRoleToProject", AssignRoleToProject, tests)
+}
+
+func TestUnassignRoleFromProject(t *testing.T) {
+	if err := UnassignRoleFromProject(&pb.UnassignRoleFromProjectRequest{
+		RoleId: uuid.NewString(),
+		UserId: uuid.NewString(),
+	}); err != nil {
+		t.Errorf("UnassignRoleFromProject() error = %v, want nil", err)
+	}
+}
+
+func TestUnassignRoleFromProject_error(t *testing.T) {
+	tests := []validationTest[*pb.UnassignRoleFromProjectRequest]{
+		{
+			name: "nil request",
+			in:   nil,
+			want: wantInvalidArgument(
+				codes.InvalidArgument.String(),
+				violation{field: "role_id", description: "required"},
+				violation{field: "user_id", description: "required"},
+			),
+		},
+		{
+			name: "invalid role id",
+			in: &pb.UnassignRoleFromProjectRequest{
+				RoleId: "bad",
+				UserId: uuid.NewString(),
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "role_id",
+				description: "must be a valid UUID",
+			}),
+		},
+		{
+			name: "invalid user id",
+			in: &pb.UnassignRoleFromProjectRequest{
+				RoleId: uuid.NewString(),
+				UserId: "bad",
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "user_id",
+				description: "must be a valid UUID",
+			}),
+		},
+		{
+			name: "invalid ids",
+			in: &pb.UnassignRoleFromProjectRequest{
+				RoleId: "bad",
+				UserId: "also-bad",
+			},
+			want: wantInvalidArgument(
+				codes.InvalidArgument.String(),
+				violation{field: "role_id", description: "must be a valid UUID"},
+				violation{field: "user_id", description: "must be a valid UUID"},
+			),
+		},
+	}
+	runValidationErrorTests(t, "UnassignRoleFromProject", UnassignRoleFromProject, tests)
+}
+
+func TestAssignRoleToOrganization(t *testing.T) {
+	if err := AssignRoleToOrganization(&pb.AssignRoleToOrganizationRequest{
+		RoleId: uuid.NewString(),
+		UserId: uuid.NewString(),
+	}); err != nil {
+		t.Errorf("AssignRoleToOrganization() error = %v, want nil", err)
+	}
+}
+
+func TestAssignRoleToOrganization_error(t *testing.T) {
+	tests := []validationTest[*pb.AssignRoleToOrganizationRequest]{
+		{
+			name: "nil request",
+			in:   nil,
+			want: wantInvalidArgument(
+				codes.InvalidArgument.String(),
+				violation{field: "role_id", description: "required"},
+				violation{field: "user_id", description: "required"},
+			),
+		},
+		{
+			name: "invalid role id",
+			in: &pb.AssignRoleToOrganizationRequest{
+				RoleId: "bad",
+				UserId: uuid.NewString(),
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "role_id",
+				description: "must be a valid UUID",
+			}),
+		},
+		{
+			name: "invalid user id",
+			in: &pb.AssignRoleToOrganizationRequest{
+				RoleId: uuid.NewString(),
+				UserId: "bad",
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "user_id",
+				description: "must be a valid UUID",
+			}),
+		},
+		{
+			name: "invalid ids",
+			in: &pb.AssignRoleToOrganizationRequest{
+				RoleId: "bad",
+				UserId: "also-bad",
+			},
+			want: wantInvalidArgument(
+				codes.InvalidArgument.String(),
+				violation{field: "role_id", description: "must be a valid UUID"},
+				violation{field: "user_id", description: "must be a valid UUID"},
+			),
+		},
+	}
+	runValidationErrorTests(t, "AssignRoleToOrganization", AssignRoleToOrganization, tests)
+}
+
+func TestUnassignRoleFromOrganization(t *testing.T) {
+	if err := UnassignRoleFromOrganization(&pb.UnassignRoleFromOrganizationRequest{
+		RoleId: uuid.NewString(),
+		UserId: uuid.NewString(),
+	}); err != nil {
+		t.Errorf("UnassignRoleFromOrganization() error = %v, want nil", err)
+	}
+}
+
+func TestUnassignRoleFromOrganization_error(t *testing.T) {
+	tests := []validationTest[*pb.UnassignRoleFromOrganizationRequest]{
+		{
+			name: "nil request",
+			in:   nil,
+			want: wantInvalidArgument(
+				codes.InvalidArgument.String(),
+				violation{field: "role_id", description: "required"},
+				violation{field: "user_id", description: "required"},
+			),
+		},
+		{
+			name: "invalid role id",
+			in: &pb.UnassignRoleFromOrganizationRequest{
+				RoleId: "bad",
+				UserId: uuid.NewString(),
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "role_id",
+				description: "must be a valid UUID",
+			}),
+		},
+		{
+			name: "invalid user id",
+			in: &pb.UnassignRoleFromOrganizationRequest{
+				RoleId: uuid.NewString(),
+				UserId: "bad",
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "user_id",
+				description: "must be a valid UUID",
+			}),
+		},
+		{
+			name: "invalid ids",
+			in: &pb.UnassignRoleFromOrganizationRequest{
+				RoleId: "bad",
+				UserId: "also-bad",
+			},
+			want: wantInvalidArgument(
+				codes.InvalidArgument.String(),
+				violation{field: "role_id", description: "must be a valid UUID"},
+				violation{field: "user_id", description: "must be a valid UUID"},
+			),
+		},
+	}
+	runValidationErrorTests(t, "UnassignRoleFromOrganization", UnassignRoleFromOrganization, tests)
+}

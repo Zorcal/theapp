@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -160,6 +161,66 @@ func DeleteRole(req *pb.DeleteRoleRequest) error {
 	if err := validUUID(req.GetId(), "id"); err != nil {
 		return err
 	}
+	return nil
+}
+
+func AssignRoleToProject(req *pb.AssignRoleToProjectRequest) error {
+	if req == nil {
+		return requiredRequest("role_id", "user_id")
+	}
+	if err := roleAssignment(req.GetRoleId(), req.GetUserId()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UnassignRoleFromProject(req *pb.UnassignRoleFromProjectRequest) error {
+	if req == nil {
+		return requiredRequest("role_id", "user_id")
+	}
+	if err := roleAssignment(req.GetRoleId(), req.GetUserId()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func AssignRoleToOrganization(req *pb.AssignRoleToOrganizationRequest) error {
+	if req == nil {
+		return requiredRequest("role_id", "user_id")
+	}
+	if err := roleAssignment(req.GetRoleId(), req.GetUserId()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UnassignRoleFromOrganization(req *pb.UnassignRoleFromOrganizationRequest) error {
+	if req == nil {
+		return requiredRequest("role_id", "user_id")
+	}
+	if err := roleAssignment(req.GetRoleId(), req.GetUserId()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func roleAssignment(roleID, userID string) error {
+	var violations []*errdetails.BadRequest_FieldViolation
+	if _, err := uuid.Parse(roleID); err != nil {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field: "role_id", Description: "must be a valid UUID",
+		})
+	}
+	if _, err := uuid.Parse(userID); err != nil {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field: "user_id", Description: "must be a valid UUID",
+		})
+	}
+
+	if len(violations) > 0 {
+		return invalidArgument(violations...)
+	}
+
 	return nil
 }
 
