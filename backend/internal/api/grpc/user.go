@@ -82,22 +82,11 @@ func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 }
 
 func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.User, error) {
-	if req.GetUser() == nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "user", Description: "required"},
-		})
-	}
-
-	id, err := uuid.Parse(req.GetUser().GetId())
-	if err != nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "user.id", Description: "must be a valid UUID"},
-		})
-	}
-
 	if err := validateUpdateUserRequest(req); err != nil {
 		return nil, fmt.Errorf("validate update user request: %w", err)
 	}
+
+	id := uuid.MustParse(req.GetUser().GetId())
 
 	usr, err := s.userCore.UpdateUser(ctx, conv.UpdateUserFromPB(req, id))
 	if err != nil {
@@ -111,6 +100,18 @@ func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 }
 
 func validateUpdateUserRequest(req *pb.UpdateUserRequest) error {
+	if req.GetUser() == nil {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "user", Description: "required"},
+		})
+	}
+
+	if _, err := uuid.Parse(req.GetUser().GetId()); err != nil {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "user.id", Description: "must be a valid UUID"},
+		})
+	}
+
 	maskPaths := req.GetUpdateMask().GetPaths()
 
 	if len(maskPaths) == 0 {

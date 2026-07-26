@@ -127,22 +127,11 @@ func (s *customRoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequ
 }
 
 func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb.Role, error) {
-	if req.GetRole() == nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "role", Description: "required"},
-		})
-	}
-
-	roleID, err := uuid.Parse(req.GetRole().GetId())
-	if err != nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "role.id", Description: "must be a valid UUID"},
-		})
-	}
-
 	if err := validateUpdateRoleRequest(req); err != nil {
 		return nil, fmt.Errorf("validate update role request: %w", err)
 	}
+
+	roleID := uuid.MustParse(req.GetRole().GetId())
 
 	role, err := s.customRoleCore.UpdateCustomRole(ctx, conv.UpdateCustomRoleFromPB(req, roleID))
 	if err != nil {
@@ -164,16 +153,11 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 }
 
 func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.ModifyRolePermissionsRequest) (*pb.Role, error) {
-	roleID, err := uuid.Parse(req.GetId())
-	if err != nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "id", Description: "must be a valid UUID"},
-		})
-	}
-
 	if err := validateModifyRolePermissionsRequest(req); err != nil {
 		return nil, fmt.Errorf("validate modify role permissions request: %w", err)
 	}
+
+	roleID := uuid.MustParse(req.GetId())
 
 	role, err := s.customRoleCore.ModifyCustomRolePermissions(ctx, conv.ModifyCustomRolePermissionsFromPB(req, roleID))
 	if err != nil {
@@ -240,6 +224,18 @@ func validateCreateRoleRequest(req *pb.CreateRoleRequest) error {
 }
 
 func validateUpdateRoleRequest(req *pb.UpdateRoleRequest) error {
+	if req.GetRole() == nil {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "role", Description: "required"},
+		})
+	}
+
+	if _, err := uuid.Parse(req.GetRole().GetId()); err != nil {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "role.id", Description: "must be a valid UUID"},
+		})
+	}
+
 	maskPaths := req.GetUpdateMask().GetPaths()
 	if len(maskPaths) == 0 {
 		return status.Error(codes.InvalidArgument, "update_mask is required")
@@ -284,6 +280,12 @@ func validateUpdateRoleRequest(req *pb.UpdateRoleRequest) error {
 }
 
 func validateModifyRolePermissionsRequest(req *pb.ModifyRolePermissionsRequest) error {
+	if _, err := uuid.Parse(req.GetId()); err != nil {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "id", Description: "must be a valid UUID"},
+		})
+	}
+
 	var violations []*errdetails.BadRequest_FieldViolation
 
 	for i, permName := range req.GetAddPermissions() {

@@ -90,23 +90,11 @@ func (s *systemRoleService) AssignSystemRole(ctx context.Context, req *pb.Assign
 		return nil, fmt.Errorf("authorize project: %w", err)
 	}
 
-	var violations []*errdetails.BadRequest_FieldViolation
-	if req.GetRoleName() == "" {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "role_name", Description: "required",
-		})
+	if err := validateAssignSystemRoleRequest(req); err != nil {
+		return nil, fmt.Errorf("validate assign system role request: %w", err)
 	}
 
-	userID, err := uuid.Parse(req.GetUserId())
-	if err != nil {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "user_id", Description: "must be a valid UUID",
-		})
-	}
-
-	if len(violations) > 0 {
-		return nil, invalidArgumentStatus(violations)
-	}
+	userID := uuid.MustParse(req.GetUserId())
 
 	if err := s.systemRoleCore.AssignSystemRole(ctx, userID, req.GetRoleName()); err != nil {
 		switch {
@@ -129,23 +117,11 @@ func (s *systemRoleService) UnassignSystemRole(ctx context.Context, req *pb.Unas
 		return nil, fmt.Errorf("authorize project: %w", err)
 	}
 
-	var violations []*errdetails.BadRequest_FieldViolation
-	if req.GetRoleName() == "" {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "role_name", Description: "required",
-		})
+	if err := validateUnassignSystemRoleRequest(req); err != nil {
+		return nil, fmt.Errorf("validate unassign system role request: %w", err)
 	}
 
-	userID, err := uuid.Parse(req.GetUserId())
-	if err != nil {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "user_id", Description: "must be a valid UUID",
-		})
-	}
-
-	if len(violations) > 0 {
-		return nil, invalidArgumentStatus(violations)
-	}
+	userID := uuid.MustParse(req.GetUserId())
 
 	if err := s.systemRoleCore.UnassignSystemRole(ctx, userID, req.GetRoleName()); err != nil {
 		switch {
@@ -161,6 +137,48 @@ func (s *systemRoleService) UnassignSystemRole(ctx context.Context, req *pb.Unas
 	}
 
 	return &pb.UnassignSystemRoleResponse{}, nil
+}
+
+func validateAssignSystemRoleRequest(req *pb.AssignSystemRoleRequest) error {
+	var violations []*errdetails.BadRequest_FieldViolation
+	if req.GetRoleName() == "" {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field: "role_name", Description: "required",
+		})
+	}
+
+	if _, err := uuid.Parse(req.GetUserId()); err != nil {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field: "user_id", Description: "must be a valid UUID",
+		})
+	}
+
+	if len(violations) > 0 {
+		return invalidArgumentStatus(violations)
+	}
+
+	return nil
+}
+
+func validateUnassignSystemRoleRequest(req *pb.UnassignSystemRoleRequest) error {
+	var violations []*errdetails.BadRequest_FieldViolation
+	if req.GetRoleName() == "" {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field: "role_name", Description: "required",
+		})
+	}
+
+	if _, err := uuid.Parse(req.GetUserId()); err != nil {
+		violations = append(violations, &errdetails.BadRequest_FieldViolation{
+			Field: "user_id", Description: "must be a valid UUID",
+		})
+	}
+
+	if len(violations) > 0 {
+		return invalidArgumentStatus(violations)
+	}
+
+	return nil
 }
 
 func (s *systemRoleService) ListSystemRoleAssignments(ctx context.Context, req *pb.ListSystemRoleAssignmentsRequest) (*pb.ListSystemRoleAssignmentsResponse, error) {

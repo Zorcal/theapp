@@ -58,15 +58,8 @@ type WorkflowAuthCore interface {
 }
 
 func (s *authService) RequestMagicLink(ctx context.Context, req *pb.RequestMagicLinkRequest) (*emptypb.Empty, error) {
-	if req.GetEmail() == "" {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "email", Description: "required"},
-		})
-	}
-	if !mdl.IsValidEmail(req.GetEmail()) {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "email", Description: "invalid format"},
-		})
+	if err := validateRequestMagicLinkRequest(req); err != nil {
+		return nil, fmt.Errorf("validate request magic link request: %w", err)
 	}
 
 	if err := s.workflowAuthCore.RequestMagicLink(ctx, req.GetEmail()); err != nil {
@@ -77,10 +70,8 @@ func (s *authService) RequestMagicLink(ctx context.Context, req *pb.RequestMagic
 }
 
 func (s *authService) VerifyMagicLink(ctx context.Context, req *pb.VerifyMagicLinkRequest) (*pb.TokenPair, error) {
-	if req.GetToken() == "" {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "token", Description: "required"},
-		})
+	if err := validateVerifyMagicLinkRequest(req); err != nil {
+		return nil, fmt.Errorf("validate verify magic link request: %w", err)
 	}
 
 	pair, err := s.authCore.VerifyMagicLink(ctx, conv.VerifyMagicLinkFromPB(req))
@@ -95,10 +86,8 @@ func (s *authService) VerifyMagicLink(ctx context.Context, req *pb.VerifyMagicLi
 }
 
 func (s *authService) RefreshAccessToken(ctx context.Context, req *pb.RefreshAccessTokenRequest) (*pb.TokenPair, error) {
-	if req.GetRefreshToken() == "" {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "refresh_token", Description: "required"},
-		})
+	if err := validateRefreshAccessTokenRequest(req); err != nil {
+		return nil, fmt.Errorf("validate refresh access token request: %w", err)
 	}
 
 	pair, err := s.authCore.RefreshAccessToken(ctx, conv.RefreshAccessTokenFromPB(req))
@@ -113,10 +102,8 @@ func (s *authService) RefreshAccessToken(ctx context.Context, req *pb.RefreshAcc
 }
 
 func (s *authService) RevokeRefreshToken(ctx context.Context, req *pb.RevokeRefreshTokenRequest) (*emptypb.Empty, error) {
-	if req.GetRefreshToken() == "" {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "refresh_token", Description: "required"},
-		})
+	if err := validateRevokeRefreshTokenRequest(req); err != nil {
+		return nil, fmt.Errorf("validate revoke refresh token request: %w", err)
 	}
 
 	if err := s.authCore.RevokeRefreshToken(ctx, conv.RevokeRefreshTokenFromPB(req)); err != nil {
@@ -127,6 +114,51 @@ func (s *authService) RevokeRefreshToken(ctx context.Context, req *pb.RevokeRefr
 	}
 
 	return &emptypb.Empty{}, nil
+}
+
+func validateRequestMagicLinkRequest(req *pb.RequestMagicLinkRequest) error {
+	if req.GetEmail() == "" {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "email", Description: "required"},
+		})
+	}
+	if !mdl.IsValidEmail(req.GetEmail()) {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "email", Description: "invalid format"},
+		})
+	}
+
+	return nil
+}
+
+func validateVerifyMagicLinkRequest(req *pb.VerifyMagicLinkRequest) error {
+	if req.GetToken() == "" {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "token", Description: "required"},
+		})
+	}
+
+	return nil
+}
+
+func validateRefreshAccessTokenRequest(req *pb.RefreshAccessTokenRequest) error {
+	if req.GetRefreshToken() == "" {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "refresh_token", Description: "required"},
+		})
+	}
+
+	return nil
+}
+
+func validateRevokeRefreshTokenRequest(req *pb.RevokeRefreshTokenRequest) error {
+	if req.GetRefreshToken() == "" {
+		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+			{Field: "refresh_token", Description: "required"},
+		})
+	}
+
+	return nil
 }
 
 func (s *authService) RevokeAllSessions(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
