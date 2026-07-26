@@ -400,6 +400,92 @@ func (s *Store) ProjectPermissions(ctx context.Context, userID, projectID int) (
 	return perms, nil
 }
 
+// AssignCustomRoleToProject grants an organization member an organization-owned role in projectID.
+// Returns [sql.ErrNoRows] if the user, role, project, or membership does not exist, or the role and
+// project belong to different organizations.
+// Returns [pgdb.ErrAlreadyExists] if the assignment already exists.
+func (s *Store) AssignCustomRoleToProject(ctx context.Context, userID, roleID uuid.UUID, projectID int) error {
+	q := assignCustomRoleToProjectQuery(userID, roleID, projectID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		var roleIDSink int
+		if err := q.Queue(ctx, b, &roleIDSink); err != nil {
+			return fmt.Errorf("assign custom role to project: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UnassignCustomRoleFromProject revokes an organization member's role assignment in projectID.
+// Returns [sql.ErrNoRows] if the membership or assignment does not exist, or the role and project
+// belong to different organizations.
+func (s *Store) UnassignCustomRoleFromProject(ctx context.Context, userID, roleID uuid.UUID, projectID int) error {
+	q := unassignCustomRoleFromProjectQuery(userID, roleID, projectID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		var roleIDSink int
+		if err := q.Queue(ctx, b, &roleIDSink); err != nil {
+			return fmt.Errorf("unassign custom role from project: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AssignCustomRoleToOrg grants an organization member an organization-owned role at org scope.
+// Returns [sql.ErrNoRows] if the user, role, organization, or membership does not exist, or the
+// role belongs to a different organization.
+// Returns [pgdb.ErrAlreadyExists] if the assignment already exists.
+func (s *Store) AssignCustomRoleToOrg(ctx context.Context, userID, roleID uuid.UUID, orgID int) error {
+	q := assignCustomRoleToOrgQuery(userID, roleID, orgID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		var roleIDSink int
+		if err := q.Queue(ctx, b, &roleIDSink); err != nil {
+			return fmt.Errorf("assign custom role to org: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UnassignCustomRoleFromOrg revokes an organization member's role assignment at org scope.
+// Returns [sql.ErrNoRows] if the membership or assignment does not exist, or the role belongs to a
+// different organization.
+func (s *Store) UnassignCustomRoleFromOrg(ctx context.Context, userID, roleID uuid.UUID, orgID int) error {
+	q := unassignCustomRoleFromOrgQuery(userID, roleID, orgID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		var roleIDSink int
+		if err := q.Queue(ctx, b, &roleIDSink); err != nil {
+			return fmt.Errorf("unassign custom role from org: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // AssignSystemRole grants userID the system role named roleName at system scope.
 // Returns [sql.ErrNoRows] if no user with that ID or system role named roleName exists.
 // Returns [pgdb.ErrAlreadyExists] if userID already has the system role.

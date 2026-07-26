@@ -139,13 +139,13 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 ## Phase 14 — custom role service: assignment endpoints
 
 35. Add project- and org-scope assign/unassign endpoints using `custom-role:assign-project`, `custom-role:unassign-project`, `custom-role:assign-org`, and `custom-role:unassign-org`. They write only to `project_role_assignments` and `org_role_assignments`; system assignment remains exclusively in `SystemRoleService`. Depends on 18, 22, 32.
-36. Gate org-scoped assignment on `org_membership`, and require the custom role's owning `org_id` to match the target project/org. Depends on 18, 33, 35.
+36. Gate project- and org-scoped assignment, unassignment, and permission resolution on current `org_membership`, and require the custom role's owning `org_id` to match the target project/org. Membership removal explicitly deletes every project- and org-scoped assignment before deleting the membership, in one transaction; assignment rows without membership are invalid state repaired through manual database intervention. Depends on 18, 33, 35.
 
 **Checkpoint:** custom roles can be assigned and unassigned at project or org scope. Privilege-escalation and lockout checks are added in phases 15–16, so these endpoints remain restricted to trusted internal testing until then.
 
 ## Phase 15 — custom role service: privilege escalation checks
 
-37. Privilege-escalation superset check on grant: resolve the actor's permission set fresh in the target project or org scope, inside the same transaction as the grant. Depends on 24, 35.
+37. Privilege-escalation superset check on grant: resolve the actor's permission set fresh in the target project or org scope, inside the same transaction as the grant. Organization-scope authorization and superset checks resolve only organization- and system-scope grants; a project-scoped grant carrying `custom-role:assign-org` does not authorize an organization-wide assignment. Depends on 24, 35.
 38. Apply the same superset check to revoke and to permissions added to or removed from a custom role. Depends on 32, 37.
 
 **Checkpoint:** custom-role grant, revoke, and permission edits enforce the correctly scoped superset rule.

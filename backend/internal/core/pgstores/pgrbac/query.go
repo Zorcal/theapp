@@ -558,11 +558,7 @@ func userSystemPermissionsByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[st
 	}
 }
 
-func systemPermissionsRemainAfterUnassignQuery(
-	userID uuid.UUID,
-	roleName string,
-	permNames []string,
-) pgdb.TypedQuery[bool] {
+func systemPermissionsRemainAfterUnassignQuery(userID uuid.UUID, roleName string, permNames []string) pgdb.TypedQuery[bool] {
 	params := pgx.NamedArgs{
 		"user_id":          userID,
 		"role_name":        roleName,
@@ -603,6 +599,153 @@ func systemPermissionsRemainAfterUnassignQuery(
 		Scan: func(row pgx.CollectableRow) (bool, error) {
 			var remain bool
 			return remain, row.Scan(&remain)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func assignCustomRoleToProjectQuery(userID, roleID uuid.UUID, projectID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{
+		"user_id":    userID,
+		"role_id":    roleID,
+		"project_id": projectID,
+	}
+	const sql = `
+		INSERT INTO rbac.project_role_assignments (user_id, role_id, project_id)
+		SELECT u.id, r.id, p.id
+		FROM (
+			SELECT id
+			FROM useraccess.users
+			WHERE external_id = @user_id
+		) AS u
+		CROSS JOIN (
+			SELECT id, org_id
+			FROM rbac.custom_roles
+			WHERE external_id = @role_id
+		) AS r
+		CROSS JOIN (
+			SELECT id, org_id
+			FROM org.projects
+			WHERE id = @project_id
+		) AS p
+		WHERE r.org_id = p.org_id
+			AND EXISTS (
+				SELECT 1
+				FROM org.org_membership AS m
+				WHERE m.user_id = u.id
+					AND m.org_id = p.org_id
+			)
+		RETURNING role_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func unassignCustomRoleFromProjectQuery(userID, roleID uuid.UUID, projectID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{
+		"user_id":    userID,
+		"role_id":    roleID,
+		"project_id": projectID,
+	}
+	const sql = `
+		DELETE FROM rbac.project_role_assignments
+		WHERE user_id = (
+			SELECT u.id
+			FROM useraccess.users AS u
+			JOIN org.org_membership AS m ON m.user_id = u.id
+			JOIN org.projects AS p ON p.org_id = m.org_id
+			WHERE u.external_id = @user_id
+				AND p.id = @project_id
+		)
+			AND role_id = (
+				SELECT r.id
+				FROM rbac.custom_roles AS r
+				JOIN org.projects AS p ON p.org_id = r.org_id
+				WHERE r.external_id = @role_id
+					AND p.id = @project_id
+			)
+			AND project_id = @project_id
+		RETURNING role_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func assignCustomRoleToOrgQuery(userID, roleID uuid.UUID, orgID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{
+		"user_id": userID,
+		"role_id": roleID,
+		"org_id":  orgID,
+	}
+	const sql = `
+		INSERT INTO rbac.org_role_assignments (user_id, role_id, org_id)
+		SELECT u.id, r.id, m.org_id
+		FROM useraccess.users AS u
+		JOIN org.org_membership AS m
+			ON m.user_id = u.id
+			AND m.org_id = @org_id
+		JOIN rbac.custom_roles AS r
+			ON r.org_id = m.org_id
+			AND r.external_id = @role_id
+		WHERE u.external_id = @user_id
+		RETURNING role_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func unassignCustomRoleFromOrgQuery(userID, roleID uuid.UUID, orgID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{
+		"user_id": userID,
+		"role_id": roleID,
+		"org_id":  orgID,
+	}
+	const sql = `
+		DELETE FROM rbac.org_role_assignments
+		WHERE user_id = (
+			SELECT u.id
+			FROM useraccess.users AS u
+			JOIN org.org_membership AS m
+				ON m.user_id = u.id
+				AND m.org_id = @org_id
+			WHERE u.external_id = @user_id
+		)
+			AND role_id = (
+				SELECT id
+				FROM rbac.custom_roles
+				WHERE external_id = @role_id
+					AND org_id = @org_id
+			)
+			AND org_id = @org_id
+		RETURNING role_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
 		},
 		Expect: pgdb.ExpectOne,
 	}
@@ -664,11 +807,10 @@ func unassignSystemRoleQuery(userID uuid.UUID, roleName string) pgdb.TypedQuery[
 }
 
 // projectPermissionsQuery resolves projectID's org and the distinct union of permissions userID
-// holds for it, across all three assignment scopes: project_role_assignments filtered by
-// projectID directly, org_role_assignments filtered by projectID's org, and
-// system_role_assignments, unconditionally. Anchoring on org.projects in a single round trip
-// means a nonexistent projectID yields zero rows rather than a permission set that only reflects
-// system-scope grants.
+// holds for it. Project- and org-scoped assignments contribute only while the user is a current
+// member of the project's organization; system-scoped assignments contribute unconditionally.
+// Anchoring on org.projects means a nonexistent projectID yields zero rows rather than a
+// permission set containing only system-scoped grants.
 func projectPermissionsQuery(userID, projectID int) pgdb.TypedQuery[ProjectPermissions] {
 	params := pgx.NamedArgs{"user_id": userID, "project_id": projectID}
 	const sql = `
@@ -679,6 +821,9 @@ func projectPermissionsQuery(userID, projectID int) pgdb.TypedQuery[ProjectPermi
 		LEFT JOIN LATERAL (
 			SELECT rp.permission_id
 			FROM rbac.project_role_assignments AS pra
+			JOIN org.org_membership AS m
+				ON m.user_id = pra.user_id
+				AND m.org_id = proj.org_id
 			JOIN rbac.custom_role_permissions AS rp ON rp.role_id = pra.role_id
 			WHERE pra.user_id = @user_id AND pra.project_id = proj.id
 
@@ -686,6 +831,9 @@ func projectPermissionsQuery(userID, projectID int) pgdb.TypedQuery[ProjectPermi
 
 			SELECT rp.permission_id
 			FROM rbac.org_role_assignments AS ora
+			JOIN org.org_membership AS m
+				ON m.user_id = ora.user_id
+				AND m.org_id = ora.org_id
 			JOIN rbac.custom_role_permissions AS rp ON rp.role_id = ora.role_id
 			WHERE ora.user_id = @user_id AND ora.org_id = proj.org_id
 
