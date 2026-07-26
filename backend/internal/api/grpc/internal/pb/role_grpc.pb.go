@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	RoleService_CreateRole_FullMethodName            = "/theapp.v1.RoleService/CreateRole"
+	RoleService_GetRole_FullMethodName               = "/theapp.v1.RoleService/GetRole"
 	RoleService_ListRoles_FullMethodName             = "/theapp.v1.RoleService/ListRoles"
 	RoleService_UpdateRole_FullMethodName            = "/theapp.v1.RoleService/UpdateRole"
 	RoleService_ModifyRolePermissions_FullMethodName = "/theapp.v1.RoleService/ModifyRolePermissions"
@@ -34,6 +35,8 @@ const (
 type RoleServiceClient interface {
 	// Creates a custom role.
 	CreateRole(ctx context.Context, in *CreateRoleRequest, opts ...grpc.CallOption) (*Role, error)
+	// Gets a custom role owned by the caller's organization.
+	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*Role, error)
 	// Lists custom roles owned by the caller's organization.
 	ListRoles(ctx context.Context, in *ListRolesRequest, opts ...grpc.CallOption) (*ListRolesResponse, error)
 	// Updates a custom role.
@@ -56,6 +59,16 @@ func (c *roleServiceClient) CreateRole(ctx context.Context, in *CreateRoleReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Role)
 	err := c.cc.Invoke(ctx, RoleService_CreateRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roleServiceClient) GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*Role, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Role)
+	err := c.cc.Invoke(ctx, RoleService_GetRole_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +123,8 @@ func (c *roleServiceClient) DeleteRole(ctx context.Context, in *DeleteRoleReques
 type RoleServiceServer interface {
 	// Creates a custom role.
 	CreateRole(context.Context, *CreateRoleRequest) (*Role, error)
+	// Gets a custom role owned by the caller's organization.
+	GetRole(context.Context, *GetRoleRequest) (*Role, error)
 	// Lists custom roles owned by the caller's organization.
 	ListRoles(context.Context, *ListRolesRequest) (*ListRolesResponse, error)
 	// Updates a custom role.
@@ -129,6 +144,9 @@ type UnimplementedRoleServiceServer struct{}
 
 func (UnimplementedRoleServiceServer) CreateRole(context.Context, *CreateRoleRequest) (*Role, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateRole not implemented")
+}
+func (UnimplementedRoleServiceServer) GetRole(context.Context, *GetRoleRequest) (*Role, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRole not implemented")
 }
 func (UnimplementedRoleServiceServer) ListRoles(context.Context, *ListRolesRequest) (*ListRolesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListRoles not implemented")
@@ -176,6 +194,24 @@ func _RoleService_CreateRole_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RoleServiceServer).CreateRole(ctx, req.(*CreateRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoleService_GetRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoleServiceServer).GetRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoleService_GetRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoleServiceServer).GetRole(ctx, req.(*GetRoleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -262,6 +298,10 @@ var RoleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateRole",
 			Handler:    _RoleService_CreateRole_Handler,
+		},
+		{
+			MethodName: "GetRole",
+			Handler:    _RoleService_GetRole_Handler,
 		},
 		{
 			MethodName: "ListRoles",

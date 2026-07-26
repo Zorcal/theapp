@@ -55,6 +55,23 @@ service RoleService {
     };
   }
 
+  // Gets a custom role owned by the caller's organization.
+  rpc GetRole(GetRoleRequest) returns (Role) {
+    option (google.api.http) = {
+      get: "/v1/roles/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the role's organization."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
   // Lists custom roles owned by the caller's organization.
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
     option (google.api.http) = {
@@ -151,6 +168,12 @@ message Role {
 message CreateRoleRequest {
   // The role to create.
   Role role = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for getting a custom role.
+message GetRoleRequest {
+  // ID of the role to get.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
 }
 
 // Request message for listing custom roles.

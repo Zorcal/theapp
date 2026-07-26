@@ -162,6 +162,52 @@ func (x *CreateRoleRequest) GetRole() *Role {
 	return nil
 }
 
+// Request message for getting a custom role.
+type GetRoleRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ID of the role to get.
+	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRoleRequest) Reset() {
+	*x = GetRoleRequest{}
+	mi := &file_role_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRoleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRoleRequest) ProtoMessage() {}
+
+func (x *GetRoleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRoleRequest.ProtoReflect.Descriptor instead.
+func (*GetRoleRequest) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetRoleRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 // Request message for listing custom roles.
 type ListRolesRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -175,7 +221,7 @@ type ListRolesRequest struct {
 
 func (x *ListRolesRequest) Reset() {
 	*x = ListRolesRequest{}
-	mi := &file_role_proto_msgTypes[2]
+	mi := &file_role_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +233,7 @@ func (x *ListRolesRequest) String() string {
 func (*ListRolesRequest) ProtoMessage() {}
 
 func (x *ListRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_role_proto_msgTypes[2]
+	mi := &file_role_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +246,7 @@ func (x *ListRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolesRequest.ProtoReflect.Descriptor instead.
 func (*ListRolesRequest) Descriptor() ([]byte, []int) {
-	return file_role_proto_rawDescGZIP(), []int{2}
+	return file_role_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListRolesRequest) GetPageSize() int32 {
@@ -232,7 +278,7 @@ type ListRolesResponse struct {
 
 func (x *ListRolesResponse) Reset() {
 	*x = ListRolesResponse{}
-	mi := &file_role_proto_msgTypes[3]
+	mi := &file_role_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -244,7 +290,7 @@ func (x *ListRolesResponse) String() string {
 func (*ListRolesResponse) ProtoMessage() {}
 
 func (x *ListRolesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_role_proto_msgTypes[3]
+	mi := &file_role_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -257,7 +303,7 @@ func (x *ListRolesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolesResponse.ProtoReflect.Descriptor instead.
 func (*ListRolesResponse) Descriptor() ([]byte, []int) {
-	return file_role_proto_rawDescGZIP(), []int{3}
+	return file_role_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ListRolesResponse) GetRoles() []*Role {
@@ -294,7 +340,7 @@ type UpdateRoleRequest struct {
 
 func (x *UpdateRoleRequest) Reset() {
 	*x = UpdateRoleRequest{}
-	mi := &file_role_proto_msgTypes[4]
+	mi := &file_role_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -306,7 +352,7 @@ func (x *UpdateRoleRequest) String() string {
 func (*UpdateRoleRequest) ProtoMessage() {}
 
 func (x *UpdateRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_role_proto_msgTypes[4]
+	mi := &file_role_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -319,7 +365,7 @@ func (x *UpdateRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRoleRequest) Descriptor() ([]byte, []int) {
-	return file_role_proto_rawDescGZIP(), []int{4}
+	return file_role_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdateRoleRequest) GetRole() *Role {
@@ -351,7 +397,7 @@ type ModifyRolePermissionsRequest struct {
 
 func (x *ModifyRolePermissionsRequest) Reset() {
 	*x = ModifyRolePermissionsRequest{}
-	mi := &file_role_proto_msgTypes[5]
+	mi := &file_role_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -363,7 +409,7 @@ func (x *ModifyRolePermissionsRequest) String() string {
 func (*ModifyRolePermissionsRequest) ProtoMessage() {}
 
 func (x *ModifyRolePermissionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_role_proto_msgTypes[5]
+	mi := &file_role_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -376,7 +422,7 @@ func (x *ModifyRolePermissionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModifyRolePermissionsRequest.ProtoReflect.Descriptor instead.
 func (*ModifyRolePermissionsRequest) Descriptor() ([]byte, []int) {
-	return file_role_proto_rawDescGZIP(), []int{5}
+	return file_role_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ModifyRolePermissionsRequest) GetId() string {
@@ -411,7 +457,7 @@ type DeleteRoleRequest struct {
 
 func (x *DeleteRoleRequest) Reset() {
 	*x = DeleteRoleRequest{}
-	mi := &file_role_proto_msgTypes[6]
+	mi := &file_role_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -423,7 +469,7 @@ func (x *DeleteRoleRequest) String() string {
 func (*DeleteRoleRequest) ProtoMessage() {}
 
 func (x *DeleteRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_role_proto_msgTypes[6]
+	mi := &file_role_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -436,7 +482,7 @@ func (x *DeleteRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRoleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRoleRequest) Descriptor() ([]byte, []int) {
-	return file_role_proto_rawDescGZIP(), []int{6}
+	return file_role_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeleteRoleRequest) GetId() string {
@@ -455,7 +501,7 @@ type DeleteRoleResponse struct {
 
 func (x *DeleteRoleResponse) Reset() {
 	*x = DeleteRoleResponse{}
-	mi := &file_role_proto_msgTypes[7]
+	mi := &file_role_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +513,7 @@ func (x *DeleteRoleResponse) String() string {
 func (*DeleteRoleResponse) ProtoMessage() {}
 
 func (x *DeleteRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_role_proto_msgTypes[7]
+	mi := &file_role_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +526,7 @@ func (x *DeleteRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRoleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteRoleResponse) Descriptor() ([]byte, []int) {
-	return file_role_proto_rawDescGZIP(), []int{7}
+	return file_role_proto_rawDescGZIP(), []int{8}
 }
 
 var File_role_proto protoreflect.FileDescriptor
@@ -499,7 +545,9 @@ const file_role_proto_rawDesc = "" +
 	"updateTime\x12\x1f\n" +
 	"\x04etag\x18\x06 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"=\n" +
 	"\x11CreateRoleRequest\x12(\n" +
-	"\x04role\x18\x01 \x01(\v2\x0f.theapp.v1.RoleB\x03\xe0A\x02R\x04role\"N\n" +
+	"\x04role\x18\x01 \x01(\v2\x0f.theapp.v1.RoleB\x03\xe0A\x02R\x04role\"-\n" +
+	"\x0eGetRoleRequest\x12\x1b\n" +
+	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\"N\n" +
 	"\x10ListRolesRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -519,12 +567,15 @@ const file_role_proto_rawDesc = "" +
 	"\x12remove_permissions\x18\x03 \x03(\tR\x11removePermissions\"0\n" +
 	"\x11DeleteRoleRequest\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\"\x14\n" +
-	"\x12DeleteRoleResponse2\xde\x06\n" +
+	"\x12DeleteRoleResponse2\xf4\a\n" +
 	"\vRoleService\x12\x97\x01\n" +
 	"\n" +
 	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"Z\x92ACrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/roles\x12\x9f\x01\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/roles\x12\x93\x01\n" +
+	"\aGetRole\x12\x19.theapp.v1.GetRoleRequest\x1a\x0f.theapp.v1.Role\"\\\x92ACrA\n" +
+	"?\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/roles/{id}\x12\x9f\x01\n" +
 	"\tListRoles\x12\x1b.theapp.v1.ListRolesRequest\x1a\x1c.theapp.v1.ListRolesResponse\"W\x92ACrA\n" +
 	"?\n" +
 	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\v\x12\t/v1/roles\x12\xa1\x01\n" +
@@ -561,38 +612,41 @@ func file_role_proto_rawDescGZIP() []byte {
 	return file_role_proto_rawDescData
 }
 
-var file_role_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_role_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_role_proto_goTypes = []any{
 	(*Role)(nil),                         // 0: theapp.v1.Role
 	(*CreateRoleRequest)(nil),            // 1: theapp.v1.CreateRoleRequest
-	(*ListRolesRequest)(nil),             // 2: theapp.v1.ListRolesRequest
-	(*ListRolesResponse)(nil),            // 3: theapp.v1.ListRolesResponse
-	(*UpdateRoleRequest)(nil),            // 4: theapp.v1.UpdateRoleRequest
-	(*ModifyRolePermissionsRequest)(nil), // 5: theapp.v1.ModifyRolePermissionsRequest
-	(*DeleteRoleRequest)(nil),            // 6: theapp.v1.DeleteRoleRequest
-	(*DeleteRoleResponse)(nil),           // 7: theapp.v1.DeleteRoleResponse
-	(*timestamppb.Timestamp)(nil),        // 8: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),        // 9: google.protobuf.FieldMask
+	(*GetRoleRequest)(nil),               // 2: theapp.v1.GetRoleRequest
+	(*ListRolesRequest)(nil),             // 3: theapp.v1.ListRolesRequest
+	(*ListRolesResponse)(nil),            // 4: theapp.v1.ListRolesResponse
+	(*UpdateRoleRequest)(nil),            // 5: theapp.v1.UpdateRoleRequest
+	(*ModifyRolePermissionsRequest)(nil), // 6: theapp.v1.ModifyRolePermissionsRequest
+	(*DeleteRoleRequest)(nil),            // 7: theapp.v1.DeleteRoleRequest
+	(*DeleteRoleResponse)(nil),           // 8: theapp.v1.DeleteRoleResponse
+	(*timestamppb.Timestamp)(nil),        // 9: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),        // 10: google.protobuf.FieldMask
 }
 var file_role_proto_depIdxs = []int32{
-	8,  // 0: theapp.v1.Role.create_time:type_name -> google.protobuf.Timestamp
-	8,  // 1: theapp.v1.Role.update_time:type_name -> google.protobuf.Timestamp
+	9,  // 0: theapp.v1.Role.create_time:type_name -> google.protobuf.Timestamp
+	9,  // 1: theapp.v1.Role.update_time:type_name -> google.protobuf.Timestamp
 	0,  // 2: theapp.v1.CreateRoleRequest.role:type_name -> theapp.v1.Role
 	0,  // 3: theapp.v1.ListRolesResponse.roles:type_name -> theapp.v1.Role
 	0,  // 4: theapp.v1.UpdateRoleRequest.role:type_name -> theapp.v1.Role
-	9,  // 5: theapp.v1.UpdateRoleRequest.update_mask:type_name -> google.protobuf.FieldMask
+	10, // 5: theapp.v1.UpdateRoleRequest.update_mask:type_name -> google.protobuf.FieldMask
 	1,  // 6: theapp.v1.RoleService.CreateRole:input_type -> theapp.v1.CreateRoleRequest
-	2,  // 7: theapp.v1.RoleService.ListRoles:input_type -> theapp.v1.ListRolesRequest
-	4,  // 8: theapp.v1.RoleService.UpdateRole:input_type -> theapp.v1.UpdateRoleRequest
-	5,  // 9: theapp.v1.RoleService.ModifyRolePermissions:input_type -> theapp.v1.ModifyRolePermissionsRequest
-	6,  // 10: theapp.v1.RoleService.DeleteRole:input_type -> theapp.v1.DeleteRoleRequest
-	0,  // 11: theapp.v1.RoleService.CreateRole:output_type -> theapp.v1.Role
-	3,  // 12: theapp.v1.RoleService.ListRoles:output_type -> theapp.v1.ListRolesResponse
-	0,  // 13: theapp.v1.RoleService.UpdateRole:output_type -> theapp.v1.Role
-	0,  // 14: theapp.v1.RoleService.ModifyRolePermissions:output_type -> theapp.v1.Role
-	7,  // 15: theapp.v1.RoleService.DeleteRole:output_type -> theapp.v1.DeleteRoleResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
+	2,  // 7: theapp.v1.RoleService.GetRole:input_type -> theapp.v1.GetRoleRequest
+	3,  // 8: theapp.v1.RoleService.ListRoles:input_type -> theapp.v1.ListRolesRequest
+	5,  // 9: theapp.v1.RoleService.UpdateRole:input_type -> theapp.v1.UpdateRoleRequest
+	6,  // 10: theapp.v1.RoleService.ModifyRolePermissions:input_type -> theapp.v1.ModifyRolePermissionsRequest
+	7,  // 11: theapp.v1.RoleService.DeleteRole:input_type -> theapp.v1.DeleteRoleRequest
+	0,  // 12: theapp.v1.RoleService.CreateRole:output_type -> theapp.v1.Role
+	0,  // 13: theapp.v1.RoleService.GetRole:output_type -> theapp.v1.Role
+	4,  // 14: theapp.v1.RoleService.ListRoles:output_type -> theapp.v1.ListRolesResponse
+	0,  // 15: theapp.v1.RoleService.UpdateRole:output_type -> theapp.v1.Role
+	0,  // 16: theapp.v1.RoleService.ModifyRolePermissions:output_type -> theapp.v1.Role
+	8,  // 17: theapp.v1.RoleService.DeleteRole:output_type -> theapp.v1.DeleteRoleResponse
+	12, // [12:18] is the sub-list for method output_type
+	6,  // [6:12] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -609,7 +663,7 @@ func file_role_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_role_proto_rawDesc), len(file_role_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

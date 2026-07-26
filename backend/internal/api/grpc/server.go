@@ -73,6 +73,7 @@ var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.SystemRoleService/ListSystemRoleAssignments": {mdl.PermissionSystemRoleRead},
 
 	"/theapp.v1.RoleService/CreateRole":            {mdl.PermissionCustomRoleCreate},
+	"/theapp.v1.RoleService/GetRole":               {mdl.PermissionCustomRoleRead},
 	"/theapp.v1.RoleService/ListRoles":             {mdl.PermissionCustomRoleRead},
 	"/theapp.v1.RoleService/UpdateRole":            {mdl.PermissionCustomRoleUpdate},
 	"/theapp.v1.RoleService/ModifyRolePermissions": {mdl.PermissionCustomRoleUpdate},

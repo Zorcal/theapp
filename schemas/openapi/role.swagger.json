@@ -103,6 +103,43 @@
       }
     },
     "/v1/roles/{id}": {
+      "get": {
+        "summary": "Gets a custom role owned by the caller's organization.",
+        "operationId": "RoleService_GetRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "ID of the role to get.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      },
       "delete": {
         "summary": "Deletes a custom role.",
         "operationId": "RoleService_DeleteRole",
