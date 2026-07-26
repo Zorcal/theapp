@@ -200,7 +200,7 @@ func TestSystemRoleService_ListSystemRoles_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "invalid page token",
+			name:           "validated request",
 			systemRoleCore: &MockedSystemRoleCore{},
 			in:             &pb.ListSystemRolesRequest{PageToken: "not-a-token"},
 			want:           status.New(codes.InvalidArgument, "invalid page_token"),
@@ -266,19 +266,11 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "invalid user id",
+			name:           "validated request",
 			systemRoleCore: &MockedSystemRoleCore{},
 			in:             &pb.AssignSystemRoleRequest{UserId: "not-a-uuid", RoleName: "whatever"},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "user_id", Description: "must be a valid UUID"},
-			})),
-		},
-		{
-			name:           "role name required",
-			systemRoleCore: &MockedSystemRoleCore{},
-			in:             &pb.AssignSystemRoleRequest{UserId: uuid.NewString()},
-			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-				{Field: "role_name", Description: "required"},
 			})),
 		},
 		{
@@ -368,8 +360,17 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 	tests := []struct {
 		name           string
 		systemRoleCore SystemRoleCore
+		in             *pb.UnassignSystemRoleRequest
 		want           *status.Status
 	}{
+		{
+			name:           "validated request",
+			systemRoleCore: &MockedSystemRoleCore{},
+			in:             &pb.UnassignSystemRoleRequest{UserId: "not-a-uuid", RoleName: "whatever"},
+			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "user_id", Description: "must be a valid UUID"},
+			})),
+		},
 		{
 			name: "not found",
 			systemRoleCore: &MockedSystemRoleCore{
@@ -377,6 +378,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return mdl.ErrNotFound
 				},
 			},
+			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
 			want: status.New(codes.NotFound, "system role assignment not found"),
 		},
 		{
@@ -386,6 +388,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return mdl.ErrPermissionDenied
 				},
 			},
+			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
 			want: status.New(codes.PermissionDenied, codes.PermissionDenied.String()),
 		},
 		{
@@ -395,6 +398,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return mdl.ErrLastRoleManager
 				},
 			},
+			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
 			want: status.New(codes.FailedPrecondition, "cannot remove the last system role manager"),
 		},
 		{
@@ -404,6 +408,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return errors.New("boom")
 				},
 			},
+			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}
@@ -416,7 +421,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 
 			_, err := srvTest.systemRoleServiceClient.UnassignSystemRole(
 				authCtxForTestUser(t, t.Context()),
-				&pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+				tt.in,
 			)
 			if err == nil {
 				t.Fatal("UnassignSystemRole() error = nil, want error")
@@ -470,18 +475,12 @@ func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "invalid user id",
+			name:           "validated request",
 			systemRoleCore: &MockedSystemRoleCore{},
 			in:             &pb.ListSystemRoleAssignmentsRequest{UserId: "not-a-uuid"},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "user_id", Description: "must be a valid UUID"},
 			})),
-		},
-		{
-			name:           "invalid page token",
-			systemRoleCore: &MockedSystemRoleCore{},
-			in:             &pb.ListSystemRoleAssignmentsRequest{UserId: uuid.NewString(), PageToken: "not-a-token"},
-			want:           status.New(codes.InvalidArgument, "invalid page_token"),
 		},
 		{
 			name: "user not found",

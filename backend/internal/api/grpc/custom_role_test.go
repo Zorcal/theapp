@@ -230,31 +230,10 @@ func TestRoleService_CreateRole_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "missing role field",
+			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
 			in:             &pb.CreateRoleRequest{},
 			want:           invalidArgWithViolation("role", "required"),
-		},
-		{
-			name:           "whitespace-only name",
-			customRoleCore: &MockedCustomRoleCore{},
-			in:             &pb.CreateRoleRequest{Role: &pb.Role{Name: " \t"}},
-			want:           invalidArgWithViolation("role.name", "required"),
-		},
-		{
-			name:           "surrounding whitespace",
-			customRoleCore: &MockedCustomRoleCore{},
-			in:             &pb.CreateRoleRequest{Role: &pb.Role{Name: " role manager "}},
-			want:           invalidArgWithViolation("role.name", "must not have leading or trailing whitespace"),
-		},
-		{
-			name:           "system-only permission",
-			customRoleCore: &MockedCustomRoleCore{},
-			in: &pb.CreateRoleRequest{Role: &pb.Role{
-				Name:        "role manager",
-				Permissions: []string{string(mdl.PermissionUserRead)},
-			}},
-			want: invalidArgWithViolation("role.permissions[0]", `"user:read" is system-only`),
 		},
 		{
 			name: "already exists",
@@ -380,7 +359,7 @@ func TestRoleService_GetRole_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "invalid id",
+			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
 			in:             &pb.GetRoleRequest{Id: "bad"},
 			want:           invalidArgWithViolation("id", "must be a valid UUID"),
@@ -599,7 +578,7 @@ func TestRoleService_ListRoles_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "invalid page token",
+			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
 			in:             &pb.ListRolesRequest{PageToken: "bad"},
 			want:           status.New(codes.InvalidArgument, "invalid page_token"),
@@ -701,61 +680,10 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "missing role field",
+			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
 			in:             &pb.UpdateRoleRequest{},
 			want:           invalidArgWithViolation("role", "required"),
-		},
-		{
-			name:           "invalid id",
-			customRoleCore: &MockedCustomRoleCore{},
-			in:             &pb.UpdateRoleRequest{Role: &pb.Role{Id: "bad"}},
-			want:           invalidArgWithViolation("role.id", "must be a valid UUID"),
-		},
-		{
-			name:           "no mask",
-			customRoleCore: &MockedCustomRoleCore{},
-			in:             &pb.UpdateRoleRequest{Role: &pb.Role{Id: roleID.String()}},
-			want:           status.New(codes.InvalidArgument, "update_mask is required"),
-		},
-		{
-			name:           "unknown mask field",
-			customRoleCore: &MockedCustomRoleCore{},
-			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID.String()},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"etag"}},
-			},
-			want: invalidArgWithViolation("update_mask", `field "etag" is not updatable`),
-		},
-		{
-			name:           "whitespace-only name",
-			customRoleCore: &MockedCustomRoleCore{},
-			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID.String(), Name: " \t"},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
-			},
-			want: invalidArgWithViolation("role.name", "required"),
-		},
-		{
-			name:           "surrounding whitespace",
-			customRoleCore: &MockedCustomRoleCore{},
-			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID.String(), Name: " updated role"},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
-			},
-			want: invalidArgWithViolation("role.name", "must not have leading or trailing whitespace"),
-		},
-		{
-			name:           "system-only permission",
-			customRoleCore: &MockedCustomRoleCore{},
-			in: &pb.UpdateRoleRequest{
-				Role: &pb.Role{
-					Id:          roleID.String(),
-					Permissions: []string{string(mdl.PermissionSystemRoleRead)},
-				},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"permissions"}},
-			},
-			want: invalidArgWithViolation("role.permissions[0]", `"system-role:read" is system-only`),
 		},
 		{
 			name: "role not found",
@@ -896,38 +824,10 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "invalid id",
+			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
 			in:             &pb.ModifyRolePermissionsRequest{Id: "bad"},
 			want:           invalidArgWithViolation("id", "must be a valid UUID"),
-		},
-		{
-			name:           "system-only permission",
-			customRoleCore: &MockedCustomRoleCore{},
-			in: &pb.ModifyRolePermissionsRequest{
-				Id:             roleID.String(),
-				AddPermissions: []string{string(mdl.PermissionUserRead)},
-			},
-			want: invalidArgWithViolation("add_permissions[0]", `"user:read" is system-only`),
-		},
-		{
-			name:           "system-only permission removal",
-			customRoleCore: &MockedCustomRoleCore{},
-			in: &pb.ModifyRolePermissionsRequest{
-				Id:                roleID.String(),
-				RemovePermissions: []string{string(mdl.PermissionUserRead)},
-			},
-			want: invalidArgWithViolation("remove_permissions[0]", `"user:read" is system-only`),
-		},
-		{
-			name:           "overlapping permission",
-			customRoleCore: &MockedCustomRoleCore{},
-			in: &pb.ModifyRolePermissionsRequest{
-				Id:                roleID.String(),
-				AddPermissions:    []string{string(mdl.PermissionCustomRoleRead)},
-				RemovePermissions: []string{string(mdl.PermissionCustomRoleRead)},
-			},
-			want: invalidArgWithViolation("add_permissions[0]", "must not also appear in remove_permissions"),
 		},
 		{
 			name: "missing role",
@@ -1028,7 +928,7 @@ func TestRoleService_DeleteRole_error(t *testing.T) {
 		want           *status.Status
 	}{
 		{
-			name:           "invalid id",
+			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
 			in:             &pb.DeleteRoleRequest{Id: "bad"},
 			want:           invalidArgWithViolation("id", "must be a valid UUID"),

@@ -78,7 +78,7 @@ func TestUserService_GetUser_error(t *testing.T) {
 		want     *status.Status
 	}{
 		{
-			name:     "invalid id",
+			name:     "validated request",
 			userCore: &MockedUserCore{},
 			in:       &pb.GetUserRequest{Id: "not-a-uuid"},
 			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
@@ -203,28 +203,10 @@ func TestUserService_CreateUser_error(t *testing.T) {
 		want     *status.Status
 	}{
 		{
-			name:     "missing user field",
+			name:     "validated request",
 			userCore: &MockedUserCore{},
 			in:       &pb.CreateUserRequest{},
 			want:     invalidArgWithViolation("user", "required"),
-		},
-		{
-			name:     "empty email",
-			userCore: &MockedUserCore{},
-			in:       &pb.CreateUserRequest{User: &pb.User{Name: "Alice Smith"}},
-			want:     invalidArgWithViolation("user.email", "required"),
-		},
-		{
-			name:     "invalid email format",
-			userCore: &MockedUserCore{},
-			in:       &pb.CreateUserRequest{User: &pb.User{Email: "not-an-email", Name: "Alice Smith"}},
-			want:     invalidArgWithViolation("user.email", "must be a valid email address"),
-		},
-		{
-			name:     "empty name",
-			userCore: &MockedUserCore{},
-			in:       &pb.CreateUserRequest{User: &pb.User{Email: "alice@test.com"}},
-			want:     invalidArgWithViolation("user.name", "required"),
 		},
 		{
 			name: "duplicate email",
@@ -340,49 +322,10 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 		want     *status.Status
 	}{
 		{
-			name:     "missing user field",
+			name:     "validated request",
 			userCore: &MockedUserCore{},
 			in:       &pb.UpdateUserRequest{},
 			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
-		},
-		{
-			name:     "invalid id",
-			userCore: &MockedUserCore{},
-			in: &pb.UpdateUserRequest{User: &pb.User{
-				Id:   "not-a-uuid",
-				Name: "Alice Updated",
-			}},
-			want: status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
-		},
-		{
-			name:     "no mask",
-			userCore: &MockedUserCore{},
-			in: &pb.UpdateUserRequest{User: &pb.User{
-				Id:   uuid.NewString(),
-				Name: "Alice Updated",
-			}},
-			want: status.New(codes.InvalidArgument, "update_mask is required"),
-		},
-		{
-			name:     "mask has name but name is empty",
-			userCore: &MockedUserCore{},
-			in: &pb.UpdateUserRequest{
-				User:       &pb.User{Id: uuid.NewString()},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
-			},
-			want: status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
-		},
-		{
-			name:     "non-updatable field in update_mask",
-			userCore: &MockedUserCore{},
-			in: &pb.UpdateUserRequest{
-				User: &pb.User{
-					Id:   uuid.NewString(),
-					Name: "Alice Updated",
-				},
-				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"email"}},
-			},
-			want: status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
 		},
 		{
 			name: "not found",
@@ -648,28 +591,10 @@ func TestUserService_ListUsers_error(t *testing.T) {
 		want     *status.Status
 	}{
 		{
-			name:     "invalid page_token",
+			name:     "validated request",
 			userCore: &MockedUserCore{},
 			in:       &pb.ListUsersRequest{PageToken: "!!!not-base64!!!"},
 			want:     status.New(codes.InvalidArgument, "invalid page_token"),
-		},
-		{
-			name:     "unknown order_by field",
-			userCore: &MockedUserCore{},
-			in:       &pb.ListUsersRequest{OrderBy: "nope"},
-			want:     status.New(codes.InvalidArgument, "invalid order_by"),
-		},
-		{
-			name:     "order_by mismatch with page_token",
-			userCore: &MockedUserCore{},
-			in:       &pb.ListUsersRequest{PageToken: "eyJvIjoyfQ==", OrderBy: "email"},
-			want:     status.New(codes.InvalidArgument, "page_token order_by mismatch"),
-		},
-		{
-			name:     "filter mismatch with page_token",
-			userCore: &MockedUserCore{},
-			in:       &pb.ListUsersRequest{PageToken: "eyJvIjoyfQ==", Filter: &pb.UserFilter{Email: "x"}},
-			want:     status.New(codes.InvalidArgument, "page_token filter mismatch"),
 		},
 		{
 			name: "core error",

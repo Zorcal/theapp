@@ -7,6 +7,7 @@ gRPC transport layer. Handlers receive protobuf requests, delegate to core inter
 - `server.go` — server construction and interceptor wiring.
 - `<service>.go` (e.g. `user.go`) — one file per gRPC service. Defines the handler struct, the core interface(s) it depends on, and all RPC method implementations for that service.
 - `internal/conv/` — all conversions between `pb` and `mdl` types.
+- `internal/validate/` — request validation for every RPC.
 - `internal/pb/` — generated protobuf code, do not edit by hand.
 - `gateway/` — HTTP/JSON reverse proxy (grpc-gateway) and OpenAPI spec endpoint.
 
@@ -49,7 +50,11 @@ One test file per service (`auth_test.go`, `user_test.go`, …). When a test exe
 
 ## Validation
 
-Validate request payloads at the handler level before calling into the core. Return `codes.InvalidArgument` with `errdetails.BadRequest` field violations so callers get actionable field-level feedback.
+Every RPC has a corresponding function in `internal/validate`. The handler calls it before reading request fields or delegating to the core. Validators reject nil requests and own all checks on client input, including required fields, UUID syntax, update masks, and pagination tokens. Field violations use protobuf payload paths such as `role` and `user.id`; `request` is reserved for request messages that have no required payload field. Return `codes.InvalidArgument` with `errdetails.BadRequest` field violations so callers get actionable field-level feedback.
+
+Handlers may rely on the validated invariants. In particular, a UUID checked by the corresponding validator can be converted with `uuid.MustParse`; a panic would indicate that the handler and validator have drifted apart.
+
+Validator tests exhaustively cover valid, nil, and invalid requests. Handler tests keep one `validated request` case per RPC to prove that the validation boundary is invoked, while the remaining handler error cases cover core error mappings and transport behavior.
 
 This is UX, not the enforcement boundary — the core enforces validation itself and returns `mdl.ErrValidation` (see `core/README.md`). The duplication is deliberate: handler-level checks can reference proto field names (`user.email`) and messages tailored to the API, which the core can't express without knowing about its callers. Relying on the core alone would also mean maintaining a mapping from field violations back to proto field names for every input type.
 

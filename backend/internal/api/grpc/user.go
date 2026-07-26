@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/validate"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/data/order"
 	"github.com/zorcal/theapp/backend/pkg/mustconv"
@@ -43,12 +43,11 @@ type UserCore interface {
 }
 
 func (s *userService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
-	id, err := uuid.Parse(req.GetId())
-	if err != nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "id", Description: "must be a valid UUID"},
-		})
+	if err := validate.GetUser(req); err != nil {
+		return nil, fmt.Errorf("validate get user request: %w", err)
 	}
+
+	id := uuid.MustParse(req.GetId())
 
 	usr, err := s.userCore.UserByID(ctx, id)
 	if err != nil {
@@ -62,7 +61,7 @@ func (s *userService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 }
 
 func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.User, error) {
-	if err := validateCreateUserRequest(req); err != nil {
+	if err := validate.CreateUser(req); err != nil {
 		return nil, fmt.Errorf("validate create user request: %w", err)
 	}
 
@@ -82,7 +81,7 @@ func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 }
 
 func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.User, error) {
-	if err := validateUpdateUserRequest(req); err != nil {
+	if err := validate.UpdateUser(req); err != nil {
 		return nil, fmt.Errorf("validate update user request: %w", err)
 	}
 
@@ -99,87 +98,11 @@ func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 	return conv.UserToPB(usr), nil
 }
 
-func validateUpdateUserRequest(req *pb.UpdateUserRequest) error {
-	if req.GetUser() == nil {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "user", Description: "required"},
-		})
-	}
-
-	if _, err := uuid.Parse(req.GetUser().GetId()); err != nil {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "user.id", Description: "must be a valid UUID"},
-		})
-	}
-
-	maskPaths := req.GetUpdateMask().GetPaths()
-
-	if len(maskPaths) == 0 {
-		return status.Error(codes.InvalidArgument, "update_mask is required")
-	}
-
-	var violations []*errdetails.BadRequest_FieldViolation
-
-	updatableFields := []string{"name"}
-	for _, path := range maskPaths {
-		if !slices.Contains(updatableFields, path) {
-			violations = append(violations, &errdetails.BadRequest_FieldViolation{
-				Field:       "update_mask",
-				Description: fmt.Sprintf("field %q is not updatable", path),
-			})
-		}
-	}
-
-	if slices.Contains(maskPaths, "name") && req.GetUser().GetName() == "" {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field:       "user.name",
-			Description: "required",
-		})
-	}
-
-	if len(violations) > 0 {
-		return invalidArgumentStatus(violations)
-	}
-	return nil
-}
-
-func validateCreateUserRequest(req *pb.CreateUserRequest) error {
-	var violations []*errdetails.BadRequest_FieldViolation
-
-	if req.GetUser() == nil {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field:       "user",
-			Description: "required",
-		})
-		return invalidArgumentStatus(violations)
-	}
-
-	if req.GetUser().GetEmail() == "" {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field:       "user.email",
-			Description: "required",
-		})
-	} else if !mdl.IsValidEmail(req.GetUser().GetEmail()) {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field:       "user.email",
-			Description: "must be a valid email address",
-		})
-	}
-
-	if req.GetUser().GetName() == "" {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field:       "user.name",
-			Description: "required",
-		})
-	}
-
-	if len(violations) > 0 {
-		return invalidArgumentStatus(violations)
-	}
-	return nil
-}
-
 func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
+	if err := validate.ListUsers(req); err != nil {
+		return nil, fmt.Errorf("validate list users request: %w", err)
+	}
+
 	pageSize := int(req.GetPageSize())
 	if pageSize <= 0 || pageSize > 100 {
 		pageSize = 50 // sensible default/cap

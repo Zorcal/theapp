@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
-	"strings"
 
 	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -15,6 +13,7 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/validate"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/pkg/mustconv"
 )
@@ -52,7 +51,7 @@ type CustomRoleCore interface {
 }
 
 func (s *customRoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb.Role, error) {
-	if err := validateCreateRoleRequest(req); err != nil {
+	if err := validate.CreateRole(req); err != nil {
 		return nil, fmt.Errorf("validate create role request: %w", err)
 	}
 
@@ -76,12 +75,11 @@ func (s *customRoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRe
 }
 
 func (s *customRoleService) GetRole(ctx context.Context, req *pb.GetRoleRequest) (*pb.Role, error) {
-	roleID, err := uuid.Parse(req.GetId())
-	if err != nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "id", Description: "must be a valid UUID"},
-		})
+	if err := validate.GetRole(req); err != nil {
+		return nil, fmt.Errorf("validate get role request: %w", err)
 	}
+
+	roleID := uuid.MustParse(req.GetId())
 
 	role, err := s.customRoleCore.CustomRoleByID(ctx, roleID)
 	if err != nil {
@@ -95,6 +93,10 @@ func (s *customRoleService) GetRole(ctx context.Context, req *pb.GetRoleRequest)
 }
 
 func (s *customRoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequest) (*pb.ListRolesResponse, error) {
+	if err := validate.ListRoles(req); err != nil {
+		return nil, fmt.Errorf("validate list roles request: %w", err)
+	}
+
 	pageSize := int(req.GetPageSize())
 	if pageSize <= 0 || pageSize > 100 {
 		pageSize = 50
@@ -127,7 +129,7 @@ func (s *customRoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequ
 }
 
 func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb.Role, error) {
-	if err := validateUpdateRoleRequest(req); err != nil {
+	if err := validate.UpdateRole(req); err != nil {
 		return nil, fmt.Errorf("validate update role request: %w", err)
 	}
 
@@ -153,7 +155,7 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 }
 
 func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.ModifyRolePermissionsRequest) (*pb.Role, error) {
-	if err := validateModifyRolePermissionsRequest(req); err != nil {
+	if err := validate.ModifyRolePermissions(req); err != nil {
 		return nil, fmt.Errorf("validate modify role permissions request: %w", err)
 	}
 
@@ -175,12 +177,11 @@ func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.M
 }
 
 func (s *customRoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
-	roleID, err := uuid.Parse(req.GetId())
-	if err != nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "id", Description: "must be a valid UUID"},
-		})
+	if err := validate.DeleteRole(req); err != nil {
+		return nil, fmt.Errorf("validate delete role request: %w", err)
 	}
+
+	roleID := uuid.MustParse(req.GetId())
 
 	if err := s.customRoleCore.DeleteCustomRole(ctx, roleID); err != nil {
 		if errors.Is(err, mdl.ErrNotFound) {
@@ -190,135 +191,4 @@ func (s *customRoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRe
 	}
 
 	return &pb.DeleteRoleResponse{}, nil
-}
-
-func validateCreateRoleRequest(req *pb.CreateRoleRequest) error {
-	if req.GetRole() == nil {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "role", Description: "required"},
-		})
-	}
-
-	var violations []*errdetails.BadRequest_FieldViolation
-
-	name := req.GetRole().GetName()
-	trimmedName := strings.TrimSpace(name)
-	switch {
-	case trimmedName == "":
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "role.name", Description: "required",
-		})
-	case trimmedName != name:
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "role.name", Description: "must not have leading or trailing whitespace",
-		})
-	}
-
-	violations = append(violations, systemOnlyPermViolations(req.GetRole().GetPermissions(), "role.permissions")...)
-
-	if len(violations) > 0 {
-		return invalidArgumentStatus(violations)
-	}
-
-	return nil
-}
-
-func validateUpdateRoleRequest(req *pb.UpdateRoleRequest) error {
-	if req.GetRole() == nil {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "role", Description: "required"},
-		})
-	}
-
-	if _, err := uuid.Parse(req.GetRole().GetId()); err != nil {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "role.id", Description: "must be a valid UUID"},
-		})
-	}
-
-	maskPaths := req.GetUpdateMask().GetPaths()
-	if len(maskPaths) == 0 {
-		return status.Error(codes.InvalidArgument, "update_mask is required")
-	}
-
-	updatableFields := []string{"name", "permissions"}
-
-	var violations []*errdetails.BadRequest_FieldViolation
-	for _, path := range maskPaths {
-		if !slices.Contains(updatableFields, path) {
-			violations = append(violations, &errdetails.BadRequest_FieldViolation{
-				Field:       "update_mask",
-				Description: fmt.Sprintf("field %q is not updatable", path),
-			})
-		}
-	}
-
-	if slices.Contains(maskPaths, "name") {
-		name := req.GetRole().GetName()
-		trimmedName := strings.TrimSpace(name)
-		switch {
-		case trimmedName == "":
-			violations = append(violations, &errdetails.BadRequest_FieldViolation{
-				Field: "role.name", Description: "required",
-			})
-		case trimmedName != name:
-			violations = append(violations, &errdetails.BadRequest_FieldViolation{
-				Field: "role.name", Description: "must not have leading or trailing whitespace",
-			})
-		}
-	}
-
-	if slices.Contains(maskPaths, "permissions") {
-		violations = append(violations, systemOnlyPermViolations(req.GetRole().GetPermissions(), "role.permissions")...)
-	}
-
-	if len(violations) > 0 {
-		return invalidArgumentStatus(violations)
-	}
-
-	return nil
-}
-
-func validateModifyRolePermissionsRequest(req *pb.ModifyRolePermissionsRequest) error {
-	if _, err := uuid.Parse(req.GetId()); err != nil {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "id", Description: "must be a valid UUID"},
-		})
-	}
-
-	var violations []*errdetails.BadRequest_FieldViolation
-
-	for i, permName := range req.GetAddPermissions() {
-		if slices.Contains(req.GetRemovePermissions(), permName) {
-			violations = append(violations, &errdetails.BadRequest_FieldViolation{
-				Field:       fmt.Sprintf("add_permissions[%d]", i),
-				Description: "must not also appear in remove_permissions",
-			})
-		}
-	}
-
-	violations = append(violations, systemOnlyPermViolations(req.GetAddPermissions(), "add_permissions")...)
-	violations = append(violations, systemOnlyPermViolations(req.GetRemovePermissions(), "remove_permissions")...)
-
-	if len(violations) > 0 {
-		return invalidArgumentStatus(violations)
-	}
-
-	return nil
-}
-
-func systemOnlyPermViolations(perms []string, field string) []*errdetails.BadRequest_FieldViolation {
-	systemOnlyPerms := mdl.SystemOnlyPermissions()
-
-	var violations []*errdetails.BadRequest_FieldViolation
-	for i, permName := range perms {
-		if slices.Contains(systemOnlyPerms, mdl.Permission(permName)) {
-			violations = append(violations, &errdetails.BadRequest_FieldViolation{
-				Field:       fmt.Sprintf("%s[%d]", field, i),
-				Description: fmt.Sprintf("%q is system-only", permName),
-			})
-		}
-	}
-
-	return violations
 }

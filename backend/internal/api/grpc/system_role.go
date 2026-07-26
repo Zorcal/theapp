@@ -6,13 +6,13 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/validate"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/pkg/mustconv"
 )
@@ -50,6 +50,10 @@ type SystemRoleOrganizationCore interface {
 }
 
 func (s *systemRoleService) ListSystemRoles(ctx context.Context, req *pb.ListSystemRolesRequest) (*pb.ListSystemRolesResponse, error) {
+	if err := validate.ListSystemRoles(req); err != nil {
+		return nil, fmt.Errorf("validate list system roles request: %w", err)
+	}
+
 	if err := s.authorizeProject(ctx); err != nil {
 		return nil, fmt.Errorf("authorize project: %w", err)
 	}
@@ -86,12 +90,12 @@ func (s *systemRoleService) ListSystemRoles(ctx context.Context, req *pb.ListSys
 }
 
 func (s *systemRoleService) AssignSystemRole(ctx context.Context, req *pb.AssignSystemRoleRequest) (*pb.AssignSystemRoleResponse, error) {
-	if err := s.authorizeProject(ctx); err != nil {
-		return nil, fmt.Errorf("authorize project: %w", err)
+	if err := validate.AssignSystemRole(req); err != nil {
+		return nil, fmt.Errorf("validate assign system role request: %w", err)
 	}
 
-	if err := validateAssignSystemRoleRequest(req); err != nil {
-		return nil, fmt.Errorf("validate assign system role request: %w", err)
+	if err := s.authorizeProject(ctx); err != nil {
+		return nil, fmt.Errorf("authorize project: %w", err)
 	}
 
 	userID := uuid.MustParse(req.GetUserId())
@@ -113,12 +117,12 @@ func (s *systemRoleService) AssignSystemRole(ctx context.Context, req *pb.Assign
 }
 
 func (s *systemRoleService) UnassignSystemRole(ctx context.Context, req *pb.UnassignSystemRoleRequest) (*pb.UnassignSystemRoleResponse, error) {
-	if err := s.authorizeProject(ctx); err != nil {
-		return nil, fmt.Errorf("authorize project: %w", err)
+	if err := validate.UnassignSystemRole(req); err != nil {
+		return nil, fmt.Errorf("validate unassign system role request: %w", err)
 	}
 
-	if err := validateUnassignSystemRoleRequest(req); err != nil {
-		return nil, fmt.Errorf("validate unassign system role request: %w", err)
+	if err := s.authorizeProject(ctx); err != nil {
+		return nil, fmt.Errorf("authorize project: %w", err)
 	}
 
 	userID := uuid.MustParse(req.GetUserId())
@@ -139,59 +143,16 @@ func (s *systemRoleService) UnassignSystemRole(ctx context.Context, req *pb.Unas
 	return &pb.UnassignSystemRoleResponse{}, nil
 }
 
-func validateAssignSystemRoleRequest(req *pb.AssignSystemRoleRequest) error {
-	var violations []*errdetails.BadRequest_FieldViolation
-	if req.GetRoleName() == "" {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "role_name", Description: "required",
-		})
-	}
-
-	if _, err := uuid.Parse(req.GetUserId()); err != nil {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "user_id", Description: "must be a valid UUID",
-		})
-	}
-
-	if len(violations) > 0 {
-		return invalidArgumentStatus(violations)
-	}
-
-	return nil
-}
-
-func validateUnassignSystemRoleRequest(req *pb.UnassignSystemRoleRequest) error {
-	var violations []*errdetails.BadRequest_FieldViolation
-	if req.GetRoleName() == "" {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "role_name", Description: "required",
-		})
-	}
-
-	if _, err := uuid.Parse(req.GetUserId()); err != nil {
-		violations = append(violations, &errdetails.BadRequest_FieldViolation{
-			Field: "user_id", Description: "must be a valid UUID",
-		})
-	}
-
-	if len(violations) > 0 {
-		return invalidArgumentStatus(violations)
-	}
-
-	return nil
-}
-
 func (s *systemRoleService) ListSystemRoleAssignments(ctx context.Context, req *pb.ListSystemRoleAssignmentsRequest) (*pb.ListSystemRoleAssignmentsResponse, error) {
+	if err := validate.ListSystemRoleAssignments(req); err != nil {
+		return nil, fmt.Errorf("validate list system role assignments request: %w", err)
+	}
+
 	if err := s.authorizeProject(ctx); err != nil {
 		return nil, fmt.Errorf("authorize project: %w", err)
 	}
 
-	userID, err := uuid.Parse(req.GetUserId())
-	if err != nil {
-		return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "user_id", Description: "must be a valid UUID"},
-		})
-	}
+	userID := uuid.MustParse(req.GetUserId())
 
 	pageSize := int(req.GetPageSize())
 	if pageSize <= 0 || pageSize > 100 {

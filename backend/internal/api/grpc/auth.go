@@ -6,13 +6,13 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/validate"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
@@ -58,7 +58,7 @@ type WorkflowAuthCore interface {
 }
 
 func (s *authService) RequestMagicLink(ctx context.Context, req *pb.RequestMagicLinkRequest) (*emptypb.Empty, error) {
-	if err := validateRequestMagicLinkRequest(req); err != nil {
+	if err := validate.RequestMagicLink(req); err != nil {
 		return nil, fmt.Errorf("validate request magic link request: %w", err)
 	}
 
@@ -70,7 +70,7 @@ func (s *authService) RequestMagicLink(ctx context.Context, req *pb.RequestMagic
 }
 
 func (s *authService) VerifyMagicLink(ctx context.Context, req *pb.VerifyMagicLinkRequest) (*pb.TokenPair, error) {
-	if err := validateVerifyMagicLinkRequest(req); err != nil {
+	if err := validate.VerifyMagicLink(req); err != nil {
 		return nil, fmt.Errorf("validate verify magic link request: %w", err)
 	}
 
@@ -86,7 +86,7 @@ func (s *authService) VerifyMagicLink(ctx context.Context, req *pb.VerifyMagicLi
 }
 
 func (s *authService) RefreshAccessToken(ctx context.Context, req *pb.RefreshAccessTokenRequest) (*pb.TokenPair, error) {
-	if err := validateRefreshAccessTokenRequest(req); err != nil {
+	if err := validate.RefreshAccessToken(req); err != nil {
 		return nil, fmt.Errorf("validate refresh access token request: %w", err)
 	}
 
@@ -102,7 +102,7 @@ func (s *authService) RefreshAccessToken(ctx context.Context, req *pb.RefreshAcc
 }
 
 func (s *authService) RevokeRefreshToken(ctx context.Context, req *pb.RevokeRefreshTokenRequest) (*emptypb.Empty, error) {
-	if err := validateRevokeRefreshTokenRequest(req); err != nil {
+	if err := validate.RevokeRefreshToken(req); err != nil {
 		return nil, fmt.Errorf("validate revoke refresh token request: %w", err)
 	}
 
@@ -116,52 +116,11 @@ func (s *authService) RevokeRefreshToken(ctx context.Context, req *pb.RevokeRefr
 	return &emptypb.Empty{}, nil
 }
 
-func validateRequestMagicLinkRequest(req *pb.RequestMagicLinkRequest) error {
-	if req.GetEmail() == "" {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "email", Description: "required"},
-		})
-	}
-	if !mdl.IsValidEmail(req.GetEmail()) {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "email", Description: "invalid format"},
-		})
+func (s *authService) RevokeAllSessions(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
+	if err := validate.RevokeAllSessions(req); err != nil {
+		return nil, fmt.Errorf("validate revoke all sessions request: %w", err)
 	}
 
-	return nil
-}
-
-func validateVerifyMagicLinkRequest(req *pb.VerifyMagicLinkRequest) error {
-	if req.GetToken() == "" {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "token", Description: "required"},
-		})
-	}
-
-	return nil
-}
-
-func validateRefreshAccessTokenRequest(req *pb.RefreshAccessTokenRequest) error {
-	if req.GetRefreshToken() == "" {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "refresh_token", Description: "required"},
-		})
-	}
-
-	return nil
-}
-
-func validateRevokeRefreshTokenRequest(req *pb.RevokeRefreshTokenRequest) error {
-	if req.GetRefreshToken() == "" {
-		return invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
-			{Field: "refresh_token", Description: "required"},
-		})
-	}
-
-	return nil
-}
-
-func (s *authService) RevokeAllSessions(ctx context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "unauthenticated")

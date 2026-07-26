@@ -147,15 +147,9 @@ func TestAuthService_RequestMagicLink_error(t *testing.T) {
 		want             *status.Status
 	}{
 		{
-			name:             "empty email",
+			name:             "validated request",
 			workflowAuthCore: &MockedWorkflowAuthCore{},
 			in:               &pb.RequestMagicLinkRequest{},
-			want:             status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
-		},
-		{
-			name:             "malformed email",
-			workflowAuthCore: &MockedWorkflowAuthCore{},
-			in:               &pb.RequestMagicLinkRequest{Email: "notanemail"},
 			want:             status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
 		},
 		{
@@ -244,7 +238,7 @@ func TestAuthService_VerifyMagicLink_error(t *testing.T) {
 		want     *status.Status
 	}{
 		{
-			name:     "empty token",
+			name:     "validated request",
 			authCore: &MockedAuthCore{},
 			in:       &pb.VerifyMagicLinkRequest{},
 			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
@@ -345,7 +339,7 @@ func TestAuthService_RefreshAccessToken_error(t *testing.T) {
 		want     *status.Status
 	}{
 		{
-			name:     "empty refresh token",
+			name:     "validated request",
 			authCore: &MockedAuthCore{},
 			in:       &pb.RefreshAccessTokenRequest{},
 			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
@@ -513,7 +507,7 @@ func TestAuthService_RevokeRefreshToken_error(t *testing.T) {
 		want     *status.Status
 	}{
 		{
-			name:     "empty refresh token",
+			name:     "validated request",
 			authCore: &MockedAuthCore{},
 			in:       &pb.RevokeRefreshTokenRequest{},
 			want:     status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
