@@ -47,6 +47,10 @@ This keeps every function's error handling shape the same regardless of whether 
 
 Order functions by importance: exported and primary functions first, helpers at the bottom. Group functions by relevance.
 
+Keep function and method signatures and calls on one line when they fit comfortably. Split them
+across lines only when the single line would become extremely long; do not default to placing each
+argument or parameter on its own line.
+
 ## Imports
 
 Avoid import aliases. Only alias an import when two imported packages would otherwise have the same name and both are used in the same file.

@@ -42,6 +42,25 @@ type RoleStorer interface {
 	CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, error)
 	// CustomRoleCount returns the number of custom roles owned by an organization.
 	CustomRoleCount(ctx context.Context, orgID int) (int, error)
+	// AssignCustomRoleToProject grants an organization member an organization-owned role in a
+	// project.
+	// Returns [sql.ErrNoRows] if the user, role, project, or membership does not exist, or the role
+	// and project belong to different organizations.
+	// Returns [pgdb.ErrAlreadyExists] if the assignment already exists.
+	AssignCustomRoleToProject(ctx context.Context, userID, roleID uuid.UUID, projectID int) error
+	// UnassignCustomRoleFromProject revokes an organization member's role assignment in a project.
+	// Returns [sql.ErrNoRows] if the membership or assignment does not exist, or the role and
+	// project belong to different organizations.
+	UnassignCustomRoleFromProject(ctx context.Context, userID, roleID uuid.UUID, projectID int) error
+	// AssignCustomRoleToOrg grants an organization member an organization-owned role at org scope.
+	// Returns [sql.ErrNoRows] if the user, role, organization, or membership does not exist, or the
+	// role belongs to a different organization.
+	// Returns [pgdb.ErrAlreadyExists] if the assignment already exists.
+	AssignCustomRoleToOrg(ctx context.Context, userID, roleID uuid.UUID, orgID int) error
+	// UnassignCustomRoleFromOrg revokes an organization member's role assignment at org scope.
+	// Returns [sql.ErrNoRows] if the membership or assignment does not exist, or the role belongs to
+	// a different organization.
+	UnassignCustomRoleFromOrg(ctx context.Context, userID, roleID uuid.UUID, orgID int) error
 	// LockSystemRoleManagement serializes system-role revokes that could remove management access.
 	LockSystemRoleManagement(ctx context.Context) error
 	// LockSystemRoleUser acquires a transaction-level lock that serializes system-role assignment
@@ -280,6 +299,84 @@ func (c *Core) DeleteCustomRole(ctx context.Context, roleID uuid.UUID) error {
 			return fmt.Errorf("delete custom role: %w", mdl.ErrNotFound)
 		}
 		return fmt.Errorf("delete custom role: %w", err)
+	}
+
+	return nil
+}
+
+// AssignCustomRoleToProject grants targetUserID a custom role in the caller's project.
+// Returns [mdl.ErrNotFound] if the target user, role, project, or membership does not exist, or the
+// role belongs to a different organization.
+// Returns [mdl.ErrAlreadyExists] if the assignment already exists.
+func (c *Core) AssignCustomRoleToProject(ctx context.Context, targetUserID, roleID uuid.UUID) error {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return errors.New("auth session missing")
+	}
+	if sess.ProjectID == nil {
+		return errors.New("project context missing")
+	}
+
+	if err := c.roleStorer.AssignCustomRoleToProject(ctx, targetUserID, roleID, *sess.ProjectID); err != nil {
+		return fmt.Errorf("assign custom role to project: %w", handleAssignmentError(err))
+	}
+
+	return nil
+}
+
+// UnassignCustomRoleFromProject revokes targetUserID's custom role in the caller's project.
+// Returns [mdl.ErrNotFound] if the membership or assignment does not exist, or the role belongs to
+// a different organization.
+func (c *Core) UnassignCustomRoleFromProject(ctx context.Context, targetUserID, roleID uuid.UUID) error {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return errors.New("auth session missing")
+	}
+	if sess.ProjectID == nil {
+		return errors.New("project context missing")
+	}
+
+	if err := c.roleStorer.UnassignCustomRoleFromProject(ctx, targetUserID, roleID, *sess.ProjectID); err != nil {
+		return fmt.Errorf("unassign custom role from project: %w", handleAssignmentError(err))
+	}
+
+	return nil
+}
+
+// AssignCustomRoleToOrg grants targetUserID a custom role in the caller's organization.
+// Returns [mdl.ErrNotFound] if the target user, role, organization, or membership does not exist,
+// or the role belongs to a different organization.
+// Returns [mdl.ErrAlreadyExists] if the assignment already exists.
+func (c *Core) AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return errors.New("organization context missing")
+	}
+
+	if err := c.roleStorer.AssignCustomRoleToOrg(ctx, targetUserID, roleID, *sess.OrgID); err != nil {
+		return fmt.Errorf("assign custom role to org: %w", handleAssignmentError(err))
+	}
+
+	return nil
+}
+
+// UnassignCustomRoleFromOrg revokes targetUserID's custom role in the caller's organization.
+// Returns [mdl.ErrNotFound] if the membership or assignment does not exist, or the role belongs to
+// a different organization.
+func (c *Core) UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return errors.New("organization context missing")
+	}
+
+	if err := c.roleStorer.UnassignCustomRoleFromOrg(ctx, targetUserID, roleID, *sess.OrgID); err != nil {
+		return fmt.Errorf("unassign custom role from org: %w", handleAssignmentError(err))
 	}
 
 	return nil

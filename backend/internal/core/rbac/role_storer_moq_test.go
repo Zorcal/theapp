@@ -21,6 +21,12 @@ var _ RoleStorer = &MockedRoleStorer{}
 //
 //		// make and configure a mocked RoleStorer
 //		mockedRoleStorer := &MockedRoleStorer{
+//			AssignCustomRoleToOrgFunc: func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error {
+//				panic("mock out the AssignCustomRoleToOrg method")
+//			},
+//			AssignCustomRoleToProjectFunc: func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int) error {
+//				panic("mock out the AssignCustomRoleToProject method")
+//			},
 //			AssignSystemRoleFunc: func(ctx context.Context, userID uuid.UUID, roleName string) error {
 //				panic("mock out the AssignSystemRole method")
 //			},
@@ -60,6 +66,12 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			SystemRolesFunc: func(ctx context.Context, pageSize int, pageOffset int) ([]pgrbac.SystemRole, error) {
 //				panic("mock out the SystemRoles method")
 //			},
+//			UnassignCustomRoleFromOrgFunc: func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error {
+//				panic("mock out the UnassignCustomRoleFromOrg method")
+//			},
+//			UnassignCustomRoleFromProjectFunc: func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int) error {
+//				panic("mock out the UnassignCustomRoleFromProject method")
+//			},
 //			UnassignSystemRoleFunc: func(ctx context.Context, userID uuid.UUID, roleName string) error {
 //				panic("mock out the UnassignSystemRole method")
 //			},
@@ -82,6 +94,12 @@ var _ RoleStorer = &MockedRoleStorer{}
 //
 //	}
 type MockedRoleStorer struct {
+	// AssignCustomRoleToOrgFunc mocks the AssignCustomRoleToOrg method.
+	AssignCustomRoleToOrgFunc func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error
+
+	// AssignCustomRoleToProjectFunc mocks the AssignCustomRoleToProject method.
+	AssignCustomRoleToProjectFunc func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int) error
+
 	// AssignSystemRoleFunc mocks the AssignSystemRole method.
 	AssignSystemRoleFunc func(ctx context.Context, userID uuid.UUID, roleName string) error
 
@@ -121,6 +139,12 @@ type MockedRoleStorer struct {
 	// SystemRolesFunc mocks the SystemRoles method.
 	SystemRolesFunc func(ctx context.Context, pageSize int, pageOffset int) ([]pgrbac.SystemRole, error)
 
+	// UnassignCustomRoleFromOrgFunc mocks the UnassignCustomRoleFromOrg method.
+	UnassignCustomRoleFromOrgFunc func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error
+
+	// UnassignCustomRoleFromProjectFunc mocks the UnassignCustomRoleFromProject method.
+	UnassignCustomRoleFromProjectFunc func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int) error
+
 	// UnassignSystemRoleFunc mocks the UnassignSystemRole method.
 	UnassignSystemRoleFunc func(ctx context.Context, userID uuid.UUID, roleName string) error
 
@@ -138,6 +162,28 @@ type MockedRoleStorer struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AssignCustomRoleToOrg holds details about calls to the AssignCustomRoleToOrg method.
+		AssignCustomRoleToOrg []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
+		}
+		// AssignCustomRoleToProject holds details about calls to the AssignCustomRoleToProject method.
+		AssignCustomRoleToProject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+			// ProjectID is the projectID argument value.
+			ProjectID int
+		}
 		// AssignSystemRole holds details about calls to the AssignSystemRole method.
 		AssignSystemRole []struct {
 			// Ctx is the ctx argument value.
@@ -241,6 +287,28 @@ type MockedRoleStorer struct {
 			// PageOffset is the pageOffset argument value.
 			PageOffset int
 		}
+		// UnassignCustomRoleFromOrg holds details about calls to the UnassignCustomRoleFromOrg method.
+		UnassignCustomRoleFromOrg []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
+		}
+		// UnassignCustomRoleFromProject holds details about calls to the UnassignCustomRoleFromProject method.
+		UnassignCustomRoleFromProject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+			// ProjectID is the projectID argument value.
+			ProjectID int
+		}
 		// UnassignSystemRole holds details about calls to the UnassignSystemRole method.
 		UnassignSystemRole []struct {
 			// Ctx is the ctx argument value.
@@ -283,6 +351,8 @@ type MockedRoleStorer struct {
 			PageOffset int
 		}
 	}
+	lockAssignCustomRoleToOrg                sync.RWMutex
+	lockAssignCustomRoleToProject            sync.RWMutex
 	lockAssignSystemRole                     sync.RWMutex
 	lockCreateCustomRole                     sync.RWMutex
 	lockCustomRoleByExternalID               sync.RWMutex
@@ -296,11 +366,101 @@ type MockedRoleStorer struct {
 	lockSystemRoleByName                     sync.RWMutex
 	lockSystemRoleCount                      sync.RWMutex
 	lockSystemRoles                          sync.RWMutex
+	lockUnassignCustomRoleFromOrg            sync.RWMutex
+	lockUnassignCustomRoleFromProject        sync.RWMutex
 	lockUnassignSystemRole                   sync.RWMutex
 	lockUpdateCustomRole                     sync.RWMutex
 	lockUserSystemPermissionsByExternalID    sync.RWMutex
 	lockUserSystemRoleCountByExternalID      sync.RWMutex
 	lockUserSystemRolesByExternalID          sync.RWMutex
+}
+
+// AssignCustomRoleToOrg calls AssignCustomRoleToOrgFunc.
+func (mock *MockedRoleStorer) AssignCustomRoleToOrg(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error {
+	if mock.AssignCustomRoleToOrgFunc == nil {
+		panic("MockedRoleStorer.AssignCustomRoleToOrgFunc: method is nil but RoleStorer.AssignCustomRoleToOrg was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		RoleID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		RoleID: roleID,
+		OrgID:  orgID,
+	}
+	mock.lockAssignCustomRoleToOrg.Lock()
+	mock.calls.AssignCustomRoleToOrg = append(mock.calls.AssignCustomRoleToOrg, callInfo)
+	mock.lockAssignCustomRoleToOrg.Unlock()
+	return mock.AssignCustomRoleToOrgFunc(ctx, userID, roleID, orgID)
+}
+
+// AssignCustomRoleToOrgCalls gets all the calls that were made to AssignCustomRoleToOrg.
+// Check the length with:
+//
+//	len(mockedRoleStorer.AssignCustomRoleToOrgCalls())
+func (mock *MockedRoleStorer) AssignCustomRoleToOrgCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	RoleID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		RoleID uuid.UUID
+		OrgID  int
+	}
+	mock.lockAssignCustomRoleToOrg.RLock()
+	calls = mock.calls.AssignCustomRoleToOrg
+	mock.lockAssignCustomRoleToOrg.RUnlock()
+	return calls
+}
+
+// AssignCustomRoleToProject calls AssignCustomRoleToProjectFunc.
+func (mock *MockedRoleStorer) AssignCustomRoleToProject(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int) error {
+	if mock.AssignCustomRoleToProjectFunc == nil {
+		panic("MockedRoleStorer.AssignCustomRoleToProjectFunc: method is nil but RoleStorer.AssignCustomRoleToProject was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		RoleID    uuid.UUID
+		ProjectID int
+	}{
+		Ctx:       ctx,
+		UserID:    userID,
+		RoleID:    roleID,
+		ProjectID: projectID,
+	}
+	mock.lockAssignCustomRoleToProject.Lock()
+	mock.calls.AssignCustomRoleToProject = append(mock.calls.AssignCustomRoleToProject, callInfo)
+	mock.lockAssignCustomRoleToProject.Unlock()
+	return mock.AssignCustomRoleToProjectFunc(ctx, userID, roleID, projectID)
+}
+
+// AssignCustomRoleToProjectCalls gets all the calls that were made to AssignCustomRoleToProject.
+// Check the length with:
+//
+//	len(mockedRoleStorer.AssignCustomRoleToProjectCalls())
+func (mock *MockedRoleStorer) AssignCustomRoleToProjectCalls() []struct {
+	Ctx       context.Context
+	UserID    uuid.UUID
+	RoleID    uuid.UUID
+	ProjectID int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		RoleID    uuid.UUID
+		ProjectID int
+	}
+	mock.lockAssignCustomRoleToProject.RLock()
+	calls = mock.calls.AssignCustomRoleToProject
+	mock.lockAssignCustomRoleToProject.RUnlock()
+	return calls
 }
 
 // AssignSystemRole calls AssignSystemRoleFunc.
@@ -792,6 +952,94 @@ func (mock *MockedRoleStorer) SystemRolesCalls() []struct {
 	mock.lockSystemRoles.RLock()
 	calls = mock.calls.SystemRoles
 	mock.lockSystemRoles.RUnlock()
+	return calls
+}
+
+// UnassignCustomRoleFromOrg calls UnassignCustomRoleFromOrgFunc.
+func (mock *MockedRoleStorer) UnassignCustomRoleFromOrg(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error {
+	if mock.UnassignCustomRoleFromOrgFunc == nil {
+		panic("MockedRoleStorer.UnassignCustomRoleFromOrgFunc: method is nil but RoleStorer.UnassignCustomRoleFromOrg was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		RoleID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		RoleID: roleID,
+		OrgID:  orgID,
+	}
+	mock.lockUnassignCustomRoleFromOrg.Lock()
+	mock.calls.UnassignCustomRoleFromOrg = append(mock.calls.UnassignCustomRoleFromOrg, callInfo)
+	mock.lockUnassignCustomRoleFromOrg.Unlock()
+	return mock.UnassignCustomRoleFromOrgFunc(ctx, userID, roleID, orgID)
+}
+
+// UnassignCustomRoleFromOrgCalls gets all the calls that were made to UnassignCustomRoleFromOrg.
+// Check the length with:
+//
+//	len(mockedRoleStorer.UnassignCustomRoleFromOrgCalls())
+func (mock *MockedRoleStorer) UnassignCustomRoleFromOrgCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	RoleID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		RoleID uuid.UUID
+		OrgID  int
+	}
+	mock.lockUnassignCustomRoleFromOrg.RLock()
+	calls = mock.calls.UnassignCustomRoleFromOrg
+	mock.lockUnassignCustomRoleFromOrg.RUnlock()
+	return calls
+}
+
+// UnassignCustomRoleFromProject calls UnassignCustomRoleFromProjectFunc.
+func (mock *MockedRoleStorer) UnassignCustomRoleFromProject(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int) error {
+	if mock.UnassignCustomRoleFromProjectFunc == nil {
+		panic("MockedRoleStorer.UnassignCustomRoleFromProjectFunc: method is nil but RoleStorer.UnassignCustomRoleFromProject was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		RoleID    uuid.UUID
+		ProjectID int
+	}{
+		Ctx:       ctx,
+		UserID:    userID,
+		RoleID:    roleID,
+		ProjectID: projectID,
+	}
+	mock.lockUnassignCustomRoleFromProject.Lock()
+	mock.calls.UnassignCustomRoleFromProject = append(mock.calls.UnassignCustomRoleFromProject, callInfo)
+	mock.lockUnassignCustomRoleFromProject.Unlock()
+	return mock.UnassignCustomRoleFromProjectFunc(ctx, userID, roleID, projectID)
+}
+
+// UnassignCustomRoleFromProjectCalls gets all the calls that were made to UnassignCustomRoleFromProject.
+// Check the length with:
+//
+//	len(mockedRoleStorer.UnassignCustomRoleFromProjectCalls())
+func (mock *MockedRoleStorer) UnassignCustomRoleFromProjectCalls() []struct {
+	Ctx       context.Context
+	UserID    uuid.UUID
+	RoleID    uuid.UUID
+	ProjectID int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		RoleID    uuid.UUID
+		ProjectID int
+	}
+	mock.lockUnassignCustomRoleFromProject.RLock()
+	calls = mock.calls.UnassignCustomRoleFromProject
+	mock.lockUnassignCustomRoleFromProject.RUnlock()
 	return calls
 }
 
