@@ -701,10 +701,24 @@ CREATE UNIQUE INDEX custom_roles_org_id_lower_name_key ON rbac.custom_roles USIN
 
 
 --
+-- Name: org_role_assignments_role_id_idx; Type: INDEX; Schema: rbac; Owner: -
+--
+
+CREATE INDEX org_role_assignments_role_id_idx ON rbac.org_role_assignments USING btree (role_id);
+
+
+--
 -- Name: org_role_assignments_user_id_org_id_idx; Type: INDEX; Schema: rbac; Owner: -
 --
 
 CREATE INDEX org_role_assignments_user_id_org_id_idx ON rbac.org_role_assignments USING btree (user_id, org_id);
+
+
+--
+-- Name: project_role_assignments_role_id_idx; Type: INDEX; Schema: rbac; Owner: -
+--
+
+CREATE INDEX project_role_assignments_role_id_idx ON rbac.project_role_assignments USING btree (role_id);
 
 
 --
