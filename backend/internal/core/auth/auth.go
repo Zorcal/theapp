@@ -83,6 +83,10 @@ type PermissionStorer interface {
 	// projectID, resolved from project-, org-, and system-scope role assignments.
 	// Returns [sql.ErrNoRows] if no such user or project exists.
 	ProjectPermissions(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error)
+	// OrgPermissionsByProjectID returns projectID's org and the names of the permissions userID
+	// holds there through organization- and system-scope role assignments.
+	// Returns [sql.ErrNoRows] if no such user or project exists.
+	OrgPermissionsByProjectID(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.OrgPermissions, error)
 }
 
 // Config holds tunables for Core.
@@ -332,6 +336,28 @@ func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int
 		},
 		ProjectID: projectID,
 		OrgID:     &perms.OrgID,
+	}, nil
+}
+
+// OrganizationAuthSession resolves userID's permissions for projectID's organization from
+// organization- and system-scope role assignments.
+// Returns [mdl.ErrNotFound] if no user or project with those IDs exists.
+func (c *Core) OrganizationAuthSession(ctx context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
+	orgPerms, err := c.permissionStorer.OrgPermissionsByProjectID(ctx, userID, projectID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthSession{}, mdl.ErrNotFound
+		}
+		return mdl.AuthSession{}, fmt.Errorf("organization permissions by project id: %w", err)
+	}
+
+	return mdl.AuthSession{
+		User: mdl.AuthUser{
+			UserID:      userID,
+			Permissions: permissionsFromPg(orgPerms.PermissionNames),
+		},
+		ProjectID: &projectID,
+		OrgID:     &orgPerms.OrgID,
 	}, nil
 }
 

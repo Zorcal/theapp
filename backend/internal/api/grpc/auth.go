@@ -47,6 +47,10 @@ type AuthCore interface {
 	// Returns [mdl.ErrNotFound] if no user with that ID exists, or if projectID is non-nil and
 	// does not match any project.
 	AuthSession(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error)
+	// OrganizationAuthSession resolves userID's organization- and system-scope permissions for
+	// projectID's organization.
+	// Returns [mdl.ErrNotFound] if no user or project with those IDs exists.
+	OrganizationAuthSession(ctx context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error)
 }
 
 //go:generate moq -rm -fmt goimports -out workflow_auth_core_moq_test.go . WorkflowAuthCore:MockedWorkflowAuthCore

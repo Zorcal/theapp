@@ -57,17 +57,16 @@ func projectPermissionsQuery(userID uuid.UUID, projectID int) pgdb.TypedQuery[Pr
 	}
 }
 
-// orgPermissionsQuery resolves the distinct union of permissions userID holds for orgID.
-// Org-scoped assignments contribute only while the user is a current organization member;
-// system-scoped assignments contribute unconditionally. Project-scoped assignments are omitted.
-// Anchoring on both the user and organization means a nonexistent ID yields zero rows.
-func orgPermissionsQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[OrgPermissions] {
-	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID}
+// orgPermissionsByProjectIDQuery resolves the distinct union of organization- and system-scoped
+// permissions userID holds for projectID's organization. Project-scoped assignments are omitted.
+// Anchoring on both the user and project means a nonexistent ID yields zero rows.
+func orgPermissionsByProjectIDQuery(userID uuid.UUID, projectID int) pgdb.TypedQuery[OrgPermissions] {
+	params := pgx.NamedArgs{"user_id": userID, "project_id": projectID}
 	const sql = `
 		SELECT
-			o.id AS org_id,
+			proj.org_id,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names
-		FROM org.organizations AS o
+		FROM org.projects AS proj
 		JOIN useraccess.users AS u ON u.external_id = @user_id
 		LEFT JOIN LATERAL (
 			SELECT rp.permission_id
@@ -76,7 +75,7 @@ func orgPermissionsQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[OrgPermiss
 				ON m.user_id = ora.user_id
 				AND m.org_id = ora.org_id
 			JOIN rbac.custom_role_permissions AS rp ON rp.role_id = ora.role_id
-			WHERE ora.user_id = u.id AND ora.org_id = o.id
+			WHERE ora.user_id = u.id AND ora.org_id = proj.org_id
 
 			UNION
 
@@ -86,8 +85,8 @@ func orgPermissionsQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[OrgPermiss
 			WHERE sra.user_id = u.id
 		) AS granted ON true
 		LEFT JOIN rbac.permissions AS p ON p.id = granted.permission_id
-		WHERE o.id = @org_id
-		GROUP BY o.id`
+		WHERE proj.id = @project_id
+		GROUP BY proj.org_id`
 
 	return pgdb.TypedQuery[OrgPermissions]{
 		SQL:    sql,

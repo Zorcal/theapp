@@ -145,7 +145,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Phase 15 — custom role service: privilege escalation checks
 
-37. Privilege-escalation superset check on grant: resolve the actor's permission set fresh in the target project or org scope, inside the same transaction as the grant. Organization-scope authorization and superset checks resolve only organization- and system-scope grants; a project-scoped grant carrying `custom-role:assign-org`, `custom-role:unassign-org`, or `custom-role:read-org-assignments` does not authorize an organization-wide mutation or assignment listing. Project-assignment listing remains authorized in the request project. Depends on 24, 35.
+37. Privilege-escalation superset check on grant: resolve the actor's permission set fresh in the target project or org scope, inside the same transaction as the grant. Organization-scope authorization and superset checks resolve only organization- and system-scope grants; a project-scoped grant carrying `custom-role:assign-org`, `custom-role:unassign-org`, or `custom-role:read-org-assignments` does not authorize an organization-wide mutation or assignment listing. Project-assignment listing remains authorized in the request project. This part is complete. Depends on 24, 35.
 38. Apply the same superset check to revoke and to permissions added to or removed from a custom role. Depends on 32, 37.
 
 **Checkpoint:** custom-role grant, revoke, and permission edits enforce the correctly scoped superset rule.

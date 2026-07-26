@@ -217,6 +217,10 @@ func (noopAuthCore) AuthSession(_ context.Context, _ uuid.UUID, _ *int) (mdl.Aut
 	return mdl.AuthSession{}, nil
 }
 
+func (noopAuthCore) OrganizationAuthSession(_ context.Context, _ uuid.UUID, _ int) (mdl.AuthSession, error) {
+	return mdl.AuthSession{}, nil
+}
+
 type noopWorkflowAuthCore struct{}
 
 func (noopWorkflowAuthCore) RequestMagicLink(_ context.Context, _ string) error { return nil }

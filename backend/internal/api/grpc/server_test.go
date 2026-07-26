@@ -81,6 +81,17 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 					OrgID:     &orgID,
 				}, nil
 			},
+			OrganizationAuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
+				orgID := 1
+				return mdl.AuthSession{
+					User: mdl.AuthUser{
+						UserID:      userID,
+						Permissions: mdl.AllPermissions(),
+					},
+					ProjectID: &projectID,
+					OrgID:     &orgID,
+				}, nil
+			},
 		}
 	}
 	if cfg.SystemRoleOrganizationCore == nil {

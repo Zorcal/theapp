@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"testing"
 	"time"
 
@@ -112,6 +114,35 @@ func TestAuthStreamInterceptor(t *testing.T) {
 		}
 		testingx.AssertDiff(t, gotSess, want)
 	})
+
+	t.Run("organization-scoped method resolves an organization session", func(t *testing.T) {
+		var gotSess mdl.AuthSession
+		handler := func(_ any, ss grpc.ServerStream) error {
+			gotSess, _ = mdl.AuthSessionFromContext(ss.Context())
+			return nil
+		}
+
+		want := mdl.AuthSession{
+			User:      mdl.AuthUser{UserID: uuid.New()},
+			ProjectID: new(7),
+			OrgID:     new(5),
+		}
+		authCore := &MockedAuthCore{
+			OrganizationAuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ int) (mdl.AuthSession, error) {
+				return want, nil
+			},
+		}
+		interceptor := authStreamInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, authCore)
+
+		ctx := withStreamProjectID(validStreamAuthCtx(t), "7")
+		if err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{
+			FullMethod: slices.Collect(maps.Keys(organizationScopedMethods))[0],
+		}, handler); err != nil {
+			t.Fatalf("authStreamInterceptor() error = %v, want nil", err)
+		}
+
+		testingx.AssertDiff(t, gotSess, want)
+	})
 }
 
 func TestAuthStreamInterceptor_error(t *testing.T) {
@@ -183,6 +214,47 @@ func TestAuthStreamInterceptor_error(t *testing.T) {
 
 				if err := interceptor(nil, fakeServerStream{ctx: tt.ctx}, &grpc.StreamServerInfo{FullMethod: tt.fullMethod}, handler); !errors.Is(err, dbErr) {
 					t.Errorf("authStreamInterceptor() error = %v, want %v", err, dbErr)
+				}
+			})
+		}
+	})
+
+	t.Run("organization session", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			authCore *MockedAuthCore
+			want     codes.Code
+		}{
+			{
+				name: "not found",
+				authCore: &MockedAuthCore{
+					OrganizationAuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ int) (mdl.AuthSession, error) {
+						return mdl.AuthSession{}, mdl.ErrNotFound
+					},
+				},
+				want: codes.Unauthenticated,
+			},
+			{
+				name: "store",
+				authCore: &MockedAuthCore{
+					OrganizationAuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ int) (mdl.AuthSession, error) {
+						return mdl.AuthSession{}, dbErr
+					},
+				},
+				want: codes.Unknown,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				interceptor := authStreamInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, tt.authCore)
+				ctx := withStreamProjectID(validStreamAuthCtx(t), "1")
+
+				err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{
+					FullMethod: slices.Collect(maps.Keys(organizationScopedMethods))[0],
+				}, handler)
+
+				if got := status.Code(err); got != tt.want {
+					t.Errorf("authStreamInterceptor() code = %v, want %v", got, tt.want)
 				}
 			})
 		}

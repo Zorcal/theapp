@@ -40,16 +40,16 @@ func (s *Store) ProjectPermissions(ctx context.Context, userID uuid.UUID, projec
 	return perms, nil
 }
 
-// OrgPermissions returns the names of the permissions userID holds for orgID, resolved from
-// organization- and system-scope role assignments.
-// Returns [sql.ErrNoRows] if no such user or organization exists.
-func (s *Store) OrgPermissions(ctx context.Context, userID uuid.UUID, orgID int) (OrgPermissions, error) {
-	q := orgPermissionsQuery(userID, orgID)
+// OrgPermissionsByProjectID returns projectID's org and the names of the permissions userID holds
+// there through organization- and system-scope role assignments.
+// Returns [sql.ErrNoRows] if no such user or project exists.
+func (s *Store) OrgPermissionsByProjectID(ctx context.Context, userID uuid.UUID, projectID int) (OrgPermissions, error) {
+	q := orgPermissionsByProjectIDQuery(userID, projectID)
 
 	var perms OrgPermissions
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &perms); err != nil {
-			return fmt.Errorf("organization permissions: %w", err)
+			return fmt.Errorf("organization permissions by project id: %w", err)
 		}
 		return nil
 	}

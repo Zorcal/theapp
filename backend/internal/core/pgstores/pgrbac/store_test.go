@@ -277,7 +277,7 @@ func TestStore_ProjectPermissions_error(t *testing.T) {
 	}
 }
 
-func TestStore_OrgPermissions(t *testing.T) {
+func TestStore_OrgPermissionsByProjectID(t *testing.T) {
 	t.Run("system scope, unconditional on organization membership", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
@@ -288,10 +288,11 @@ func TestStore_OrgPermissions(t *testing.T) {
 		user := seedUser(t, userStore, "org-permissions-system@test.com")
 		seedSystemRoleAssignment(t, rbacStore, user.ExternalID, "superadmin")
 		org := seedOrg(t, orgStore, "org-permissions-system-org")
+		project := seedProject(t, orgStore, org.ID, "project")
 
-		got, err := rbacStore.OrgPermissions(ctx, user.ExternalID, org.ID)
+		got, err := rbacStore.OrgPermissionsByProjectID(ctx, user.ExternalID, project.ID)
 		if err != nil {
-			t.Fatalf("OrgPermissions() error = %v", err)
+			t.Fatalf("OrgPermissionsByProjectID() error = %v", err)
 		}
 
 		want := OrgPermissions{
@@ -320,9 +321,9 @@ func TestStore_OrgPermissions(t *testing.T) {
 		seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, projectRole.ExternalID, project.ID)
 		seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, orgRole.ExternalID, org.ID)
 
-		got, err := rbacStore.OrgPermissions(ctx, user.ExternalID, org.ID)
+		got, err := rbacStore.OrgPermissionsByProjectID(ctx, user.ExternalID, project.ID)
 		if err != nil {
-			t.Fatalf("OrgPermissions() error = %v", err)
+			t.Fatalf("OrgPermissionsByProjectID() error = %v", err)
 		}
 
 		want := OrgPermissions{
@@ -342,14 +343,15 @@ func TestStore_OrgPermissions(t *testing.T) {
 
 		user := seedUser(t, userStore, "org-permissions-membership@test.com")
 		org := seedOrg(t, orgStore, "org-permissions-membership-org")
+		project := seedProject(t, orgStore, org.ID, "project")
 		seedOrgMembership(t, ctx, pool, user.ID, org.ID)
 		role := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: org.ID, Name: "org role", PermissionNames: []string{"user:create"}})
 		seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, role.ExternalID, org.ID)
 		deleteOrgMembership(t, ctx, pool, user.ID, org.ID)
 
-		got, err := rbacStore.OrgPermissions(ctx, user.ExternalID, org.ID)
+		got, err := rbacStore.OrgPermissionsByProjectID(ctx, user.ExternalID, project.ID)
 		if err != nil {
-			t.Fatalf("OrgPermissions() error = %v", err)
+			t.Fatalf("OrgPermissionsByProjectID() error = %v", err)
 		}
 
 		want := OrgPermissions{
@@ -370,6 +372,7 @@ func TestStore_OrgPermissions(t *testing.T) {
 		user := seedUser(t, userStore, "org-permissions-isolation@test.com")
 		firstOrg := seedOrg(t, orgStore, "first-org-permissions-isolation-org")
 		secondOrg := seedOrg(t, orgStore, "second-org-permissions-isolation-org")
+		firstProject := seedProject(t, orgStore, firstOrg.ID, "project")
 		seedOrgMembership(t, ctx, pool, user.ID, firstOrg.ID)
 		seedOrgMembership(t, ctx, pool, user.ID, secondOrg.ID)
 		firstRole := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: firstOrg.ID, Name: "first org role", PermissionNames: []string{"user:create"}})
@@ -377,9 +380,9 @@ func TestStore_OrgPermissions(t *testing.T) {
 		seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, firstRole.ExternalID, firstOrg.ID)
 		seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, secondRole.ExternalID, secondOrg.ID)
 
-		got, err := rbacStore.OrgPermissions(ctx, user.ExternalID, firstOrg.ID)
+		got, err := rbacStore.OrgPermissionsByProjectID(ctx, user.ExternalID, firstProject.ID)
 		if err != nil {
-			t.Fatalf("OrgPermissions() error = %v", err)
+			t.Fatalf("OrgPermissionsByProjectID() error = %v", err)
 		}
 
 		want := OrgPermissions{
@@ -399,10 +402,11 @@ func TestStore_OrgPermissions(t *testing.T) {
 
 		user := seedUser(t, userStore, "org-permissions-empty@test.com")
 		org := seedOrg(t, orgStore, "org-permissions-empty-org")
+		project := seedProject(t, orgStore, org.ID, "project")
 
-		got, err := rbacStore.OrgPermissions(ctx, user.ExternalID, org.ID)
+		got, err := rbacStore.OrgPermissionsByProjectID(ctx, user.ExternalID, project.ID)
 		if err != nil {
-			t.Fatalf("OrgPermissions() error = %v", err)
+			t.Fatalf("OrgPermissionsByProjectID() error = %v", err)
 		}
 
 		want := OrgPermissions{
@@ -414,36 +418,37 @@ func TestStore_OrgPermissions(t *testing.T) {
 	})
 }
 
-func TestStore_OrgPermissions_error(t *testing.T) {
+func TestStore_OrgPermissionsByProjectID_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	rbacStore := NewStore(pool)
 	userStore := pguser.NewStore(pool)
 	orgStore := pgorg.NewStore(pool)
 
-	user := seedUser(t, userStore, "org-permissions-error@test.com")
-	org := seedOrg(t, orgStore, "org-permissions-error-org")
+	user := seedUser(t, userStore, "org-permissions-by-project-error@test.com")
+	org := seedOrg(t, orgStore, "org-permissions-by-project-error-org")
+	project := seedProject(t, orgStore, org.ID, "project")
 
 	tests := []struct {
-		name   string
-		userID uuid.UUID
-		orgID  int
+		name      string
+		userID    uuid.UUID
+		projectID int
 	}{
 		{
-			name:   "user missing",
-			userID: uuid.New(),
-			orgID:  org.ID,
+			name:      "user missing",
+			userID:    uuid.New(),
+			projectID: project.ID,
 		},
 		{
-			name:   "organization missing",
-			userID: user.ExternalID,
-			orgID:  -1,
+			name:      "project missing",
+			userID:    user.ExternalID,
+			projectID: -1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := rbacStore.OrgPermissions(ctx, tt.userID, tt.orgID); !errors.Is(err, sql.ErrNoRows) {
-				t.Errorf("OrgPermissions(%v, %d) error = %v, want sql.ErrNoRows", tt.userID, tt.orgID, err)
+			if _, err := rbacStore.OrgPermissionsByProjectID(ctx, tt.userID, tt.projectID); !errors.Is(err, sql.ErrNoRows) {
+				t.Errorf("OrgPermissionsByProjectID(%v, %d) error = %v, want sql.ErrNoRows", tt.userID, tt.projectID, err)
 			}
 		})
 	}

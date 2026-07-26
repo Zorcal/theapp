@@ -55,6 +55,14 @@ var noProjectMethods = set.Set[string]{
 	"/theapp.v1.UserService/UpdateUser": {},
 }
 
+// organizationScopedMethods lists methods whose permissions must be resolved without project-scoped
+// role assignments. The request project identifies the organization in which the method operates.
+var organizationScopedMethods = set.Set[string]{
+	"/theapp.v1.RoleService/ListOrganizationRoleAssignments": {},
+	"/theapp.v1.RoleService/AssignRoleToOrganization":        {},
+	"/theapp.v1.RoleService/UnassignRoleFromOrganization":    {},
+}
+
 // permissionRegistry maps every protected (non-public, see publicMethods) gRPC method to the
 // permissions required to call it. All listed permissions must be held — this is a conjunction
 // (AND), never a disjunction. A method with no entry here is denied rather than let through

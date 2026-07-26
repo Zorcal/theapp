@@ -980,6 +980,78 @@ func TestCore_AuthSession_error(t *testing.T) {
 	}
 }
 
+func TestCore_OrganizationAuthSession(t *testing.T) {
+	userID := uuid.New()
+	projectID := 42
+	orgID := 5
+	permissionStorer := &MockedPermissionStorer{
+		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+			return pgrbac.OrgPermissions{
+				OrgID:           orgID,
+				PermissionNames: []string{"custom-role:assign-org", "custom-role:read-org-assignments"},
+			}, nil
+		},
+	}
+	core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, permissionStorer, immediateTransactor{}, testConfig())
+
+	got, err := core.OrganizationAuthSession(t.Context(), userID, projectID)
+	if err != nil {
+		t.Fatalf("OrganizationAuthSession() error = %v", err)
+	}
+
+	want := mdl.AuthSession{
+		User: mdl.AuthUser{
+			UserID: userID,
+			Permissions: []mdl.Permission{
+				mdl.PermissionCustomRoleAssignOrg,
+				mdl.PermissionCustomRoleReadOrgAssignments,
+			},
+		},
+		ProjectID: &projectID,
+		OrgID:     &orgID,
+	}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_OrganizationAuthSession_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name             string
+		permissionStorer *MockedPermissionStorer
+		want             error
+	}{
+		{
+			name: "user or project not found",
+			permissionStorer: &MockedPermissionStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "resolve organization permissions",
+			permissionStorer: &MockedPermissionStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, tt.permissionStorer, immediateTransactor{}, testConfig())
+
+			if _, err := core.OrganizationAuthSession(t.Context(), uuid.New(), 42); !errors.Is(err, tt.want) {
+				t.Errorf("OrganizationAuthSession() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestCore_txRollback(t *testing.T) {
 	// Verifies that a failure inside the transaction rolls back the preceding
 	// write, leaving the credential reusable on retry.

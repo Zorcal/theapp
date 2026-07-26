@@ -99,9 +99,10 @@ func marshalRequest(req any) ([]byte, error) {
 // authUnaryInterceptor validates the JWT Bearer token on every method not in publicMethods,
 // resolves the caller's mdl.AuthSession via authCore, and attaches it to the context. The
 // project ID passed to authCore is nil for a method in noProjectMethods, which resolves a session
-// scoped to system-scope role assignments only; every other method rejects the call with
-// codes.InvalidArgument if x-project-id metadata is missing or malformed, otherwise resolves the
-// project ID from it first.
+// scoped to system-scope role assignments only. Organization-scoped methods resolve permissions
+// from organization- and system-scope assignments; every other protected method resolves project-,
+// organization-, and system-scope assignments. Methods with project context reject the call with
+// codes.InvalidArgument if x-project-id metadata is missing or malformed.
 func authUnaryInterceptor(jwtKey []byte, issuer, audience string, authCore AuthCore) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if publicMethods.Contains(info.FullMethod) {
@@ -122,7 +123,12 @@ func authUnaryInterceptor(jwtKey []byte, issuer, audience string, authCore AuthC
 			projectID = &id
 		}
 
-		sess, err := authCore.AuthSession(ctx, claims.UserID, projectID)
+		var sess mdl.AuthSession
+		if organizationScopedMethods.Contains(info.FullMethod) {
+			sess, err = authCore.OrganizationAuthSession(ctx, claims.UserID, *projectID)
+		} else {
+			sess, err = authCore.AuthSession(ctx, claims.UserID, projectID)
+		}
 		if err != nil {
 			if errors.Is(err, mdl.ErrNotFound) {
 				return nil, fmt.Errorf("resolve auth session: unknown user or project: %w", status.Error(codes.Unauthenticated, "unauthenticated"))

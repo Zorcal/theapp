@@ -48,6 +48,10 @@ One test file per service (`auth_test.go`, `user_test.go`, …). When a test exe
 
 `NewServerTest` always sets `testJWTKey`. Use `authCtxForTestUser(t, t.Context())` for calls to protected endpoints and plain `t.Context()` for methods listed in `publicMethods`.
 
+## Authorization scopes
+
+Protected methods normally resolve permissions for the project identified by `x-project-id`, combining project-, organization-, and system-scope assignments. Methods in `organizationScopedMethods` use the same project metadata to identify the active organization but resolve permissions from organization- and system-scope assignments only. A project-scoped role therefore cannot authorize an organization-wide operation. Methods in `noProjectMethods` resolve system-scope assignments only.
+
 ## Validation
 
 Every RPC has a corresponding function in `internal/validate`. The handler calls it before reading request fields or delegating to the core. Validators reject nil requests and own all checks on client input, including required fields, UUID syntax, update masks, and pagination tokens. Field violations use protobuf payload paths such as `role` and `user.id`; `request` is reserved for request messages that have no required payload field. Return `codes.InvalidArgument` with `errdetails.BadRequest` field violations so callers get actionable field-level feedback.

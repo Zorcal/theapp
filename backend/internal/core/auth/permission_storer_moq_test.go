@@ -21,6 +21,9 @@ var _ PermissionStorer = &MockedPermissionStorer{}
 //
 //		// make and configure a mocked PermissionStorer
 //		mockedPermissionStorer := &MockedPermissionStorer{
+//			OrgPermissionsByProjectIDFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.OrgPermissions, error) {
+//				panic("mock out the OrgPermissionsByProjectID method")
+//			},
 //			ProjectPermissionsFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error) {
 //				panic("mock out the ProjectPermissions method")
 //			},
@@ -34,6 +37,9 @@ var _ PermissionStorer = &MockedPermissionStorer{}
 //
 //	}
 type MockedPermissionStorer struct {
+	// OrgPermissionsByProjectIDFunc mocks the OrgPermissionsByProjectID method.
+	OrgPermissionsByProjectIDFunc func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.OrgPermissions, error)
+
 	// ProjectPermissionsFunc mocks the ProjectPermissions method.
 	ProjectPermissionsFunc func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error)
 
@@ -42,6 +48,15 @@ type MockedPermissionStorer struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// OrgPermissionsByProjectID holds details about calls to the OrgPermissionsByProjectID method.
+		OrgPermissionsByProjectID []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// ProjectID is the projectID argument value.
+			ProjectID int
+		}
 		// ProjectPermissions holds details about calls to the ProjectPermissions method.
 		ProjectPermissions []struct {
 			// Ctx is the ctx argument value.
@@ -59,8 +74,49 @@ type MockedPermissionStorer struct {
 			UserID uuid.UUID
 		}
 	}
+	lockOrgPermissionsByProjectID         sync.RWMutex
 	lockProjectPermissions                sync.RWMutex
 	lockUserSystemPermissionsByExternalID sync.RWMutex
+}
+
+// OrgPermissionsByProjectID calls OrgPermissionsByProjectIDFunc.
+func (mock *MockedPermissionStorer) OrgPermissionsByProjectID(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.OrgPermissions, error) {
+	if mock.OrgPermissionsByProjectIDFunc == nil {
+		panic("MockedPermissionStorer.OrgPermissionsByProjectIDFunc: method is nil but PermissionStorer.OrgPermissionsByProjectID was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID int
+	}{
+		Ctx:       ctx,
+		UserID:    userID,
+		ProjectID: projectID,
+	}
+	mock.lockOrgPermissionsByProjectID.Lock()
+	mock.calls.OrgPermissionsByProjectID = append(mock.calls.OrgPermissionsByProjectID, callInfo)
+	mock.lockOrgPermissionsByProjectID.Unlock()
+	return mock.OrgPermissionsByProjectIDFunc(ctx, userID, projectID)
+}
+
+// OrgPermissionsByProjectIDCalls gets all the calls that were made to OrgPermissionsByProjectID.
+// Check the length with:
+//
+//	len(mockedPermissionStorer.OrgPermissionsByProjectIDCalls())
+func (mock *MockedPermissionStorer) OrgPermissionsByProjectIDCalls() []struct {
+	Ctx       context.Context
+	UserID    uuid.UUID
+	ProjectID int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID int
+	}
+	mock.lockOrgPermissionsByProjectID.RLock()
+	calls = mock.calls.OrgPermissionsByProjectID
+	mock.lockOrgPermissionsByProjectID.RUnlock()
+	return calls
 }
 
 // ProjectPermissions calls ProjectPermissionsFunc.

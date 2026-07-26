@@ -44,7 +44,12 @@ func authStreamInterceptor(jwtKey []byte, issuer, audience string, authCore Auth
 			projectID = &id
 		}
 
-		sess, err := authCore.AuthSession(ss.Context(), claims.UserID, projectID)
+		var sess mdl.AuthSession
+		if organizationScopedMethods.Contains(info.FullMethod) {
+			sess, err = authCore.OrganizationAuthSession(ss.Context(), claims.UserID, *projectID)
+		} else {
+			sess, err = authCore.AuthSession(ss.Context(), claims.UserID, projectID)
+		}
 		if err != nil {
 			if errors.Is(err, mdl.ErrNotFound) {
 				return fmt.Errorf("resolve auth session: unknown user or project: %w", status.Error(codes.Unauthenticated, "unauthenticated"))

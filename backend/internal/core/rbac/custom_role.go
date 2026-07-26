@@ -290,7 +290,7 @@ func (c *Core) UnassignCustomRoleFromProject(ctx context.Context, targetUserID, 
 	return nil
 }
 
-// AssignCustomRoleToOrg grants targetUserID a custom role in the caller's organization.
+// AssignCustomRoleToOrg grants targetUserID a custom role in the caller's project organization.
 // Returns [mdl.ErrNotFound] if the target user, role, organization, or membership does not exist,
 // or the role belongs to a different organization.
 // Returns [mdl.ErrAlreadyExists] if the assignment already exists.
@@ -300,12 +300,12 @@ func (c *Core) AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID u
 	if !ok {
 		return errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return errors.New("organization context missing")
+	if sess.ProjectID == nil {
+		return errors.New("project context missing")
 	}
 
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-		perms, err := c.roleStorer.OrgPermissions(ctx, sess.User.UserID, *sess.OrgID)
+		perms, err := c.roleStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, *sess.ProjectID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("get actor organization permissions: %w", mdl.ErrNotFound)
@@ -325,7 +325,7 @@ func (c *Core) AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID u
 			return mdl.ErrPermissionDenied
 		}
 
-		if err := c.roleStorer.AssignCustomRoleToOrg(ctx, targetUserID, roleID, *sess.OrgID); err != nil {
+		if err := c.roleStorer.AssignCustomRoleToOrg(ctx, targetUserID, roleID, perms.OrgID); err != nil {
 			return fmt.Errorf("assign custom role to org: %w", handleAssignmentError(err))
 		}
 

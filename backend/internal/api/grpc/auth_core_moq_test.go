@@ -24,6 +24,9 @@ var _ AuthCore = &MockedAuthCore{}
 //			AuthSessionFunc: func(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
 //				panic("mock out the AuthSession method")
 //			},
+//			OrganizationAuthSessionFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
+//				panic("mock out the OrganizationAuthSession method")
+//			},
 //			RefreshAccessTokenFunc: func(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error) {
 //				panic("mock out the RefreshAccessToken method")
 //			},
@@ -45,6 +48,9 @@ var _ AuthCore = &MockedAuthCore{}
 type MockedAuthCore struct {
 	// AuthSessionFunc mocks the AuthSession method.
 	AuthSessionFunc func(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error)
+
+	// OrganizationAuthSessionFunc mocks the OrganizationAuthSession method.
+	OrganizationAuthSessionFunc func(ctx context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error)
 
 	// RefreshAccessTokenFunc mocks the RefreshAccessToken method.
 	RefreshAccessTokenFunc func(ctx context.Context, rt mdl.RefreshToken) (mdl.AuthTokenPair, error)
@@ -68,6 +74,15 @@ type MockedAuthCore struct {
 			UserID uuid.UUID
 			// ProjectID is the projectID argument value.
 			ProjectID *int
+		}
+		// OrganizationAuthSession holds details about calls to the OrganizationAuthSession method.
+		OrganizationAuthSession []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// ProjectID is the projectID argument value.
+			ProjectID int
 		}
 		// RefreshAccessToken holds details about calls to the RefreshAccessToken method.
 		RefreshAccessToken []struct {
@@ -99,6 +114,7 @@ type MockedAuthCore struct {
 		}
 	}
 	lockAuthSession                sync.RWMutex
+	lockOrganizationAuthSession    sync.RWMutex
 	lockRefreshAccessToken         sync.RWMutex
 	lockRevokeAllUserRefreshTokens sync.RWMutex
 	lockRevokeRefreshToken         sync.RWMutex
@@ -142,6 +158,46 @@ func (mock *MockedAuthCore) AuthSessionCalls() []struct {
 	mock.lockAuthSession.RLock()
 	calls = mock.calls.AuthSession
 	mock.lockAuthSession.RUnlock()
+	return calls
+}
+
+// OrganizationAuthSession calls OrganizationAuthSessionFunc.
+func (mock *MockedAuthCore) OrganizationAuthSession(ctx context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
+	if mock.OrganizationAuthSessionFunc == nil {
+		panic("MockedAuthCore.OrganizationAuthSessionFunc: method is nil but AuthCore.OrganizationAuthSession was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID int
+	}{
+		Ctx:       ctx,
+		UserID:    userID,
+		ProjectID: projectID,
+	}
+	mock.lockOrganizationAuthSession.Lock()
+	mock.calls.OrganizationAuthSession = append(mock.calls.OrganizationAuthSession, callInfo)
+	mock.lockOrganizationAuthSession.Unlock()
+	return mock.OrganizationAuthSessionFunc(ctx, userID, projectID)
+}
+
+// OrganizationAuthSessionCalls gets all the calls that were made to OrganizationAuthSession.
+// Check the length with:
+//
+//	len(mockedAuthCore.OrganizationAuthSessionCalls())
+func (mock *MockedAuthCore) OrganizationAuthSessionCalls() []struct {
+	Ctx       context.Context
+	UserID    uuid.UUID
+	ProjectID int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID int
+	}
+	mock.lockOrganizationAuthSession.RLock()
+	calls = mock.calls.OrganizationAuthSession
+	mock.lockOrganizationAuthSession.RUnlock()
 	return calls
 }
 
