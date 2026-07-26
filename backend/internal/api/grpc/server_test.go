@@ -12,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -113,6 +114,7 @@ type ServerIntegrationTest struct {
 	userStore               *pguser.Store
 	orgStore                *pgorg.Store
 	rbacStore               *pgrbac.Store
+	pool                    *pgxpool.Pool
 }
 
 // NewServerIntegrationTest starts a gRPC server over an in-memory transport wired to real cores
@@ -179,6 +181,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		userStore:               pgUserStore,
 		orgStore:                pgOrgStore,
 		rbacStore:               pgRBACStore,
+		pool:                    pool,
 	}
 }
 
@@ -208,6 +211,15 @@ func authCtxForUserAtProject(t *testing.T, ctx context.Context, userID uuid.UUID
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 		},
 	}, testJWTKey)
+}
+
+func seedOrgMembership(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID, orgID int) {
+	t.Helper()
+
+	// TODO: Replace this direct insert once pgorg exposes an organization-membership creation method.
+	if _, err := pool.Exec(ctx, "INSERT INTO org.org_membership (user_id, org_id) VALUES ($1, $2)", userID, orgID); err != nil {
+		t.Fatalf("seed organization membership (user %d, organization %d): %v", userID, orgID, err)
+	}
 }
 
 // authCtxWithToken returns ctx with the given JWT as a Bearer token in the gRPC outgoing metadata.

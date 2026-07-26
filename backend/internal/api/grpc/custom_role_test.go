@@ -46,7 +46,7 @@ func TestRoleService_Integration(t *testing.T) {
 		t.Fatalf("CreateOrganization() error = %v", err)
 	}
 
-	// Seed an actor with authority to manage every custom role.
+	// Seed an authorized actor and an organization-member assignment target.
 
 	actor, err := srv.userStore.CreateUser(ctx, pguser.CreateUser{
 		Email: "role-service-actor@test.com",
@@ -59,6 +59,16 @@ func TestRoleService_Integration(t *testing.T) {
 	if err := srv.rbacStore.AssignSystemRole(ctx, actor.ExternalID, "superadmin"); err != nil {
 		t.Fatalf("AssignSystemRole() error = %v", err)
 	}
+
+	target, err := srv.userStore.CreateUser(ctx, pguser.CreateUser{
+		Email: "role-service-target@test.com",
+		Name:  "Role Service Target",
+	})
+	if err != nil {
+		t.Fatalf("CreateUser() target error = %v", err)
+	}
+
+	seedOrgMembership(t, ctx, srv.pool, target.ID, org.ID)
 
 	// Authenticate the actor through the owning organization's control project.
 
@@ -136,6 +146,42 @@ func TestRoleService_Integration(t *testing.T) {
 
 	if got, want := modified.GetPermissions(), []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE}; !slices.Equal(got, want) {
 		t.Errorf("ModifyRolePermissions() permissions = %v, want %v", got, want)
+	}
+
+	// Assign and unassign the role in the request's project.
+
+	if _, err := srv.customRoleServiceClient.AssignRoleToProject(authCtx, &pb.AssignRoleToProjectRequest{
+		RoleId: created.GetId(),
+		UserId: target.ExternalID.String(),
+	}); err != nil {
+		t.Fatalf("AssignRoleToProject() error = %v", err)
+	}
+
+	// TODO: Verify the target's project role assignments once RoleService exposes a listing endpoint.
+
+	if _, err := srv.customRoleServiceClient.UnassignRoleFromProject(authCtx, &pb.UnassignRoleFromProjectRequest{
+		RoleId: created.GetId(),
+		UserId: target.ExternalID.String(),
+	}); err != nil {
+		t.Fatalf("UnassignRoleFromProject() error = %v", err)
+	}
+
+	// Assign and unassign the role across the request project's organization.
+
+	if _, err := srv.customRoleServiceClient.AssignRoleToOrganization(authCtx, &pb.AssignRoleToOrganizationRequest{
+		RoleId: created.GetId(),
+		UserId: target.ExternalID.String(),
+	}); err != nil {
+		t.Fatalf("AssignRoleToOrganization() error = %v", err)
+	}
+
+	// TODO: Verify the target's organization role assignments once RoleService exposes a listing endpoint.
+
+	if _, err := srv.customRoleServiceClient.UnassignRoleFromOrganization(authCtx, &pb.UnassignRoleFromOrganizationRequest{
+		RoleId: created.GetId(),
+		UserId: target.ExternalID.String(),
+	}); err != nil {
+		t.Fatalf("UnassignRoleFromOrganization() error = %v", err)
 	}
 
 	// Verify the role is inaccessible through another organization.
@@ -969,6 +1015,346 @@ func TestRoleService_DeleteRole_error(t *testing.T) {
 			got, ok := status.FromError(err)
 			if !ok {
 				t.Fatalf("DeleteRole() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_AssignRoleToProject(t *testing.T) {
+	customRoleCore := &MockedCustomRoleCore{
+		AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID) error { return nil },
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.AssignRoleToProject(
+		authCtxForTestUser(t, t.Context()),
+		&pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+	)
+	if err != nil {
+		t.Fatalf("AssignRoleToProject() error = %v", err)
+	}
+
+	want := &pb.AssignRoleToProjectResponse{}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_AssignRoleToProject_error(t *testing.T) {
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.AssignRoleToProjectRequest
+		want           *status.Status
+	}{
+		{
+			name:           "validated request",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.AssignRoleToProjectRequest{RoleId: "not-a-uuid", UserId: uuid.NewString()},
+			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "role_id", Description: "must be a valid UUID"},
+			})),
+		},
+		{
+			name: "not found",
+			customRoleCore: &MockedCustomRoleCore{
+				AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrNotFound
+				},
+			},
+			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.NotFound, "user, role, project, or organization membership not found"),
+		},
+		{
+			name: "already assigned",
+			customRoleCore: &MockedCustomRoleCore{
+				AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrAlreadyExists
+				},
+			},
+			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.AlreadyExists, "user already has role in project"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return errors.New("boom")
+				},
+			},
+			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.AssignRoleToProject(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("AssignRoleToProject() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("AssignRoleToProject() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_UnassignRoleFromProject(t *testing.T) {
+	customRoleCore := &MockedCustomRoleCore{
+		UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID) error { return nil },
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.UnassignRoleFromProject(
+		authCtxForTestUser(t, t.Context()),
+		&pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+	)
+	if err != nil {
+		t.Fatalf("UnassignRoleFromProject() error = %v", err)
+	}
+
+	want := &pb.UnassignRoleFromProjectResponse{}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_UnassignRoleFromProject_error(t *testing.T) {
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.UnassignRoleFromProjectRequest
+		want           *status.Status
+	}{
+		{
+			name:           "validated request",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.UnassignRoleFromProjectRequest{RoleId: "not-a-uuid", UserId: uuid.NewString()},
+			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "role_id", Description: "must be a valid UUID"},
+			})),
+		},
+		{
+			name: "not found",
+			customRoleCore: &MockedCustomRoleCore{
+				UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrNotFound
+				},
+			},
+			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.NotFound, "project role assignment not found"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return errors.New("boom")
+				},
+			},
+			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.UnassignRoleFromProject(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("UnassignRoleFromProject() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("UnassignRoleFromProject() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_AssignRoleToOrganization(t *testing.T) {
+	customRoleCore := &MockedCustomRoleCore{
+		AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID) error { return nil },
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.AssignRoleToOrganization(
+		authCtxForTestUser(t, t.Context()),
+		&pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+	)
+	if err != nil {
+		t.Fatalf("AssignRoleToOrganization() error = %v", err)
+	}
+
+	want := &pb.AssignRoleToOrganizationResponse{}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_AssignRoleToOrganization_error(t *testing.T) {
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.AssignRoleToOrganizationRequest
+		want           *status.Status
+	}{
+		{
+			name:           "validated request",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.AssignRoleToOrganizationRequest{RoleId: "not-a-uuid", UserId: uuid.NewString()},
+			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "role_id", Description: "must be a valid UUID"},
+			})),
+		},
+		{
+			name: "not found",
+			customRoleCore: &MockedCustomRoleCore{
+				AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrNotFound
+				},
+			},
+			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.NotFound, "user, role, organization, or organization membership not found"),
+		},
+		{
+			name: "already assigned",
+			customRoleCore: &MockedCustomRoleCore{
+				AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrAlreadyExists
+				},
+			},
+			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.AlreadyExists, "user already has role in organization"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return errors.New("boom")
+				},
+			},
+			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.AssignRoleToOrganization(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("AssignRoleToOrganization() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("AssignRoleToOrganization() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_UnassignRoleFromOrganization(t *testing.T) {
+	customRoleCore := &MockedCustomRoleCore{
+		UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID) error { return nil },
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		CustomRoleCore: customRoleCore,
+	})
+
+	got, err := srvTest.customRoleServiceClient.UnassignRoleFromOrganization(
+		authCtxForTestUser(t, t.Context()),
+		&pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+	)
+	if err != nil {
+		t.Fatalf("UnassignRoleFromOrganization() error = %v", err)
+	}
+
+	want := &pb.UnassignRoleFromOrganizationResponse{}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_UnassignRoleFromOrganization_error(t *testing.T) {
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.UnassignRoleFromOrganizationRequest
+		want           *status.Status
+	}{
+		{
+			name:           "validated request",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.UnassignRoleFromOrganizationRequest{RoleId: "not-a-uuid", UserId: uuid.NewString()},
+			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "role_id", Description: "must be a valid UUID"},
+			})),
+		},
+		{
+			name: "not found",
+			customRoleCore: &MockedCustomRoleCore{
+				UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrNotFound
+				},
+			},
+			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.NotFound, "organization role assignment not found"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return errors.New("boom")
+				},
+			},
+			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:            testingx.NewLogger(t),
+				CustomRoleCore: tt.customRoleCore,
+			})
+
+			_, err := srvTest.customRoleServiceClient.UnassignRoleFromOrganization(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("UnassignRoleFromOrganization() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("UnassignRoleFromOrganization() error = %q, want a gRPC status error", err)
 			}
 
 			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())

@@ -48,6 +48,14 @@ type CustomRoleCore interface {
 	// DeleteCustomRole deletes a custom role in the caller's organization.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	DeleteCustomRole(ctx context.Context, customRoleID uuid.UUID) error
+	// AssignCustomRoleToProject assigns a custom role to a user in the caller's project.
+	AssignCustomRoleToProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
+	// UnassignCustomRoleFromProject unassigns a custom role from a user in the caller's project.
+	UnassignCustomRoleFromProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
+	// AssignCustomRoleToOrg assigns a custom role to a user across the caller's organization.
+	AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
+	// UnassignCustomRoleFromOrg unassigns a custom role from a user across the caller's organization.
+	UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
 }
 
 func (s *customRoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb.Role, error) {
@@ -191,4 +199,84 @@ func (s *customRoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRe
 	}
 
 	return &pb.DeleteRoleResponse{}, nil
+}
+
+func (s *customRoleService) AssignRoleToProject(ctx context.Context, req *pb.AssignRoleToProjectRequest) (*pb.AssignRoleToProjectResponse, error) {
+	if err := validate.AssignRoleToProject(req); err != nil {
+		return nil, fmt.Errorf("validate assign role to project request: %w", err)
+	}
+
+	roleID := uuid.MustParse(req.GetRoleId())
+	userID := uuid.MustParse(req.GetUserId())
+
+	if err := s.customRoleCore.AssignCustomRoleToProject(ctx, userID, roleID); err != nil {
+		switch {
+		case errors.Is(err, mdl.ErrNotFound):
+			return nil, status.Error(codes.NotFound, "user, role, project, or organization membership not found")
+		case errors.Is(err, mdl.ErrAlreadyExists):
+			return nil, status.Error(codes.AlreadyExists, "user already has role in project")
+		default:
+			return nil, fmt.Errorf("assign role to project: %w", err)
+		}
+	}
+
+	return &pb.AssignRoleToProjectResponse{}, nil
+}
+
+func (s *customRoleService) UnassignRoleFromProject(ctx context.Context, req *pb.UnassignRoleFromProjectRequest) (*pb.UnassignRoleFromProjectResponse, error) {
+	if err := validate.UnassignRoleFromProject(req); err != nil {
+		return nil, fmt.Errorf("validate unassign role from project request: %w", err)
+	}
+
+	roleID := uuid.MustParse(req.GetRoleId())
+	userID := uuid.MustParse(req.GetUserId())
+
+	if err := s.customRoleCore.UnassignCustomRoleFromProject(ctx, userID, roleID); err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "project role assignment not found")
+		}
+		return nil, fmt.Errorf("unassign role from project: %w", err)
+	}
+
+	return &pb.UnassignRoleFromProjectResponse{}, nil
+}
+
+func (s *customRoleService) AssignRoleToOrganization(ctx context.Context, req *pb.AssignRoleToOrganizationRequest) (*pb.AssignRoleToOrganizationResponse, error) {
+	if err := validate.AssignRoleToOrganization(req); err != nil {
+		return nil, fmt.Errorf("validate assign role to organization request: %w", err)
+	}
+
+	roleID := uuid.MustParse(req.GetRoleId())
+	userID := uuid.MustParse(req.GetUserId())
+
+	if err := s.customRoleCore.AssignCustomRoleToOrg(ctx, userID, roleID); err != nil {
+		switch {
+		case errors.Is(err, mdl.ErrNotFound):
+			return nil, status.Error(codes.NotFound, "user, role, organization, or organization membership not found")
+		case errors.Is(err, mdl.ErrAlreadyExists):
+			return nil, status.Error(codes.AlreadyExists, "user already has role in organization")
+		default:
+			return nil, fmt.Errorf("assign role to organization: %w", err)
+		}
+	}
+
+	return &pb.AssignRoleToOrganizationResponse{}, nil
+}
+
+func (s *customRoleService) UnassignRoleFromOrganization(ctx context.Context, req *pb.UnassignRoleFromOrganizationRequest) (*pb.UnassignRoleFromOrganizationResponse, error) {
+	if err := validate.UnassignRoleFromOrganization(req); err != nil {
+		return nil, fmt.Errorf("validate unassign role from organization request: %w", err)
+	}
+
+	roleID := uuid.MustParse(req.GetRoleId())
+	userID := uuid.MustParse(req.GetUserId())
+
+	if err := s.customRoleCore.UnassignCustomRoleFromOrg(ctx, userID, roleID); err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "organization role assignment not found")
+		}
+		return nil, fmt.Errorf("unassign role from organization: %w", err)
+	}
+
+	return &pb.UnassignRoleFromOrganizationResponse{}, nil
 }

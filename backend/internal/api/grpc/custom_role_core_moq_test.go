@@ -21,6 +21,12 @@ var _ CustomRoleCore = &MockedCustomRoleCore{}
 //
 //		// make and configure a mocked CustomRoleCore
 //		mockedCustomRoleCore := &MockedCustomRoleCore{
+//			AssignCustomRoleToOrgFunc: func(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error {
+//				panic("mock out the AssignCustomRoleToOrg method")
+//			},
+//			AssignCustomRoleToProjectFunc: func(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error {
+//				panic("mock out the AssignCustomRoleToProject method")
+//			},
 //			CreateCustomRoleFunc: func(ctx context.Context, cr mdl.CreateCustomRole) (mdl.CustomRole, error) {
 //				panic("mock out the CreateCustomRole method")
 //			},
@@ -36,6 +42,12 @@ var _ CustomRoleCore = &MockedCustomRoleCore{}
 //			ModifyCustomRolePermissionsFunc: func(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
 //				panic("mock out the ModifyCustomRolePermissions method")
 //			},
+//			UnassignCustomRoleFromOrgFunc: func(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error {
+//				panic("mock out the UnassignCustomRoleFromOrg method")
+//			},
+//			UnassignCustomRoleFromProjectFunc: func(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error {
+//				panic("mock out the UnassignCustomRoleFromProject method")
+//			},
 //			UpdateCustomRoleFunc: func(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error) {
 //				panic("mock out the UpdateCustomRole method")
 //			},
@@ -46,6 +58,12 @@ var _ CustomRoleCore = &MockedCustomRoleCore{}
 //
 //	}
 type MockedCustomRoleCore struct {
+	// AssignCustomRoleToOrgFunc mocks the AssignCustomRoleToOrg method.
+	AssignCustomRoleToOrgFunc func(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error
+
+	// AssignCustomRoleToProjectFunc mocks the AssignCustomRoleToProject method.
+	AssignCustomRoleToProjectFunc func(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error
+
 	// CreateCustomRoleFunc mocks the CreateCustomRole method.
 	CreateCustomRoleFunc func(ctx context.Context, cr mdl.CreateCustomRole) (mdl.CustomRole, error)
 
@@ -61,11 +79,35 @@ type MockedCustomRoleCore struct {
 	// ModifyCustomRolePermissionsFunc mocks the ModifyCustomRolePermissions method.
 	ModifyCustomRolePermissionsFunc func(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error)
 
+	// UnassignCustomRoleFromOrgFunc mocks the UnassignCustomRoleFromOrg method.
+	UnassignCustomRoleFromOrgFunc func(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error
+
+	// UnassignCustomRoleFromProjectFunc mocks the UnassignCustomRoleFromProject method.
+	UnassignCustomRoleFromProjectFunc func(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error
+
 	// UpdateCustomRoleFunc mocks the UpdateCustomRole method.
 	UpdateCustomRoleFunc func(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AssignCustomRoleToOrg holds details about calls to the AssignCustomRoleToOrg method.
+		AssignCustomRoleToOrg []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TargetUserID is the targetUserID argument value.
+			TargetUserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+		}
+		// AssignCustomRoleToProject holds details about calls to the AssignCustomRoleToProject method.
+		AssignCustomRoleToProject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TargetUserID is the targetUserID argument value.
+			TargetUserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+		}
 		// CreateCustomRole holds details about calls to the CreateCustomRole method.
 		CreateCustomRole []struct {
 			// Ctx is the ctx argument value.
@@ -103,6 +145,24 @@ type MockedCustomRoleCore struct {
 			// Mrp is the mrp argument value.
 			Mrp mdl.ModifyCustomRolePermissions
 		}
+		// UnassignCustomRoleFromOrg holds details about calls to the UnassignCustomRoleFromOrg method.
+		UnassignCustomRoleFromOrg []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TargetUserID is the targetUserID argument value.
+			TargetUserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+		}
+		// UnassignCustomRoleFromProject holds details about calls to the UnassignCustomRoleFromProject method.
+		UnassignCustomRoleFromProject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TargetUserID is the targetUserID argument value.
+			TargetUserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+		}
 		// UpdateCustomRole holds details about calls to the UpdateCustomRole method.
 		UpdateCustomRole []struct {
 			// Ctx is the ctx argument value.
@@ -111,12 +171,96 @@ type MockedCustomRoleCore struct {
 			Ur mdl.UpdateCustomRole
 		}
 	}
-	lockCreateCustomRole            sync.RWMutex
-	lockCustomRoleByID              sync.RWMutex
-	lockCustomRoles                 sync.RWMutex
-	lockDeleteCustomRole            sync.RWMutex
-	lockModifyCustomRolePermissions sync.RWMutex
-	lockUpdateCustomRole            sync.RWMutex
+	lockAssignCustomRoleToOrg         sync.RWMutex
+	lockAssignCustomRoleToProject     sync.RWMutex
+	lockCreateCustomRole              sync.RWMutex
+	lockCustomRoleByID                sync.RWMutex
+	lockCustomRoles                   sync.RWMutex
+	lockDeleteCustomRole              sync.RWMutex
+	lockModifyCustomRolePermissions   sync.RWMutex
+	lockUnassignCustomRoleFromOrg     sync.RWMutex
+	lockUnassignCustomRoleFromProject sync.RWMutex
+	lockUpdateCustomRole              sync.RWMutex
+}
+
+// AssignCustomRoleToOrg calls AssignCustomRoleToOrgFunc.
+func (mock *MockedCustomRoleCore) AssignCustomRoleToOrg(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error {
+	if mock.AssignCustomRoleToOrgFunc == nil {
+		panic("MockedCustomRoleCore.AssignCustomRoleToOrgFunc: method is nil but CustomRoleCore.AssignCustomRoleToOrg was just called")
+	}
+	callInfo := struct {
+		Ctx          context.Context
+		TargetUserID uuid.UUID
+		RoleID       uuid.UUID
+	}{
+		Ctx:          ctx,
+		TargetUserID: targetUserID,
+		RoleID:       roleID,
+	}
+	mock.lockAssignCustomRoleToOrg.Lock()
+	mock.calls.AssignCustomRoleToOrg = append(mock.calls.AssignCustomRoleToOrg, callInfo)
+	mock.lockAssignCustomRoleToOrg.Unlock()
+	return mock.AssignCustomRoleToOrgFunc(ctx, targetUserID, roleID)
+}
+
+// AssignCustomRoleToOrgCalls gets all the calls that were made to AssignCustomRoleToOrg.
+// Check the length with:
+//
+//	len(mockedCustomRoleCore.AssignCustomRoleToOrgCalls())
+func (mock *MockedCustomRoleCore) AssignCustomRoleToOrgCalls() []struct {
+	Ctx          context.Context
+	TargetUserID uuid.UUID
+	RoleID       uuid.UUID
+} {
+	var calls []struct {
+		Ctx          context.Context
+		TargetUserID uuid.UUID
+		RoleID       uuid.UUID
+	}
+	mock.lockAssignCustomRoleToOrg.RLock()
+	calls = mock.calls.AssignCustomRoleToOrg
+	mock.lockAssignCustomRoleToOrg.RUnlock()
+	return calls
+}
+
+// AssignCustomRoleToProject calls AssignCustomRoleToProjectFunc.
+func (mock *MockedCustomRoleCore) AssignCustomRoleToProject(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error {
+	if mock.AssignCustomRoleToProjectFunc == nil {
+		panic("MockedCustomRoleCore.AssignCustomRoleToProjectFunc: method is nil but CustomRoleCore.AssignCustomRoleToProject was just called")
+	}
+	callInfo := struct {
+		Ctx          context.Context
+		TargetUserID uuid.UUID
+		RoleID       uuid.UUID
+	}{
+		Ctx:          ctx,
+		TargetUserID: targetUserID,
+		RoleID:       roleID,
+	}
+	mock.lockAssignCustomRoleToProject.Lock()
+	mock.calls.AssignCustomRoleToProject = append(mock.calls.AssignCustomRoleToProject, callInfo)
+	mock.lockAssignCustomRoleToProject.Unlock()
+	return mock.AssignCustomRoleToProjectFunc(ctx, targetUserID, roleID)
+}
+
+// AssignCustomRoleToProjectCalls gets all the calls that were made to AssignCustomRoleToProject.
+// Check the length with:
+//
+//	len(mockedCustomRoleCore.AssignCustomRoleToProjectCalls())
+func (mock *MockedCustomRoleCore) AssignCustomRoleToProjectCalls() []struct {
+	Ctx          context.Context
+	TargetUserID uuid.UUID
+	RoleID       uuid.UUID
+} {
+	var calls []struct {
+		Ctx          context.Context
+		TargetUserID uuid.UUID
+		RoleID       uuid.UUID
+	}
+	mock.lockAssignCustomRoleToProject.RLock()
+	calls = mock.calls.AssignCustomRoleToProject
+	mock.lockAssignCustomRoleToProject.RUnlock()
+	return calls
 }
 
 // CreateCustomRole calls CreateCustomRoleFunc.
@@ -300,6 +444,86 @@ func (mock *MockedCustomRoleCore) ModifyCustomRolePermissionsCalls() []struct {
 	mock.lockModifyCustomRolePermissions.RLock()
 	calls = mock.calls.ModifyCustomRolePermissions
 	mock.lockModifyCustomRolePermissions.RUnlock()
+	return calls
+}
+
+// UnassignCustomRoleFromOrg calls UnassignCustomRoleFromOrgFunc.
+func (mock *MockedCustomRoleCore) UnassignCustomRoleFromOrg(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error {
+	if mock.UnassignCustomRoleFromOrgFunc == nil {
+		panic("MockedCustomRoleCore.UnassignCustomRoleFromOrgFunc: method is nil but CustomRoleCore.UnassignCustomRoleFromOrg was just called")
+	}
+	callInfo := struct {
+		Ctx          context.Context
+		TargetUserID uuid.UUID
+		RoleID       uuid.UUID
+	}{
+		Ctx:          ctx,
+		TargetUserID: targetUserID,
+		RoleID:       roleID,
+	}
+	mock.lockUnassignCustomRoleFromOrg.Lock()
+	mock.calls.UnassignCustomRoleFromOrg = append(mock.calls.UnassignCustomRoleFromOrg, callInfo)
+	mock.lockUnassignCustomRoleFromOrg.Unlock()
+	return mock.UnassignCustomRoleFromOrgFunc(ctx, targetUserID, roleID)
+}
+
+// UnassignCustomRoleFromOrgCalls gets all the calls that were made to UnassignCustomRoleFromOrg.
+// Check the length with:
+//
+//	len(mockedCustomRoleCore.UnassignCustomRoleFromOrgCalls())
+func (mock *MockedCustomRoleCore) UnassignCustomRoleFromOrgCalls() []struct {
+	Ctx          context.Context
+	TargetUserID uuid.UUID
+	RoleID       uuid.UUID
+} {
+	var calls []struct {
+		Ctx          context.Context
+		TargetUserID uuid.UUID
+		RoleID       uuid.UUID
+	}
+	mock.lockUnassignCustomRoleFromOrg.RLock()
+	calls = mock.calls.UnassignCustomRoleFromOrg
+	mock.lockUnassignCustomRoleFromOrg.RUnlock()
+	return calls
+}
+
+// UnassignCustomRoleFromProject calls UnassignCustomRoleFromProjectFunc.
+func (mock *MockedCustomRoleCore) UnassignCustomRoleFromProject(ctx context.Context, targetUserID uuid.UUID, roleID uuid.UUID) error {
+	if mock.UnassignCustomRoleFromProjectFunc == nil {
+		panic("MockedCustomRoleCore.UnassignCustomRoleFromProjectFunc: method is nil but CustomRoleCore.UnassignCustomRoleFromProject was just called")
+	}
+	callInfo := struct {
+		Ctx          context.Context
+		TargetUserID uuid.UUID
+		RoleID       uuid.UUID
+	}{
+		Ctx:          ctx,
+		TargetUserID: targetUserID,
+		RoleID:       roleID,
+	}
+	mock.lockUnassignCustomRoleFromProject.Lock()
+	mock.calls.UnassignCustomRoleFromProject = append(mock.calls.UnassignCustomRoleFromProject, callInfo)
+	mock.lockUnassignCustomRoleFromProject.Unlock()
+	return mock.UnassignCustomRoleFromProjectFunc(ctx, targetUserID, roleID)
+}
+
+// UnassignCustomRoleFromProjectCalls gets all the calls that were made to UnassignCustomRoleFromProject.
+// Check the length with:
+//
+//	len(mockedCustomRoleCore.UnassignCustomRoleFromProjectCalls())
+func (mock *MockedCustomRoleCore) UnassignCustomRoleFromProjectCalls() []struct {
+	Ctx          context.Context
+	TargetUserID uuid.UUID
+	RoleID       uuid.UUID
+} {
+	var calls []struct {
+		Ctx          context.Context
+		TargetUserID uuid.UUID
+		RoleID       uuid.UUID
+	}
+	mock.lockUnassignCustomRoleFromProject.RLock()
+	calls = mock.calls.UnassignCustomRoleFromProject
+	mock.lockUnassignCustomRoleFromProject.RUnlock()
 	return calls
 }
 
