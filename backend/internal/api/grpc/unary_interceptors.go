@@ -124,7 +124,7 @@ func authUnaryInterceptor(jwtKey []byte, issuer, audience string, authCore AuthC
 		}
 
 		var sess mdl.AuthSession
-		if organizationScopedMethods.Contains(info.FullMethod) {
+		if methodRequiresOrganizationScope(info.FullMethod) {
 			sess, err = authCore.OrganizationAuthSession(ctx, claims.UserID, *projectID)
 		} else {
 			sess, err = authCore.AuthSession(ctx, claims.UserID, projectID)

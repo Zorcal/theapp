@@ -3,6 +3,7 @@ package grpc
 
 import (
 	"log/slog"
+	"slices"
 	"strings"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -55,12 +56,13 @@ var noProjectMethods = set.Set[string]{
 	"/theapp.v1.UserService/UpdateUser": {},
 }
 
-// organizationScopedMethods lists methods whose permissions must be resolved without project-scoped
-// role assignments. The request project identifies the organization in which the method operates.
-var organizationScopedMethods = set.Set[string]{
-	"/theapp.v1.RoleService/ListOrganizationRoleAssignments": {},
-	"/theapp.v1.RoleService/AssignRoleToOrganization":        {},
-	"/theapp.v1.RoleService/UnassignRoleFromOrganization":    {},
+// organizationScopedPermissions identifies permissions that must be resolved without
+// project-scoped role assignments. The request project identifies the organization in which the
+// method operates.
+var organizationScopedPermissions = set.Set[mdl.Permission]{
+	mdl.PermissionCustomRoleReadOrgAssignments: {},
+	mdl.PermissionCustomRoleAssignOrg:          {},
+	mdl.PermissionCustomRoleUnassignOrg:        {},
 }
 
 // permissionRegistry maps every protected (non-public, see publicMethods) gRPC method to the
@@ -95,6 +97,10 @@ var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.RoleService/UnassignRoleFromOrganization":    {mdl.PermissionCustomRoleUnassignOrg},
 
 	"/theapp.v1.PermissionService/ListPermissions": {mdl.PermissionCustomRoleRead},
+}
+
+func methodRequiresOrganizationScope(method string) bool {
+	return slices.ContainsFunc(permissionRegistry[method], organizationScopedPermissions.Contains)
 }
 
 // NewServer constructs the GRPC server.

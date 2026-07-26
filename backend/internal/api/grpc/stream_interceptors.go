@@ -45,7 +45,7 @@ func authStreamInterceptor(jwtKey []byte, issuer, audience string, authCore Auth
 		}
 
 		var sess mdl.AuthSession
-		if organizationScopedMethods.Contains(info.FullMethod) {
+		if methodRequiresOrganizationScope(info.FullMethod) {
 			sess, err = authCore.OrganizationAuthSession(ss.Context(), claims.UserID, *projectID)
 		} else {
 			sess, err = authCore.AuthSession(ss.Context(), claims.UserID, projectID)

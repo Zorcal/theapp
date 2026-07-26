@@ -297,6 +297,101 @@ func TestPermissionRegistry_exhaustiveness(t *testing.T) {
 	}
 }
 
+func TestProjectScopedAuthorization(t *testing.T) {
+	authCore := &MockedAuthCore{
+		AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+			return mdl.AuthSession{
+				User: mdl.AuthUser{
+					UserID:      userID,
+					Permissions: []mdl.Permission{mdl.PermissionCustomRoleAssignProject},
+				},
+				ProjectID: projectID,
+				OrgID:     new(1),
+			}, nil
+		},
+	}
+	customRoleCore := &MockedCustomRoleCore{
+		AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+			return nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		AuthCore:       authCore,
+		CustomRoleCore: customRoleCore,
+	})
+
+	if _, err := srvTest.customRoleServiceClient.AssignRoleToProject(authCtxForTestUser(t, t.Context()), &pb.AssignRoleToProjectRequest{
+		RoleId: uuid.NewString(),
+		UserId: uuid.NewString(),
+	}); err != nil {
+		t.Fatalf("AssignRoleToProject() error = %v", err)
+	}
+}
+
+func TestOrganizationScopedAuthorization(t *testing.T) {
+	authCore := &MockedAuthCore{
+		OrganizationAuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
+			return mdl.AuthSession{
+				User: mdl.AuthUser{
+					UserID:      userID,
+					Permissions: []mdl.Permission{mdl.PermissionCustomRoleAssignOrg},
+				},
+				ProjectID: &projectID,
+				OrgID:     new(1),
+			}, nil
+		},
+	}
+	customRoleCore := &MockedCustomRoleCore{
+		AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+			return nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:            testingx.NewLogger(t),
+		AuthCore:       authCore,
+		CustomRoleCore: customRoleCore,
+	})
+
+	if _, err := srvTest.customRoleServiceClient.AssignRoleToOrganization(authCtxForTestUser(t, t.Context()), &pb.AssignRoleToOrganizationRequest{
+		RoleId: uuid.NewString(),
+		UserId: uuid.NewString(),
+	}); err != nil {
+		t.Fatalf("AssignRoleToOrganization() error = %v", err)
+	}
+}
+
+func TestMethodRequiresOrganizationScope(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		want   bool
+	}{
+		{
+			name:   "read organization assignments",
+			method: "/theapp.v1.RoleService/ListOrganizationRoleAssignments",
+			want:   true,
+		},
+		{
+			name:   "assign project role",
+			method: "/theapp.v1.RoleService/AssignRoleToProject",
+			want:   false,
+		},
+		{
+			name:   "unknown method",
+			method: "/theapp.v1.UnknownService/UnknownMethod",
+			want:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := methodRequiresOrganizationScope(tt.method); got != tt.want {
+				t.Errorf("methodRequiresOrganizationScope(%q) = %t, want %t", tt.method, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestAuthUnaryInterceptor_error(t *testing.T) {
 	dbErr := errors.New("db error")
 
@@ -390,6 +485,47 @@ func TestAuthUnaryInterceptor_error(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				if _, err := interceptor(tt.ctx, nil, &grpc.UnaryServerInfo{FullMethod: tt.fullMethod}, handler); !errors.Is(err, dbErr) {
 					t.Errorf("authUnaryInterceptor() error = %v, want %v", err, dbErr)
+				}
+			})
+		}
+	})
+
+	t.Run("organization session", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			authCore *MockedAuthCore
+			want     codes.Code
+		}{
+			{
+				name: "not found",
+				authCore: &MockedAuthCore{
+					OrganizationAuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ int) (mdl.AuthSession, error) {
+						return mdl.AuthSession{}, mdl.ErrNotFound
+					},
+				},
+				want: codes.Unauthenticated,
+			},
+			{
+				name: "store",
+				authCore: &MockedAuthCore{
+					OrganizationAuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ int) (mdl.AuthSession, error) {
+						return mdl.AuthSession{}, dbErr
+					},
+				},
+				want: codes.Unknown,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				interceptor := authUnaryInterceptor(testJWTKey, testJWTIssuer, testJWTAudience, tt.authCore)
+				ctx := withProjectID(validCtx(t), "1")
+
+				_, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{
+					FullMethod: "/theapp.v1.RoleService/AssignRoleToOrganization",
+				}, handler)
+
+				if got := status.Code(err); got != tt.want {
+					t.Errorf("authUnaryInterceptor() code = %v, want %v", got, tt.want)
 				}
 			})
 		}

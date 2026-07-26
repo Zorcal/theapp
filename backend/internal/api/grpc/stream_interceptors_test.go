@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
 	"testing"
 	"time"
 
@@ -136,7 +134,7 @@ func TestAuthStreamInterceptor(t *testing.T) {
 
 		ctx := withStreamProjectID(validStreamAuthCtx(t), "7")
 		if err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{
-			FullMethod: slices.Collect(maps.Keys(organizationScopedMethods))[0],
+			FullMethod: "/theapp.v1.RoleService/AssignRoleToOrganization",
 		}, handler); err != nil {
 			t.Fatalf("authStreamInterceptor() error = %v, want nil", err)
 		}
@@ -250,7 +248,7 @@ func TestAuthStreamInterceptor_error(t *testing.T) {
 				ctx := withStreamProjectID(validStreamAuthCtx(t), "1")
 
 				err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{
-					FullMethod: slices.Collect(maps.Keys(organizationScopedMethods))[0],
+					FullMethod: "/theapp.v1.RoleService/AssignRoleToOrganization",
 				}, handler)
 
 				if got := status.Code(err); got != tt.want {

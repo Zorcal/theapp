@@ -50,7 +50,7 @@ One test file per service (`auth_test.go`, `user_test.go`, …). When a test exe
 
 ## Authorization scopes
 
-Protected methods normally resolve permissions for the project identified by `x-project-id`, combining project-, organization-, and system-scope assignments. Methods in `organizationScopedMethods` use the same project metadata to identify the active organization but resolve permissions from organization- and system-scope assignments only. A project-scoped role therefore cannot authorize an organization-wide operation. Methods in `noProjectMethods` resolve system-scope assignments only.
+Protected methods normally resolve permissions for the project identified by `x-project-id`, combining project-, organization-, and system-scope assignments. Organization-scoped permissions use the same project metadata to identify the active organization but resolve only organization- and system-scope assignments. A project-scoped role therefore cannot authorize an organization-wide operation. System-scoped permissions resolve only system-scope assignments and do not require project metadata.
 
 ## Validation
 
