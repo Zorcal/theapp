@@ -529,6 +529,374 @@ func (*DeleteRoleResponse) Descriptor() ([]byte, []int) {
 	return file_role_proto_rawDescGZIP(), []int{8}
 }
 
+// Request message for assigning a custom role in the request's project.
+type AssignRoleToProjectRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ID of the role to assign.
+	RoleId string `protobuf:"bytes,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	// ID of the user to assign the role to.
+	UserId        string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssignRoleToProjectRequest) Reset() {
+	*x = AssignRoleToProjectRequest{}
+	mi := &file_role_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignRoleToProjectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignRoleToProjectRequest) ProtoMessage() {}
+
+func (x *AssignRoleToProjectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignRoleToProjectRequest.ProtoReflect.Descriptor instead.
+func (*AssignRoleToProjectRequest) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AssignRoleToProjectRequest) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *AssignRoleToProjectRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+// Response message for assigning a custom role in a project.
+type AssignRoleToProjectResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssignRoleToProjectResponse) Reset() {
+	*x = AssignRoleToProjectResponse{}
+	mi := &file_role_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignRoleToProjectResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignRoleToProjectResponse) ProtoMessage() {}
+
+func (x *AssignRoleToProjectResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignRoleToProjectResponse.ProtoReflect.Descriptor instead.
+func (*AssignRoleToProjectResponse) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{10}
+}
+
+// Request message for unassigning a custom role in the request's project.
+type UnassignRoleFromProjectRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ID of the role to unassign.
+	RoleId string `protobuf:"bytes,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	// ID of the user to unassign the role from.
+	UserId        string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnassignRoleFromProjectRequest) Reset() {
+	*x = UnassignRoleFromProjectRequest{}
+	mi := &file_role_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnassignRoleFromProjectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnassignRoleFromProjectRequest) ProtoMessage() {}
+
+func (x *UnassignRoleFromProjectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnassignRoleFromProjectRequest.ProtoReflect.Descriptor instead.
+func (*UnassignRoleFromProjectRequest) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *UnassignRoleFromProjectRequest) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *UnassignRoleFromProjectRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+// Response message for unassigning a custom role from a project.
+type UnassignRoleFromProjectResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnassignRoleFromProjectResponse) Reset() {
+	*x = UnassignRoleFromProjectResponse{}
+	mi := &file_role_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnassignRoleFromProjectResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnassignRoleFromProjectResponse) ProtoMessage() {}
+
+func (x *UnassignRoleFromProjectResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnassignRoleFromProjectResponse.ProtoReflect.Descriptor instead.
+func (*UnassignRoleFromProjectResponse) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{12}
+}
+
+// Request message for assigning a custom role across the request project's organization.
+type AssignRoleToOrganizationRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ID of the role to assign.
+	RoleId string `protobuf:"bytes,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	// ID of the user to assign the role to.
+	UserId        string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssignRoleToOrganizationRequest) Reset() {
+	*x = AssignRoleToOrganizationRequest{}
+	mi := &file_role_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignRoleToOrganizationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignRoleToOrganizationRequest) ProtoMessage() {}
+
+func (x *AssignRoleToOrganizationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignRoleToOrganizationRequest.ProtoReflect.Descriptor instead.
+func (*AssignRoleToOrganizationRequest) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AssignRoleToOrganizationRequest) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *AssignRoleToOrganizationRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+// Response message for assigning a custom role across an organization.
+type AssignRoleToOrganizationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssignRoleToOrganizationResponse) Reset() {
+	*x = AssignRoleToOrganizationResponse{}
+	mi := &file_role_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignRoleToOrganizationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignRoleToOrganizationResponse) ProtoMessage() {}
+
+func (x *AssignRoleToOrganizationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignRoleToOrganizationResponse.ProtoReflect.Descriptor instead.
+func (*AssignRoleToOrganizationResponse) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{14}
+}
+
+// Request message for unassigning a custom role across the request project's organization.
+type UnassignRoleFromOrganizationRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ID of the role to unassign.
+	RoleId string `protobuf:"bytes,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	// ID of the user to unassign the role from.
+	UserId        string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnassignRoleFromOrganizationRequest) Reset() {
+	*x = UnassignRoleFromOrganizationRequest{}
+	mi := &file_role_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnassignRoleFromOrganizationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnassignRoleFromOrganizationRequest) ProtoMessage() {}
+
+func (x *UnassignRoleFromOrganizationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnassignRoleFromOrganizationRequest.ProtoReflect.Descriptor instead.
+func (*UnassignRoleFromOrganizationRequest) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UnassignRoleFromOrganizationRequest) GetRoleId() string {
+	if x != nil {
+		return x.RoleId
+	}
+	return ""
+}
+
+func (x *UnassignRoleFromOrganizationRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+// Response message for unassigning a custom role from an organization.
+type UnassignRoleFromOrganizationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnassignRoleFromOrganizationResponse) Reset() {
+	*x = UnassignRoleFromOrganizationResponse{}
+	mi := &file_role_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnassignRoleFromOrganizationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnassignRoleFromOrganizationResponse) ProtoMessage() {}
+
+func (x *UnassignRoleFromOrganizationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_role_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnassignRoleFromOrganizationResponse.ProtoReflect.Descriptor instead.
+func (*UnassignRoleFromOrganizationResponse) Descriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{16}
+}
+
 var File_role_proto protoreflect.FileDescriptor
 
 const file_role_proto_rawDesc = "" +
@@ -567,7 +935,23 @@ const file_role_proto_rawDesc = "" +
 	"\x12remove_permissions\x18\x03 \x03(\x0e2\x15.theapp.v1.PermissionR\x11removePermissions\"0\n" +
 	"\x11DeleteRoleRequest\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\"\x14\n" +
-	"\x12DeleteRoleResponse2\xf4\a\n" +
+	"\x12DeleteRoleResponse\"h\n" +
+	"\x1aAssignRoleToProjectRequest\x12$\n" +
+	"\arole_id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06roleId\x12$\n" +
+	"\auser_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06userId\"\x1d\n" +
+	"\x1bAssignRoleToProjectResponse\"l\n" +
+	"\x1eUnassignRoleFromProjectRequest\x12$\n" +
+	"\arole_id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06roleId\x12$\n" +
+	"\auser_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06userId\"!\n" +
+	"\x1fUnassignRoleFromProjectResponse\"m\n" +
+	"\x1fAssignRoleToOrganizationRequest\x12$\n" +
+	"\arole_id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06roleId\x12$\n" +
+	"\auser_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06userId\"\"\n" +
+	" AssignRoleToOrganizationResponse\"q\n" +
+	"#UnassignRoleFromOrganizationRequest\x12$\n" +
+	"\arole_id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06roleId\x12$\n" +
+	"\auser_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06userId\"&\n" +
+	"$UnassignRoleFromOrganizationResponse2\xba\x0f\n" +
 	"\vRoleService\x12\x97\x01\n" +
 	"\n" +
 	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"Z\x92ACrA\n" +
@@ -589,7 +973,19 @@ const file_role_proto_rawDesc = "" +
 	"\n" +
 	"DeleteRole\x12\x1c.theapp.v1.DeleteRoleRequest\x1a\x1d.theapp.v1.DeleteRoleResponse\"\\\x92ACrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10*\x0e/v1/roles/{id}B\xc7\x02\x92A\xa1\x01\x12\x15\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10*\x0e/v1/roles/{id}\x12\xd2\x01\n" +
+	"\x13AssignRoleToProject\x12%.theapp.v1.AssignRoleToProjectRequest\x1a&.theapp.v1.AssignRoleToProjectResponse\"l\x92AErC\n" +
+	"A\n" +
+	"\fx-project-id\x12-ID of the project where the role is assigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/v1/roles:assignToProject\x12\xe4\x01\n" +
+	"\x17UnassignRoleFromProject\x12).theapp.v1.UnassignRoleFromProjectRequest\x1a*.theapp.v1.UnassignRoleFromProjectResponse\"r\x92AGrE\n" +
+	"C\n" +
+	"\fx-project-id\x12/ID of the project where the role is unassigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/roles:unassignFromProject\x12\xf9\x01\n" +
+	"\x18AssignRoleToOrganization\x12*.theapp.v1.AssignRoleToOrganizationRequest\x1a+.theapp.v1.AssignRoleToOrganizationResponse\"\x83\x01\x92AWrU\n" +
+	"S\n" +
+	"\fx-project-id\x12?ID of a project in the organization where the role is assigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02#:\x01*\"\x1e/v1/roles:assignToOrganization\x12\x8b\x02\n" +
+	"\x1cUnassignRoleFromOrganization\x12..theapp.v1.UnassignRoleFromOrganizationRequest\x1a/.theapp.v1.UnassignRoleFromOrganizationResponse\"\x89\x01\x92AYrW\n" +
+	"U\n" +
+	"\fx-project-id\x12AID of a project in the organization where the role is unassigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02':\x01*\"\"/v1/roles:unassignFromOrganizationB\xc7\x02\x92A\xa1\x01\x12\x15\n" +
 	"\x0ftheapp Role API2\x02v1Zv\n" +
 	"t\n" +
 	"\n" +
@@ -612,45 +1008,61 @@ func file_role_proto_rawDescGZIP() []byte {
 	return file_role_proto_rawDescData
 }
 
-var file_role_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_role_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_role_proto_goTypes = []any{
-	(*Role)(nil),                         // 0: theapp.v1.Role
-	(*CreateRoleRequest)(nil),            // 1: theapp.v1.CreateRoleRequest
-	(*GetRoleRequest)(nil),               // 2: theapp.v1.GetRoleRequest
-	(*ListRolesRequest)(nil),             // 3: theapp.v1.ListRolesRequest
-	(*ListRolesResponse)(nil),            // 4: theapp.v1.ListRolesResponse
-	(*UpdateRoleRequest)(nil),            // 5: theapp.v1.UpdateRoleRequest
-	(*ModifyRolePermissionsRequest)(nil), // 6: theapp.v1.ModifyRolePermissionsRequest
-	(*DeleteRoleRequest)(nil),            // 7: theapp.v1.DeleteRoleRequest
-	(*DeleteRoleResponse)(nil),           // 8: theapp.v1.DeleteRoleResponse
-	(Permission)(0),                      // 9: theapp.v1.Permission
-	(*timestamppb.Timestamp)(nil),        // 10: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),        // 11: google.protobuf.FieldMask
+	(*Role)(nil),                                 // 0: theapp.v1.Role
+	(*CreateRoleRequest)(nil),                    // 1: theapp.v1.CreateRoleRequest
+	(*GetRoleRequest)(nil),                       // 2: theapp.v1.GetRoleRequest
+	(*ListRolesRequest)(nil),                     // 3: theapp.v1.ListRolesRequest
+	(*ListRolesResponse)(nil),                    // 4: theapp.v1.ListRolesResponse
+	(*UpdateRoleRequest)(nil),                    // 5: theapp.v1.UpdateRoleRequest
+	(*ModifyRolePermissionsRequest)(nil),         // 6: theapp.v1.ModifyRolePermissionsRequest
+	(*DeleteRoleRequest)(nil),                    // 7: theapp.v1.DeleteRoleRequest
+	(*DeleteRoleResponse)(nil),                   // 8: theapp.v1.DeleteRoleResponse
+	(*AssignRoleToProjectRequest)(nil),           // 9: theapp.v1.AssignRoleToProjectRequest
+	(*AssignRoleToProjectResponse)(nil),          // 10: theapp.v1.AssignRoleToProjectResponse
+	(*UnassignRoleFromProjectRequest)(nil),       // 11: theapp.v1.UnassignRoleFromProjectRequest
+	(*UnassignRoleFromProjectResponse)(nil),      // 12: theapp.v1.UnassignRoleFromProjectResponse
+	(*AssignRoleToOrganizationRequest)(nil),      // 13: theapp.v1.AssignRoleToOrganizationRequest
+	(*AssignRoleToOrganizationResponse)(nil),     // 14: theapp.v1.AssignRoleToOrganizationResponse
+	(*UnassignRoleFromOrganizationRequest)(nil),  // 15: theapp.v1.UnassignRoleFromOrganizationRequest
+	(*UnassignRoleFromOrganizationResponse)(nil), // 16: theapp.v1.UnassignRoleFromOrganizationResponse
+	(Permission)(0),                              // 17: theapp.v1.Permission
+	(*timestamppb.Timestamp)(nil),                // 18: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),                // 19: google.protobuf.FieldMask
 }
 var file_role_proto_depIdxs = []int32{
-	9,  // 0: theapp.v1.Role.permissions:type_name -> theapp.v1.Permission
-	10, // 1: theapp.v1.Role.create_time:type_name -> google.protobuf.Timestamp
-	10, // 2: theapp.v1.Role.update_time:type_name -> google.protobuf.Timestamp
+	17, // 0: theapp.v1.Role.permissions:type_name -> theapp.v1.Permission
+	18, // 1: theapp.v1.Role.create_time:type_name -> google.protobuf.Timestamp
+	18, // 2: theapp.v1.Role.update_time:type_name -> google.protobuf.Timestamp
 	0,  // 3: theapp.v1.CreateRoleRequest.role:type_name -> theapp.v1.Role
 	0,  // 4: theapp.v1.ListRolesResponse.roles:type_name -> theapp.v1.Role
 	0,  // 5: theapp.v1.UpdateRoleRequest.role:type_name -> theapp.v1.Role
-	11, // 6: theapp.v1.UpdateRoleRequest.update_mask:type_name -> google.protobuf.FieldMask
-	9,  // 7: theapp.v1.ModifyRolePermissionsRequest.add_permissions:type_name -> theapp.v1.Permission
-	9,  // 8: theapp.v1.ModifyRolePermissionsRequest.remove_permissions:type_name -> theapp.v1.Permission
+	19, // 6: theapp.v1.UpdateRoleRequest.update_mask:type_name -> google.protobuf.FieldMask
+	17, // 7: theapp.v1.ModifyRolePermissionsRequest.add_permissions:type_name -> theapp.v1.Permission
+	17, // 8: theapp.v1.ModifyRolePermissionsRequest.remove_permissions:type_name -> theapp.v1.Permission
 	1,  // 9: theapp.v1.RoleService.CreateRole:input_type -> theapp.v1.CreateRoleRequest
 	2,  // 10: theapp.v1.RoleService.GetRole:input_type -> theapp.v1.GetRoleRequest
 	3,  // 11: theapp.v1.RoleService.ListRoles:input_type -> theapp.v1.ListRolesRequest
 	5,  // 12: theapp.v1.RoleService.UpdateRole:input_type -> theapp.v1.UpdateRoleRequest
 	6,  // 13: theapp.v1.RoleService.ModifyRolePermissions:input_type -> theapp.v1.ModifyRolePermissionsRequest
 	7,  // 14: theapp.v1.RoleService.DeleteRole:input_type -> theapp.v1.DeleteRoleRequest
-	0,  // 15: theapp.v1.RoleService.CreateRole:output_type -> theapp.v1.Role
-	0,  // 16: theapp.v1.RoleService.GetRole:output_type -> theapp.v1.Role
-	4,  // 17: theapp.v1.RoleService.ListRoles:output_type -> theapp.v1.ListRolesResponse
-	0,  // 18: theapp.v1.RoleService.UpdateRole:output_type -> theapp.v1.Role
-	0,  // 19: theapp.v1.RoleService.ModifyRolePermissions:output_type -> theapp.v1.Role
-	8,  // 20: theapp.v1.RoleService.DeleteRole:output_type -> theapp.v1.DeleteRoleResponse
-	15, // [15:21] is the sub-list for method output_type
-	9,  // [9:15] is the sub-list for method input_type
+	9,  // 15: theapp.v1.RoleService.AssignRoleToProject:input_type -> theapp.v1.AssignRoleToProjectRequest
+	11, // 16: theapp.v1.RoleService.UnassignRoleFromProject:input_type -> theapp.v1.UnassignRoleFromProjectRequest
+	13, // 17: theapp.v1.RoleService.AssignRoleToOrganization:input_type -> theapp.v1.AssignRoleToOrganizationRequest
+	15, // 18: theapp.v1.RoleService.UnassignRoleFromOrganization:input_type -> theapp.v1.UnassignRoleFromOrganizationRequest
+	0,  // 19: theapp.v1.RoleService.CreateRole:output_type -> theapp.v1.Role
+	0,  // 20: theapp.v1.RoleService.GetRole:output_type -> theapp.v1.Role
+	4,  // 21: theapp.v1.RoleService.ListRoles:output_type -> theapp.v1.ListRolesResponse
+	0,  // 22: theapp.v1.RoleService.UpdateRole:output_type -> theapp.v1.Role
+	0,  // 23: theapp.v1.RoleService.ModifyRolePermissions:output_type -> theapp.v1.Role
+	8,  // 24: theapp.v1.RoleService.DeleteRole:output_type -> theapp.v1.DeleteRoleResponse
+	10, // 25: theapp.v1.RoleService.AssignRoleToProject:output_type -> theapp.v1.AssignRoleToProjectResponse
+	12, // 26: theapp.v1.RoleService.UnassignRoleFromProject:output_type -> theapp.v1.UnassignRoleFromProjectResponse
+	14, // 27: theapp.v1.RoleService.AssignRoleToOrganization:output_type -> theapp.v1.AssignRoleToOrganizationResponse
+	16, // 28: theapp.v1.RoleService.UnassignRoleFromOrganization:output_type -> theapp.v1.UnassignRoleFromOrganizationResponse
+	19, // [19:29] is the sub-list for method output_type
+	9,  // [9:19] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -668,7 +1080,7 @@ func file_role_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_role_proto_rawDesc), len(file_role_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -13,7 +13,11 @@ INSERT INTO rbac.permissions (name) VALUES
     ('custom-role:create'),
     ('custom-role:read'),
     ('custom-role:update'),
-    ('custom-role:delete')
+    ('custom-role:delete'),
+    ('custom-role:assign-project'),
+    ('custom-role:unassign-project'),
+    ('custom-role:assign-org'),
+    ('custom-role:unassign-org')
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO rbac.system_roles (external_id, name, created_at)

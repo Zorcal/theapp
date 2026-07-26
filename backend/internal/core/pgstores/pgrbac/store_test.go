@@ -1081,9 +1081,13 @@ func seededSystemRoles() []SystemRole {
 		{
 			Name: "superadmin",
 			PermissionNames: []string{
+				"custom-role:assign-org",
+				"custom-role:assign-project",
 				"custom-role:create",
 				"custom-role:delete",
 				"custom-role:read",
+				"custom-role:unassign-org",
+				"custom-role:unassign-project",
 				"custom-role:update",
 				"system-role:assign",
 				"system-role:read",

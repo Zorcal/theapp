@@ -19,12 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RoleService_CreateRole_FullMethodName            = "/theapp.v1.RoleService/CreateRole"
-	RoleService_GetRole_FullMethodName               = "/theapp.v1.RoleService/GetRole"
-	RoleService_ListRoles_FullMethodName             = "/theapp.v1.RoleService/ListRoles"
-	RoleService_UpdateRole_FullMethodName            = "/theapp.v1.RoleService/UpdateRole"
-	RoleService_ModifyRolePermissions_FullMethodName = "/theapp.v1.RoleService/ModifyRolePermissions"
-	RoleService_DeleteRole_FullMethodName            = "/theapp.v1.RoleService/DeleteRole"
+	RoleService_CreateRole_FullMethodName                   = "/theapp.v1.RoleService/CreateRole"
+	RoleService_GetRole_FullMethodName                      = "/theapp.v1.RoleService/GetRole"
+	RoleService_ListRoles_FullMethodName                    = "/theapp.v1.RoleService/ListRoles"
+	RoleService_UpdateRole_FullMethodName                   = "/theapp.v1.RoleService/UpdateRole"
+	RoleService_ModifyRolePermissions_FullMethodName        = "/theapp.v1.RoleService/ModifyRolePermissions"
+	RoleService_DeleteRole_FullMethodName                   = "/theapp.v1.RoleService/DeleteRole"
+	RoleService_AssignRoleToProject_FullMethodName          = "/theapp.v1.RoleService/AssignRoleToProject"
+	RoleService_UnassignRoleFromProject_FullMethodName      = "/theapp.v1.RoleService/UnassignRoleFromProject"
+	RoleService_AssignRoleToOrganization_FullMethodName     = "/theapp.v1.RoleService/AssignRoleToOrganization"
+	RoleService_UnassignRoleFromOrganization_FullMethodName = "/theapp.v1.RoleService/UnassignRoleFromOrganization"
 )
 
 // RoleServiceClient is the client API for RoleService service.
@@ -45,6 +49,14 @@ type RoleServiceClient interface {
 	ModifyRolePermissions(ctx context.Context, in *ModifyRolePermissionsRequest, opts ...grpc.CallOption) (*Role, error)
 	// Deletes a custom role.
 	DeleteRole(ctx context.Context, in *DeleteRoleRequest, opts ...grpc.CallOption) (*DeleteRoleResponse, error)
+	// Assigns a custom role to a user in the request's project.
+	AssignRoleToProject(ctx context.Context, in *AssignRoleToProjectRequest, opts ...grpc.CallOption) (*AssignRoleToProjectResponse, error)
+	// Unassigns a custom role from a user in the request's project.
+	UnassignRoleFromProject(ctx context.Context, in *UnassignRoleFromProjectRequest, opts ...grpc.CallOption) (*UnassignRoleFromProjectResponse, error)
+	// Assigns a custom role to a user across the request project's organization.
+	AssignRoleToOrganization(ctx context.Context, in *AssignRoleToOrganizationRequest, opts ...grpc.CallOption) (*AssignRoleToOrganizationResponse, error)
+	// Unassigns a custom role from a user across the request project's organization.
+	UnassignRoleFromOrganization(ctx context.Context, in *UnassignRoleFromOrganizationRequest, opts ...grpc.CallOption) (*UnassignRoleFromOrganizationResponse, error)
 }
 
 type roleServiceClient struct {
@@ -115,6 +127,46 @@ func (c *roleServiceClient) DeleteRole(ctx context.Context, in *DeleteRoleReques
 	return out, nil
 }
 
+func (c *roleServiceClient) AssignRoleToProject(ctx context.Context, in *AssignRoleToProjectRequest, opts ...grpc.CallOption) (*AssignRoleToProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssignRoleToProjectResponse)
+	err := c.cc.Invoke(ctx, RoleService_AssignRoleToProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roleServiceClient) UnassignRoleFromProject(ctx context.Context, in *UnassignRoleFromProjectRequest, opts ...grpc.CallOption) (*UnassignRoleFromProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnassignRoleFromProjectResponse)
+	err := c.cc.Invoke(ctx, RoleService_UnassignRoleFromProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roleServiceClient) AssignRoleToOrganization(ctx context.Context, in *AssignRoleToOrganizationRequest, opts ...grpc.CallOption) (*AssignRoleToOrganizationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssignRoleToOrganizationResponse)
+	err := c.cc.Invoke(ctx, RoleService_AssignRoleToOrganization_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roleServiceClient) UnassignRoleFromOrganization(ctx context.Context, in *UnassignRoleFromOrganizationRequest, opts ...grpc.CallOption) (*UnassignRoleFromOrganizationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnassignRoleFromOrganizationResponse)
+	err := c.cc.Invoke(ctx, RoleService_UnassignRoleFromOrganization_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RoleServiceServer is the server API for RoleService service.
 // All implementations should embed UnimplementedRoleServiceServer
 // for forward compatibility.
@@ -133,6 +185,14 @@ type RoleServiceServer interface {
 	ModifyRolePermissions(context.Context, *ModifyRolePermissionsRequest) (*Role, error)
 	// Deletes a custom role.
 	DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error)
+	// Assigns a custom role to a user in the request's project.
+	AssignRoleToProject(context.Context, *AssignRoleToProjectRequest) (*AssignRoleToProjectResponse, error)
+	// Unassigns a custom role from a user in the request's project.
+	UnassignRoleFromProject(context.Context, *UnassignRoleFromProjectRequest) (*UnassignRoleFromProjectResponse, error)
+	// Assigns a custom role to a user across the request project's organization.
+	AssignRoleToOrganization(context.Context, *AssignRoleToOrganizationRequest) (*AssignRoleToOrganizationResponse, error)
+	// Unassigns a custom role from a user across the request project's organization.
+	UnassignRoleFromOrganization(context.Context, *UnassignRoleFromOrganizationRequest) (*UnassignRoleFromOrganizationResponse, error)
 }
 
 // UnimplementedRoleServiceServer should be embedded to have
@@ -159,6 +219,18 @@ func (UnimplementedRoleServiceServer) ModifyRolePermissions(context.Context, *Mo
 }
 func (UnimplementedRoleServiceServer) DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteRole not implemented")
+}
+func (UnimplementedRoleServiceServer) AssignRoleToProject(context.Context, *AssignRoleToProjectRequest) (*AssignRoleToProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AssignRoleToProject not implemented")
+}
+func (UnimplementedRoleServiceServer) UnassignRoleFromProject(context.Context, *UnassignRoleFromProjectRequest) (*UnassignRoleFromProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnassignRoleFromProject not implemented")
+}
+func (UnimplementedRoleServiceServer) AssignRoleToOrganization(context.Context, *AssignRoleToOrganizationRequest) (*AssignRoleToOrganizationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AssignRoleToOrganization not implemented")
+}
+func (UnimplementedRoleServiceServer) UnassignRoleFromOrganization(context.Context, *UnassignRoleFromOrganizationRequest) (*UnassignRoleFromOrganizationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnassignRoleFromOrganization not implemented")
 }
 func (UnimplementedRoleServiceServer) testEmbeddedByValue() {}
 
@@ -288,6 +360,78 @@ func _RoleService_DeleteRole_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RoleService_AssignRoleToProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssignRoleToProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoleServiceServer).AssignRoleToProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoleService_AssignRoleToProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoleServiceServer).AssignRoleToProject(ctx, req.(*AssignRoleToProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoleService_UnassignRoleFromProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnassignRoleFromProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoleServiceServer).UnassignRoleFromProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoleService_UnassignRoleFromProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoleServiceServer).UnassignRoleFromProject(ctx, req.(*UnassignRoleFromProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoleService_AssignRoleToOrganization_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssignRoleToOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoleServiceServer).AssignRoleToOrganization(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoleService_AssignRoleToOrganization_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoleServiceServer).AssignRoleToOrganization(ctx, req.(*AssignRoleToOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoleService_UnassignRoleFromOrganization_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnassignRoleFromOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoleServiceServer).UnassignRoleFromOrganization(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoleService_UnassignRoleFromOrganization_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoleServiceServer).UnassignRoleFromOrganization(ctx, req.(*UnassignRoleFromOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RoleService_ServiceDesc is the grpc.ServiceDesc for RoleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -318,6 +462,22 @@ var RoleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteRole",
 			Handler:    _RoleService_DeleteRole_Handler,
+		},
+		{
+			MethodName: "AssignRoleToProject",
+			Handler:    _RoleService_AssignRoleToProject_Handler,
+		},
+		{
+			MethodName: "UnassignRoleFromProject",
+			Handler:    _RoleService_UnassignRoleFromProject_Handler,
+		},
+		{
+			MethodName: "AssignRoleToOrganization",
+			Handler:    _RoleService_AssignRoleToOrganization_Handler,
+		},
+		{
+			MethodName: "UnassignRoleFromOrganization",
+			Handler:    _RoleService_UnassignRoleFromOrganization_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

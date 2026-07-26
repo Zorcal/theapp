@@ -271,6 +271,170 @@
           "RoleService"
         ]
       }
+    },
+    "/v1/roles:assignToOrganization": {
+      "post": {
+        "summary": "Assigns a custom role to a user across the request project's organization.",
+        "operationId": "RoleService_AssignRoleToOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AssignRoleToOrganizationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for assigning a custom role across the request project's organization.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1AssignRoleToOrganizationRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the organization where the role is assigned.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles:assignToProject": {
+      "post": {
+        "summary": "Assigns a custom role to a user in the request's project.",
+        "operationId": "RoleService_AssignRoleToProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AssignRoleToProjectResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for assigning a custom role in the request's project.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1AssignRoleToProjectRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the project where the role is assigned.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles:unassignFromOrganization": {
+      "post": {
+        "summary": "Unassigns a custom role from a user across the request project's organization.",
+        "operationId": "RoleService_UnassignRoleFromOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UnassignRoleFromOrganizationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for unassigning a custom role across the request project's organization.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1UnassignRoleFromOrganizationRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the organization where the role is unassigned.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles:unassignFromProject": {
+      "post": {
+        "summary": "Unassigns a custom role from a user in the request's project.",
+        "operationId": "RoleService_UnassignRoleFromProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UnassignRoleFromProjectResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for unassigning a custom role in the request's project.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1UnassignRoleFromProjectRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the project where the role is unassigned.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
     }
   },
   "definitions": {
@@ -371,6 +535,50 @@
         }
       }
     },
+    "v1AssignRoleToOrganizationRequest": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "description": "ID of the role to assign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user to assign the role to."
+        }
+      },
+      "description": "Request message for assigning a custom role across the request project's organization.",
+      "required": [
+        "roleId",
+        "userId"
+      ]
+    },
+    "v1AssignRoleToOrganizationResponse": {
+      "type": "object",
+      "description": "Response message for assigning a custom role across an organization."
+    },
+    "v1AssignRoleToProjectRequest": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "description": "ID of the role to assign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user to assign the role to."
+        }
+      },
+      "description": "Request message for assigning a custom role in the request's project.",
+      "required": [
+        "roleId",
+        "userId"
+      ]
+    },
+    "v1AssignRoleToProjectResponse": {
+      "type": "object",
+      "description": "Response message for assigning a custom role in a project."
+    },
     "v1CreateRoleRequest": {
       "type": "object",
       "properties": {
@@ -424,7 +632,11 @@
         "PERMISSION_CUSTOM_ROLE_CREATE",
         "PERMISSION_CUSTOM_ROLE_READ",
         "PERMISSION_CUSTOM_ROLE_UPDATE",
-        "PERMISSION_CUSTOM_ROLE_DELETE"
+        "PERMISSION_CUSTOM_ROLE_DELETE",
+        "PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT",
+        "PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT",
+        "PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION",
+        "PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION"
       ],
       "default": "PERMISSION_UNSPECIFIED",
       "description": "Permission is a capability that can be granted through a role."
@@ -467,6 +679,50 @@
         }
       },
       "description": "Role is a custom role owned by an organization."
+    },
+    "v1UnassignRoleFromOrganizationRequest": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "description": "ID of the role to unassign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user to unassign the role from."
+        }
+      },
+      "description": "Request message for unassigning a custom role across the request project's organization.",
+      "required": [
+        "roleId",
+        "userId"
+      ]
+    },
+    "v1UnassignRoleFromOrganizationResponse": {
+      "type": "object",
+      "description": "Response message for unassigning a custom role from an organization."
+    },
+    "v1UnassignRoleFromProjectRequest": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "description": "ID of the role to unassign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user to unassign the role from."
+        }
+      },
+      "description": "Request message for unassigning a custom role in the request's project.",
+      "required": [
+        "roleId",
+        "userId"
+      ]
+    },
+    "v1UnassignRoleFromProjectResponse": {
+      "type": "object",
+      "description": "Response message for unassigning a custom role from a project."
     }
   },
   "securityDefinitions": {

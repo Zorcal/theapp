@@ -27,10 +27,14 @@ const (
 // All custom role service permissions. They authorize role management only within the organization
 // resolved from the request's project context.
 const (
-	PermissionCustomRoleCreate Permission = "custom-role:create"
-	PermissionCustomRoleRead   Permission = "custom-role:read"
-	PermissionCustomRoleUpdate Permission = "custom-role:update"
-	PermissionCustomRoleDelete Permission = "custom-role:delete"
+	PermissionCustomRoleCreate          Permission = "custom-role:create"
+	PermissionCustomRoleRead            Permission = "custom-role:read"
+	PermissionCustomRoleUpdate          Permission = "custom-role:update"
+	PermissionCustomRoleDelete          Permission = "custom-role:delete"
+	PermissionCustomRoleAssignProject   Permission = "custom-role:assign-project"
+	PermissionCustomRoleUnassignProject Permission = "custom-role:unassign-project"
+	PermissionCustomRoleAssignOrg       Permission = "custom-role:assign-org"
+	PermissionCustomRoleUnassignOrg     Permission = "custom-role:unassign-org"
 )
 
 // AllPermissions returns all permissions.
@@ -46,6 +50,10 @@ func AllPermissions() []Permission {
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
 		PermissionCustomRoleDelete,
+		PermissionCustomRoleAssignProject,
+		PermissionCustomRoleUnassignProject,
+		PermissionCustomRoleAssignOrg,
+		PermissionCustomRoleUnassignOrg,
 	}
 }
 
@@ -69,6 +77,10 @@ func PermissionsAssignableToCustomRoles() []Permission {
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
 		PermissionCustomRoleDelete,
+		PermissionCustomRoleAssignProject,
+		PermissionCustomRoleUnassignProject,
+		PermissionCustomRoleAssignOrg,
+		PermissionCustomRoleUnassignOrg,
 	}
 }
 

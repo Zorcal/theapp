@@ -138,7 +138,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Phase 14 — custom role service: assignment endpoints
 
-35. Add project- and org-scope assign/unassign endpoints using `custom-role:assign` and `custom-role:unassign`. They write only to `project_role_assignments` and `org_role_assignments`; system assignment remains exclusively in `SystemRoleService`. Depends on 18, 22, 32.
+35. Add project- and org-scope assign/unassign endpoints using `custom-role:assign-project`, `custom-role:unassign-project`, `custom-role:assign-org`, and `custom-role:unassign-org`. They write only to `project_role_assignments` and `org_role_assignments`; system assignment remains exclusively in `SystemRoleService`. Depends on 18, 22, 32.
 36. Gate org-scoped assignment on `org_membership`, and require the custom role's owning `org_id` to match the target project/org. Depends on 18, 33, 35.
 
 **Checkpoint:** custom roles can be assigned and unassigned at project or org scope. Privilege-escalation and lockout checks are added in phases 15–16, so these endpoints remain restricted to trusted internal testing until then.

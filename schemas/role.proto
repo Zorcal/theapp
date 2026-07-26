@@ -142,6 +142,78 @@ service RoleService {
       }
     };
   }
+
+  // Assigns a custom role to a user in the request's project.
+  rpc AssignRoleToProject(AssignRoleToProjectRequest) returns (AssignRoleToProjectResponse) {
+    option (google.api.http) = {
+      post: "/v1/roles:assignToProject"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project where the role is assigned."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Unassigns a custom role from a user in the request's project.
+  rpc UnassignRoleFromProject(UnassignRoleFromProjectRequest) returns (UnassignRoleFromProjectResponse) {
+    option (google.api.http) = {
+      post: "/v1/roles:unassignFromProject"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project where the role is unassigned."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Assigns a custom role to a user across the request project's organization.
+  rpc AssignRoleToOrganization(AssignRoleToOrganizationRequest) returns (AssignRoleToOrganizationResponse) {
+    option (google.api.http) = {
+      post: "/v1/roles:assignToOrganization"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the organization where the role is assigned."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Unassigns a custom role from a user across the request project's organization.
+  rpc UnassignRoleFromOrganization(UnassignRoleFromOrganizationRequest) returns (UnassignRoleFromOrganizationResponse) {
+    option (google.api.http) = {
+      post: "/v1/roles:unassignFromOrganization"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the organization where the role is unassigned."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
 }
 
 // Role is a custom role owned by an organization.
@@ -227,3 +299,51 @@ message DeleteRoleRequest {
 
 // Response message for deleting a custom role.
 message DeleteRoleResponse {}
+
+// Request message for assigning a custom role in the request's project.
+message AssignRoleToProjectRequest {
+  // ID of the role to assign.
+  string role_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // ID of the user to assign the role to.
+  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Response message for assigning a custom role in a project.
+message AssignRoleToProjectResponse {}
+
+// Request message for unassigning a custom role in the request's project.
+message UnassignRoleFromProjectRequest {
+  // ID of the role to unassign.
+  string role_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // ID of the user to unassign the role from.
+  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Response message for unassigning a custom role from a project.
+message UnassignRoleFromProjectResponse {}
+
+// Request message for assigning a custom role across the request project's organization.
+message AssignRoleToOrganizationRequest {
+  // ID of the role to assign.
+  string role_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // ID of the user to assign the role to.
+  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Response message for assigning a custom role across an organization.
+message AssignRoleToOrganizationResponse {}
+
+// Request message for unassigning a custom role across the request project's organization.
+message UnassignRoleFromOrganizationRequest {
+  // ID of the role to unassign.
+  string role_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // ID of the user to unassign the role from.
+  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+// Response message for unassigning a custom role from an organization.
+message UnassignRoleFromOrganizationResponse {}

@@ -73,12 +73,16 @@ var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.SystemRoleService/UnassignSystemRole":        {mdl.PermissionSystemRoleUnassign},
 	"/theapp.v1.SystemRoleService/ListSystemRoleAssignments": {mdl.PermissionSystemRoleRead},
 
-	"/theapp.v1.RoleService/CreateRole":            {mdl.PermissionCustomRoleCreate},
-	"/theapp.v1.RoleService/GetRole":               {mdl.PermissionCustomRoleRead},
-	"/theapp.v1.RoleService/ListRoles":             {mdl.PermissionCustomRoleRead},
-	"/theapp.v1.RoleService/UpdateRole":            {mdl.PermissionCustomRoleUpdate},
-	"/theapp.v1.RoleService/ModifyRolePermissions": {mdl.PermissionCustomRoleUpdate},
-	"/theapp.v1.RoleService/DeleteRole":            {mdl.PermissionCustomRoleDelete},
+	"/theapp.v1.RoleService/CreateRole":                   {mdl.PermissionCustomRoleCreate},
+	"/theapp.v1.RoleService/GetRole":                      {mdl.PermissionCustomRoleRead},
+	"/theapp.v1.RoleService/ListRoles":                    {mdl.PermissionCustomRoleRead},
+	"/theapp.v1.RoleService/UpdateRole":                   {mdl.PermissionCustomRoleUpdate},
+	"/theapp.v1.RoleService/ModifyRolePermissions":        {mdl.PermissionCustomRoleUpdate},
+	"/theapp.v1.RoleService/DeleteRole":                   {mdl.PermissionCustomRoleDelete},
+	"/theapp.v1.RoleService/AssignRoleToProject":          {mdl.PermissionCustomRoleAssignProject},
+	"/theapp.v1.RoleService/UnassignRoleFromProject":      {mdl.PermissionCustomRoleUnassignProject},
+	"/theapp.v1.RoleService/AssignRoleToOrganization":     {mdl.PermissionCustomRoleAssignOrg},
+	"/theapp.v1.RoleService/UnassignRoleFromOrganization": {mdl.PermissionCustomRoleUnassignOrg},
 
 	"/theapp.v1.PermissionService/ListPermissions": {mdl.PermissionCustomRoleRead},
 }

@@ -27,17 +27,21 @@ const (
 type Permission int32
 
 const (
-	Permission_PERMISSION_UNSPECIFIED          Permission = 0
-	Permission_PERMISSION_USER_READ            Permission = 1
-	Permission_PERMISSION_USER_CREATE          Permission = 2
-	Permission_PERMISSION_USER_UPDATE          Permission = 3
-	Permission_PERMISSION_SYSTEM_ROLE_READ     Permission = 4
-	Permission_PERMISSION_SYSTEM_ROLE_ASSIGN   Permission = 5
-	Permission_PERMISSION_SYSTEM_ROLE_UNASSIGN Permission = 6
-	Permission_PERMISSION_CUSTOM_ROLE_CREATE   Permission = 7
-	Permission_PERMISSION_CUSTOM_ROLE_READ     Permission = 8
-	Permission_PERMISSION_CUSTOM_ROLE_UPDATE   Permission = 9
-	Permission_PERMISSION_CUSTOM_ROLE_DELETE   Permission = 10
+	Permission_PERMISSION_UNSPECIFIED                       Permission = 0
+	Permission_PERMISSION_USER_READ                         Permission = 1
+	Permission_PERMISSION_USER_CREATE                       Permission = 2
+	Permission_PERMISSION_USER_UPDATE                       Permission = 3
+	Permission_PERMISSION_SYSTEM_ROLE_READ                  Permission = 4
+	Permission_PERMISSION_SYSTEM_ROLE_ASSIGN                Permission = 5
+	Permission_PERMISSION_SYSTEM_ROLE_UNASSIGN              Permission = 6
+	Permission_PERMISSION_CUSTOM_ROLE_CREATE                Permission = 7
+	Permission_PERMISSION_CUSTOM_ROLE_READ                  Permission = 8
+	Permission_PERMISSION_CUSTOM_ROLE_UPDATE                Permission = 9
+	Permission_PERMISSION_CUSTOM_ROLE_DELETE                Permission = 10
+	Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT        Permission = 11
+	Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT      Permission = 12
+	Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION   Permission = 13
+	Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION Permission = 14
 )
 
 // Enum value maps for Permission.
@@ -54,19 +58,27 @@ var (
 		8:  "PERMISSION_CUSTOM_ROLE_READ",
 		9:  "PERMISSION_CUSTOM_ROLE_UPDATE",
 		10: "PERMISSION_CUSTOM_ROLE_DELETE",
+		11: "PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT",
+		12: "PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT",
+		13: "PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION",
+		14: "PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION",
 	}
 	Permission_value = map[string]int32{
-		"PERMISSION_UNSPECIFIED":          0,
-		"PERMISSION_USER_READ":            1,
-		"PERMISSION_USER_CREATE":          2,
-		"PERMISSION_USER_UPDATE":          3,
-		"PERMISSION_SYSTEM_ROLE_READ":     4,
-		"PERMISSION_SYSTEM_ROLE_ASSIGN":   5,
-		"PERMISSION_SYSTEM_ROLE_UNASSIGN": 6,
-		"PERMISSION_CUSTOM_ROLE_CREATE":   7,
-		"PERMISSION_CUSTOM_ROLE_READ":     8,
-		"PERMISSION_CUSTOM_ROLE_UPDATE":   9,
-		"PERMISSION_CUSTOM_ROLE_DELETE":   10,
+		"PERMISSION_UNSPECIFIED":                       0,
+		"PERMISSION_USER_READ":                         1,
+		"PERMISSION_USER_CREATE":                       2,
+		"PERMISSION_USER_UPDATE":                       3,
+		"PERMISSION_SYSTEM_ROLE_READ":                  4,
+		"PERMISSION_SYSTEM_ROLE_ASSIGN":                5,
+		"PERMISSION_SYSTEM_ROLE_UNASSIGN":              6,
+		"PERMISSION_CUSTOM_ROLE_CREATE":                7,
+		"PERMISSION_CUSTOM_ROLE_READ":                  8,
+		"PERMISSION_CUSTOM_ROLE_UPDATE":                9,
+		"PERMISSION_CUSTOM_ROLE_DELETE":                10,
+		"PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT":        11,
+		"PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT":      12,
+		"PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION":   13,
+		"PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION": 14,
 	}
 )
 
@@ -187,7 +199,7 @@ const file_permission_proto_rawDesc = "" +
 	"\x10permission.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x18\n" +
 	"\x16ListPermissionsRequest\"R\n" +
 	"\x17ListPermissionsResponse\x127\n" +
-	"\vpermissions\x18\x01 \x03(\x0e2\x15.theapp.v1.PermissionR\vpermissions*\xed\x02\n" +
+	"\vpermissions\x18\x01 \x03(\x0e2\x15.theapp.v1.PermissionR\vpermissions*\xa7\x04\n" +
 	"\n" +
 	"Permission\x12\x1a\n" +
 	"\x16PERMISSION_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -201,7 +213,11 @@ const file_permission_proto_rawDesc = "" +
 	"\x1bPERMISSION_CUSTOM_ROLE_READ\x10\b\x12!\n" +
 	"\x1dPERMISSION_CUSTOM_ROLE_UPDATE\x10\t\x12!\n" +
 	"\x1dPERMISSION_CUSTOM_ROLE_DELETE\x10\n" +
-	"2\x86\x01\n" +
+	"\x12)\n" +
+	"%PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT\x10\v\x12+\n" +
+	"'PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT\x10\f\x12.\n" +
+	"*PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION\x10\r\x120\n" +
+	",PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION\x10\x0e2\x86\x01\n" +
 	"\x11PermissionService\x12q\n" +
 	"\x0fListPermissions\x12!.theapp.v1.ListPermissionsRequest\x1a\".theapp.v1.ListPermissionsResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/permissionsB\xd3\x02\x92A\xa7\x01\x12\x1b\n" +
 	"\x15theapp Permission API2\x02v1Zv\n" +
