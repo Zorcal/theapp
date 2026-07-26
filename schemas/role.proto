@@ -90,6 +90,40 @@ service RoleService {
     };
   }
 
+  // Lists a user's custom-role assignments in the request's project.
+  rpc ListProjectRoleAssignments(ListProjectRoleAssignmentsRequest) returns (ListProjectRoleAssignmentsResponse) {
+    option (google.api.http) = {
+      get: "/v1/project-role-assignments"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project whose assignments to list."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
+  // Lists a user's organization-scoped custom-role assignments.
+  rpc ListOrganizationRoleAssignments(ListOrganizationRoleAssignmentsRequest) returns (ListOrganizationRoleAssignmentsResponse) {
+    option (google.api.http) = {
+      get: "/v1/organization-role-assignments"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of a project in the organization whose assignments to list."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
+
   // Updates a custom role.
   rpc UpdateRole(UpdateRoleRequest) returns (Role) {
     option (google.api.http) = {
@@ -264,6 +298,54 @@ message ListRolesResponse {
   repeated Role roles = 1;
 
   // Total number of matching roles.
+  int32 total_size = 2;
+
+  // Token for fetching the next page.
+  string next_page_token = 3;
+}
+
+// Request message for listing a user's project-scoped custom-role assignments.
+message ListProjectRoleAssignmentsRequest {
+  // ID of the user whose assignments to list.
+  string user_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // Maximum number of assignments to return.
+  int32 page_size = 2;
+
+  // Token for fetching the next page.
+  string page_token = 3;
+}
+
+// Response message for listing a user's project-scoped custom-role assignments.
+message ListProjectRoleAssignmentsResponse {
+  // Custom roles assigned directly in the request's project.
+  repeated Role roles = 1;
+
+  // Total number of matching assignments.
+  int32 total_size = 2;
+
+  // Token for fetching the next page.
+  string next_page_token = 3;
+}
+
+// Request message for listing a user's organization-scoped custom-role assignments.
+message ListOrganizationRoleAssignmentsRequest {
+  // ID of the user whose assignments to list.
+  string user_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+
+  // Maximum number of assignments to return.
+  int32 page_size = 2;
+
+  // Token for fetching the next page.
+  string page_token = 3;
+}
+
+// Response message for listing a user's organization-scoped custom-role assignments.
+message ListOrganizationRoleAssignmentsResponse {
+  // Custom roles assigned across the request project's organization.
+  repeated Role roles = 1;
+
+  // Total number of matching assignments.
   int32 total_size = 2;
 
   // Token for fetching the next page.

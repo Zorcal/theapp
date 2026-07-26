@@ -70,6 +70,26 @@ func ListRoles(req *pb.ListRolesRequest) error {
 	return nil
 }
 
+func ListProjectRoleAssignments(req *pb.ListProjectRoleAssignmentsRequest) error {
+	if req == nil {
+		return requiredRequest("user_id")
+	}
+	if err := roleAssignments(req.GetUserId(), req.GetPageToken()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ListOrganizationRoleAssignments(req *pb.ListOrganizationRoleAssignmentsRequest) error {
+	if req == nil {
+		return requiredRequest("user_id")
+	}
+	if err := roleAssignments(req.GetUserId(), req.GetPageToken()); err != nil {
+		return err
+	}
+	return nil
+}
+
 func UpdateRole(req *pb.UpdateRoleRequest) error {
 	if req == nil {
 		return requiredRequest("role")
@@ -221,6 +241,16 @@ func roleAssignment(roleID, userID string) error {
 		return invalidArgument(violations...)
 	}
 
+	return nil
+}
+
+func roleAssignments(userID, pageToken string) error {
+	if err := validUUID(userID, "user_id"); err != nil {
+		return err
+	}
+	if _, err := conv.DecodePageToken[*emptypb.Empty](pageToken); err != nil {
+		return status.Error(codes.InvalidArgument, "invalid page_token")
+	}
 	return nil
 }
 

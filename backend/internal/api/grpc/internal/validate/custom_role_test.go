@@ -114,6 +114,60 @@ func TestListRoles_error(t *testing.T) {
 	runValidationErrorTests(t, "ListRoles", ListRoles, tests)
 }
 
+func TestListProjectRoleAssignments(t *testing.T) {
+	if err := ListProjectRoleAssignments(&pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString()}); err != nil {
+		t.Errorf("ListProjectRoleAssignments() error = %v, want nil", err)
+	}
+}
+
+func TestListProjectRoleAssignments_error(t *testing.T) {
+	tests := []validationTest[*pb.ListProjectRoleAssignmentsRequest]{
+		{
+			name: "request missing",
+			in:   nil,
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "user_id", description: "required"}),
+		},
+		{
+			name: "invalid user id",
+			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: "bad"},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "user_id", description: "must be a valid UUID"}),
+		},
+		{
+			name: "invalid page token",
+			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString(), PageToken: "bad"},
+			want: wantInvalidArgument("invalid page_token"),
+		},
+	}
+	runValidationErrorTests(t, "ListProjectRoleAssignments", ListProjectRoleAssignments, tests)
+}
+
+func TestListOrganizationRoleAssignments(t *testing.T) {
+	if err := ListOrganizationRoleAssignments(&pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString()}); err != nil {
+		t.Errorf("ListOrganizationRoleAssignments() error = %v, want nil", err)
+	}
+}
+
+func TestListOrganizationRoleAssignments_error(t *testing.T) {
+	tests := []validationTest[*pb.ListOrganizationRoleAssignmentsRequest]{
+		{
+			name: "request missing",
+			in:   nil,
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "user_id", description: "required"}),
+		},
+		{
+			name: "invalid user id",
+			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: "bad"},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "user_id", description: "must be a valid UUID"}),
+		},
+		{
+			name: "invalid page token",
+			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString(), PageToken: "bad"},
+			want: wantInvalidArgument("invalid page_token"),
+		},
+	}
+	runValidationErrorTests(t, "ListOrganizationRoleAssignments", ListOrganizationRoleAssignments, tests)
+}
+
 func TestUpdateRole(t *testing.T) {
 	err := UpdateRole(&pb.UpdateRoleRequest{
 		Role:       &pb.Role{Id: uuid.NewString(), Name: "role manager"},

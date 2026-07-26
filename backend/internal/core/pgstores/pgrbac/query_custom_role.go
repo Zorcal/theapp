@@ -579,3 +579,113 @@ func unassignCustomRoleFromOrgQuery(userID, roleID uuid.UUID, orgID int) pgdb.Ty
 		Expect: pgdb.ExpectOne,
 	}
 }
+
+func userProjectCustomRolesQuery(userID uuid.UUID, projectID, pageSize, pageOffset int) pgdb.TypedQuery[CustomRole] {
+	params := pgx.NamedArgs{"user_id": userID, "project_id": projectID, "page_size": pageSize, "page_offset": pageOffset}
+	const sql = `
+		SELECT
+			r.id,
+			r.external_id,
+			r.name,
+			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}'),
+			r.created_at,
+			r.updated_at,
+			r.etag
+		FROM useraccess.users AS u
+		JOIN org.projects AS proj ON proj.id = @project_id
+		JOIN org.org_membership AS m ON m.user_id = u.id AND m.org_id = proj.org_id
+		JOIN rbac.project_role_assignments AS a ON a.user_id = u.id AND a.project_id = proj.id
+		JOIN rbac.custom_roles AS r ON r.id = a.role_id AND r.org_id = proj.org_id
+		LEFT JOIN rbac.custom_role_permissions AS rp ON rp.role_id = r.id
+		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
+		WHERE u.external_id = @user_id
+		GROUP BY r.id
+		ORDER BY r.name, r.id
+		LIMIT @page_size OFFSET @page_offset`
+
+	return pgdb.TypedQuery[CustomRole]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (CustomRole, error) {
+			var role CustomRole
+			return role, row.Scan(&role.ID, &role.ExternalID, &role.Name, &role.PermissionNames, &role.CreatedAt, &role.UpdatedAt, &role.ETag)
+		},
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func userProjectCustomRoleCountQuery(userID uuid.UUID, projectID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"user_id": userID, "project_id": projectID}
+	const sql = `
+		SELECT COUNT(a.role_id)
+		FROM useraccess.users AS u
+		JOIN org.projects AS proj ON proj.id = @project_id
+		JOIN org.org_membership AS m ON m.user_id = u.id AND m.org_id = proj.org_id
+		LEFT JOIN rbac.project_role_assignments AS a ON a.user_id = u.id AND a.project_id = proj.id
+		WHERE u.external_id = @user_id
+		GROUP BY u.id, proj.id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var count int
+			return count, row.Scan(&count)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func userOrgCustomRolesQuery(userID uuid.UUID, orgID, pageSize, pageOffset int) pgdb.TypedQuery[CustomRole] {
+	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID, "page_size": pageSize, "page_offset": pageOffset}
+	const sql = `
+		SELECT
+			r.id,
+			r.external_id,
+			r.name,
+			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}'),
+			r.created_at,
+			r.updated_at,
+			r.etag
+		FROM useraccess.users AS u
+		JOIN org.org_membership AS m ON m.user_id = u.id AND m.org_id = @org_id
+		JOIN rbac.org_role_assignments AS a ON a.user_id = u.id AND a.org_id = m.org_id
+		JOIN rbac.custom_roles AS r ON r.id = a.role_id AND r.org_id = m.org_id
+		LEFT JOIN rbac.custom_role_permissions AS rp ON rp.role_id = r.id
+		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
+		WHERE u.external_id = @user_id
+		GROUP BY r.id
+		ORDER BY r.name, r.id
+		LIMIT @page_size OFFSET @page_offset`
+
+	return pgdb.TypedQuery[CustomRole]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (CustomRole, error) {
+			var role CustomRole
+			return role, row.Scan(&role.ID, &role.ExternalID, &role.Name, &role.PermissionNames, &role.CreatedAt, &role.UpdatedAt, &role.ETag)
+		},
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func userOrgCustomRoleCountQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID}
+	const sql = `
+		SELECT COUNT(a.role_id)
+		FROM useraccess.users AS u
+		JOIN org.org_membership AS m ON m.user_id = u.id AND m.org_id = @org_id
+		LEFT JOIN rbac.org_role_assignments AS a ON a.user_id = u.id AND a.org_id = m.org_id
+		WHERE u.external_id = @user_id
+		GROUP BY u.id, m.org_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var count int
+			return count, row.Scan(&count)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}

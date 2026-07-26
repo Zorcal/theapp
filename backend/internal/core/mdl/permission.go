@@ -27,14 +27,16 @@ const (
 // All custom role service permissions. They authorize role management only within the organization
 // resolved from the request's project context.
 const (
-	PermissionCustomRoleCreate          Permission = "custom-role:create"
-	PermissionCustomRoleRead            Permission = "custom-role:read"
-	PermissionCustomRoleUpdate          Permission = "custom-role:update"
-	PermissionCustomRoleDelete          Permission = "custom-role:delete"
-	PermissionCustomRoleAssignProject   Permission = "custom-role:assign-project"
-	PermissionCustomRoleUnassignProject Permission = "custom-role:unassign-project"
-	PermissionCustomRoleAssignOrg       Permission = "custom-role:assign-org"
-	PermissionCustomRoleUnassignOrg     Permission = "custom-role:unassign-org"
+	PermissionCustomRoleCreate                 Permission = "custom-role:create"
+	PermissionCustomRoleRead                   Permission = "custom-role:read"
+	PermissionCustomRoleUpdate                 Permission = "custom-role:update"
+	PermissionCustomRoleDelete                 Permission = "custom-role:delete"
+	PermissionCustomRoleAssignProject          Permission = "custom-role:assign-project"
+	PermissionCustomRoleUnassignProject        Permission = "custom-role:unassign-project"
+	PermissionCustomRoleAssignOrg              Permission = "custom-role:assign-org"
+	PermissionCustomRoleUnassignOrg            Permission = "custom-role:unassign-org"
+	PermissionCustomRoleReadProjectAssignments Permission = "custom-role:read-project-assignments"
+	PermissionCustomRoleReadOrgAssignments     Permission = "custom-role:read-org-assignments"
 )
 
 // AllPermissions returns all permissions.
@@ -54,6 +56,8 @@ func AllPermissions() []Permission {
 		PermissionCustomRoleUnassignProject,
 		PermissionCustomRoleAssignOrg,
 		PermissionCustomRoleUnassignOrg,
+		PermissionCustomRoleReadProjectAssignments,
+		PermissionCustomRoleReadOrgAssignments,
 	}
 }
 
@@ -81,6 +85,8 @@ func PermissionsAssignableToCustomRoles() []Permission {
 		PermissionCustomRoleUnassignProject,
 		PermissionCustomRoleAssignOrg,
 		PermissionCustomRoleUnassignOrg,
+		PermissionCustomRoleReadProjectAssignments,
+		PermissionCustomRoleReadOrgAssignments,
 	}
 }
 

@@ -39,6 +39,20 @@ type RoleStorer interface {
 	CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, error)
 	// CustomRoleCount returns the number of custom roles owned by an organization.
 	CustomRoleCount(ctx context.Context, orgID int) (int, error)
+	// UserProjectCustomRoles returns a page of custom roles assigned directly to userID in projectID.
+	// An empty page does not indicate whether the user, project, or organization membership exists.
+	// Callers must use UserProjectCustomRoleCount with this method to validate that context.
+	UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, projectID, pageSize, pageOffset int) ([]pgrbac.CustomRole, error)
+	// UserProjectCustomRoleCount returns the number of custom roles assigned directly to userID in projectID.
+	// Returns [sql.ErrNoRows] if the user, project, or organization membership does not exist.
+	UserProjectCustomRoleCount(ctx context.Context, userID uuid.UUID, projectID int) (int, error)
+	// UserOrgCustomRoles returns a page of custom roles assigned to userID across orgID.
+	// An empty page does not indicate whether the user or organization membership exists.
+	// Callers must use UserOrgCustomRoleCount with this method to validate that context.
+	UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, error)
+	// UserOrgCustomRoleCount returns the number of custom roles assigned to userID across orgID.
+	// Returns [sql.ErrNoRows] if the user or organization membership does not exist.
+	UserOrgCustomRoleCount(ctx context.Context, userID uuid.UUID, orgID int) (int, error)
 	// AssignCustomRoleToProject grants an organization member an organization-owned role in a
 	// project.
 	// Returns [sql.ErrNoRows] if the user, role, project, or membership does not exist, or the role

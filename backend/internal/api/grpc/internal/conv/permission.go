@@ -7,20 +7,22 @@ import (
 )
 
 var permissionToPB = map[mdl.Permission]pb.Permission{
-	mdl.PermissionUserRead:                  pb.Permission_PERMISSION_USER_READ,
-	mdl.PermissionUserCreate:                pb.Permission_PERMISSION_USER_CREATE,
-	mdl.PermissionUserUpdate:                pb.Permission_PERMISSION_USER_UPDATE,
-	mdl.PermissionSystemRoleRead:            pb.Permission_PERMISSION_SYSTEM_ROLE_READ,
-	mdl.PermissionSystemRoleAssign:          pb.Permission_PERMISSION_SYSTEM_ROLE_ASSIGN,
-	mdl.PermissionSystemRoleUnassign:        pb.Permission_PERMISSION_SYSTEM_ROLE_UNASSIGN,
-	mdl.PermissionCustomRoleCreate:          pb.Permission_PERMISSION_CUSTOM_ROLE_CREATE,
-	mdl.PermissionCustomRoleRead:            pb.Permission_PERMISSION_CUSTOM_ROLE_READ,
-	mdl.PermissionCustomRoleUpdate:          pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE,
-	mdl.PermissionCustomRoleDelete:          pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE,
-	mdl.PermissionCustomRoleAssignProject:   pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT,
-	mdl.PermissionCustomRoleUnassignProject: pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT,
-	mdl.PermissionCustomRoleAssignOrg:       pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION,
-	mdl.PermissionCustomRoleUnassignOrg:     pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION,
+	mdl.PermissionUserRead:                         pb.Permission_PERMISSION_USER_READ,
+	mdl.PermissionUserCreate:                       pb.Permission_PERMISSION_USER_CREATE,
+	mdl.PermissionUserUpdate:                       pb.Permission_PERMISSION_USER_UPDATE,
+	mdl.PermissionSystemRoleRead:                   pb.Permission_PERMISSION_SYSTEM_ROLE_READ,
+	mdl.PermissionSystemRoleAssign:                 pb.Permission_PERMISSION_SYSTEM_ROLE_ASSIGN,
+	mdl.PermissionSystemRoleUnassign:               pb.Permission_PERMISSION_SYSTEM_ROLE_UNASSIGN,
+	mdl.PermissionCustomRoleCreate:                 pb.Permission_PERMISSION_CUSTOM_ROLE_CREATE,
+	mdl.PermissionCustomRoleRead:                   pb.Permission_PERMISSION_CUSTOM_ROLE_READ,
+	mdl.PermissionCustomRoleUpdate:                 pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE,
+	mdl.PermissionCustomRoleDelete:                 pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE,
+	mdl.PermissionCustomRoleAssignProject:          pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT,
+	mdl.PermissionCustomRoleUnassignProject:        pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT,
+	mdl.PermissionCustomRoleAssignOrg:              pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION,
+	mdl.PermissionCustomRoleUnassignOrg:            pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION,
+	mdl.PermissionCustomRoleReadProjectAssignments: pb.Permission_PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS,
+	mdl.PermissionCustomRoleReadOrgAssignments:     pb.Permission_PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS,
 }
 
 var permissionFromPB = func() map[pb.Permission]mdl.Permission {

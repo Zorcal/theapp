@@ -19,16 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RoleService_CreateRole_FullMethodName                   = "/theapp.v1.RoleService/CreateRole"
-	RoleService_GetRole_FullMethodName                      = "/theapp.v1.RoleService/GetRole"
-	RoleService_ListRoles_FullMethodName                    = "/theapp.v1.RoleService/ListRoles"
-	RoleService_UpdateRole_FullMethodName                   = "/theapp.v1.RoleService/UpdateRole"
-	RoleService_ModifyRolePermissions_FullMethodName        = "/theapp.v1.RoleService/ModifyRolePermissions"
-	RoleService_DeleteRole_FullMethodName                   = "/theapp.v1.RoleService/DeleteRole"
-	RoleService_AssignRoleToProject_FullMethodName          = "/theapp.v1.RoleService/AssignRoleToProject"
-	RoleService_UnassignRoleFromProject_FullMethodName      = "/theapp.v1.RoleService/UnassignRoleFromProject"
-	RoleService_AssignRoleToOrganization_FullMethodName     = "/theapp.v1.RoleService/AssignRoleToOrganization"
-	RoleService_UnassignRoleFromOrganization_FullMethodName = "/theapp.v1.RoleService/UnassignRoleFromOrganization"
+	RoleService_CreateRole_FullMethodName                      = "/theapp.v1.RoleService/CreateRole"
+	RoleService_GetRole_FullMethodName                         = "/theapp.v1.RoleService/GetRole"
+	RoleService_ListRoles_FullMethodName                       = "/theapp.v1.RoleService/ListRoles"
+	RoleService_ListProjectRoleAssignments_FullMethodName      = "/theapp.v1.RoleService/ListProjectRoleAssignments"
+	RoleService_ListOrganizationRoleAssignments_FullMethodName = "/theapp.v1.RoleService/ListOrganizationRoleAssignments"
+	RoleService_UpdateRole_FullMethodName                      = "/theapp.v1.RoleService/UpdateRole"
+	RoleService_ModifyRolePermissions_FullMethodName           = "/theapp.v1.RoleService/ModifyRolePermissions"
+	RoleService_DeleteRole_FullMethodName                      = "/theapp.v1.RoleService/DeleteRole"
+	RoleService_AssignRoleToProject_FullMethodName             = "/theapp.v1.RoleService/AssignRoleToProject"
+	RoleService_UnassignRoleFromProject_FullMethodName         = "/theapp.v1.RoleService/UnassignRoleFromProject"
+	RoleService_AssignRoleToOrganization_FullMethodName        = "/theapp.v1.RoleService/AssignRoleToOrganization"
+	RoleService_UnassignRoleFromOrganization_FullMethodName    = "/theapp.v1.RoleService/UnassignRoleFromOrganization"
 )
 
 // RoleServiceClient is the client API for RoleService service.
@@ -43,6 +45,10 @@ type RoleServiceClient interface {
 	GetRole(ctx context.Context, in *GetRoleRequest, opts ...grpc.CallOption) (*Role, error)
 	// Lists custom roles owned by the caller's organization.
 	ListRoles(ctx context.Context, in *ListRolesRequest, opts ...grpc.CallOption) (*ListRolesResponse, error)
+	// Lists a user's custom-role assignments in the request's project.
+	ListProjectRoleAssignments(ctx context.Context, in *ListProjectRoleAssignmentsRequest, opts ...grpc.CallOption) (*ListProjectRoleAssignmentsResponse, error)
+	// Lists a user's organization-scoped custom-role assignments.
+	ListOrganizationRoleAssignments(ctx context.Context, in *ListOrganizationRoleAssignmentsRequest, opts ...grpc.CallOption) (*ListOrganizationRoleAssignmentsResponse, error)
 	// Updates a custom role.
 	UpdateRole(ctx context.Context, in *UpdateRoleRequest, opts ...grpc.CallOption) (*Role, error)
 	// Modifies a custom role's permissions.
@@ -91,6 +97,26 @@ func (c *roleServiceClient) ListRoles(ctx context.Context, in *ListRolesRequest,
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListRolesResponse)
 	err := c.cc.Invoke(ctx, RoleService_ListRoles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roleServiceClient) ListProjectRoleAssignments(ctx context.Context, in *ListProjectRoleAssignmentsRequest, opts ...grpc.CallOption) (*ListProjectRoleAssignmentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProjectRoleAssignmentsResponse)
+	err := c.cc.Invoke(ctx, RoleService_ListProjectRoleAssignments_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roleServiceClient) ListOrganizationRoleAssignments(ctx context.Context, in *ListOrganizationRoleAssignmentsRequest, opts ...grpc.CallOption) (*ListOrganizationRoleAssignmentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOrganizationRoleAssignmentsResponse)
+	err := c.cc.Invoke(ctx, RoleService_ListOrganizationRoleAssignments_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +205,10 @@ type RoleServiceServer interface {
 	GetRole(context.Context, *GetRoleRequest) (*Role, error)
 	// Lists custom roles owned by the caller's organization.
 	ListRoles(context.Context, *ListRolesRequest) (*ListRolesResponse, error)
+	// Lists a user's custom-role assignments in the request's project.
+	ListProjectRoleAssignments(context.Context, *ListProjectRoleAssignmentsRequest) (*ListProjectRoleAssignmentsResponse, error)
+	// Lists a user's organization-scoped custom-role assignments.
+	ListOrganizationRoleAssignments(context.Context, *ListOrganizationRoleAssignmentsRequest) (*ListOrganizationRoleAssignmentsResponse, error)
 	// Updates a custom role.
 	UpdateRole(context.Context, *UpdateRoleRequest) (*Role, error)
 	// Modifies a custom role's permissions.
@@ -210,6 +240,12 @@ func (UnimplementedRoleServiceServer) GetRole(context.Context, *GetRoleRequest) 
 }
 func (UnimplementedRoleServiceServer) ListRoles(context.Context, *ListRolesRequest) (*ListRolesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListRoles not implemented")
+}
+func (UnimplementedRoleServiceServer) ListProjectRoleAssignments(context.Context, *ListProjectRoleAssignmentsRequest) (*ListProjectRoleAssignmentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListProjectRoleAssignments not implemented")
+}
+func (UnimplementedRoleServiceServer) ListOrganizationRoleAssignments(context.Context, *ListOrganizationRoleAssignmentsRequest) (*ListOrganizationRoleAssignmentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOrganizationRoleAssignments not implemented")
 }
 func (UnimplementedRoleServiceServer) UpdateRole(context.Context, *UpdateRoleRequest) (*Role, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRole not implemented")
@@ -302,6 +338,42 @@ func _RoleService_ListRoles_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RoleServiceServer).ListRoles(ctx, req.(*ListRolesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoleService_ListProjectRoleAssignments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProjectRoleAssignmentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoleServiceServer).ListProjectRoleAssignments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoleService_ListProjectRoleAssignments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoleServiceServer).ListProjectRoleAssignments(ctx, req.(*ListProjectRoleAssignmentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoleService_ListOrganizationRoleAssignments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOrganizationRoleAssignmentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoleServiceServer).ListOrganizationRoleAssignments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoleService_ListOrganizationRoleAssignments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoleServiceServer).ListOrganizationRoleAssignments(ctx, req.(*ListOrganizationRoleAssignmentsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -450,6 +522,14 @@ var RoleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListRoles",
 			Handler:    _RoleService_ListRoles_Handler,
+		},
+		{
+			MethodName: "ListProjectRoleAssignments",
+			Handler:    _RoleService_ListProjectRoleAssignments_Handler,
+		},
+		{
+			MethodName: "ListOrganizationRoleAssignments",
+			Handler:    _RoleService_ListOrganizationRoleAssignments_Handler,
 		},
 		{
 			MethodName: "UpdateRole",

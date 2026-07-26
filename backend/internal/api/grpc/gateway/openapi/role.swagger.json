@@ -16,6 +16,114 @@
     "application/json"
   ],
   "paths": {
+    "/v1/organization-role-assignments": {
+      "get": {
+        "summary": "Lists a user's organization-scoped custom-role assignments.",
+        "operationId": "RoleService_ListOrganizationRoleAssignments",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListOrganizationRoleAssignmentsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "ID of the user whose assignments to list.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Maximum number of assignments to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the organization whose assignments to list.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/project-role-assignments": {
+      "get": {
+        "summary": "Lists a user's custom-role assignments in the request's project.",
+        "operationId": "RoleService_ListProjectRoleAssignments",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListProjectRoleAssignmentsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "ID of the user whose assignments to list.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Maximum number of assignments to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the project whose assignments to list.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
     "/v1/roles": {
       "get": {
         "summary": "Lists custom roles owned by the caller's organization.",
@@ -596,6 +704,52 @@
       "type": "object",
       "description": "Response message for deleting a custom role."
     },
+    "v1ListOrganizationRoleAssignmentsResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Role"
+          },
+          "description": "Custom roles assigned across the request project's organization."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of matching assignments."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page."
+        }
+      },
+      "description": "Response message for listing a user's organization-scoped custom-role assignments."
+    },
+    "v1ListProjectRoleAssignmentsResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Role"
+          },
+          "description": "Custom roles assigned directly in the request's project."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of matching assignments."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page."
+        }
+      },
+      "description": "Response message for listing a user's project-scoped custom-role assignments."
+    },
     "v1ListRolesResponse": {
       "type": "object",
       "properties": {
@@ -636,7 +790,9 @@
         "PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT",
         "PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT",
         "PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION",
-        "PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION"
+        "PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION",
+        "PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS",
+        "PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS"
       ],
       "default": "PERMISSION_UNSPECIFIED",
       "description": "Permission is a capability that can be granted through a role."

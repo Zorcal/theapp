@@ -155,6 +155,36 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 		testingx.AssertDiff(t, projectPerms.PermissionNames, want, cmpopts.EquateEmpty())
 	}
 
+	assertProjectRoles := func(want []mdl.CustomRole) {
+		t.Helper()
+
+		got, count, err := core.UserProjectCustomRoles(roleCtx, user.ExternalID, 50, 0)
+		if err != nil {
+			t.Fatalf("UserProjectCustomRoles() error = %v", err)
+		}
+
+		testingx.AssertDiff(t, got, want, cmpopts.EquateEmpty())
+
+		if wantCount := len(want); count != wantCount {
+			t.Errorf("UserProjectCustomRoles() total count = %d, want %d", count, wantCount)
+		}
+	}
+
+	assertOrgRoles := func(want []mdl.CustomRole) {
+		t.Helper()
+
+		got, count, err := core.UserOrgCustomRoles(roleCtx, user.ExternalID, 50, 0)
+		if err != nil {
+			t.Fatalf("UserOrgCustomRoles() error = %v", err)
+		}
+
+		testingx.AssertDiff(t, got, want, cmpopts.EquateEmpty())
+
+		if wantCount := len(want); count != wantCount {
+			t.Errorf("UserOrgCustomRoles() total count = %d, want %d", count, wantCount)
+		}
+	}
+
 	// Assign and unassign the role in one project.
 
 	if err := core.AssignCustomRoleToProject(roleCtx, user.ExternalID, role.ExternalID); err != nil {
@@ -162,12 +192,14 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 	}
 
 	assertProjectPermNames(firstProject.ID, []string{"custom-role:read"})
+	assertProjectRoles([]mdl.CustomRole{customRoleFromPg(role)})
 
 	if err := core.UnassignCustomRoleFromProject(roleCtx, user.ExternalID, role.ExternalID); err != nil {
 		t.Fatalf("UnassignCustomRoleFromProject() error = %v", err)
 	}
 
 	assertProjectPermNames(firstProject.ID, nil)
+	assertProjectRoles([]mdl.CustomRole{})
 
 	// Assign and unassign the role across the organization.
 
@@ -177,6 +209,7 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 
 	assertProjectPermNames(firstProject.ID, []string{"custom-role:read"})
 	assertProjectPermNames(secondProject.ID, []string{"custom-role:read"})
+	assertOrgRoles([]mdl.CustomRole{customRoleFromPg(role)})
 
 	if err := core.UnassignCustomRoleFromOrg(roleCtx, user.ExternalID, role.ExternalID); err != nil {
 		t.Fatalf("UnassignCustomRoleFromOrg() error = %v", err)
@@ -184,6 +217,7 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 
 	assertProjectPermNames(firstProject.ID, nil)
 	assertProjectPermNames(secondProject.ID, nil)
+	assertOrgRoles([]mdl.CustomRole{})
 }
 
 func TestCore_CustomRoles(t *testing.T) {
@@ -288,6 +322,234 @@ func TestCore_CustomRoles_error(t *testing.T) {
 
 				if _, _, err := core.CustomRoles(tt.ctx, 25, 0); err == nil {
 					t.Error("CustomRoles() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_UserProjectCustomRoles(t *testing.T) {
+	mockedRole := pgrbac.CustomRole{
+		ID:              1,
+		ExternalID:      uuid.New(),
+		Name:            "project reader",
+		PermissionNames: []string{"custom-role:read"},
+		CreatedAt:       time.Now(),
+		UpdatedAt:       new(time.Now().Add(time.Minute)),
+		ETag:            uuid.New(),
+	}
+	roleStorer := &MockedRoleStorer{
+		UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
+			return []pgrbac.CustomRole{mockedRole}, nil
+		},
+		UserProjectCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
+			return 1, nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+
+	got, count, err := core.UserProjectCustomRoles(ctx, uuid.New(), 25, 0)
+	if err != nil {
+		t.Fatalf("UserProjectCustomRoles() error = %v", err)
+	}
+
+	if want := 1; count != want {
+		t.Errorf("UserProjectCustomRoles() total count = %d, want %d", count, want)
+	}
+
+	want := []mdl.CustomRole{customRoleFromPg(mockedRole)}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_UserProjectCustomRoles_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "roles store error",
+			roleStorer: &MockedRoleStorer{
+				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
+					return nil, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "target not found",
+			roleStorer: &MockedRoleStorer{
+				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
+					return nil, nil
+				},
+				UserProjectCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
+					return 0, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "count store error",
+			roleStorer: &MockedRoleStorer{
+				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
+					return nil, nil
+				},
+				UserProjectCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
+					return 0, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+
+			if _, _, err := core.UserProjectCustomRoles(ctx, uuid.New(), 25, 0); !errors.Is(err, tt.want) {
+				t.Errorf("UserProjectCustomRoles() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "project context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if _, _, err := core.UserProjectCustomRoles(tt.ctx, uuid.New(), 25, 0); err == nil {
+					t.Error("UserProjectCustomRoles() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
+func TestCore_UserOrgCustomRoles(t *testing.T) {
+	mockedRole := pgrbac.CustomRole{
+		ID:              1,
+		ExternalID:      uuid.New(),
+		Name:            "organization reader",
+		PermissionNames: []string{"custom-role:read"},
+		CreatedAt:       time.Now(),
+		UpdatedAt:       new(time.Now().Add(time.Minute)),
+		ETag:            uuid.New(),
+	}
+	roleStorer := &MockedRoleStorer{
+		UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
+			return []pgrbac.CustomRole{mockedRole}, nil
+		},
+		UserOrgCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
+			return 1, nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+
+	got, count, err := core.UserOrgCustomRoles(ctx, uuid.New(), 25, 0)
+	if err != nil {
+		t.Fatalf("UserOrgCustomRoles() error = %v", err)
+	}
+
+	if want := 1; count != want {
+		t.Errorf("UserOrgCustomRoles() total count = %d, want %d", count, want)
+	}
+
+	want := []mdl.CustomRole{customRoleFromPg(mockedRole)}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_UserOrgCustomRoles_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "roles store error",
+			roleStorer: &MockedRoleStorer{
+				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
+					return nil, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "target not found",
+			roleStorer: &MockedRoleStorer{
+				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
+					return nil, nil
+				},
+				UserOrgCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
+					return 0, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "count store error",
+			roleStorer: &MockedRoleStorer{
+				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
+					return nil, nil
+				},
+				UserOrgCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
+					return 0, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+
+			if _, _, err := core.UserOrgCustomRoles(ctx, uuid.New(), 25, 0); !errors.Is(err, tt.want) {
+				t.Errorf("UserOrgCustomRoles() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  context.Background(),
+			},
+			{
+				name: "organization context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
+
+				if _, _, err := core.UserOrgCustomRoles(tt.ctx, uuid.New(), 25, 0); err == nil {
+					t.Error("UserOrgCustomRoles() error = nil, want error")
 				}
 			})
 		}

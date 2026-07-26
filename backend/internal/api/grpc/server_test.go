@@ -216,7 +216,7 @@ func authCtxForUserAtProject(t *testing.T, ctx context.Context, userID uuid.UUID
 func seedOrgMembership(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID, orgID int) {
 	t.Helper()
 
-	// TODO: Replace this direct insert once pgorg exposes an organization-membership creation method.
+	// TODO: Replace this direct insert when the organization store exposes membership creation.
 	if _, err := pool.Exec(ctx, "INSERT INTO org.org_membership (user_id, org_id) VALUES ($1, $2)", userID, orgID); err != nil {
 		t.Fatalf("seed organization membership (user %d, organization %d): %v", userID, orgID, err)
 	}

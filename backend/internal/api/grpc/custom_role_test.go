@@ -148,7 +148,7 @@ func TestRoleService_Integration(t *testing.T) {
 		t.Errorf("ModifyRolePermissions() permissions = %v, want %v", got, want)
 	}
 
-	// Assign and unassign the role in the request's project.
+	// Assign the role in the request's project.
 
 	if _, err := srv.customRoleServiceClient.AssignRoleToProject(authCtx, &pb.AssignRoleToProjectRequest{
 		RoleId: created.GetId(),
@@ -157,7 +157,24 @@ func TestRoleService_Integration(t *testing.T) {
 		t.Fatalf("AssignRoleToProject() error = %v", err)
 	}
 
-	// TODO: Verify the target's project role assignments once RoleService exposes a listing endpoint.
+	// List the target user's project role assignments.
+
+	projectAssignments, err := srv.customRoleServiceClient.ListProjectRoleAssignments(authCtx, &pb.ListProjectRoleAssignmentsRequest{
+		UserId: target.ExternalID.String(),
+	})
+	if err != nil {
+		t.Fatalf("ListProjectRoleAssignments() error = %v", err)
+	}
+
+	wantProjectRoles := []*pb.Role{modified}
+
+	testingx.AssertDiff(t, projectAssignments.GetRoles(), wantProjectRoles, defaultDiffOpts())
+
+	if got, want := projectAssignments.GetTotalSize(), int32(1); got != want {
+		t.Errorf("ListProjectRoleAssignments() total size = %d, want %d", got, want)
+	}
+
+	// Unassign the role from the request's project.
 
 	if _, err := srv.customRoleServiceClient.UnassignRoleFromProject(authCtx, &pb.UnassignRoleFromProjectRequest{
 		RoleId: created.GetId(),
@@ -166,7 +183,22 @@ func TestRoleService_Integration(t *testing.T) {
 		t.Fatalf("UnassignRoleFromProject() error = %v", err)
 	}
 
-	// Assign and unassign the role across the request project's organization.
+	// List the target user's project role assignments after unassignment.
+
+	projectAssignments, err = srv.customRoleServiceClient.ListProjectRoleAssignments(authCtx, &pb.ListProjectRoleAssignmentsRequest{
+		UserId: target.ExternalID.String(),
+	})
+	if err != nil {
+		t.Fatalf("ListProjectRoleAssignments() after unassign error = %v", err)
+	}
+
+	testingx.AssertDiff(t, projectAssignments.GetRoles(), []*pb.Role{}, append(defaultDiffOpts(), cmpopts.EquateEmpty())...)
+
+	if got, want := projectAssignments.GetTotalSize(), int32(0); got != want {
+		t.Errorf("ListProjectRoleAssignments() after unassign total size = %d, want %d", got, want)
+	}
+
+	// Assign the role across the request project's organization.
 
 	if _, err := srv.customRoleServiceClient.AssignRoleToOrganization(authCtx, &pb.AssignRoleToOrganizationRequest{
 		RoleId: created.GetId(),
@@ -175,13 +207,45 @@ func TestRoleService_Integration(t *testing.T) {
 		t.Fatalf("AssignRoleToOrganization() error = %v", err)
 	}
 
-	// TODO: Verify the target's organization role assignments once RoleService exposes a listing endpoint.
+	// List the target user's organization role assignments.
+
+	orgAssignments, err := srv.customRoleServiceClient.ListOrganizationRoleAssignments(authCtx, &pb.ListOrganizationRoleAssignmentsRequest{
+		UserId: target.ExternalID.String(),
+	})
+	if err != nil {
+		t.Fatalf("ListOrganizationRoleAssignments() error = %v", err)
+	}
+
+	wantOrgRoles := []*pb.Role{modified}
+
+	testingx.AssertDiff(t, orgAssignments.GetRoles(), wantOrgRoles, defaultDiffOpts())
+
+	if got, want := orgAssignments.GetTotalSize(), int32(1); got != want {
+		t.Errorf("ListOrganizationRoleAssignments() total size = %d, want %d", got, want)
+	}
+
+	// Unassign the role from the request project's organization.
 
 	if _, err := srv.customRoleServiceClient.UnassignRoleFromOrganization(authCtx, &pb.UnassignRoleFromOrganizationRequest{
 		RoleId: created.GetId(),
 		UserId: target.ExternalID.String(),
 	}); err != nil {
 		t.Fatalf("UnassignRoleFromOrganization() error = %v", err)
+	}
+
+	// List the target user's organization role assignments after unassignment.
+
+	orgAssignments, err = srv.customRoleServiceClient.ListOrganizationRoleAssignments(authCtx, &pb.ListOrganizationRoleAssignmentsRequest{
+		UserId: target.ExternalID.String(),
+	})
+	if err != nil {
+		t.Fatalf("ListOrganizationRoleAssignments() after unassign error = %v", err)
+	}
+
+	testingx.AssertDiff(t, orgAssignments.GetRoles(), []*pb.Role{}, append(defaultDiffOpts(), cmpopts.EquateEmpty())...)
+
+	if got, want := orgAssignments.GetTotalSize(), int32(0); got != want {
+		t.Errorf("ListOrganizationRoleAssignments() after unassign total size = %d, want %d", got, want)
 	}
 
 	// Verify the role is inaccessible through another organization.
@@ -655,6 +719,196 @@ func TestRoleService_ListRoles_error(t *testing.T) {
 			got, ok := status.FromError(err)
 			if !ok {
 				t.Fatalf("ListRoles() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_ListProjectRoleAssignments(t *testing.T) {
+	mockedRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "project reader",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+		CreatedAt:   time.Now(),
+		UpdatedAt:   new(time.Now().Add(time.Minute)),
+		ETag:        uuid.NewString(),
+	}
+	customRoleCore := &MockedCustomRoleCore{
+		UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.CustomRole, int, error) {
+			return []mdl.CustomRole{mockedRole}, 2, nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), CustomRoleCore: customRoleCore})
+
+	got, err := srvTest.customRoleServiceClient.ListProjectRoleAssignments(
+		authCtxForTestUser(t, t.Context()),
+		&pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString(), PageSize: 1},
+	)
+	if err != nil {
+		t.Fatalf("ListProjectRoleAssignments() error = %v", err)
+	}
+
+	want := &pb.ListProjectRoleAssignmentsResponse{
+		Roles: []*pb.Role{{
+			Id:          mockedRole.ID.String(),
+			Name:        mockedRole.Name,
+			Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
+			CreateTime:  timestamppb.New(mockedRole.CreatedAt),
+			UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
+			Etag:        mockedRole.ETag,
+		}},
+		TotalSize:     2,
+		NextPageToken: "eyJvIjoxfQ==",
+	}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_ListProjectRoleAssignments_error(t *testing.T) {
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.ListProjectRoleAssignmentsRequest
+		want           *status.Status
+	}{
+		{
+			name:           "validated request",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.ListProjectRoleAssignmentsRequest{UserId: "bad"},
+			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "user_id", Description: "must be a valid UUID"},
+			})),
+		},
+		{
+			name: "not found",
+			customRoleCore: &MockedCustomRoleCore{
+				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.CustomRole, int, error) {
+					return nil, 0, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString()},
+			want: status.New(codes.NotFound, "user, project, or organization membership not found"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.CustomRole, int, error) {
+					return nil, 0, errors.New("boom")
+				},
+			},
+			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), CustomRoleCore: tt.customRoleCore})
+
+			_, err := srvTest.customRoleServiceClient.ListProjectRoleAssignments(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("ListProjectRoleAssignments() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("ListProjectRoleAssignments() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestRoleService_ListOrganizationRoleAssignments(t *testing.T) {
+	mockedRole := mdl.CustomRole{
+		ID:          uuid.New(),
+		Name:        "organization reader",
+		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+		CreatedAt:   time.Now(),
+		UpdatedAt:   new(time.Now().Add(time.Minute)),
+		ETag:        uuid.NewString(),
+	}
+	customRoleCore := &MockedCustomRoleCore{
+		UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.CustomRole, int, error) {
+			return []mdl.CustomRole{mockedRole}, 2, nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), CustomRoleCore: customRoleCore})
+
+	got, err := srvTest.customRoleServiceClient.ListOrganizationRoleAssignments(
+		authCtxForTestUser(t, t.Context()),
+		&pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString(), PageSize: 1},
+	)
+	if err != nil {
+		t.Fatalf("ListOrganizationRoleAssignments() error = %v", err)
+	}
+
+	want := &pb.ListOrganizationRoleAssignmentsResponse{
+		Roles: []*pb.Role{{
+			Id:          mockedRole.ID.String(),
+			Name:        mockedRole.Name,
+			Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
+			CreateTime:  timestamppb.New(mockedRole.CreatedAt),
+			UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
+			Etag:        mockedRole.ETag,
+		}},
+		TotalSize:     2,
+		NextPageToken: "eyJvIjoxfQ==",
+	}
+
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestRoleService_ListOrganizationRoleAssignments_error(t *testing.T) {
+	tests := []struct {
+		name           string
+		customRoleCore CustomRoleCore
+		in             *pb.ListOrganizationRoleAssignmentsRequest
+		want           *status.Status
+	}{
+		{
+			name:           "validated request",
+			customRoleCore: &MockedCustomRoleCore{},
+			in:             &pb.ListOrganizationRoleAssignmentsRequest{UserId: "bad"},
+			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "user_id", Description: "must be a valid UUID"},
+			})),
+		},
+		{
+			name: "not found",
+			customRoleCore: &MockedCustomRoleCore{
+				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.CustomRole, int, error) {
+					return nil, 0, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString()},
+			want: status.New(codes.NotFound, "user or organization membership not found"),
+		},
+		{
+			name: "core error",
+			customRoleCore: &MockedCustomRoleCore{
+				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.CustomRole, int, error) {
+					return nil, 0, errors.New("boom")
+				},
+			},
+			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString()},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), CustomRoleCore: tt.customRoleCore})
+
+			_, err := srvTest.customRoleServiceClient.ListOrganizationRoleAssignments(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("ListOrganizationRoleAssignments() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("ListOrganizationRoleAssignments() error = %q, want a gRPC status error", err)
 			}
 
 			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())

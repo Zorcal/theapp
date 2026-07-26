@@ -281,6 +281,8 @@ func seededSystemRoles() []SystemRole {
 				"custom-role:create",
 				"custom-role:delete",
 				"custom-role:read",
+				"custom-role:read-org-assignments",
+				"custom-role:read-project-assignments",
 				"custom-role:unassign-org",
 				"custom-role:unassign-project",
 				"custom-role:update",

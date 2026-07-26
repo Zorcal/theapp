@@ -32,6 +32,12 @@ type CustomRoleCore interface {
 	// CustomRoleByID returns a custom role owned by the caller's organization.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	CustomRoleByID(ctx context.Context, customRoleID uuid.UUID) (mdl.CustomRole, error)
+	// UserProjectCustomRoles returns a page of custom roles assigned directly to userID in the caller's project.
+	// Returns [mdl.ErrNotFound] if the user, project, or organization membership does not exist.
+	UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]mdl.CustomRole, int, error)
+	// UserOrgCustomRoles returns a page of custom roles assigned to userID across the caller's organization.
+	// Returns [mdl.ErrNotFound] if the user or organization membership does not exist.
+	UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]mdl.CustomRole, int, error)
 	// CreateCustomRole creates a custom role in the caller's organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
@@ -130,6 +136,88 @@ func (s *customRoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequ
 	}
 
 	return &pb.ListRolesResponse{
+		Roles:         conv.CustomRolesToPB(roles),
+		TotalSize:     mustconv.Int32(totalCount),
+		NextPageToken: nextPageToken,
+	}, nil
+}
+
+func (s *customRoleService) ListProjectRoleAssignments(ctx context.Context, req *pb.ListProjectRoleAssignmentsRequest) (*pb.ListProjectRoleAssignmentsResponse, error) {
+	if err := validate.ListProjectRoleAssignments(req); err != nil {
+		return nil, fmt.Errorf("validate list project role assignments request: %w", err)
+	}
+
+	userID := uuid.MustParse(req.GetUserId())
+
+	pageSize := int(req.GetPageSize())
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 50
+	}
+
+	pageToken, err := conv.DecodePageToken[*emptypb.Empty](req.GetPageToken())
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", status.Error(codes.InvalidArgument, "invalid page_token"), err)
+	}
+
+	roles, totalCount, err := s.customRoleCore.UserProjectCustomRoles(ctx, userID, pageSize, pageToken.Offset)
+	if err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "user, project, or organization membership not found")
+		}
+		return nil, fmt.Errorf("list project role assignments: %w", err)
+	}
+
+	var nextPageToken string
+	nextPageOffset := pageToken.Offset + pageSize
+	if nextPageOffset < totalCount {
+		nextPageToken, err = conv.EncodePageToken(nextPageOffset, "", &emptypb.Empty{})
+		if err != nil {
+			return nil, fmt.Errorf("encode next_page_token: %w", err)
+		}
+	}
+
+	return &pb.ListProjectRoleAssignmentsResponse{
+		Roles:         conv.CustomRolesToPB(roles),
+		TotalSize:     mustconv.Int32(totalCount),
+		NextPageToken: nextPageToken,
+	}, nil
+}
+
+func (s *customRoleService) ListOrganizationRoleAssignments(ctx context.Context, req *pb.ListOrganizationRoleAssignmentsRequest) (*pb.ListOrganizationRoleAssignmentsResponse, error) {
+	if err := validate.ListOrganizationRoleAssignments(req); err != nil {
+		return nil, fmt.Errorf("validate list organization role assignments request: %w", err)
+	}
+
+	userID := uuid.MustParse(req.GetUserId())
+
+	pageSize := int(req.GetPageSize())
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 50
+	}
+
+	pageToken, err := conv.DecodePageToken[*emptypb.Empty](req.GetPageToken())
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", status.Error(codes.InvalidArgument, "invalid page_token"), err)
+	}
+
+	roles, totalCount, err := s.customRoleCore.UserOrgCustomRoles(ctx, userID, pageSize, pageToken.Offset)
+	if err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "user or organization membership not found")
+		}
+		return nil, fmt.Errorf("list organization role assignments: %w", err)
+	}
+
+	var nextPageToken string
+	nextPageOffset := pageToken.Offset + pageSize
+	if nextPageOffset < totalCount {
+		nextPageToken, err = conv.EncodePageToken(nextPageOffset, "", &emptypb.Empty{})
+		if err != nil {
+			return nil, fmt.Errorf("encode next_page_token: %w", err)
+		}
+	}
+
+	return &pb.ListOrganizationRoleAssignmentsResponse{
 		Roles:         conv.CustomRolesToPB(roles),
 		TotalSize:     mustconv.Int32(totalCount),
 		NextPageToken: nextPageToken,

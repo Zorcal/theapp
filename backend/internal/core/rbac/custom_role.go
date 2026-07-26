@@ -35,6 +35,58 @@ func (c *Core) CustomRoles(ctx context.Context, pageSize, pageOffset int) ([]mdl
 	return customRolesFromPg(rs), count, nil
 }
 
+// UserProjectCustomRoles returns a page of custom roles assigned directly to userID in the caller's project.
+func (c *Core) UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]mdl.CustomRole, int, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return nil, 0, errors.New("auth session missing")
+	}
+	if sess.ProjectID == nil {
+		return nil, 0, errors.New("project context missing")
+	}
+
+	roles, err := c.roleStorer.UserProjectCustomRoles(ctx, userID, *sess.ProjectID, pageSize, pageOffset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("user project custom roles: %w", err)
+	}
+
+	count, err := c.roleStorer.UserProjectCustomRoleCount(ctx, userID, *sess.ProjectID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, mdl.ErrNotFound
+		}
+		return nil, 0, fmt.Errorf("user project custom role count: %w", err)
+	}
+
+	return customRolesFromPg(roles), count, nil
+}
+
+// UserOrgCustomRoles returns a page of custom roles assigned to userID across the caller's organization.
+func (c *Core) UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]mdl.CustomRole, int, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return nil, 0, errors.New("auth session missing")
+	}
+	if sess.OrgID == nil {
+		return nil, 0, errors.New("organization context missing")
+	}
+
+	roles, err := c.roleStorer.UserOrgCustomRoles(ctx, userID, *sess.OrgID, pageSize, pageOffset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("user organization custom roles: %w", err)
+	}
+
+	count, err := c.roleStorer.UserOrgCustomRoleCount(ctx, userID, *sess.OrgID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, mdl.ErrNotFound
+		}
+		return nil, 0, fmt.Errorf("user organization custom role count: %w", err)
+	}
+
+	return customRolesFromPg(roles), count, nil
+}
+
 // CustomRoleByID returns a custom role owned by the caller's organization.
 // Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 func (c *Core) CustomRoleByID(ctx context.Context, roleID uuid.UUID) (mdl.CustomRole, error) {
