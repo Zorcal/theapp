@@ -62,6 +62,16 @@ func SystemOnlyPermissions() []Permission {
 	}
 }
 
+// PermissionsAssignableToCustomRoles returns permissions that may be granted through custom roles.
+func PermissionsAssignableToCustomRoles() []Permission {
+	return []Permission{
+		PermissionCustomRoleCreate,
+		PermissionCustomRoleRead,
+		PermissionCustomRoleUpdate,
+		PermissionCustomRoleDelete,
+	}
+}
+
 // SystemRoleManagementPermissions returns the permissions required to manage system-role
 // assignments.
 func SystemRoleManagementPermissions() []Permission {

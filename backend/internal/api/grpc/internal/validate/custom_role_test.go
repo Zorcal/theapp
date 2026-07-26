@@ -8,7 +8,6 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
-	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
 func TestCreateRole(t *testing.T) {
@@ -46,11 +45,33 @@ func TestCreateRole_error(t *testing.T) {
 			name: "system-only permission",
 			in: &pb.CreateRoleRequest{Role: &pb.Role{
 				Name:        "role manager",
-				Permissions: []string{string(mdl.PermissionUserRead)},
+				Permissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 			}},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "role.permissions[0]",
-				description: `"user:read" is system-only`,
+				description: `"PERMISSION_USER_READ" is system-only`,
+			}),
+		},
+		{
+			name: "unspecified permission",
+			in: &pb.CreateRoleRequest{Role: &pb.Role{
+				Name:        "role manager",
+				Permissions: []pb.Permission{pb.Permission_PERMISSION_UNSPECIFIED},
+			}},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "role.permissions[0]",
+				description: `"PERMISSION_UNSPECIFIED" is not a recognized permission`,
+			}),
+		},
+		{
+			name: "unknown permission",
+			in: &pb.CreateRoleRequest{Role: &pb.Role{
+				Name:        "role manager",
+				Permissions: []pb.Permission{pb.Permission(999)},
+			}},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "role.permissions[0]",
+				description: `"999" is not a recognized permission`,
 			}),
 		},
 	}
@@ -162,13 +183,13 @@ func TestUpdateRole_error(t *testing.T) {
 			in: &pb.UpdateRoleRequest{
 				Role: &pb.Role{
 					Id:          roleID,
-					Permissions: []string{string(mdl.PermissionUserRead)},
+					Permissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"permissions"}},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "role.permissions[0]",
-				description: `"user:read" is system-only`,
+				description: `"PERMISSION_USER_READ" is system-only`,
 			}),
 		},
 	}
@@ -199,8 +220,8 @@ func TestModifyRolePermissions_error(t *testing.T) {
 			name: "overlapping permission",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:                roleID,
-				AddPermissions:    []string{string(mdl.PermissionCustomRoleRead)},
-				RemovePermissions: []string{string(mdl.PermissionCustomRoleRead)},
+				AddPermissions:    []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
+				RemovePermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "add_permissions[0]",
@@ -211,22 +232,22 @@ func TestModifyRolePermissions_error(t *testing.T) {
 			name: "system-only permission addition",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:             roleID,
-				AddPermissions: []string{string(mdl.PermissionUserRead)},
+				AddPermissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "add_permissions[0]",
-				description: `"user:read" is system-only`,
+				description: `"PERMISSION_USER_READ" is system-only`,
 			}),
 		},
 		{
 			name: "system-only permission removal",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:                roleID,
-				RemovePermissions: []string{string(mdl.PermissionUserRead)},
+				RemovePermissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "remove_permissions[0]",
-				description: `"user:read" is system-only`,
+				description: `"PERMISSION_USER_READ" is system-only`,
 			}),
 		},
 	}

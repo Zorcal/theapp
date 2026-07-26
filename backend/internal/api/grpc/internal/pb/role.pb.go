@@ -33,7 +33,7 @@ type Role struct {
 	// Name of the role.
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	// Permissions granted to the role.
-	Permissions []string `protobuf:"bytes,3,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	Permissions []Permission `protobuf:"varint,3,rep,packed,name=permissions,proto3,enum=theapp.v1.Permission" json:"permissions,omitempty"`
 	// Timestamp when the role was created.
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Timestamp when the role was last updated.
@@ -88,7 +88,7 @@ func (x *Role) GetName() string {
 	return ""
 }
 
-func (x *Role) GetPermissions() []string {
+func (x *Role) GetPermissions() []Permission {
 	if x != nil {
 		return x.Permissions
 	}
@@ -388,9 +388,9 @@ type ModifyRolePermissionsRequest struct {
 	// ID of the role to modify.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Permission names to add to the role.
-	AddPermissions []string `protobuf:"bytes,2,rep,name=add_permissions,json=addPermissions,proto3" json:"add_permissions,omitempty"`
+	AddPermissions []Permission `protobuf:"varint,2,rep,packed,name=add_permissions,json=addPermissions,proto3,enum=theapp.v1.Permission" json:"add_permissions,omitempty"`
 	// Permission names to remove from the role.
-	RemovePermissions []string `protobuf:"bytes,3,rep,name=remove_permissions,json=removePermissions,proto3" json:"remove_permissions,omitempty"`
+	RemovePermissions []Permission `protobuf:"varint,3,rep,packed,name=remove_permissions,json=removePermissions,proto3,enum=theapp.v1.Permission" json:"remove_permissions,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -432,14 +432,14 @@ func (x *ModifyRolePermissionsRequest) GetId() string {
 	return ""
 }
 
-func (x *ModifyRolePermissionsRequest) GetAddPermissions() []string {
+func (x *ModifyRolePermissionsRequest) GetAddPermissions() []Permission {
 	if x != nil {
 		return x.AddPermissions
 	}
 	return nil
 }
 
-func (x *ModifyRolePermissionsRequest) GetRemovePermissions() []string {
+func (x *ModifyRolePermissionsRequest) GetRemovePermissions() []Permission {
 	if x != nil {
 		return x.RemovePermissions
 	}
@@ -534,11 +534,11 @@ var File_role_proto protoreflect.FileDescriptor
 const file_role_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xfe\x01\n" +
+	"role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x10permission.proto\"\x95\x02\n" +
 	"\x04Role\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vpermissions\x18\x03 \x03(\tR\vpermissions\x12@\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x127\n" +
+	"\vpermissions\x18\x03 \x03(\x0e2\x15.theapp.v1.PermissionR\vpermissions\x12@\n" +
 	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
@@ -560,11 +560,11 @@ const file_role_proto_rawDesc = "" +
 	"\x11UpdateRoleRequest\x12(\n" +
 	"\x04role\x18\x01 \x01(\v2\x0f.theapp.v1.RoleB\x03\xe0A\x02R\x04role\x12@\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x02R\n" +
-	"updateMask\"\x93\x01\n" +
+	"updateMask\"\xc1\x01\n" +
 	"\x1cModifyRolePermissionsRequest\x12\x1b\n" +
-	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12'\n" +
-	"\x0fadd_permissions\x18\x02 \x03(\tR\x0eaddPermissions\x12-\n" +
-	"\x12remove_permissions\x18\x03 \x03(\tR\x11removePermissions\"0\n" +
+	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12>\n" +
+	"\x0fadd_permissions\x18\x02 \x03(\x0e2\x15.theapp.v1.PermissionR\x0eaddPermissions\x12D\n" +
+	"\x12remove_permissions\x18\x03 \x03(\x0e2\x15.theapp.v1.PermissionR\x11removePermissions\"0\n" +
 	"\x11DeleteRoleRequest\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\"\x14\n" +
 	"\x12DeleteRoleResponse2\xf4\a\n" +
@@ -623,33 +623,37 @@ var file_role_proto_goTypes = []any{
 	(*ModifyRolePermissionsRequest)(nil), // 6: theapp.v1.ModifyRolePermissionsRequest
 	(*DeleteRoleRequest)(nil),            // 7: theapp.v1.DeleteRoleRequest
 	(*DeleteRoleResponse)(nil),           // 8: theapp.v1.DeleteRoleResponse
-	(*timestamppb.Timestamp)(nil),        // 9: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),        // 10: google.protobuf.FieldMask
+	(Permission)(0),                      // 9: theapp.v1.Permission
+	(*timestamppb.Timestamp)(nil),        // 10: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),        // 11: google.protobuf.FieldMask
 }
 var file_role_proto_depIdxs = []int32{
-	9,  // 0: theapp.v1.Role.create_time:type_name -> google.protobuf.Timestamp
-	9,  // 1: theapp.v1.Role.update_time:type_name -> google.protobuf.Timestamp
-	0,  // 2: theapp.v1.CreateRoleRequest.role:type_name -> theapp.v1.Role
-	0,  // 3: theapp.v1.ListRolesResponse.roles:type_name -> theapp.v1.Role
-	0,  // 4: theapp.v1.UpdateRoleRequest.role:type_name -> theapp.v1.Role
-	10, // 5: theapp.v1.UpdateRoleRequest.update_mask:type_name -> google.protobuf.FieldMask
-	1,  // 6: theapp.v1.RoleService.CreateRole:input_type -> theapp.v1.CreateRoleRequest
-	2,  // 7: theapp.v1.RoleService.GetRole:input_type -> theapp.v1.GetRoleRequest
-	3,  // 8: theapp.v1.RoleService.ListRoles:input_type -> theapp.v1.ListRolesRequest
-	5,  // 9: theapp.v1.RoleService.UpdateRole:input_type -> theapp.v1.UpdateRoleRequest
-	6,  // 10: theapp.v1.RoleService.ModifyRolePermissions:input_type -> theapp.v1.ModifyRolePermissionsRequest
-	7,  // 11: theapp.v1.RoleService.DeleteRole:input_type -> theapp.v1.DeleteRoleRequest
-	0,  // 12: theapp.v1.RoleService.CreateRole:output_type -> theapp.v1.Role
-	0,  // 13: theapp.v1.RoleService.GetRole:output_type -> theapp.v1.Role
-	4,  // 14: theapp.v1.RoleService.ListRoles:output_type -> theapp.v1.ListRolesResponse
-	0,  // 15: theapp.v1.RoleService.UpdateRole:output_type -> theapp.v1.Role
-	0,  // 16: theapp.v1.RoleService.ModifyRolePermissions:output_type -> theapp.v1.Role
-	8,  // 17: theapp.v1.RoleService.DeleteRole:output_type -> theapp.v1.DeleteRoleResponse
-	12, // [12:18] is the sub-list for method output_type
-	6,  // [6:12] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	9,  // 0: theapp.v1.Role.permissions:type_name -> theapp.v1.Permission
+	10, // 1: theapp.v1.Role.create_time:type_name -> google.protobuf.Timestamp
+	10, // 2: theapp.v1.Role.update_time:type_name -> google.protobuf.Timestamp
+	0,  // 3: theapp.v1.CreateRoleRequest.role:type_name -> theapp.v1.Role
+	0,  // 4: theapp.v1.ListRolesResponse.roles:type_name -> theapp.v1.Role
+	0,  // 5: theapp.v1.UpdateRoleRequest.role:type_name -> theapp.v1.Role
+	11, // 6: theapp.v1.UpdateRoleRequest.update_mask:type_name -> google.protobuf.FieldMask
+	9,  // 7: theapp.v1.ModifyRolePermissionsRequest.add_permissions:type_name -> theapp.v1.Permission
+	9,  // 8: theapp.v1.ModifyRolePermissionsRequest.remove_permissions:type_name -> theapp.v1.Permission
+	1,  // 9: theapp.v1.RoleService.CreateRole:input_type -> theapp.v1.CreateRoleRequest
+	2,  // 10: theapp.v1.RoleService.GetRole:input_type -> theapp.v1.GetRoleRequest
+	3,  // 11: theapp.v1.RoleService.ListRoles:input_type -> theapp.v1.ListRolesRequest
+	5,  // 12: theapp.v1.RoleService.UpdateRole:input_type -> theapp.v1.UpdateRoleRequest
+	6,  // 13: theapp.v1.RoleService.ModifyRolePermissions:input_type -> theapp.v1.ModifyRolePermissionsRequest
+	7,  // 14: theapp.v1.RoleService.DeleteRole:input_type -> theapp.v1.DeleteRoleRequest
+	0,  // 15: theapp.v1.RoleService.CreateRole:output_type -> theapp.v1.Role
+	0,  // 16: theapp.v1.RoleService.GetRole:output_type -> theapp.v1.Role
+	4,  // 17: theapp.v1.RoleService.ListRoles:output_type -> theapp.v1.ListRolesResponse
+	0,  // 18: theapp.v1.RoleService.UpdateRole:output_type -> theapp.v1.Role
+	0,  // 19: theapp.v1.RoleService.ModifyRolePermissions:output_type -> theapp.v1.Role
+	8,  // 20: theapp.v1.RoleService.DeleteRole:output_type -> theapp.v1.DeleteRoleResponse
+	15, // [15:21] is the sub-list for method output_type
+	9,  // [9:15] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_role_proto_init() }
@@ -657,6 +661,7 @@ func file_role_proto_init() {
 	if File_role_proto != nil {
 		return
 	}
+	file_permission_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

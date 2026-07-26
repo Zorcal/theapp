@@ -6,10 +6,12 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
@@ -18,7 +20,6 @@ import (
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/testingx"
-	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
 // TestSystemRoleService_Integration exercises all system-role RPCs through the real cores and
@@ -103,21 +104,20 @@ func TestSystemRoleService_Integration(t *testing.T) {
 		t.Fatalf("ListSystemRoleAssignments() after assign error = %v", err)
 	}
 
-	wantPerms := slicesx.Map(mdl.AllPermissions(), func(permission mdl.Permission) string {
-		return string(permission)
-	})
-	slices.Sort(wantPerms)
-
 	wantAssignments := &pb.ListSystemRoleAssignmentsResponse{
 		Roles: []*pb.SystemRole{
 			{
 				Name:        "superadmin",
-				Permissions: wantPerms,
+				Permissions: conv.PermissionsToPB(mdl.AllPermissions()),
 			},
 		},
 		TotalSize: 1,
 	}
-	testingx.AssertDiff(t, assignments, wantAssignments, defaultDiffOpts())
+
+	testingx.AssertDiff(t, assignments, wantAssignments, cmp.Options{
+		protocmp.Transform(),
+		protocmp.SortRepeatedFields(&pb.SystemRole{}, "permissions"),
+	})
 
 	// Unassign the role and observe that the assignment is gone.
 
@@ -177,13 +177,11 @@ func TestSystemRoleService_ListSystemRoles(t *testing.T) {
 		Roles: []*pb.SystemRole{
 			{
 				Name:        "systemrolesreader",
-				Permissions: []string{string(mdl.PermissionSystemRoleRead)},
+				Permissions: []pb.Permission{pb.Permission_PERMISSION_SYSTEM_ROLE_READ},
 			},
 			{
-				Name: "superadmin",
-				Permissions: slicesx.Map(mdl.AllPermissions(), func(permission mdl.Permission) string {
-					return string(permission)
-				}),
+				Name:        "superadmin",
+				Permissions: conv.PermissionsToPB(mdl.AllPermissions()),
 			},
 		},
 		TotalSize:     3,
@@ -460,7 +458,7 @@ func TestSystemRoleService_ListSystemRoleAssignments(t *testing.T) {
 
 	want := &pb.ListSystemRoleAssignmentsResponse{
 		Roles: []*pb.SystemRole{
-			{Name: "systemrolesreader", Permissions: []string{string(mdl.PermissionSystemRoleRead)}},
+			{Name: "systemrolesreader", Permissions: []pb.Permission{pb.Permission_PERMISSION_SYSTEM_ROLE_READ}},
 		},
 		TotalSize: 1,
 	}

@@ -40,7 +40,7 @@ func CreateRole(req *pb.CreateRoleRequest) error {
 		})
 	}
 
-	violations = append(violations, systemOnlyPermViolations(req.GetRole().GetPermissions(), "role.permissions")...)
+	violations = append(violations, permissionViolations(req.GetRole().GetPermissions(), "role.permissions")...)
 
 	if len(violations) > 0 {
 		return invalidArgument(violations...)
@@ -115,7 +115,7 @@ func UpdateRole(req *pb.UpdateRoleRequest) error {
 	}
 
 	if slices.Contains(maskPaths, "permissions") {
-		violations = append(violations, systemOnlyPermViolations(req.GetRole().GetPermissions(), "role.permissions")...)
+		violations = append(violations, permissionViolations(req.GetRole().GetPermissions(), "role.permissions")...)
 	}
 
 	if len(violations) > 0 {
@@ -143,8 +143,8 @@ func ModifyRolePermissions(req *pb.ModifyRolePermissionsRequest) error {
 		}
 	}
 
-	violations = append(violations, systemOnlyPermViolations(req.GetAddPermissions(), "add_permissions")...)
-	violations = append(violations, systemOnlyPermViolations(req.GetRemovePermissions(), "remove_permissions")...)
+	violations = append(violations, permissionViolations(req.GetAddPermissions(), "add_permissions")...)
+	violations = append(violations, permissionViolations(req.GetRemovePermissions(), "remove_permissions")...)
 
 	if len(violations) > 0 {
 		return invalidArgument(violations...)
@@ -163,15 +163,22 @@ func DeleteRole(req *pb.DeleteRoleRequest) error {
 	return nil
 }
 
-func systemOnlyPermViolations(perms []string, field string) []*errdetails.BadRequest_FieldViolation {
+func permissionViolations(perms []pb.Permission, field string) []*errdetails.BadRequest_FieldViolation {
 	systemOnlyPerms := mdl.SystemOnlyPermissions()
 
 	var violations []*errdetails.BadRequest_FieldViolation
-	for i, permName := range perms {
-		if slices.Contains(systemOnlyPerms, mdl.Permission(permName)) {
+	for i, perm := range perms {
+		mdlPerm, ok := conv.PermissionFromPB(perm)
+		switch {
+		case !ok:
 			violations = append(violations, &errdetails.BadRequest_FieldViolation{
 				Field:       fmt.Sprintf("%s[%d]", field, i),
-				Description: fmt.Sprintf("%q is system-only", permName),
+				Description: fmt.Sprintf("%q is not a recognized permission", perm.String()),
+			})
+		case slices.Contains(systemOnlyPerms, mdlPerm):
+			violations = append(violations, &errdetails.BadRequest_FieldViolation{
+				Field:       fmt.Sprintf("%s[%d]", field, i),
+				Description: fmt.Sprintf("%q is system-only", perm.String()),
 			})
 		}
 	}

@@ -70,7 +70,7 @@ func TestRoleService_Integration(t *testing.T) {
 	created, err := srv.customRoleServiceClient.CreateRole(authCtx, &pb.CreateRoleRequest{
 		Role: &pb.Role{
 			Name:        "role manager",
-			Permissions: []string{string(mdl.PermissionCustomRoleRead)},
+			Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 		},
 	})
 	if err != nil {
@@ -107,7 +107,7 @@ func TestRoleService_Integration(t *testing.T) {
 		Role: &pb.Role{
 			Id:          created.GetId(),
 			Name:        "custom role manager",
-			Permissions: []string{string(mdl.PermissionCustomRoleDelete)},
+			Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE},
 		},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name", "permissions"}},
 	})
@@ -119,7 +119,7 @@ func TestRoleService_Integration(t *testing.T) {
 		t.Errorf("UpdateRole() name = %q, want %q", got, want)
 	}
 
-	if got, want := updated.GetPermissions(), []string{string(mdl.PermissionCustomRoleDelete)}; !slices.Equal(got, want) {
+	if got, want := updated.GetPermissions(), []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE}; !slices.Equal(got, want) {
 		t.Errorf("UpdateRole() permissions = %v, want %v", got, want)
 	}
 
@@ -127,14 +127,14 @@ func TestRoleService_Integration(t *testing.T) {
 
 	modified, err := srv.customRoleServiceClient.ModifyRolePermissions(authCtx, &pb.ModifyRolePermissionsRequest{
 		Id:                created.GetId(),
-		AddPermissions:    []string{string(mdl.PermissionCustomRoleUpdate)},
-		RemovePermissions: []string{string(mdl.PermissionCustomRoleDelete)},
+		AddPermissions:    []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
+		RemovePermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE},
 	})
 	if err != nil {
 		t.Fatalf("ModifyRolePermissions() error = %v", err)
 	}
 
-	if got, want := modified.GetPermissions(), []string{string(mdl.PermissionCustomRoleUpdate)}; !slices.Equal(got, want) {
+	if got, want := modified.GetPermissions(), []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE}; !slices.Equal(got, want) {
 		t.Errorf("ModifyRolePermissions() permissions = %v, want %v", got, want)
 	}
 
@@ -191,7 +191,7 @@ func TestRoleService_CreateRole(t *testing.T) {
 	got, err := srvTest.customRoleServiceClient.CreateRole(
 		authCtxForTestUser(t, t.Context()),
 		&pb.CreateRoleRequest{
-			Role: &pb.Role{Name: mockedRole.Name, Permissions: []string{string(mdl.PermissionCustomRoleRead)}},
+			Role: &pb.Role{Name: mockedRole.Name, Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ}},
 		},
 	)
 	if err != nil {
@@ -201,7 +201,7 @@ func TestRoleService_CreateRole(t *testing.T) {
 	want := &pb.Role{
 		Id:          mockedRole.ID.String(),
 		Name:        mockedRole.Name,
-		Permissions: []string{string(mdl.PermissionCustomRoleRead)},
+		Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 		CreateTime:  timestamppb.New(mockedRole.CreatedAt),
 		UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
 		Etag:        mockedRole.ETag,
@@ -328,7 +328,7 @@ func TestRoleService_GetRole(t *testing.T) {
 	want := &pb.Role{
 		Id:          mockedRole.ID.String(),
 		Name:        mockedRole.Name,
-		Permissions: []string{string(mdl.PermissionCustomRoleRead)},
+		Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 		CreateTime:  timestamppb.New(mockedRole.CreatedAt),
 		UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
 		Etag:        mockedRole.ETag,
@@ -438,14 +438,14 @@ func TestRoleService_ListRoles(t *testing.T) {
 	pbFirstRole := &pb.Role{
 		Id:          firstRole.ID.String(),
 		Name:        firstRole.Name,
-		Permissions: []string{string(mdl.PermissionCustomRoleRead)},
+		Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 		CreateTime:  timestamppb.New(firstRole.CreatedAt),
 		Etag:        firstRole.ETag,
 	}
 	pbSecondRole := &pb.Role{
 		Id:          secondRole.ID.String(),
 		Name:        secondRole.Name,
-		Permissions: []string{string(mdl.PermissionCustomRoleRead), string(mdl.PermissionCustomRoleUpdate)},
+		Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ, pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		CreateTime:  timestamppb.New(secondRole.CreatedAt),
 		UpdateTime:  timestamppb.New(*secondRole.UpdatedAt),
 		Etag:        secondRole.ETag,
@@ -453,7 +453,7 @@ func TestRoleService_ListRoles(t *testing.T) {
 	pbThirdRole := &pb.Role{
 		Id:          thirdRole.ID.String(),
 		Name:        thirdRole.Name,
-		Permissions: []string{string(mdl.PermissionCustomRoleCreate), string(mdl.PermissionCustomRoleDelete)},
+		Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_CREATE, pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE},
 		CreateTime:  timestamppb.New(thirdRole.CreatedAt),
 		Etag:        thirdRole.ETag,
 	}
@@ -649,7 +649,7 @@ func TestRoleService_UpdateRole(t *testing.T) {
 	want := &pb.Role{
 		Id:          mockedRole.ID.String(),
 		Name:        mockedRole.Name,
-		Permissions: []string{string(mdl.PermissionCustomRoleUpdate)},
+		Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		CreateTime:  timestamppb.New(mockedRole.CreatedAt),
 		UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
 		Etag:        mockedRole.ETag,
@@ -783,7 +783,7 @@ func TestRoleService_ModifyRolePermissions(t *testing.T) {
 		authCtxForTestUser(t, t.Context()),
 		&pb.ModifyRolePermissionsRequest{
 			Id:             mockedRole.ID.String(),
-			AddPermissions: []string{string(mdl.PermissionCustomRoleUpdate)},
+			AddPermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		},
 	)
 	if err != nil {
@@ -793,7 +793,7 @@ func TestRoleService_ModifyRolePermissions(t *testing.T) {
 	want := &pb.Role{
 		Id:          mockedRole.ID.String(),
 		Name:        mockedRole.Name,
-		Permissions: []string{string(mdl.PermissionCustomRoleUpdate)},
+		Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		CreateTime:  timestamppb.New(mockedRole.CreatedAt),
 		UpdateTime:  timestamppb.New(*mockedRole.UpdatedAt),
 		Etag:        mockedRole.ETag,

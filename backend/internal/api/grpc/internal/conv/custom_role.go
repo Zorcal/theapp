@@ -19,7 +19,7 @@ func CustomRoleToPB(customRole mdl.CustomRole) *pb.Role {
 	return &pb.Role{
 		Id:          customRole.ID.String(),
 		Name:        customRole.Name,
-		Permissions: slicesx.Map(customRole.Permissions, func(perm mdl.Permission) string { return string(perm) }),
+		Permissions: PermissionsToPB(customRole.Permissions),
 		CreateTime:  timestamppb.New(customRole.CreatedAt),
 		UpdateTime:  maybeNewTimestamppb(customRole.UpdatedAt),
 		Etag:        customRole.ETag,
@@ -52,8 +52,4 @@ func ModifyCustomRolePermissionsFromPB(req *pb.ModifyRolePermissionsRequest, cus
 		AddPermissions:    permsFromPB(req.GetAddPermissions()),
 		RemovePermissions: permsFromPB(req.GetRemovePermissions()),
 	}
-}
-
-func permsFromPB(perms []string) []mdl.Permission {
-	return slicesx.Map(perms, func(perm string) mdl.Permission { return mdl.Permission(perm) })
 }

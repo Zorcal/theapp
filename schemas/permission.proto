@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package theapp.v1;
+
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "theapp Permission API"
+    version: "v1"
+  }
+  security_definitions: {
+    security: {
+      key: "BearerAuth"
+      value: {
+        type: TYPE_API_KEY
+        in: IN_HEADER
+        name: "Authorization"
+        description: "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'"
+      }
+    }
+  }
+  security: {
+    security_requirement: {
+      key: "BearerAuth"
+      value: {}
+    }
+  }
+};
+
+// Permission is a capability that can be granted through a role.
+enum Permission {
+  PERMISSION_UNSPECIFIED = 0;
+  PERMISSION_USER_READ = 1;
+  PERMISSION_USER_CREATE = 2;
+  PERMISSION_USER_UPDATE = 3;
+  PERMISSION_SYSTEM_ROLE_READ = 4;
+  PERMISSION_SYSTEM_ROLE_ASSIGN = 5;
+  PERMISSION_SYSTEM_ROLE_UNASSIGN = 6;
+  PERMISSION_CUSTOM_ROLE_CREATE = 7;
+  PERMISSION_CUSTOM_ROLE_READ = 8;
+  PERMISSION_CUSTOM_ROLE_UPDATE = 9;
+  PERMISSION_CUSTOM_ROLE_DELETE = 10;
+}
+
+// PermissionService exposes permissions available for custom roles.
+service PermissionService {
+  // Lists permissions that may be granted through a custom role.
+  rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/permissions"
+    };
+  }
+}
+
+// Request message for listing custom-role-assignable permissions.
+message ListPermissionsRequest {}
+
+// Response message for listing custom-role-assignable permissions.
+message ListPermissionsResponse {
+  // Permissions that may be granted through a custom role.
+  repeated Permission permissions = 1;
+}

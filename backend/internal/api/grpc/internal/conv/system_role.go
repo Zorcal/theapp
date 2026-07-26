@@ -13,6 +13,6 @@ func SystemRolesToPB(roles []mdl.SystemRole) []*pb.SystemRole {
 func SystemRoleToPB(role mdl.SystemRole) *pb.SystemRole {
 	return &pb.SystemRole{
 		Name:        role.Name,
-		Permissions: slicesx.Map(role.Permissions, func(permission mdl.Permission) string { return string(permission) }),
+		Permissions: PermissionsToPB(role.Permissions),
 	}
 }

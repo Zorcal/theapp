@@ -5,6 +5,7 @@ package theapp.v1;
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
+import "permission.proto";
 
 option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
 
@@ -116,7 +117,7 @@ message SystemRole {
   string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
 
   // Permissions granted to the system role.
-  repeated string permissions = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated Permission permissions = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Request message for listing system roles.

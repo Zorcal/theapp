@@ -79,6 +79,8 @@ var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.RoleService/UpdateRole":            {mdl.PermissionCustomRoleUpdate},
 	"/theapp.v1.RoleService/ModifyRolePermissions": {mdl.PermissionCustomRoleUpdate},
 	"/theapp.v1.RoleService/DeleteRole":            {mdl.PermissionCustomRoleDelete},
+
+	"/theapp.v1.PermissionService/ListPermissions": {mdl.PermissionCustomRoleRead},
 }
 
 // NewServer constructs the GRPC server.
@@ -125,6 +127,8 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	pb.RegisterRoleServiceServer(srv, &customRoleService{
 		customRoleCore: cfg.CustomRoleCore,
 	})
+
+	pb.RegisterPermissionServiceServer(srv, &permissionService{})
 
 	if cfg.Reflection {
 		reflection.Register(srv)

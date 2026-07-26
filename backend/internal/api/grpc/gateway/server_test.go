@@ -68,6 +68,15 @@ func TestNewServer(t *testing.T) {
 			},
 		},
 		{
+			name:       "permission openapi spec",
+			method:     http.MethodGet,
+			path:       "/v1/openapi/permission.json",
+			wantStatus: http.StatusOK,
+			wantHeaders: map[string]string{
+				"Content-Type": "application/json",
+			},
+		},
+		{
 			name:       "unknown route",
 			method:     http.MethodGet,
 			path:       "/unknown",

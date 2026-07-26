@@ -297,6 +297,24 @@
       },
       "description": "Response message for listing system roles."
     },
+    "v1Permission": {
+      "type": "string",
+      "enum": [
+        "PERMISSION_UNSPECIFIED",
+        "PERMISSION_USER_READ",
+        "PERMISSION_USER_CREATE",
+        "PERMISSION_USER_UPDATE",
+        "PERMISSION_SYSTEM_ROLE_READ",
+        "PERMISSION_SYSTEM_ROLE_ASSIGN",
+        "PERMISSION_SYSTEM_ROLE_UNASSIGN",
+        "PERMISSION_CUSTOM_ROLE_CREATE",
+        "PERMISSION_CUSTOM_ROLE_READ",
+        "PERMISSION_CUSTOM_ROLE_UPDATE",
+        "PERMISSION_CUSTOM_ROLE_DELETE"
+      ],
+      "default": "PERMISSION_UNSPECIFIED",
+      "description": "Permission is a capability that can be granted through a role."
+    },
     "v1SystemRole": {
       "type": "object",
       "properties": {
@@ -308,7 +326,7 @@
         "permissions": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/v1Permission"
           },
           "description": "Permissions granted to the system role.",
           "readOnly": true

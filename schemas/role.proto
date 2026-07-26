@@ -8,6 +8,7 @@ import "google/api/field_info.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
+import "permission.proto";
 
 option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
 
@@ -152,7 +153,7 @@ message Role {
   string name = 2;
 
   // Permissions granted to the role.
-  repeated string permissions = 3;
+  repeated Permission permissions = 3;
 
   // Timestamp when the role was created.
   google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -212,10 +213,10 @@ message ModifyRolePermissionsRequest {
   string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
 
   // Permission names to add to the role.
-  repeated string add_permissions = 2;
+  repeated Permission add_permissions = 2;
 
   // Permission names to remove from the role.
-  repeated string remove_permissions = 3;
+  repeated Permission remove_permissions = 3;
 }
 
 // Request message for deleting a custom role.

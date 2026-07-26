@@ -53,6 +53,7 @@ type ServerTest struct {
 	authServiceClient       pb.AuthServiceClient
 	systemRoleServiceClient pb.SystemRoleServiceClient
 	customRoleServiceClient pb.RoleServiceClient
+	permissionServiceClient pb.PermissionServiceClient
 }
 
 // NewServerTest starts a gRPC server with the given config over an in-memory transport and returns
@@ -96,6 +97,7 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 		authServiceClient:       pb.NewAuthServiceClient(conn),
 		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
 		customRoleServiceClient: pb.NewRoleServiceClient(conn),
+		permissionServiceClient: pb.NewPermissionServiceClient(conn),
 	}
 }
 
@@ -106,6 +108,7 @@ type ServerIntegrationTest struct {
 	authServiceClient       pb.AuthServiceClient
 	systemRoleServiceClient pb.SystemRoleServiceClient
 	customRoleServiceClient pb.RoleServiceClient
+	permissionServiceClient pb.PermissionServiceClient
 	emailSender             *testingx.CaptureEmailSender
 	userStore               *pguser.Store
 	orgStore                *pgorg.Store
@@ -171,6 +174,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		authServiceClient:       pb.NewAuthServiceClient(conn),
 		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
 		customRoleServiceClient: pb.NewRoleServiceClient(conn),
+		permissionServiceClient: pb.NewPermissionServiceClient(conn),
 		emailSender:             emailSender,
 		userStore:               pgUserStore,
 		orgStore:                pgOrgStore,

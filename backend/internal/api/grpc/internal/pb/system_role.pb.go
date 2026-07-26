@@ -29,7 +29,7 @@ type SystemRole struct {
 	// Unique name of the system role.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Permissions granted to the system role.
-	Permissions   []string `protobuf:"bytes,2,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	Permissions   []Permission `protobuf:"varint,2,rep,packed,name=permissions,proto3,enum=theapp.v1.Permission" json:"permissions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -71,7 +71,7 @@ func (x *SystemRole) GetName() string {
 	return ""
 }
 
-func (x *SystemRole) GetPermissions() []string {
+func (x *SystemRole) GetPermissions() []Permission {
 	if x != nil {
 		return x.Permissions
 	}
@@ -513,11 +513,11 @@ var File_system_role_proto protoreflect.FileDescriptor
 
 const file_system_role_proto_rawDesc = "" +
 	"\n" +
-	"\x11system_role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"L\n" +
+	"\x11system_role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x10permission.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"c\n" +
 	"\n" +
 	"SystemRole\x12\x17\n" +
-	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12%\n" +
-	"\vpermissions\x18\x02 \x03(\tB\x03\xe0A\x03R\vpermissions\"T\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12<\n" +
+	"\vpermissions\x18\x02 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\vpermissions\"T\n" +
 	"\x16ListSystemRolesRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
@@ -591,23 +591,25 @@ var file_system_role_proto_goTypes = []any{
 	(*UnassignSystemRoleResponse)(nil),        // 6: theapp.v1.UnassignSystemRoleResponse
 	(*ListSystemRoleAssignmentsRequest)(nil),  // 7: theapp.v1.ListSystemRoleAssignmentsRequest
 	(*ListSystemRoleAssignmentsResponse)(nil), // 8: theapp.v1.ListSystemRoleAssignmentsResponse
+	(Permission)(0),                           // 9: theapp.v1.Permission
 }
 var file_system_role_proto_depIdxs = []int32{
-	0, // 0: theapp.v1.ListSystemRolesResponse.roles:type_name -> theapp.v1.SystemRole
-	0, // 1: theapp.v1.ListSystemRoleAssignmentsResponse.roles:type_name -> theapp.v1.SystemRole
-	1, // 2: theapp.v1.SystemRoleService.ListSystemRoles:input_type -> theapp.v1.ListSystemRolesRequest
-	3, // 3: theapp.v1.SystemRoleService.AssignSystemRole:input_type -> theapp.v1.AssignSystemRoleRequest
-	5, // 4: theapp.v1.SystemRoleService.UnassignSystemRole:input_type -> theapp.v1.UnassignSystemRoleRequest
-	7, // 5: theapp.v1.SystemRoleService.ListSystemRoleAssignments:input_type -> theapp.v1.ListSystemRoleAssignmentsRequest
-	2, // 6: theapp.v1.SystemRoleService.ListSystemRoles:output_type -> theapp.v1.ListSystemRolesResponse
-	4, // 7: theapp.v1.SystemRoleService.AssignSystemRole:output_type -> theapp.v1.AssignSystemRoleResponse
-	6, // 8: theapp.v1.SystemRoleService.UnassignSystemRole:output_type -> theapp.v1.UnassignSystemRoleResponse
-	8, // 9: theapp.v1.SystemRoleService.ListSystemRoleAssignments:output_type -> theapp.v1.ListSystemRoleAssignmentsResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	9, // 0: theapp.v1.SystemRole.permissions:type_name -> theapp.v1.Permission
+	0, // 1: theapp.v1.ListSystemRolesResponse.roles:type_name -> theapp.v1.SystemRole
+	0, // 2: theapp.v1.ListSystemRoleAssignmentsResponse.roles:type_name -> theapp.v1.SystemRole
+	1, // 3: theapp.v1.SystemRoleService.ListSystemRoles:input_type -> theapp.v1.ListSystemRolesRequest
+	3, // 4: theapp.v1.SystemRoleService.AssignSystemRole:input_type -> theapp.v1.AssignSystemRoleRequest
+	5, // 5: theapp.v1.SystemRoleService.UnassignSystemRole:input_type -> theapp.v1.UnassignSystemRoleRequest
+	7, // 6: theapp.v1.SystemRoleService.ListSystemRoleAssignments:input_type -> theapp.v1.ListSystemRoleAssignmentsRequest
+	2, // 7: theapp.v1.SystemRoleService.ListSystemRoles:output_type -> theapp.v1.ListSystemRolesResponse
+	4, // 8: theapp.v1.SystemRoleService.AssignSystemRole:output_type -> theapp.v1.AssignSystemRoleResponse
+	6, // 9: theapp.v1.SystemRoleService.UnassignSystemRole:output_type -> theapp.v1.UnassignSystemRoleResponse
+	8, // 10: theapp.v1.SystemRoleService.ListSystemRoleAssignments:output_type -> theapp.v1.ListSystemRoleAssignmentsResponse
+	7, // [7:11] is the sub-list for method output_type
+	3, // [3:7] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_system_role_proto_init() }
@@ -615,6 +617,7 @@ func file_system_role_proto_init() {
 	if File_system_role_proto != nil {
 		return
 	}
+	file_permission_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

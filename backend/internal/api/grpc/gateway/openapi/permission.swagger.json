@@ -1,0 +1,117 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "theapp Permission API",
+    "version": "v1"
+  },
+  "tags": [
+    {
+      "name": "PermissionService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/permissions": {
+      "get": {
+        "summary": "Lists permissions that may be granted through a custom role.",
+        "operationId": "PermissionService_ListPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "PermissionService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1ListPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions that may be granted through a custom role."
+        }
+      },
+      "description": "Response message for listing custom-role-assignable permissions."
+    },
+    "v1Permission": {
+      "type": "string",
+      "enum": [
+        "PERMISSION_UNSPECIFIED",
+        "PERMISSION_USER_READ",
+        "PERMISSION_USER_CREATE",
+        "PERMISSION_USER_UPDATE",
+        "PERMISSION_SYSTEM_ROLE_READ",
+        "PERMISSION_SYSTEM_ROLE_ASSIGN",
+        "PERMISSION_SYSTEM_ROLE_UNASSIGN",
+        "PERMISSION_CUSTOM_ROLE_CREATE",
+        "PERMISSION_CUSTOM_ROLE_READ",
+        "PERMISSION_CUSTOM_ROLE_UPDATE",
+        "PERMISSION_CUSTOM_ROLE_DELETE"
+      ],
+      "default": "PERMISSION_UNSPECIFIED",
+      "description": "Permission is a capability that can be granted through a role."
+    }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "description": "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}
