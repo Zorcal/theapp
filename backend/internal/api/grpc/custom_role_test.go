@@ -1334,6 +1334,16 @@ func TestRoleService_AssignRoleToProject_error(t *testing.T) {
 			want: status.New(codes.AlreadyExists, "user already has role in project"),
 		},
 		{
+			name: "permission denied",
+			customRoleCore: &MockedCustomRoleCore{
+				AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrPermissionDenied
+				},
+			},
+			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.PermissionDenied, "caller cannot grant role permissions"),
+		},
+		{
 			name: "core error",
 			customRoleCore: &MockedCustomRoleCore{
 				AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
@@ -1502,6 +1512,16 @@ func TestRoleService_AssignRoleToOrganization_error(t *testing.T) {
 			},
 			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
 			want: status.New(codes.AlreadyExists, "user already has role in organization"),
+		},
+		{
+			name: "permission denied",
+			customRoleCore: &MockedCustomRoleCore{
+				AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrPermissionDenied
+				},
+			},
+			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.PermissionDenied, "caller cannot grant role permissions"),
 		},
 		{
 			name: "core error",

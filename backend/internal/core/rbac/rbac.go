@@ -53,6 +53,14 @@ type RoleStorer interface {
 	// UserOrgCustomRoleCount returns the number of custom roles assigned to userID across orgID.
 	// Returns [sql.ErrNoRows] if the user or organization membership does not exist.
 	UserOrgCustomRoleCount(ctx context.Context, userID uuid.UUID, orgID int) (int, error)
+	// OrgPermissions returns the names of the permissions userID holds for orgID through
+	// organization- and system-scope role assignments.
+	// Returns [sql.ErrNoRows] if no such user or organization exists.
+	OrgPermissions(ctx context.Context, userID uuid.UUID, orgID int) (pgrbac.OrgPermissions, error)
+	// ProjectPermissions returns projectID's org and the names of the permissions userID holds
+	// through project-, organization-, and system-scope role assignments.
+	// Returns [sql.ErrNoRows] if no such user or project exists.
+	ProjectPermissions(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error)
 	// AssignCustomRoleToProject grants an organization member an organization-owned role in a
 	// project.
 	// Returns [sql.ErrNoRows] if the user, role, project, or membership does not exist, or the role
@@ -91,6 +99,7 @@ type RoleStorer interface {
 	UserSystemRoleCountByExternalID(ctx context.Context, userID uuid.UUID) (int, error)
 	// UserSystemPermissionsByExternalID returns the names of the permissions userID holds through
 	// system-role assignments.
+	// Returns [sql.ErrNoRows] if no such user exists.
 	UserSystemPermissionsByExternalID(ctx context.Context, userID uuid.UUID) ([]string, error)
 	// SystemPermissionsRemainAfterUnassign reports whether every permission in permissionNames is
 	// carried by another system-role assignment.

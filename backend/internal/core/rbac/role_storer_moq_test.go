@@ -54,6 +54,12 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			ModifyCustomRolePermissionsFunc: func(ctx context.Context, mp pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
 //				panic("mock out the ModifyCustomRolePermissions method")
 //			},
+//			OrgPermissionsFunc: func(ctx context.Context, userID uuid.UUID, orgID int) (pgrbac.OrgPermissions, error) {
+//				panic("mock out the OrgPermissions method")
+//			},
+//			ProjectPermissionsFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error) {
+//				panic("mock out the ProjectPermissions method")
+//			},
 //			SystemPermissionsRemainAfterUnassignFunc: func(ctx context.Context, userID uuid.UUID, roleName string, permissionNames []string) (bool, error) {
 //				panic("mock out the SystemPermissionsRemainAfterUnassign method")
 //			},
@@ -138,6 +144,12 @@ type MockedRoleStorer struct {
 
 	// ModifyCustomRolePermissionsFunc mocks the ModifyCustomRolePermissions method.
 	ModifyCustomRolePermissionsFunc func(ctx context.Context, mp pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error)
+
+	// OrgPermissionsFunc mocks the OrgPermissions method.
+	OrgPermissionsFunc func(ctx context.Context, userID uuid.UUID, orgID int) (pgrbac.OrgPermissions, error)
+
+	// ProjectPermissionsFunc mocks the ProjectPermissions method.
+	ProjectPermissionsFunc func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error)
 
 	// SystemPermissionsRemainAfterUnassignFunc mocks the SystemPermissionsRemainAfterUnassign method.
 	SystemPermissionsRemainAfterUnassignFunc func(ctx context.Context, userID uuid.UUID, roleName string, permissionNames []string) (bool, error)
@@ -278,6 +290,24 @@ type MockedRoleStorer struct {
 			Ctx context.Context
 			// Mp is the mp argument value.
 			Mp pgrbac.ModifyCustomRolePermissions
+		}
+		// OrgPermissions holds details about calls to the OrgPermissions method.
+		OrgPermissions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
+		}
+		// ProjectPermissions holds details about calls to the ProjectPermissions method.
+		ProjectPermissions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// ProjectID is the projectID argument value.
+			ProjectID int
 		}
 		// SystemPermissionsRemainAfterUnassign holds details about calls to the SystemPermissionsRemainAfterUnassign method.
 		SystemPermissionsRemainAfterUnassign []struct {
@@ -430,6 +460,8 @@ type MockedRoleStorer struct {
 	lockLockSystemRoleManagement             sync.RWMutex
 	lockLockSystemRoleUser                   sync.RWMutex
 	lockModifyCustomRolePermissions          sync.RWMutex
+	lockOrgPermissions                       sync.RWMutex
+	lockProjectPermissions                   sync.RWMutex
 	lockSystemPermissionsRemainAfterUnassign sync.RWMutex
 	lockSystemRoleByName                     sync.RWMutex
 	lockSystemRoleCount                      sync.RWMutex
@@ -872,6 +904,86 @@ func (mock *MockedRoleStorer) ModifyCustomRolePermissionsCalls() []struct {
 	mock.lockModifyCustomRolePermissions.RLock()
 	calls = mock.calls.ModifyCustomRolePermissions
 	mock.lockModifyCustomRolePermissions.RUnlock()
+	return calls
+}
+
+// OrgPermissions calls OrgPermissionsFunc.
+func (mock *MockedRoleStorer) OrgPermissions(ctx context.Context, userID uuid.UUID, orgID int) (pgrbac.OrgPermissions, error) {
+	if mock.OrgPermissionsFunc == nil {
+		panic("MockedRoleStorer.OrgPermissionsFunc: method is nil but RoleStorer.OrgPermissions was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		OrgID:  orgID,
+	}
+	mock.lockOrgPermissions.Lock()
+	mock.calls.OrgPermissions = append(mock.calls.OrgPermissions, callInfo)
+	mock.lockOrgPermissions.Unlock()
+	return mock.OrgPermissionsFunc(ctx, userID, orgID)
+}
+
+// OrgPermissionsCalls gets all the calls that were made to OrgPermissions.
+// Check the length with:
+//
+//	len(mockedRoleStorer.OrgPermissionsCalls())
+func (mock *MockedRoleStorer) OrgPermissionsCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}
+	mock.lockOrgPermissions.RLock()
+	calls = mock.calls.OrgPermissions
+	mock.lockOrgPermissions.RUnlock()
+	return calls
+}
+
+// ProjectPermissions calls ProjectPermissionsFunc.
+func (mock *MockedRoleStorer) ProjectPermissions(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error) {
+	if mock.ProjectPermissionsFunc == nil {
+		panic("MockedRoleStorer.ProjectPermissionsFunc: method is nil but RoleStorer.ProjectPermissions was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID int
+	}{
+		Ctx:       ctx,
+		UserID:    userID,
+		ProjectID: projectID,
+	}
+	mock.lockProjectPermissions.Lock()
+	mock.calls.ProjectPermissions = append(mock.calls.ProjectPermissions, callInfo)
+	mock.lockProjectPermissions.Unlock()
+	return mock.ProjectPermissionsFunc(ctx, userID, projectID)
+}
+
+// ProjectPermissionsCalls gets all the calls that were made to ProjectPermissions.
+// Check the length with:
+//
+//	len(mockedRoleStorer.ProjectPermissionsCalls())
+func (mock *MockedRoleStorer) ProjectPermissionsCalls() []struct {
+	Ctx       context.Context
+	UserID    uuid.UUID
+	ProjectID int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID int
+	}
+	mock.lockProjectPermissions.RLock()
+	calls = mock.calls.ProjectPermissions
+	mock.lockProjectPermissions.RUnlock()
 	return calls
 }
 

@@ -60,3 +60,9 @@ type ProjectPermissions struct {
 	OrgID           int      `db:"org_id"`
 	PermissionNames []string `db:"permission_names"`
 }
+
+// OrgPermissions is a user's resolved permissions for an organization.
+type OrgPermissions struct {
+	OrgID           int      `db:"org_id"`
+	PermissionNames []string `db:"permission_names"`
+}

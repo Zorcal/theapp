@@ -110,25 +110,25 @@ func userSystemRoleCountByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[int]
 	}
 }
 
-func userSystemPermissionsByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[string] {
+func userSystemPermissionsByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[[]string] {
 	params := pgx.NamedArgs{"user_id": userID}
 	const sql = `
-		SELECT DISTINCT p.name
+		SELECT COALESCE(array_agg(DISTINCT p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}')
 		FROM useraccess.users AS u
-		JOIN rbac.system_role_assignments AS sra ON sra.user_id = u.id
-		JOIN rbac.system_role_permissions AS rp ON rp.role_id = sra.role_id
-		JOIN rbac.permissions AS p ON p.id = rp.permission_id
+		LEFT JOIN rbac.system_role_assignments AS sra ON sra.user_id = u.id
+		LEFT JOIN rbac.system_role_permissions AS rp ON rp.role_id = sra.role_id
+		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
 		WHERE u.external_id = @user_id
-		ORDER BY p.name`
+		GROUP BY u.id`
 
-	return pgdb.TypedQuery[string]{
+	return pgdb.TypedQuery[[]string]{
 		SQL:  sql,
 		Args: params,
-		Scan: func(row pgx.CollectableRow) (string, error) {
-			var name string
-			return name, row.Scan(&name)
+		Scan: func(row pgx.CollectableRow) ([]string, error) {
+			var names []string
+			return names, row.Scan(&names)
 		},
-		Expect: pgdb.ExpectMany,
+		Expect: pgdb.ExpectOne,
 	}
 }
 

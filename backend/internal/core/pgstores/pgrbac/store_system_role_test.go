@@ -212,6 +212,19 @@ func TestStore_UserSystemPermissionsByExternalID(t *testing.T) {
 	})
 }
 
+func TestStore_UserSystemPermissionsByExternalID_error(t *testing.T) {
+	t.Run("user not found", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		rbacStore := NewStore(pool)
+
+		userID := uuid.New()
+		if _, err := rbacStore.UserSystemPermissionsByExternalID(ctx, userID); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UserSystemPermissionsByExternalID(%v) error = %v, want sql.ErrNoRows", userID, err)
+		}
+	})
+}
+
 func TestStore_AssignSystemRole_error(t *testing.T) {
 	t.Run("user not found", func(t *testing.T) {
 		ctx := context.Background()

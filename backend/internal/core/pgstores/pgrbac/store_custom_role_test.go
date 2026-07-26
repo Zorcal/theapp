@@ -907,7 +907,7 @@ func TestStore_AssignCustomRoleToProject(t *testing.T) {
 		t.Fatalf("AssignCustomRoleToProject() error = %v", err)
 	}
 
-	got, err := rbacStore.ProjectPermissions(ctx, user.ID, project.ID)
+	got, err := rbacStore.ProjectPermissions(ctx, user.ExternalID, project.ID)
 	if err != nil {
 		t.Fatalf("ProjectPermissions() error = %v", err)
 	}
@@ -995,7 +995,7 @@ func TestStore_UnassignCustomRoleFromProject(t *testing.T) {
 		t.Fatalf("UnassignCustomRoleFromProject() error = %v", err)
 	}
 
-	got, err := rbacStore.ProjectPermissions(ctx, user.ID, project.ID)
+	got, err := rbacStore.ProjectPermissions(ctx, user.ExternalID, project.ID)
 	if err != nil {
 		t.Fatalf("ProjectPermissions() error = %v", err)
 	}
@@ -1064,7 +1064,7 @@ func TestStore_AssignCustomRoleToOrg(t *testing.T) {
 		t.Fatalf("AssignCustomRoleToOrg() error = %v", err)
 	}
 
-	got, err := rbacStore.ProjectPermissions(ctx, user.ID, project.ID)
+	got, err := rbacStore.ProjectPermissions(ctx, user.ExternalID, project.ID)
 	if err != nil {
 		t.Fatalf("ProjectPermissions() error = %v", err)
 	}
@@ -1149,7 +1149,7 @@ func TestStore_UnassignCustomRoleFromOrg(t *testing.T) {
 		t.Fatalf("UnassignCustomRoleFromOrg() error = %v", err)
 	}
 
-	got, err := rbacStore.ProjectPermissions(ctx, user.ID, project.ID)
+	got, err := rbacStore.ProjectPermissions(ctx, user.ExternalID, project.ID)
 	if err != nil {
 		t.Fatalf("ProjectPermissions() error = %v", err)
 	}

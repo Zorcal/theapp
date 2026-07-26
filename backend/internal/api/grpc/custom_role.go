@@ -55,10 +55,12 @@ type CustomRoleCore interface {
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	DeleteCustomRole(ctx context.Context, customRoleID uuid.UUID) error
 	// AssignCustomRoleToProject assigns a custom role to a user in the caller's project.
+	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	AssignCustomRoleToProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromProject unassigns a custom role from a user in the caller's project.
 	UnassignCustomRoleFromProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// AssignCustomRoleToOrg assigns a custom role to a user across the caller's organization.
+	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromOrg unassigns a custom role from a user across the caller's organization.
 	UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
@@ -303,6 +305,8 @@ func (s *customRoleService) AssignRoleToProject(ctx context.Context, req *pb.Ass
 			return nil, status.Error(codes.NotFound, "user, role, project, or organization membership not found")
 		case errors.Is(err, mdl.ErrAlreadyExists):
 			return nil, status.Error(codes.AlreadyExists, "user already has role in project")
+		case errors.Is(err, mdl.ErrPermissionDenied):
+			return nil, status.Error(codes.PermissionDenied, "caller cannot grant role permissions")
 		default:
 			return nil, fmt.Errorf("assign role to project: %w", err)
 		}
@@ -343,6 +347,8 @@ func (s *customRoleService) AssignRoleToOrganization(ctx context.Context, req *p
 			return nil, status.Error(codes.NotFound, "user, role, organization, or organization membership not found")
 		case errors.Is(err, mdl.ErrAlreadyExists):
 			return nil, status.Error(codes.AlreadyExists, "user already has role in organization")
+		case errors.Is(err, mdl.ErrPermissionDenied):
+			return nil, status.Error(codes.PermissionDenied, "caller cannot grant role permissions")
 		default:
 			return nil, fmt.Errorf("assign role to organization: %w", err)
 		}

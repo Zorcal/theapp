@@ -228,6 +228,7 @@ func (c *Core) DeleteCustomRole(ctx context.Context, roleID uuid.UUID) error {
 // Returns [mdl.ErrNotFound] if the target user, role, project, or membership does not exist, or the
 // role belongs to a different organization.
 // Returns [mdl.ErrAlreadyExists] if the assignment already exists.
+// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 func (c *Core) AssignCustomRoleToProject(ctx context.Context, targetUserID, roleID uuid.UUID) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -237,8 +238,34 @@ func (c *Core) AssignCustomRoleToProject(ctx context.Context, targetUserID, role
 		return errors.New("project context missing")
 	}
 
-	if err := c.roleStorer.AssignCustomRoleToProject(ctx, targetUserID, roleID, *sess.ProjectID); err != nil {
-		return fmt.Errorf("assign custom role to project: %w", handleAssignmentError(err))
+	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
+		perms, err := c.roleStorer.ProjectPermissions(ctx, sess.User.UserID, *sess.ProjectID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("get actor project permissions: %w", mdl.ErrNotFound)
+			}
+			return fmt.Errorf("get actor project permissions: %w", err)
+		}
+
+		role, err := c.roleStorer.CustomRoleByExternalID(ctx, perms.OrgID, roleID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("get custom role: %w", mdl.ErrNotFound)
+			}
+			return fmt.Errorf("get custom role: %w", err)
+		}
+
+		if !mdl.IsPermissionSuperset(permissionsFromPg(perms.PermissionNames), permissionsFromPg(role.PermissionNames)) {
+			return mdl.ErrPermissionDenied
+		}
+
+		if err := c.roleStorer.AssignCustomRoleToProject(ctx, targetUserID, roleID, *sess.ProjectID); err != nil {
+			return fmt.Errorf("assign custom role to project: %w", handleAssignmentError(err))
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("run tx: %w", err)
 	}
 
 	return nil
@@ -267,6 +294,7 @@ func (c *Core) UnassignCustomRoleFromProject(ctx context.Context, targetUserID, 
 // Returns [mdl.ErrNotFound] if the target user, role, organization, or membership does not exist,
 // or the role belongs to a different organization.
 // Returns [mdl.ErrAlreadyExists] if the assignment already exists.
+// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 func (c *Core) AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -276,8 +304,34 @@ func (c *Core) AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID u
 		return errors.New("organization context missing")
 	}
 
-	if err := c.roleStorer.AssignCustomRoleToOrg(ctx, targetUserID, roleID, *sess.OrgID); err != nil {
-		return fmt.Errorf("assign custom role to org: %w", handleAssignmentError(err))
+	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
+		perms, err := c.roleStorer.OrgPermissions(ctx, sess.User.UserID, *sess.OrgID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("get actor organization permissions: %w", mdl.ErrNotFound)
+			}
+			return fmt.Errorf("get actor organization permissions: %w", err)
+		}
+
+		role, err := c.roleStorer.CustomRoleByExternalID(ctx, perms.OrgID, roleID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("get custom role: %w", mdl.ErrNotFound)
+			}
+			return fmt.Errorf("get custom role: %w", err)
+		}
+
+		if !mdl.IsPermissionSuperset(permissionsFromPg(perms.PermissionNames), permissionsFromPg(role.PermissionNames)) {
+			return mdl.ErrPermissionDenied
+		}
+
+		if err := c.roleStorer.AssignCustomRoleToOrg(ctx, targetUserID, roleID, *sess.OrgID); err != nil {
+			return fmt.Errorf("assign custom role to org: %w", handleAssignmentError(err))
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("run tx: %w", err)
 	}
 
 	return nil

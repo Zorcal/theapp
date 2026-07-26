@@ -21,7 +21,7 @@ var _ PermissionStorer = &MockedPermissionStorer{}
 //
 //		// make and configure a mocked PermissionStorer
 //		mockedPermissionStorer := &MockedPermissionStorer{
-//			ProjectPermissionsFunc: func(ctx context.Context, userID int, projectID int) (pgrbac.ProjectPermissions, error) {
+//			ProjectPermissionsFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error) {
 //				panic("mock out the ProjectPermissions method")
 //			},
 //			UserSystemPermissionsByExternalIDFunc: func(ctx context.Context, userID uuid.UUID) ([]string, error) {
@@ -35,7 +35,7 @@ var _ PermissionStorer = &MockedPermissionStorer{}
 //	}
 type MockedPermissionStorer struct {
 	// ProjectPermissionsFunc mocks the ProjectPermissions method.
-	ProjectPermissionsFunc func(ctx context.Context, userID int, projectID int) (pgrbac.ProjectPermissions, error)
+	ProjectPermissionsFunc func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error)
 
 	// UserSystemPermissionsByExternalIDFunc mocks the UserSystemPermissionsByExternalID method.
 	UserSystemPermissionsByExternalIDFunc func(ctx context.Context, userID uuid.UUID) ([]string, error)
@@ -47,7 +47,7 @@ type MockedPermissionStorer struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// UserID is the userID argument value.
-			UserID int
+			UserID uuid.UUID
 			// ProjectID is the projectID argument value.
 			ProjectID int
 		}
@@ -64,13 +64,13 @@ type MockedPermissionStorer struct {
 }
 
 // ProjectPermissions calls ProjectPermissionsFunc.
-func (mock *MockedPermissionStorer) ProjectPermissions(ctx context.Context, userID int, projectID int) (pgrbac.ProjectPermissions, error) {
+func (mock *MockedPermissionStorer) ProjectPermissions(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error) {
 	if mock.ProjectPermissionsFunc == nil {
 		panic("MockedPermissionStorer.ProjectPermissionsFunc: method is nil but PermissionStorer.ProjectPermissions was just called")
 	}
 	callInfo := struct {
 		Ctx       context.Context
-		UserID    int
+		UserID    uuid.UUID
 		ProjectID int
 	}{
 		Ctx:       ctx,
@@ -89,12 +89,12 @@ func (mock *MockedPermissionStorer) ProjectPermissions(ctx context.Context, user
 //	len(mockedPermissionStorer.ProjectPermissionsCalls())
 func (mock *MockedPermissionStorer) ProjectPermissionsCalls() []struct {
 	Ctx       context.Context
-	UserID    int
+	UserID    uuid.UUID
 	ProjectID int
 } {
 	var calls []struct {
 		Ctx       context.Context
-		UserID    int
+		UserID    uuid.UUID
 		ProjectID int
 	}
 	mock.lockProjectPermissions.RLock()
