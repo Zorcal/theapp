@@ -113,7 +113,7 @@ Permissions and system roles are rows inserted by `seed.sql`, not something any 
 
 **Checkpoint:** permission checks are project-scoped end-to-end, with real organizations/projects backing them — still no custom roles or self-service org/project creation endpoint.
 
-## Phase 12 — system role service
+## Phase 12 — system role service - done
 
 26. Finalize `schemas/system_role.proto` and its generated gRPC/gateway/OpenAPI artifacts: list system roles with their permissions, assign/unassign a system role, and list a user's system-role assignments. `SystemRole.permissions` is embedded so list and assignment responses carry the complete role definition without a per-role follow-up request. Every method is anchored on `theapp`'s control project. This part is complete.
 27. Seed `system-role:read`, `system-role:assign`, and `system-role:unassign`; add their `mdl.Permission` constants and register every `SystemRoleService` method in `permissionRegistry`. List operations require `system-role:read`, assign requires `system-role:assign`, and unassign requires `system-role:unassign`. This part is already complete. Depends on 7, 15, 26.
