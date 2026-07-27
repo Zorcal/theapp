@@ -60,6 +60,9 @@ var noProjectMethods = set.Set[string]{
 // project-scoped role assignments. The request project identifies the organization in which the
 // method operates.
 var organizationScopedPermissions = set.Set[mdl.Permission]{
+	mdl.PermissionCustomRoleCreate:             {},
+	mdl.PermissionCustomRoleUpdate:             {},
+	mdl.PermissionCustomRoleDelete:             {},
 	mdl.PermissionCustomRoleReadOrgAssignments: {},
 	mdl.PermissionCustomRoleAssignOrg:          {},
 	mdl.PermissionCustomRoleUnassignOrg:        {},
