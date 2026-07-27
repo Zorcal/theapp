@@ -109,7 +109,16 @@ This means a permission or system-role grant removed from `seed.sql` stays exact
 
 ## Exposing auth data to clients
 
-The auth service exposes an endpoint that returns the authenticated caller's ID, email, and resolved permissions — not full profile data. Without it, a frontend has no way to conditionally render UI based on permissions short of probing individual endpoints and reacting to `codes.PermissionDenied`. This lives on the auth service rather than the user service because it is authorization context for the current session, not user profile data, and it only ever concerns the caller rather than an arbitrary user ID.
+The auth service exposes an endpoint that returns the authenticated caller's ID and email plus
+effective project-, organization-, and system-scoped permission sets — not full profile data. The
+project set combines project-, organization-, and system-scope assignments for the selected
+project; the organization set combines organization- and system-scope assignments for that
+project's organization; the system set contains only system-scope assignments. This tells a
+frontend where a permission is usable without exposing which role or assignment supplied it.
+Without these separate sets, a project-only grant could make an organization-scoped control appear
+available even though the backend correctly rejects it. This lives on the auth service rather than
+the user service because it is authorization context for the current session, not user profile
+data, and it only ever concerns the caller rather than an arbitrary user ID.
 
 ## System role management
 
