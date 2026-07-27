@@ -292,20 +292,36 @@ func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCu
 
 // DeleteCustomRole deletes a custom role in the caller's organization.
 // Returns [mdl.ErrNotFound] if the role is not owned by the caller's organization.
+// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 func (c *Core) DeleteCustomRole(ctx context.Context, roleID uuid.UUID) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
 		return errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return errors.New("organization context missing")
+	if sess.ProjectID == nil {
+		return errors.New("project context missing")
 	}
 
-	if err := c.roleStorer.DeleteCustomRole(ctx, *sess.OrgID, roleID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("delete custom role: %w", mdl.ErrNotFound)
+	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
+		userOrgPerms, role, err := c.customRolePermChangeContext(ctx, sess.User.UserID, *sess.ProjectID, roleID)
+		if err != nil {
+			return fmt.Errorf("get permission change context: %w", err)
 		}
-		return fmt.Errorf("delete custom role: %w", err)
+
+		if !mdl.IsPermissionSuperset(permissionsFromPg(userOrgPerms.PermissionNames), permissionsFromPg(role.PermissionNames)) {
+			return mdl.ErrPermissionDenied
+		}
+
+		if err := c.roleStorer.DeleteCustomRole(ctx, userOrgPerms.OrgID, roleID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("delete custom role: %w", mdl.ErrNotFound)
+			}
+			return fmt.Errorf("delete custom role: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("run tx: %w", err)
 	}
 
 	return nil

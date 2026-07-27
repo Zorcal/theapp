@@ -442,7 +442,10 @@ func TestCore_UserProjectCustomRoles_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User:  mdl.AuthUser{UserID: uuid.New()},
+					OrgID: new(42),
+				}),
 			},
 		}
 		for _, tt := range tests {
@@ -848,7 +851,10 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)}),
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User:  mdl.AuthUser{UserID: uuid.New()},
+					OrgID: new(42),
+				}),
 			},
 		}
 		for _, tt := range tests {
@@ -1075,7 +1081,10 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 			{
 				name: "project context missing for permission update",
 				in:   mdl.UpdateCustomRole{Fields: mdl.CustomRoleUpdateFields{Permissions: true}},
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)}),
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User:  mdl.AuthUser{UserID: uuid.New()},
+					OrgID: new(42),
+				}),
 			},
 		}
 		for _, tt := range tests {
@@ -1286,7 +1295,10 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)}),
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User:  mdl.AuthUser{UserID: uuid.New()},
+					OrgID: new(42),
+				}),
 			},
 		}
 		for _, tt := range tests {
@@ -1302,16 +1314,26 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 }
 
 func TestCore_DeleteCustomRole(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
 	roleStorer := &MockedRoleStorer{
+		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+			return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+		},
+		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+		},
 		DeleteCustomRoleFunc: func(_ context.Context, _ int, _ uuid.UUID) error {
 			return nil
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User:      mdl.AuthUser{UserID: uuid.New()},
+		ProjectID: new(7),
+		OrgID:     new(42),
+	})
 
 	if err := core.DeleteCustomRole(ctx, uuid.New()); err != nil {
-		t.Errorf("DeleteCustomRole() error = %v", err)
+		t.Fatalf("DeleteCustomRole() error = %v", err)
 	}
 }
 
@@ -1324,8 +1346,71 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 		want       error
 	}{
 		{
+			name: "actor or organization not found",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "resolve actor permissions",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
 			name: "role not found",
 			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "get role",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "permission denied",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: nil, // Missing custom-role:read
+					}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
+			},
+			want: mdl.ErrPermissionDenied,
+		},
+		{
+			name: "role disappeared",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
 				DeleteCustomRoleFunc: func(_ context.Context, _ int, _ uuid.UUID) error {
 					return sql.ErrNoRows
 				},
@@ -1335,6 +1420,12 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 		{
 			name: "store error",
 			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
 				DeleteCustomRoleFunc: func(_ context.Context, _ int, _ uuid.UUID) error {
 					return dbErr
 				},
@@ -1344,7 +1435,11 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(7),
+				OrgID:     new(42),
+			})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if err := core.DeleteCustomRole(ctx, uuid.New()); !errors.Is(err, tt.want) {
@@ -1363,8 +1458,11 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 				ctx:  context.Background(),
 			},
 			{
-				name: "organization context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+				name: "project context missing",
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User:  mdl.AuthUser{UserID: uuid.New()},
+					OrgID: new(42),
+				}),
 			},
 		}
 		for _, tt := range tests {
@@ -1543,7 +1641,10 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User:  mdl.AuthUser{UserID: uuid.New()},
+					OrgID: new(42),
+				}),
 			},
 		}
 		for _, tt := range tests {
@@ -1700,7 +1801,10 @@ func TestCore_UnassignCustomRoleFromProject_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User:  mdl.AuthUser{UserID: uuid.New()},
+					OrgID: new(42),
+				}),
 			},
 		}
 		for _, tt := range tests {
@@ -2043,7 +2147,10 @@ func TestCore_UnassignCustomRoleFromOrg_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User:  mdl.AuthUser{UserID: uuid.New()},
+					OrgID: new(42),
+				}),
 			},
 		}
 		for _, tt := range tests {

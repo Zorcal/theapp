@@ -56,6 +56,7 @@ type CustomRoleCore interface {
 	ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error)
 	// DeleteCustomRole deletes a custom role in the caller's organization.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
+	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	DeleteCustomRole(ctx context.Context, customRoleID uuid.UUID) error
 	// AssignCustomRoleToProject assigns a custom role to a user in the caller's project.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
@@ -293,10 +294,14 @@ func (s *customRoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRe
 	roleID := uuid.MustParse(req.GetId())
 
 	if err := s.customRoleCore.DeleteCustomRole(ctx, roleID); err != nil {
-		if errors.Is(err, mdl.ErrNotFound) {
+		switch {
+		case errors.Is(err, mdl.ErrNotFound):
 			return nil, status.Errorf(codes.NotFound, "role %q not found", req.GetId())
+		case errors.Is(err, mdl.ErrPermissionDenied):
+			return nil, status.Error(codes.PermissionDenied, "caller cannot delete role permissions")
+		default:
+			return nil, fmt.Errorf("delete role: %w", err)
 		}
-		return nil, fmt.Errorf("delete role: %w", err)
 	}
 
 	return &pb.DeleteRoleResponse{}, nil

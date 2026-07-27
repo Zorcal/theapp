@@ -1277,6 +1277,16 @@ func TestRoleService_DeleteRole_error(t *testing.T) {
 			want: status.New(codes.NotFound, `role "`+roleID.String()+`" not found`),
 		},
 		{
+			name: "permission denied",
+			customRoleCore: &MockedCustomRoleCore{
+				DeleteCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error {
+					return mdl.ErrPermissionDenied
+				},
+			},
+			in:   &pb.DeleteRoleRequest{Id: roleID.String()},
+			want: status.New(codes.PermissionDenied, "caller cannot delete role permissions"),
+		},
+		{
 			name: "core error",
 			customRoleCore: &MockedCustomRoleCore{
 				DeleteCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error {

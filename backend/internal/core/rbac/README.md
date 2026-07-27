@@ -34,18 +34,19 @@ through another system-role assignment.
 
 ## Custom-role authorization
 
-Creating a custom role, changing its permissions, and assigning or unassigning it all enforce the
-permission-superset rule. The actor must hold every permission being granted or revoked. For a
-replacement or incremental permission edit, the check applies only to permissions that actually
-change; permissions already present and no-op additions or removals require no additional
-authority.
+Creating or deleting a custom role, changing its permissions, and assigning or unassigning it all
+enforce the permission-superset rule. The actor must hold every permission being granted or
+revoked. Deletion requires every permission carried by the role because it removes that entire
+permission set from every assignment. For a replacement or incremental permission edit, the check
+applies only to permissions that actually change; permissions already present and no-op additions
+or removals require no additional authority.
 
 The actor's permissions are resolved fresh in the same transaction as the mutation:
 
 1. Resolve the target project or organization and the actor's permissions in that scope.
 2. Load the organization-owned custom role when the operation targets an existing role.
-3. Require the actor's permissions to contain every permission being added, removed, assigned, or
-   unassigned.
+3. Require the actor's permissions to contain every permission being added, removed, assigned,
+   unassigned, or deleted.
 4. Apply the role or assignment mutation.
 
 Project-scoped assignment changes combine project-, organization-, and system-scope permissions.
@@ -54,12 +55,12 @@ system-scope permissions. A project role can therefore justify a change within i
 cannot be used to alter organization-wide access or an organization-owned role definition.
 
 Custom roles are owned by an organization rather than a project and may be assigned in any project
-within that organization or directly at organization scope. Creating a role or changing its
-permissions therefore requires organization- or system-scoped authority: allowing a permission
-held in one project to define a reusable role would let that project-level authority be carried
-into other projects or promoted to organization scope. Organization-scoped assignment changes use
-the same rule because their effect already spans every project in the organization. Project-scoped
-assignment changes are narrower and may be authorized by permissions held in that project.
+within that organization or directly at organization scope. Creating, changing, or deleting a role
+therefore requires organization- or system-scoped authority: allowing authority held in one
+project to control a reusable role would let it affect other projects or organization-wide access.
+Organization-scoped assignment changes use the same rule because their effect already spans every
+project in the organization. Project-scoped assignment changes are narrower and may be authorized
+by permissions held in that project.
 
 Missing users, projects, organizations, memberships, roles, or assignments are reported as not
 found without exposing cross-organization resources. Attempting to act on permissions the actor
