@@ -18,15 +18,19 @@ func FromSlice[T comparable](vs []T) Set[T] {
 	return s
 }
 
-// Add inserts v into the set and returns the set.
-func (s Set[T]) Add(v T) Set[T] {
-	s[v] = struct{}{}
+// Add inserts vs into the set and returns the set.
+func (s Set[T]) Add(vs ...T) Set[T] {
+	for _, v := range vs {
+		s[v] = struct{}{}
+	}
 	return s
 }
 
-// Remove deletes v from the set and returns the set.
-func (s Set[T]) Remove(v T) Set[T] {
-	delete(s, v)
+// Remove deletes vs from the set and returns the set.
+func (s Set[T]) Remove(vs ...T) Set[T] {
+	for _, v := range vs {
+		delete(s, v)
+	}
 	return s
 }
 
@@ -76,6 +80,26 @@ func (s Set[T]) Union(other Set[T]) Set[T] {
 		result.Add(v)
 	}
 	return result
+}
+
+// Difference returns a new set containing the elements present in s but not
+// in other.
+func (s Set[T]) Difference(other Set[T]) Set[T] {
+	result := New[T]()
+
+	for v := range s {
+		if !other.Contains(v) {
+			result.Add(v)
+		}
+	}
+
+	return result
+}
+
+// SymmetricDifference returns a new set containing the elements present in
+// either s or other, but not both.
+func (s Set[T]) SymmetricDifference(other Set[T]) Set[T] {
+	return s.Difference(other).Union(other.Difference(s))
 }
 
 // Intersection returns a new set containing only the elements present in both

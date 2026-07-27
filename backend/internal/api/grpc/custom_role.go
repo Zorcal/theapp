@@ -41,15 +41,18 @@ type CustomRoleCore interface {
 	// CreateCustomRole creates a custom role in the caller's organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
+	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to the role.
 	CreateCustomRole(ctx context.Context, cr mdl.CreateCustomRole) (mdl.CustomRole, error)
 	// UpdateCustomRole updates a custom role in the caller's organization.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
+	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
 	UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error)
 	// ModifyCustomRolePermissions atomically changes permissions on a custom role.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
+	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
 	ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error)
 	// DeleteCustomRole deletes a custom role in the caller's organization.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
@@ -58,11 +61,13 @@ type CustomRoleCore interface {
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	AssignCustomRoleToProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromProject unassigns a custom role from a user in the caller's project.
+	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	UnassignCustomRoleFromProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// AssignCustomRoleToOrg assigns a custom role to a user across the caller's organization.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromOrg unassigns a custom role from a user across the caller's organization.
+	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
 }
 
@@ -82,6 +87,8 @@ func (s *customRoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRe
 			})
 		case errors.Is(err, mdl.ErrNotFound):
 			return nil, status.Error(codes.NotFound, "organization or permission not found")
+		case errors.Is(err, mdl.ErrPermissionDenied):
+			return nil, status.Error(codes.PermissionDenied, "caller cannot add role permissions")
 		default:
 			return nil, fmt.Errorf("create role: %w", err)
 		}
@@ -244,6 +251,8 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 			return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "role.name", Description: "a role with this name already exists"},
 			})
+		case errors.Is(err, mdl.ErrPermissionDenied):
+			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
 		default:
 			return nil, fmt.Errorf("update role: %w", err)
 		}
@@ -266,6 +275,8 @@ func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.M
 			return nil, status.Errorf(codes.NotFound, "role %q or permission not found", req.GetId())
 		case errors.Is(err, mdl.ErrValidation):
 			return nil, status.Error(codes.InvalidArgument, "invalid permission changes")
+		case errors.Is(err, mdl.ErrPermissionDenied):
+			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
 		default:
 			return nil, fmt.Errorf("modify role permissions: %w", err)
 		}
@@ -324,10 +335,14 @@ func (s *customRoleService) UnassignRoleFromProject(ctx context.Context, req *pb
 	userID := uuid.MustParse(req.GetUserId())
 
 	if err := s.customRoleCore.UnassignCustomRoleFromProject(ctx, userID, roleID); err != nil {
-		if errors.Is(err, mdl.ErrNotFound) {
+		switch {
+		case errors.Is(err, mdl.ErrNotFound):
 			return nil, status.Error(codes.NotFound, "project role assignment not found")
+		case errors.Is(err, mdl.ErrPermissionDenied):
+			return nil, status.Error(codes.PermissionDenied, "caller cannot revoke role permissions")
+		default:
+			return nil, fmt.Errorf("unassign role from project: %w", err)
 		}
-		return nil, fmt.Errorf("unassign role from project: %w", err)
 	}
 
 	return &pb.UnassignRoleFromProjectResponse{}, nil
@@ -366,10 +381,14 @@ func (s *customRoleService) UnassignRoleFromOrganization(ctx context.Context, re
 	userID := uuid.MustParse(req.GetUserId())
 
 	if err := s.customRoleCore.UnassignCustomRoleFromOrg(ctx, userID, roleID); err != nil {
-		if errors.Is(err, mdl.ErrNotFound) {
+		switch {
+		case errors.Is(err, mdl.ErrNotFound):
 			return nil, status.Error(codes.NotFound, "organization role assignment not found")
+		case errors.Is(err, mdl.ErrPermissionDenied):
+			return nil, status.Error(codes.PermissionDenied, "caller cannot revoke role permissions")
+		default:
+			return nil, fmt.Errorf("unassign role from organization: %w", err)
 		}
-		return nil, fmt.Errorf("unassign role from organization: %w", err)
 	}
 
 	return &pb.UnassignRoleFromOrganizationResponse{}, nil

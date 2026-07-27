@@ -376,6 +376,16 @@ func TestRoleService_CreateRole_error(t *testing.T) {
 			want: status.New(codes.NotFound, "organization or permission not found"),
 		},
 		{
+			name: "permission denied",
+			customRoleCore: &MockedCustomRoleCore{
+				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrPermissionDenied
+				},
+			},
+			in:   &pb.CreateRoleRequest{Role: &pb.Role{Name: "role manager"}},
+			want: status.New(codes.PermissionDenied, "caller cannot add role permissions"),
+		},
+		{
 			name: "core error",
 			customRoleCore: &MockedCustomRoleCore{
 				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
@@ -1025,6 +1035,19 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 			want: invalidArgWithViolation("role.name", "a role with this name already exists"),
 		},
 		{
+			name: "permission denied",
+			customRoleCore: &MockedCustomRoleCore{
+				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrPermissionDenied
+				},
+			},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.PermissionDenied, "caller cannot change role permissions"),
+		},
+		{
 			name: "core error",
 			customRoleCore: &MockedCustomRoleCore{
 				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
@@ -1148,6 +1171,16 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 			},
 			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
 			want: status.New(codes.InvalidArgument, "invalid permission changes"),
+		},
+		{
+			name: "permission denied",
+			customRoleCore: &MockedCustomRoleCore{
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrPermissionDenied
+				},
+			},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			want: status.New(codes.PermissionDenied, "caller cannot change role permissions"),
 		},
 		{
 			name: "core error",
@@ -1424,6 +1457,16 @@ func TestRoleService_UnassignRoleFromProject_error(t *testing.T) {
 			want: status.New(codes.NotFound, "project role assignment not found"),
 		},
 		{
+			name: "permission denied",
+			customRoleCore: &MockedCustomRoleCore{
+				UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrPermissionDenied
+				},
+			},
+			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.PermissionDenied, "caller cannot revoke role permissions"),
+		},
+		{
 			name: "core error",
 			customRoleCore: &MockedCustomRoleCore{
 				UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
@@ -1602,6 +1645,16 @@ func TestRoleService_UnassignRoleFromOrganization_error(t *testing.T) {
 			},
 			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
 			want: status.New(codes.NotFound, "organization role assignment not found"),
+		},
+		{
+			name: "permission denied",
+			customRoleCore: &MockedCustomRoleCore{
+				UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrPermissionDenied
+				},
+			},
+			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.PermissionDenied, "caller cannot revoke role permissions"),
 		},
 		{
 			name: "core error",

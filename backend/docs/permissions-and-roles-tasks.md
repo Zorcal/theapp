@@ -1,9 +1,9 @@
 # Permissions and roles — implementation tasks
 
-Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–12
+Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–15
 are complete. They established users/auth, organizations/projects, the RBAC schema, permission
-resolution, the bootstrap CLI, project-scoped enforcement, and the system-role API. Phase 13 is
-current: custom-role management.
+resolution, the bootstrap CLI, project-scoped enforcement, and the system- and custom-role APIs.
+Phase 16 is current: custom-role lockout and cleanup.
 
 ## Working process
 
@@ -143,10 +143,10 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** custom roles can be assigned and unassigned at project or org scope. Privilege-escalation and lockout checks are added in phases 15–16, so these endpoints remain restricted to trusted internal testing until then.
 
-## Phase 15 — custom role service: privilege escalation checks
+## Phase 15 — custom role service: privilege escalation checks — done
 
 37. Privilege-escalation superset check on grant: resolve the actor's permission set fresh in the target project or org scope, inside the same transaction as the grant. Organization-scope authorization and superset checks resolve only organization- and system-scope grants; a project-scoped grant carrying `custom-role:assign-org`, `custom-role:unassign-org`, or `custom-role:read-org-assignments` does not authorize an organization-wide mutation or assignment listing. Project-assignment listing remains authorized in the request project. This part is complete. Depends on 24, 35.
-38. Apply the same superset check to revoke and to permissions added to or removed from a custom role. Depends on 32, 37.
+38. Apply the same superset check to revoke and to permissions added to or removed from a custom role. This part is complete. Depends on 32, 37.
 
 **Checkpoint:** custom-role grant, revoke, and permission edits enforce the correctly scoped superset rule.
 

@@ -44,6 +44,11 @@ func TestAdd(t *testing.T) {
 		want Set[int]
 	}{
 		{
+			name: "none",
+			in:   nil,
+			want: Set[int]{},
+		},
+		{
 			name: "single",
 			in:   []int{1},
 			want: Set[int]{1: {}},
@@ -62,9 +67,7 @@ func TestAdd(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := New[int]()
-			for _, v := range tt.in {
-				got.Add(v)
-			}
+			got = got.Add(tt.in...)
 
 			if diff := cmp.Diff(got, tt.want); diff != "" {
 				t.Errorf("Add(%v) mismatch (-got +want):\n%s", tt.in, diff)
@@ -77,29 +80,53 @@ func TestRemove(t *testing.T) {
 	tests := []struct {
 		name    string
 		initial Set[int]
-		remove  int
+		remove  []int
 		want    Set[int]
 	}{
 		{
+			name:    "none",
+			initial: Set[int]{1: {}, 2: {}},
+			remove:  nil,
+			want:    Set[int]{1: {}, 2: {}},
+		},
+		{
 			name:    "present",
 			initial: Set[int]{1: {}, 2: {}},
-			remove:  1,
+			remove:  []int{1},
+			want:    Set[int]{2: {}},
+		},
+		{
+			name:    "multiple",
+			initial: Set[int]{1: {}, 2: {}, 3: {}},
+			remove:  []int{1, 3},
 			want:    Set[int]{2: {}},
 		},
 		{
 			name:    "missing",
 			initial: Set[int]{1: {}},
-			remove:  2,
+			remove:  []int{2},
 			want:    Set[int]{1: {}},
+		},
+		{
+			name:    "present and missing",
+			initial: Set[int]{1: {}, 2: {}},
+			remove:  []int{1, 3},
+			want:    Set[int]{2: {}},
+		},
+		{
+			name:    "duplicates",
+			initial: Set[int]{1: {}, 2: {}},
+			remove:  []int{1, 1},
+			want:    Set[int]{2: {}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.initial.Clone()
-			got.Remove(tt.remove)
+			got = got.Remove(tt.remove...)
 
 			if diff := cmp.Diff(got, tt.want); diff != "" {
-				t.Errorf("Remove(%d) mismatch (-got +want):\n%s", tt.remove, diff)
+				t.Errorf("Remove(%v) mismatch (-got +want):\n%s", tt.remove, diff)
 			}
 		})
 	}
@@ -348,6 +375,126 @@ func TestIntersection(t *testing.T) {
 
 			if diff := cmp.Diff(right, tt.right); diff != "" {
 				t.Errorf("Intersection(%v, %v) mutated right operand (-got +want):\n%s", tt.left, tt.right, diff)
+			}
+		})
+	}
+}
+
+func TestDifference(t *testing.T) {
+	tests := []struct {
+		name  string
+		left  Set[int]
+		right Set[int]
+		want  Set[int]
+	}{
+		{
+			name:  "overlap",
+			left:  Set[int]{1: {}, 2: {}, 3: {}},
+			right: Set[int]{2: {}, 3: {}, 4: {}},
+			want:  Set[int]{1: {}},
+		},
+		{
+			name:  "no overlap",
+			left:  Set[int]{1: {}, 2: {}},
+			right: Set[int]{3: {}, 4: {}},
+			want:  Set[int]{1: {}, 2: {}},
+		},
+		{
+			name:  "equal sets",
+			left:  Set[int]{1: {}, 2: {}},
+			right: Set[int]{1: {}, 2: {}},
+			want:  Set[int]{},
+		},
+		{
+			name:  "empty left",
+			left:  Set[int]{},
+			right: Set[int]{1: {}},
+			want:  Set[int]{},
+		},
+		{
+			name:  "empty right",
+			left:  Set[int]{1: {}, 2: {}},
+			right: Set[int]{},
+			want:  Set[int]{1: {}, 2: {}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			left := tt.left.Clone()
+			right := tt.right.Clone()
+
+			got := left.Difference(right)
+
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				t.Errorf("Difference(%v, %v) mismatch (-got +want):\n%s", tt.left, tt.right, diff)
+			}
+
+			if diff := cmp.Diff(left, tt.left); diff != "" {
+				t.Errorf("Difference(%v, %v) mutated left operand (-got +want):\n%s", tt.left, tt.right, diff)
+			}
+
+			if diff := cmp.Diff(right, tt.right); diff != "" {
+				t.Errorf("Difference(%v, %v) mutated right operand (-got +want):\n%s", tt.left, tt.right, diff)
+			}
+		})
+	}
+}
+
+func TestSymmetricDifference(t *testing.T) {
+	tests := []struct {
+		name  string
+		left  Set[int]
+		right Set[int]
+		want  Set[int]
+	}{
+		{
+			name:  "overlap",
+			left:  Set[int]{1: {}, 2: {}, 3: {}},
+			right: Set[int]{2: {}, 3: {}, 4: {}},
+			want:  Set[int]{1: {}, 4: {}},
+		},
+		{
+			name:  "no overlap",
+			left:  Set[int]{1: {}, 2: {}},
+			right: Set[int]{3: {}, 4: {}},
+			want:  Set[int]{1: {}, 2: {}, 3: {}, 4: {}},
+		},
+		{
+			name:  "equal sets",
+			left:  Set[int]{1: {}, 2: {}},
+			right: Set[int]{1: {}, 2: {}},
+			want:  Set[int]{},
+		},
+		{
+			name:  "empty left",
+			left:  Set[int]{},
+			right: Set[int]{1: {}, 2: {}},
+			want:  Set[int]{1: {}, 2: {}},
+		},
+		{
+			name:  "empty right",
+			left:  Set[int]{1: {}, 2: {}},
+			right: Set[int]{},
+			want:  Set[int]{1: {}, 2: {}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			left := tt.left.Clone()
+			right := tt.right.Clone()
+
+			got := left.SymmetricDifference(right)
+
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				t.Errorf("SymmetricDifference(%v, %v) mismatch (-got +want):\n%s", tt.left, tt.right, diff)
+			}
+
+			if diff := cmp.Diff(left, tt.left); diff != "" {
+				t.Errorf("SymmetricDifference(%v, %v) mutated left operand (-got +want):\n%s", tt.left, tt.right, diff)
+			}
+
+			if diff := cmp.Diff(right, tt.right); diff != "" {
+				t.Errorf("SymmetricDifference(%v, %v) mutated right operand (-got +want):\n%s", tt.left, tt.right, diff)
 			}
 		})
 	}

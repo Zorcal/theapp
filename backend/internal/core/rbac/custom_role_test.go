@@ -26,6 +26,7 @@ func TestCore_integration_customRoleLifecycle(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	orgStore := pgorg.NewStore(pool)
+	userStore := pguser.NewStore(pool)
 	roleStore := pgrbac.NewStore(pool)
 	core := NewCore(roleStore, pgdb.NewTransactor(pool))
 
@@ -34,7 +35,14 @@ func TestCore_integration_customRoleLifecycle(t *testing.T) {
 	}
 
 	org := seedOrg(t, orgStore, "custom-role-integration-org")
-	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{OrgID: &org.ID})
+	project := seedProject(t, ctx, orgStore, org.ID, "custom-role-integration-project")
+	actor := seedUser(t, ctx, userStore, "custom-role-actor@test.com", "Custom Role Actor")
+	seedSystemRoleAssignment(t, ctx, pool, actor.ID, "superadmin")
+	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
+		User:      mdl.AuthUser{UserID: actor.ExternalID},
+		ProjectID: &project.ID,
+		OrgID:     &org.ID,
+	})
 
 	// Create roles with organization-scoped permissions.
 
@@ -660,7 +668,11 @@ func TestCore_CustomRoleByID_error(t *testing.T) {
 }
 
 func TestCore_CreateCustomRole(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User:      mdl.AuthUser{UserID: uuid.New()},
+		ProjectID: new(7),
+		OrgID:     new(42),
+	})
 	mockOutput := pgrbac.CustomRole{
 		ID:              1,
 		ExternalID:      uuid.New(),
@@ -670,6 +682,9 @@ func TestCore_CreateCustomRole(t *testing.T) {
 		ETag:            uuid.New(),
 	}
 	roleStorer := &MockedRoleStorer{
+		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+			return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+		},
 		CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
 			return mockOutput, nil
 		},
@@ -715,9 +730,48 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 			want:       mdl.ErrValidation,
 		},
 		{
+			name: "actor or organization not found",
+			in:   mdl.CreateCustomRole{Name: "project manager"},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "resolve actor permissions",
+			in:   mdl.CreateCustomRole{Name: "project manager"},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "permission denied",
+			in: mdl.CreateCustomRole{
+				Name:        "project manager",
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: nil, // Missing custom-role:read
+					}, nil
+				},
+			},
+			want: mdl.ErrPermissionDenied,
+		},
+		{
 			name: "role already exists",
 			in:   mdl.CreateCustomRole{Name: "project manager"},
 			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
 				CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, pgdb.ErrAlreadyExists
 				},
@@ -728,6 +782,9 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 			name: "name constraint violated",
 			in:   mdl.CreateCustomRole{Name: "project manager"},
 			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
 				CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, pgdb.ErrCheckConstraintViolated
 				},
@@ -738,6 +795,9 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 			name: "organization not found",
 			in:   mdl.CreateCustomRole{Name: "project manager"},
 			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
 				CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
@@ -748,6 +808,9 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 			name: "store error",
 			in:   mdl.CreateCustomRole{Name: "project manager"},
 			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
 				CreateCustomRoleFunc: func(_ context.Context, _ pgrbac.CreateCustomRole) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, dbErr
 				},
@@ -757,7 +820,11 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(7),
+				OrgID:     new(42),
+			})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if _, err := core.CreateCustomRole(ctx, tt.in); !errors.Is(err, tt.want) {
@@ -779,6 +846,10 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 				name: "organization context missing",
 				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
 			},
+			{
+				name: "project context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)}),
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -793,7 +864,12 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 }
 
 func TestCore_UpdateCustomRole(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	actorID := uuid.New()
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User:      mdl.AuthUser{UserID: actorID},
+		ProjectID: new(7),
+		OrgID:     new(42),
+	})
 	mockOutput := pgrbac.CustomRole{
 		ID:              1,
 		ExternalID:      uuid.New(),
@@ -803,7 +879,16 @@ func TestCore_UpdateCustomRole(t *testing.T) {
 		ETag:            uuid.New(),
 	}
 	roleStorer := &MockedRoleStorer{
-		UpdateCustomRoleFunc: func(ctx context.Context, ur pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+			return pgrbac.OrgPermissions{
+				OrgID:           42,
+				PermissionNames: []string{"custom-role:create", "custom-role:delete"},
+			}, nil
+		},
+		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
+		},
+		UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
 			return mockOutput, nil
 		},
 	}
@@ -853,6 +938,71 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 			want:       mdl.ErrValidation,
 		},
 		{
+			name: "actor or organization not found",
+			in:   mdl.UpdateCustomRole{Fields: mdl.CustomRoleUpdateFields{Permissions: true}},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "resolve actor permissions",
+			in:   mdl.UpdateCustomRole{Fields: mdl.CustomRoleUpdateFields{Permissions: true}},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "permission update role not found",
+			in:   mdl.UpdateCustomRole{Fields: mdl.CustomRoleUpdateFields{Permissions: true}},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "get permission update role",
+			in:   mdl.UpdateCustomRole{Fields: mdl.CustomRoleUpdateFields{Permissions: true}},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "permission denied",
+			in: mdl.UpdateCustomRole{
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: nil, // Missing custom-role:read
+					}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+			},
+			want: mdl.ErrPermissionDenied,
+		},
+		{
 			name: "role not found",
 			in:   mdl.UpdateCustomRole{},
 			roleStorer: &MockedRoleStorer{
@@ -861,6 +1011,26 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 				},
 			},
 			want: mdl.ErrNotFound,
+		},
+		{
+			name: "role already exists",
+			in:   mdl.UpdateCustomRole{},
+			roleStorer: &MockedRoleStorer{
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, pgdb.ErrAlreadyExists
+				},
+			},
+			want: mdl.ErrAlreadyExists,
+		},
+		{
+			name: "constraint violated",
+			in:   mdl.UpdateCustomRole{},
+			roleStorer: &MockedRoleStorer{
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, pgdb.ErrCheckConstraintViolated
+				},
+			},
+			want: mdl.ErrValidation,
 		},
 		{
 			name: "store error",
@@ -875,7 +1045,11 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(7),
+				OrgID:     new(42),
+			})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if _, err := core.UpdateCustomRole(ctx, tt.in); !errors.Is(err, tt.want) {
@@ -887,6 +1061,7 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 	t.Run("missing auth data", func(t *testing.T) {
 		tests := []struct {
 			name string
+			in   mdl.UpdateCustomRole
 			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
 		}{
 			{
@@ -897,12 +1072,17 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 				name: "organization context missing",
 				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
 			},
+			{
+				name: "project context missing for permission update",
+				in:   mdl.UpdateCustomRole{Fields: mdl.CustomRoleUpdateFields{Permissions: true}},
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)}),
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				core := NewCore(&MockedRoleStorer{}, immediateTransactor{})
 
-				if _, err := core.UpdateCustomRole(tt.ctx, mdl.UpdateCustomRole{}); err == nil {
+				if _, err := core.UpdateCustomRole(tt.ctx, tt.in); err == nil {
 					t.Error("UpdateCustomRole() error = nil, want error")
 				}
 			})
@@ -911,7 +1091,12 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 }
 
 func TestCore_ModifyCustomRolePermissions(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	actorID := uuid.New()
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User:      mdl.AuthUser{UserID: actorID},
+		ProjectID: new(7),
+		OrgID:     new(42),
+	})
 	mockOutput := pgrbac.CustomRole{
 		ID:              1,
 		ExternalID:      uuid.New(),
@@ -921,7 +1106,16 @@ func TestCore_ModifyCustomRolePermissions(t *testing.T) {
 		ETag:            uuid.New(),
 	}
 	roleStorer := &MockedRoleStorer{
-		ModifyCustomRolePermissionsFunc: func(ctx context.Context, mp pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
+		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+			return pgrbac.OrgPermissions{
+				OrgID:           42,
+				PermissionNames: []string{"custom-role:read", "custom-role:delete"},
+			}, nil
+		},
+		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
+		},
+		ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
 			return mockOutput, nil
 		},
 	}
@@ -966,9 +1160,79 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 			want:       mdl.ErrValidation,
 		},
 		{
+			name: "actor or organization not found",
+			in:   mdl.ModifyCustomRolePermissions{},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "resolve actor permissions",
+			in:   mdl.ModifyCustomRolePermissions{},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
 			name: "role not found",
 			in:   mdl.ModifyCustomRolePermissions{},
 			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "get role",
+			in:   mdl.ModifyCustomRolePermissions{},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "permission denied",
+			in: mdl.ModifyCustomRolePermissions{
+				AddPermissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: nil, // Missing custom-role:read
+					}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+			},
+			want: mdl.ErrPermissionDenied,
+		},
+		{
+			name: "permission missing during update",
+			in:   mdl.ModifyCustomRolePermissions{},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
 				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
@@ -976,9 +1240,15 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 			want: mdl.ErrNotFound,
 		},
 		{
-			name: "store error",
+			name: "store",
 			in:   mdl.ModifyCustomRolePermissions{},
 			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
 				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, dbErr
 				},
@@ -988,7 +1258,11 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(7),
+				OrgID:     new(42),
+			})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if _, err := core.ModifyCustomRolePermissions(ctx, tt.in); !errors.Is(err, tt.want) {
@@ -1009,6 +1283,10 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 			{
 				name: "organization context missing",
 				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
+			},
+			{
+				name: "project context missing",
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)}),
 			},
 		}
 		for _, tt := range tests {
@@ -1282,10 +1560,19 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 
 func TestCore_UnassignCustomRoleFromProject(t *testing.T) {
 	roleStorer := &MockedRoleStorer{
+		ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+			return pgrbac.ProjectPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+		},
+		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+		},
 		UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error { return nil },
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User:      mdl.AuthUser{UserID: uuid.New()},
+		ProjectID: new(42),
+	})
 
 	if err := core.UnassignCustomRoleFromProject(ctx, uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("UnassignCustomRoleFromProject() error = %v", err)
@@ -1301,24 +1588,100 @@ func TestCore_UnassignCustomRoleFromProject_error(t *testing.T) {
 		want       error
 	}{
 		{
-			name: "not found",
-			roleStorer: &MockedRoleStorer{UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
-				return sql.ErrNoRows
-			}},
+			name: "actor or project not found",
+			roleStorer: &MockedRoleStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "resolve actor permissions",
+			roleStorer: &MockedRoleStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "role not found",
+			roleStorer: &MockedRoleStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "get role",
+			roleStorer: &MockedRoleStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "permission denied",
+			roleStorer: &MockedRoleStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{
+						OrgID:           42,
+						PermissionNames: nil, // Missing custom-role:read
+					}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
+			},
+			want: mdl.ErrPermissionDenied,
+		},
+		{
+			name: "assignment not found",
+			roleStorer: &MockedRoleStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+					return sql.ErrNoRows
+				},
+			},
 			want: mdl.ErrNotFound,
 		},
 		{
 			name: "store",
-			roleStorer: &MockedRoleStorer{UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
-				return dbErr
-			}},
+			roleStorer: &MockedRoleStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+					return dbErr
+				},
+			},
 			want: dbErr,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.roleStorer, immediateTransactor{})
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(42),
+			})
 
 			if err := core.UnassignCustomRoleFromProject(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
 				t.Errorf("UnassignCustomRoleFromProject() error = %v, want %v", err, tt.want)
@@ -1435,7 +1798,7 @@ func TestCore_AssignCustomRoleToOrg_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{
 						OrgID:           42,
-						PermissionNames: []string{"custom-role:read"},
+						PermissionNames: []string{"custom-role:read"}, // Missing custom-role:update
 					}, nil
 				},
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
@@ -1538,10 +1901,20 @@ func TestCore_AssignCustomRoleToOrg_error(t *testing.T) {
 
 func TestCore_UnassignCustomRoleFromOrg(t *testing.T) {
 	roleStorer := &MockedRoleStorer{
+		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+			return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+		},
+		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+		},
 		UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error { return nil },
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User:      mdl.AuthUser{UserID: uuid.New()},
+		ProjectID: new(7),
+		OrgID:     new(42),
+	})
 
 	if err := core.UnassignCustomRoleFromOrg(ctx, uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("UnassignCustomRoleFromOrg() error = %v", err)
@@ -1557,24 +1930,101 @@ func TestCore_UnassignCustomRoleFromOrg_error(t *testing.T) {
 		want       error
 	}{
 		{
-			name: "not found",
-			roleStorer: &MockedRoleStorer{UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
-				return sql.ErrNoRows
-			}},
+			name: "actor or organization not found",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "resolve actor permissions",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "role not found",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "get role",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "permission denied",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: nil, // Missing custom-role:read
+					}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
+			},
+			want: mdl.ErrPermissionDenied,
+		},
+		{
+			name: "assignment not found",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+					return sql.ErrNoRows
+				},
+			},
 			want: mdl.ErrNotFound,
 		},
 		{
 			name: "store",
-			roleStorer: &MockedRoleStorer{UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
-				return dbErr
-			}},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
+				UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+					return dbErr
+				},
+			},
 			want: dbErr,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.roleStorer, immediateTransactor{})
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(7),
+				OrgID:     new(42),
+			})
 
 			if err := core.UnassignCustomRoleFromOrg(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
 				t.Errorf("UnassignCustomRoleFromOrg() error = %v, want %v", err, tt.want)
@@ -1592,7 +2042,7 @@ func TestCore_UnassignCustomRoleFromOrg_error(t *testing.T) {
 				ctx:  context.Background(),
 			},
 			{
-				name: "organization context missing",
+				name: "project context missing",
 				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
 			},
 		}
