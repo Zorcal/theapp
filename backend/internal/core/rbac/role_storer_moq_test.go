@@ -39,17 +39,11 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			CustomRoleCountFunc: func(ctx context.Context, orgID int) (int, error) {
 //				panic("mock out the CustomRoleCount method")
 //			},
-//			CustomRoleManagementPermissionsRemainAfterRemovalFunc: func(ctx context.Context, orgID int, roleID uuid.UUID, projectPermissionNames []string, orgPermissionNames []string) (bool, error) {
-//				panic("mock out the CustomRoleManagementPermissionsRemainAfterRemoval method")
-//			},
 //			CustomRolesFunc: func(ctx context.Context, orgID int, pageSize int, pageOffset int) ([]pgrbac.CustomRole, error) {
 //				panic("mock out the CustomRoles method")
 //			},
 //			DeleteCustomRoleFunc: func(ctx context.Context, orgID int, roleID uuid.UUID) error {
 //				panic("mock out the DeleteCustomRole method")
-//			},
-//			LockCustomRoleManagementFunc: func(ctx context.Context) error {
-//				panic("mock out the LockCustomRoleManagement method")
 //			},
 //			LockSystemRoleManagementFunc: func(ctx context.Context) error {
 //				panic("mock out the LockSystemRoleManagement method")
@@ -60,14 +54,8 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			ModifyCustomRolePermissionsFunc: func(ctx context.Context, mp pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
 //				panic("mock out the ModifyCustomRolePermissions method")
 //			},
-//			OrgCustomRolePermissionsRemainAfterUnassignFunc: func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int, permissionNames []string) (bool, error) {
-//				panic("mock out the OrgCustomRolePermissionsRemainAfterUnassign method")
-//			},
 //			OrgPermissionsByProjectIDFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.OrgPermissions, error) {
 //				panic("mock out the OrgPermissionsByProjectID method")
-//			},
-//			ProjectCustomRolePermissionsRemainAfterUnassignFunc: func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int, permissionNames []string) (bool, error) {
-//				panic("mock out the ProjectCustomRolePermissionsRemainAfterUnassign method")
 //			},
 //			ProjectPermissionsFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error) {
 //				panic("mock out the ProjectPermissions method")
@@ -142,17 +130,11 @@ type MockedRoleStorer struct {
 	// CustomRoleCountFunc mocks the CustomRoleCount method.
 	CustomRoleCountFunc func(ctx context.Context, orgID int) (int, error)
 
-	// CustomRoleManagementPermissionsRemainAfterRemovalFunc mocks the CustomRoleManagementPermissionsRemainAfterRemoval method.
-	CustomRoleManagementPermissionsRemainAfterRemovalFunc func(ctx context.Context, orgID int, roleID uuid.UUID, projectPermissionNames []string, orgPermissionNames []string) (bool, error)
-
 	// CustomRolesFunc mocks the CustomRoles method.
 	CustomRolesFunc func(ctx context.Context, orgID int, pageSize int, pageOffset int) ([]pgrbac.CustomRole, error)
 
 	// DeleteCustomRoleFunc mocks the DeleteCustomRole method.
 	DeleteCustomRoleFunc func(ctx context.Context, orgID int, roleID uuid.UUID) error
-
-	// LockCustomRoleManagementFunc mocks the LockCustomRoleManagement method.
-	LockCustomRoleManagementFunc func(ctx context.Context) error
 
 	// LockSystemRoleManagementFunc mocks the LockSystemRoleManagement method.
 	LockSystemRoleManagementFunc func(ctx context.Context) error
@@ -163,14 +145,8 @@ type MockedRoleStorer struct {
 	// ModifyCustomRolePermissionsFunc mocks the ModifyCustomRolePermissions method.
 	ModifyCustomRolePermissionsFunc func(ctx context.Context, mp pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error)
 
-	// OrgCustomRolePermissionsRemainAfterUnassignFunc mocks the OrgCustomRolePermissionsRemainAfterUnassign method.
-	OrgCustomRolePermissionsRemainAfterUnassignFunc func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int, permissionNames []string) (bool, error)
-
 	// OrgPermissionsByProjectIDFunc mocks the OrgPermissionsByProjectID method.
 	OrgPermissionsByProjectIDFunc func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.OrgPermissions, error)
-
-	// ProjectCustomRolePermissionsRemainAfterUnassignFunc mocks the ProjectCustomRolePermissionsRemainAfterUnassign method.
-	ProjectCustomRolePermissionsRemainAfterUnassignFunc func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int, permissionNames []string) (bool, error)
 
 	// ProjectPermissionsFunc mocks the ProjectPermissions method.
 	ProjectPermissionsFunc func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error)
@@ -276,19 +252,6 @@ type MockedRoleStorer struct {
 			// OrgID is the orgID argument value.
 			OrgID int
 		}
-		// CustomRoleManagementPermissionsRemainAfterRemoval holds details about calls to the CustomRoleManagementPermissionsRemainAfterRemoval method.
-		CustomRoleManagementPermissionsRemainAfterRemoval []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// OrgID is the orgID argument value.
-			OrgID int
-			// RoleID is the roleID argument value.
-			RoleID uuid.UUID
-			// ProjectPermissionNames is the projectPermissionNames argument value.
-			ProjectPermissionNames []string
-			// OrgPermissionNames is the orgPermissionNames argument value.
-			OrgPermissionNames []string
-		}
 		// CustomRoles holds details about calls to the CustomRoles method.
 		CustomRoles []struct {
 			// Ctx is the ctx argument value.
@@ -309,11 +272,6 @@ type MockedRoleStorer struct {
 			// RoleID is the roleID argument value.
 			RoleID uuid.UUID
 		}
-		// LockCustomRoleManagement holds details about calls to the LockCustomRoleManagement method.
-		LockCustomRoleManagement []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 		// LockSystemRoleManagement holds details about calls to the LockSystemRoleManagement method.
 		LockSystemRoleManagement []struct {
 			// Ctx is the ctx argument value.
@@ -333,19 +291,6 @@ type MockedRoleStorer struct {
 			// Mp is the mp argument value.
 			Mp pgrbac.ModifyCustomRolePermissions
 		}
-		// OrgCustomRolePermissionsRemainAfterUnassign holds details about calls to the OrgCustomRolePermissionsRemainAfterUnassign method.
-		OrgCustomRolePermissionsRemainAfterUnassign []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// UserID is the userID argument value.
-			UserID uuid.UUID
-			// RoleID is the roleID argument value.
-			RoleID uuid.UUID
-			// OrgID is the orgID argument value.
-			OrgID int
-			// PermissionNames is the permissionNames argument value.
-			PermissionNames []string
-		}
 		// OrgPermissionsByProjectID holds details about calls to the OrgPermissionsByProjectID method.
 		OrgPermissionsByProjectID []struct {
 			// Ctx is the ctx argument value.
@@ -354,19 +299,6 @@ type MockedRoleStorer struct {
 			UserID uuid.UUID
 			// ProjectID is the projectID argument value.
 			ProjectID int
-		}
-		// ProjectCustomRolePermissionsRemainAfterUnassign holds details about calls to the ProjectCustomRolePermissionsRemainAfterUnassign method.
-		ProjectCustomRolePermissionsRemainAfterUnassign []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// UserID is the userID argument value.
-			UserID uuid.UUID
-			// RoleID is the roleID argument value.
-			RoleID uuid.UUID
-			// ProjectID is the projectID argument value.
-			ProjectID int
-			// PermissionNames is the permissionNames argument value.
-			PermissionNames []string
 		}
 		// ProjectPermissions holds details about calls to the ProjectPermissions method.
 		ProjectPermissions []struct {
@@ -517,38 +449,34 @@ type MockedRoleStorer struct {
 			PageOffset int
 		}
 	}
-	lockAssignCustomRoleToOrg                             sync.RWMutex
-	lockAssignCustomRoleToProject                         sync.RWMutex
-	lockAssignSystemRole                                  sync.RWMutex
-	lockCreateCustomRole                                  sync.RWMutex
-	lockCustomRoleByExternalID                            sync.RWMutex
-	lockCustomRoleCount                                   sync.RWMutex
-	lockCustomRoleManagementPermissionsRemainAfterRemoval sync.RWMutex
-	lockCustomRoles                                       sync.RWMutex
-	lockDeleteCustomRole                                  sync.RWMutex
-	lockLockCustomRoleManagement                          sync.RWMutex
-	lockLockSystemRoleManagement                          sync.RWMutex
-	lockLockSystemRoleUser                                sync.RWMutex
-	lockModifyCustomRolePermissions                       sync.RWMutex
-	lockOrgCustomRolePermissionsRemainAfterUnassign       sync.RWMutex
-	lockOrgPermissionsByProjectID                         sync.RWMutex
-	lockProjectCustomRolePermissionsRemainAfterUnassign   sync.RWMutex
-	lockProjectPermissions                                sync.RWMutex
-	lockSystemPermissionsRemainAfterUnassign              sync.RWMutex
-	lockSystemRoleByName                                  sync.RWMutex
-	lockSystemRoleCount                                   sync.RWMutex
-	lockSystemRoles                                       sync.RWMutex
-	lockUnassignCustomRoleFromOrg                         sync.RWMutex
-	lockUnassignCustomRoleFromProject                     sync.RWMutex
-	lockUnassignSystemRole                                sync.RWMutex
-	lockUpdateCustomRole                                  sync.RWMutex
-	lockUserOrgCustomRoleCount                            sync.RWMutex
-	lockUserOrgCustomRoles                                sync.RWMutex
-	lockUserProjectCustomRoleCount                        sync.RWMutex
-	lockUserProjectCustomRoles                            sync.RWMutex
-	lockUserSystemPermissionsByExternalID                 sync.RWMutex
-	lockUserSystemRoleCountByExternalID                   sync.RWMutex
-	lockUserSystemRolesByExternalID                       sync.RWMutex
+	lockAssignCustomRoleToOrg                sync.RWMutex
+	lockAssignCustomRoleToProject            sync.RWMutex
+	lockAssignSystemRole                     sync.RWMutex
+	lockCreateCustomRole                     sync.RWMutex
+	lockCustomRoleByExternalID               sync.RWMutex
+	lockCustomRoleCount                      sync.RWMutex
+	lockCustomRoles                          sync.RWMutex
+	lockDeleteCustomRole                     sync.RWMutex
+	lockLockSystemRoleManagement             sync.RWMutex
+	lockLockSystemRoleUser                   sync.RWMutex
+	lockModifyCustomRolePermissions          sync.RWMutex
+	lockOrgPermissionsByProjectID            sync.RWMutex
+	lockProjectPermissions                   sync.RWMutex
+	lockSystemPermissionsRemainAfterUnassign sync.RWMutex
+	lockSystemRoleByName                     sync.RWMutex
+	lockSystemRoleCount                      sync.RWMutex
+	lockSystemRoles                          sync.RWMutex
+	lockUnassignCustomRoleFromOrg            sync.RWMutex
+	lockUnassignCustomRoleFromProject        sync.RWMutex
+	lockUnassignSystemRole                   sync.RWMutex
+	lockUpdateCustomRole                     sync.RWMutex
+	lockUserOrgCustomRoleCount               sync.RWMutex
+	lockUserOrgCustomRoles                   sync.RWMutex
+	lockUserProjectCustomRoleCount           sync.RWMutex
+	lockUserProjectCustomRoles               sync.RWMutex
+	lockUserSystemPermissionsByExternalID    sync.RWMutex
+	lockUserSystemRoleCountByExternalID      sync.RWMutex
+	lockUserSystemRolesByExternalID          sync.RWMutex
 }
 
 // AssignCustomRoleToOrg calls AssignCustomRoleToOrgFunc.
@@ -791,54 +719,6 @@ func (mock *MockedRoleStorer) CustomRoleCountCalls() []struct {
 	return calls
 }
 
-// CustomRoleManagementPermissionsRemainAfterRemoval calls CustomRoleManagementPermissionsRemainAfterRemovalFunc.
-func (mock *MockedRoleStorer) CustomRoleManagementPermissionsRemainAfterRemoval(ctx context.Context, orgID int, roleID uuid.UUID, projectPermissionNames []string, orgPermissionNames []string) (bool, error) {
-	if mock.CustomRoleManagementPermissionsRemainAfterRemovalFunc == nil {
-		panic("MockedRoleStorer.CustomRoleManagementPermissionsRemainAfterRemovalFunc: method is nil but RoleStorer.CustomRoleManagementPermissionsRemainAfterRemoval was just called")
-	}
-	callInfo := struct {
-		Ctx                    context.Context
-		OrgID                  int
-		RoleID                 uuid.UUID
-		ProjectPermissionNames []string
-		OrgPermissionNames     []string
-	}{
-		Ctx:                    ctx,
-		OrgID:                  orgID,
-		RoleID:                 roleID,
-		ProjectPermissionNames: projectPermissionNames,
-		OrgPermissionNames:     orgPermissionNames,
-	}
-	mock.lockCustomRoleManagementPermissionsRemainAfterRemoval.Lock()
-	mock.calls.CustomRoleManagementPermissionsRemainAfterRemoval = append(mock.calls.CustomRoleManagementPermissionsRemainAfterRemoval, callInfo)
-	mock.lockCustomRoleManagementPermissionsRemainAfterRemoval.Unlock()
-	return mock.CustomRoleManagementPermissionsRemainAfterRemovalFunc(ctx, orgID, roleID, projectPermissionNames, orgPermissionNames)
-}
-
-// CustomRoleManagementPermissionsRemainAfterRemovalCalls gets all the calls that were made to CustomRoleManagementPermissionsRemainAfterRemoval.
-// Check the length with:
-//
-//	len(mockedRoleStorer.CustomRoleManagementPermissionsRemainAfterRemovalCalls())
-func (mock *MockedRoleStorer) CustomRoleManagementPermissionsRemainAfterRemovalCalls() []struct {
-	Ctx                    context.Context
-	OrgID                  int
-	RoleID                 uuid.UUID
-	ProjectPermissionNames []string
-	OrgPermissionNames     []string
-} {
-	var calls []struct {
-		Ctx                    context.Context
-		OrgID                  int
-		RoleID                 uuid.UUID
-		ProjectPermissionNames []string
-		OrgPermissionNames     []string
-	}
-	mock.lockCustomRoleManagementPermissionsRemainAfterRemoval.RLock()
-	calls = mock.calls.CustomRoleManagementPermissionsRemainAfterRemoval
-	mock.lockCustomRoleManagementPermissionsRemainAfterRemoval.RUnlock()
-	return calls
-}
-
 // CustomRoles calls CustomRolesFunc.
 func (mock *MockedRoleStorer) CustomRoles(ctx context.Context, orgID int, pageSize int, pageOffset int) ([]pgrbac.CustomRole, error) {
 	if mock.CustomRolesFunc == nil {
@@ -920,38 +800,6 @@ func (mock *MockedRoleStorer) DeleteCustomRoleCalls() []struct {
 	mock.lockDeleteCustomRole.RLock()
 	calls = mock.calls.DeleteCustomRole
 	mock.lockDeleteCustomRole.RUnlock()
-	return calls
-}
-
-// LockCustomRoleManagement calls LockCustomRoleManagementFunc.
-func (mock *MockedRoleStorer) LockCustomRoleManagement(ctx context.Context) error {
-	if mock.LockCustomRoleManagementFunc == nil {
-		panic("MockedRoleStorer.LockCustomRoleManagementFunc: method is nil but RoleStorer.LockCustomRoleManagement was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	mock.lockLockCustomRoleManagement.Lock()
-	mock.calls.LockCustomRoleManagement = append(mock.calls.LockCustomRoleManagement, callInfo)
-	mock.lockLockCustomRoleManagement.Unlock()
-	return mock.LockCustomRoleManagementFunc(ctx)
-}
-
-// LockCustomRoleManagementCalls gets all the calls that were made to LockCustomRoleManagement.
-// Check the length with:
-//
-//	len(mockedRoleStorer.LockCustomRoleManagementCalls())
-func (mock *MockedRoleStorer) LockCustomRoleManagementCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	mock.lockLockCustomRoleManagement.RLock()
-	calls = mock.calls.LockCustomRoleManagement
-	mock.lockLockCustomRoleManagement.RUnlock()
 	return calls
 }
 
@@ -1059,54 +907,6 @@ func (mock *MockedRoleStorer) ModifyCustomRolePermissionsCalls() []struct {
 	return calls
 }
 
-// OrgCustomRolePermissionsRemainAfterUnassign calls OrgCustomRolePermissionsRemainAfterUnassignFunc.
-func (mock *MockedRoleStorer) OrgCustomRolePermissionsRemainAfterUnassign(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int, permissionNames []string) (bool, error) {
-	if mock.OrgCustomRolePermissionsRemainAfterUnassignFunc == nil {
-		panic("MockedRoleStorer.OrgCustomRolePermissionsRemainAfterUnassignFunc: method is nil but RoleStorer.OrgCustomRolePermissionsRemainAfterUnassign was just called")
-	}
-	callInfo := struct {
-		Ctx             context.Context
-		UserID          uuid.UUID
-		RoleID          uuid.UUID
-		OrgID           int
-		PermissionNames []string
-	}{
-		Ctx:             ctx,
-		UserID:          userID,
-		RoleID:          roleID,
-		OrgID:           orgID,
-		PermissionNames: permissionNames,
-	}
-	mock.lockOrgCustomRolePermissionsRemainAfterUnassign.Lock()
-	mock.calls.OrgCustomRolePermissionsRemainAfterUnassign = append(mock.calls.OrgCustomRolePermissionsRemainAfterUnassign, callInfo)
-	mock.lockOrgCustomRolePermissionsRemainAfterUnassign.Unlock()
-	return mock.OrgCustomRolePermissionsRemainAfterUnassignFunc(ctx, userID, roleID, orgID, permissionNames)
-}
-
-// OrgCustomRolePermissionsRemainAfterUnassignCalls gets all the calls that were made to OrgCustomRolePermissionsRemainAfterUnassign.
-// Check the length with:
-//
-//	len(mockedRoleStorer.OrgCustomRolePermissionsRemainAfterUnassignCalls())
-func (mock *MockedRoleStorer) OrgCustomRolePermissionsRemainAfterUnassignCalls() []struct {
-	Ctx             context.Context
-	UserID          uuid.UUID
-	RoleID          uuid.UUID
-	OrgID           int
-	PermissionNames []string
-} {
-	var calls []struct {
-		Ctx             context.Context
-		UserID          uuid.UUID
-		RoleID          uuid.UUID
-		OrgID           int
-		PermissionNames []string
-	}
-	mock.lockOrgCustomRolePermissionsRemainAfterUnassign.RLock()
-	calls = mock.calls.OrgCustomRolePermissionsRemainAfterUnassign
-	mock.lockOrgCustomRolePermissionsRemainAfterUnassign.RUnlock()
-	return calls
-}
-
 // OrgPermissionsByProjectID calls OrgPermissionsByProjectIDFunc.
 func (mock *MockedRoleStorer) OrgPermissionsByProjectID(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.OrgPermissions, error) {
 	if mock.OrgPermissionsByProjectIDFunc == nil {
@@ -1144,54 +944,6 @@ func (mock *MockedRoleStorer) OrgPermissionsByProjectIDCalls() []struct {
 	mock.lockOrgPermissionsByProjectID.RLock()
 	calls = mock.calls.OrgPermissionsByProjectID
 	mock.lockOrgPermissionsByProjectID.RUnlock()
-	return calls
-}
-
-// ProjectCustomRolePermissionsRemainAfterUnassign calls ProjectCustomRolePermissionsRemainAfterUnassignFunc.
-func (mock *MockedRoleStorer) ProjectCustomRolePermissionsRemainAfterUnassign(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, projectID int, permissionNames []string) (bool, error) {
-	if mock.ProjectCustomRolePermissionsRemainAfterUnassignFunc == nil {
-		panic("MockedRoleStorer.ProjectCustomRolePermissionsRemainAfterUnassignFunc: method is nil but RoleStorer.ProjectCustomRolePermissionsRemainAfterUnassign was just called")
-	}
-	callInfo := struct {
-		Ctx             context.Context
-		UserID          uuid.UUID
-		RoleID          uuid.UUID
-		ProjectID       int
-		PermissionNames []string
-	}{
-		Ctx:             ctx,
-		UserID:          userID,
-		RoleID:          roleID,
-		ProjectID:       projectID,
-		PermissionNames: permissionNames,
-	}
-	mock.lockProjectCustomRolePermissionsRemainAfterUnassign.Lock()
-	mock.calls.ProjectCustomRolePermissionsRemainAfterUnassign = append(mock.calls.ProjectCustomRolePermissionsRemainAfterUnassign, callInfo)
-	mock.lockProjectCustomRolePermissionsRemainAfterUnassign.Unlock()
-	return mock.ProjectCustomRolePermissionsRemainAfterUnassignFunc(ctx, userID, roleID, projectID, permissionNames)
-}
-
-// ProjectCustomRolePermissionsRemainAfterUnassignCalls gets all the calls that were made to ProjectCustomRolePermissionsRemainAfterUnassign.
-// Check the length with:
-//
-//	len(mockedRoleStorer.ProjectCustomRolePermissionsRemainAfterUnassignCalls())
-func (mock *MockedRoleStorer) ProjectCustomRolePermissionsRemainAfterUnassignCalls() []struct {
-	Ctx             context.Context
-	UserID          uuid.UUID
-	RoleID          uuid.UUID
-	ProjectID       int
-	PermissionNames []string
-} {
-	var calls []struct {
-		Ctx             context.Context
-		UserID          uuid.UUID
-		RoleID          uuid.UUID
-		ProjectID       int
-		PermissionNames []string
-	}
-	mock.lockProjectCustomRolePermissionsRemainAfterUnassign.RLock()
-	calls = mock.calls.ProjectCustomRolePermissionsRemainAfterUnassign
-	mock.lockProjectCustomRolePermissionsRemainAfterUnassign.RUnlock()
 	return calls
 }
 

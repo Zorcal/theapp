@@ -80,20 +80,6 @@ type RoleStorer interface {
 	// Returns [sql.ErrNoRows] if the membership or assignment does not exist, or the role belongs to
 	// a different organization.
 	UnassignCustomRoleFromOrg(ctx context.Context, userID, roleID uuid.UUID, orgID int) error
-	// LockCustomRoleManagement serializes custom-role changes that could remove management access.
-	LockCustomRoleManagement(ctx context.Context) error
-	// ProjectCustomRolePermissionsRemainAfterUnassign reports whether every permission in
-	// permissionNames is carried by another assignment in the project.
-	// Returns [sql.ErrNoRows] if the assignment does not exist.
-	ProjectCustomRolePermissionsRemainAfterUnassign(ctx context.Context, userID, roleID uuid.UUID, projectID int, permissionNames []string) (bool, error)
-	// OrgCustomRolePermissionsRemainAfterUnassign reports whether every permission in
-	// permissionNames is carried by another assignment in the organization.
-	// Returns [sql.ErrNoRows] if the assignment does not exist.
-	OrgCustomRolePermissionsRemainAfterUnassign(ctx context.Context, userID, roleID uuid.UUID, orgID int, permissionNames []string) (bool, error)
-	// CustomRoleManagementPermissionsRemainAfterRemoval reports whether removing the given
-	// permissions from a role leaves every affected project and organization with another holder.
-	// Returns [sql.ErrNoRows] if the organization does not own the role.
-	CustomRoleManagementPermissionsRemainAfterRemoval(ctx context.Context, orgID int, roleID uuid.UUID, projectPermissionNames, orgPermissionNames []string) (bool, error)
 	// LockSystemRoleManagement serializes system-role revokes that could remove management access.
 	LockSystemRoleManagement(ctx context.Context) error
 	// LockSystemRoleUser acquires a transaction-level lock that serializes system-role assignment

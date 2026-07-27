@@ -885,9 +885,6 @@ func TestCore_UpdateCustomRole(t *testing.T) {
 		ETag:            uuid.New(),
 	}
 	roleStorer := &MockedRoleStorer{
-		LockCustomRoleManagementFunc: func(_ context.Context) error {
-			return nil
-		},
 		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 			return pgrbac.OrgPermissions{
 				OrgID:           42,
@@ -896,9 +893,6 @@ func TestCore_UpdateCustomRole(t *testing.T) {
 		},
 		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-		},
-		CustomRoleManagementPermissionsRemainAfterRemovalFunc: func(_ context.Context, _ int, _ uuid.UUID, _, _ []string) (bool, error) {
-			return true, nil
 		},
 		UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
 			return mockOutput, nil
@@ -1015,75 +1009,6 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 			want: mdl.ErrPermissionDenied,
 		},
 		{
-			name: "last role manager",
-			in: mdl.UpdateCustomRole{
-				Fields: mdl.CustomRoleUpdateFields{Permissions: true},
-			},
-			roleStorer: &MockedRoleStorer{
-				LockCustomRoleManagementFunc: func(_ context.Context) error {
-					return nil
-				},
-				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
-					return pgrbac.OrgPermissions{
-						OrgID:           42,
-						PermissionNames: []string{"custom-role:delete"},
-					}, nil
-				},
-				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-				},
-				CustomRoleManagementPermissionsRemainAfterRemovalFunc: func(_ context.Context, _ int, _ uuid.UUID, _, _ []string) (bool, error) {
-					return false, nil
-				},
-			},
-			want: mdl.ErrLastRoleManager,
-		},
-		{
-			name: "lock role management",
-			in: mdl.UpdateCustomRole{
-				Fields: mdl.CustomRoleUpdateFields{Permissions: true},
-			},
-			roleStorer: &MockedRoleStorer{
-				LockCustomRoleManagementFunc: func(_ context.Context) error {
-					return dbErr
-				},
-				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
-					return pgrbac.OrgPermissions{
-						OrgID:           42,
-						PermissionNames: []string{"custom-role:delete"},
-					}, nil
-				},
-				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-				},
-			},
-			want: dbErr,
-		},
-		{
-			name: "check role management",
-			in: mdl.UpdateCustomRole{
-				Fields: mdl.CustomRoleUpdateFields{Permissions: true},
-			},
-			roleStorer: &MockedRoleStorer{
-				LockCustomRoleManagementFunc: func(_ context.Context) error {
-					return nil
-				},
-				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
-					return pgrbac.OrgPermissions{
-						OrgID:           42,
-						PermissionNames: []string{"custom-role:delete"},
-					}, nil
-				},
-				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-				},
-				CustomRoleManagementPermissionsRemainAfterRemovalFunc: func(_ context.Context, _ int, _ uuid.UUID, _, _ []string) (bool, error) {
-					return false, dbErr
-				},
-			},
-			want: dbErr,
-		},
-		{
 			name: "role not found",
 			in:   mdl.UpdateCustomRole{},
 			roleStorer: &MockedRoleStorer{
@@ -1190,9 +1115,6 @@ func TestCore_ModifyCustomRolePermissions(t *testing.T) {
 		ETag:            uuid.New(),
 	}
 	roleStorer := &MockedRoleStorer{
-		LockCustomRoleManagementFunc: func(_ context.Context) error {
-			return nil
-		},
 		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 			return pgrbac.OrgPermissions{
 				OrgID:           42,
@@ -1201,9 +1123,6 @@ func TestCore_ModifyCustomRolePermissions(t *testing.T) {
 		},
 		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-		},
-		CustomRoleManagementPermissionsRemainAfterRemovalFunc: func(_ context.Context, _ int, _ uuid.UUID, _, _ []string) (bool, error) {
-			return true, nil
 		},
 		ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
 			return mockOutput, nil
@@ -1312,30 +1231,6 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 				},
 			},
 			want: mdl.ErrPermissionDenied,
-		},
-		{
-			name: "last role manager",
-			in: mdl.ModifyCustomRolePermissions{
-				RemovePermissions: []mdl.Permission{mdl.PermissionCustomRoleDelete},
-			},
-			roleStorer: &MockedRoleStorer{
-				LockCustomRoleManagementFunc: func(_ context.Context) error {
-					return nil
-				},
-				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
-					return pgrbac.OrgPermissions{
-						OrgID:           42,
-						PermissionNames: []string{"custom-role:delete"},
-					}, nil
-				},
-				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-				},
-				CustomRoleManagementPermissionsRemainAfterRemovalFunc: func(_ context.Context, _ int, _ uuid.UUID, _, _ []string) (bool, error) {
-					return false, nil
-				},
-			},
-			want: mdl.ErrLastRoleManager,
 		},
 		{
 			name: "permission missing during update",
@@ -1506,27 +1401,6 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 				},
 			},
 			want: mdl.ErrPermissionDenied,
-		},
-		{
-			name: "last role manager",
-			roleStorer: &MockedRoleStorer{
-				LockCustomRoleManagementFunc: func(_ context.Context) error {
-					return nil
-				},
-				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
-					return pgrbac.OrgPermissions{
-						OrgID:           42,
-						PermissionNames: []string{"custom-role:delete"},
-					}, nil
-				},
-				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-				},
-				CustomRoleManagementPermissionsRemainAfterRemovalFunc: func(_ context.Context, _ int, _ uuid.UUID, _, _ []string) (bool, error) {
-					return false, nil
-				},
-			},
-			want: mdl.ErrLastRoleManager,
 		},
 		{
 			name: "role disappeared",
@@ -1872,27 +1746,6 @@ func TestCore_UnassignCustomRoleFromProject_error(t *testing.T) {
 			want: mdl.ErrPermissionDenied,
 		},
 		{
-			name: "last role manager",
-			roleStorer: &MockedRoleStorer{
-				LockCustomRoleManagementFunc: func(_ context.Context) error {
-					return nil
-				},
-				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
-					return pgrbac.ProjectPermissions{
-						OrgID:           42,
-						PermissionNames: []string{"custom-role:assign-project"},
-					}, nil
-				},
-				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:assign-project"}}, nil
-				},
-				ProjectCustomRolePermissionsRemainAfterUnassignFunc: func(_ context.Context, _, _ uuid.UUID, _ int, _ []string) (bool, error) {
-					return false, nil
-				},
-			},
-			want: mdl.ErrLastRoleManager,
-		},
-		{
 			name: "assignment not found",
 			roleStorer: &MockedRoleStorer{
 				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
@@ -2236,27 +2089,6 @@ func TestCore_UnassignCustomRoleFromOrg_error(t *testing.T) {
 				},
 			},
 			want: mdl.ErrPermissionDenied,
-		},
-		{
-			name: "last role manager",
-			roleStorer: &MockedRoleStorer{
-				LockCustomRoleManagementFunc: func(_ context.Context) error {
-					return nil
-				},
-				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
-					return pgrbac.OrgPermissions{
-						OrgID:           42,
-						PermissionNames: []string{"custom-role:assign-org"},
-					}, nil
-				},
-				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:assign-org"}}, nil
-				},
-				OrgCustomRolePermissionsRemainAfterUnassignFunc: func(_ context.Context, _, _ uuid.UUID, _ int, _ []string) (bool, error) {
-					return false, nil
-				},
-			},
-			want: mdl.ErrLastRoleManager,
 		},
 		{
 			name: "assignment not found",
