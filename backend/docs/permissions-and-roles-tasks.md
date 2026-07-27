@@ -3,7 +3,7 @@
 Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–15
 are complete. They established users/auth, organizations/projects, the RBAC schema, permission
 resolution, the bootstrap CLI, project-scoped enforcement, and the system- and custom-role APIs.
-Phase 16 is current: custom-role lockout and cleanup.
+Phase 16 is current: global recovery and custom-role cleanup.
 
 ## Working process
 
@@ -141,7 +141,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 35. Add project- and org-scope assign/unassign endpoints using `custom-role:assign-project`, `custom-role:unassign-project`, `custom-role:assign-org`, and `custom-role:unassign-org`. Add paginated endpoints that list a target user's project- and organization-scoped assignments separately, authorized by `custom-role:read-project-assignments` and `custom-role:read-org-assignments`. Assignment mutations write only to `project_role_assignments` and `org_role_assignments`; system assignment remains exclusively in `SystemRoleService`. This part is complete. Depends on 18, 22, 32.
 36. Gate project- and org-scoped assignment, unassignment, and permission resolution on current `org_membership`, and require the custom role's owning `org_id` to match the target project/org. Membership removal explicitly deletes every project- and org-scoped assignment before deleting the membership, in one transaction; assignment rows without membership are invalid state repaired through manual database intervention. This part is complete. Depends on 18, 33, 35.
 
-**Checkpoint:** custom roles can be assigned and unassigned at project or org scope. Privilege-escalation and lockout checks are added in phases 15–16, so these endpoints remain restricted to trusted internal testing until then.
+**Checkpoint:** custom roles can be assigned and unassigned at project or org scope. Privilege-escalation checks and the global recovery invariant are completed in phases 15–16, so these endpoints remain restricted to trusted internal testing until then.
 
 ## Phase 15 — custom role service: privilege escalation checks — done
 
@@ -150,12 +150,12 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** custom-role grant, revoke, and permission edits enforce the correctly scoped superset rule.
 
-## Phase 16 — custom role service: lockout and cleanup
+## Phase 16 — global recovery and custom-role cleanup
 
-39. Last-custom-role-management-holder lockout check on revoke, role deletion, and permission removal from a custom role. Depends on 35, 37.
+39. Strengthen system-role unassignment lockout so every revoke leaves at least one user holding every registered permission through the effective union of that user's remaining system-scoped assignments. Project- and organization-scoped assignments do not contribute. Custom-role revoke, deletion, and permission removal do not have per-scope last-manager guards; the retained fully privileged system administrator is the recovery path when a scope loses local management access. Depends on 29, 35, 37.
 40. Explicit project/org assignment-row cleanup on custom-role deletion. Depends on 35.
 
-**Checkpoint:** the custom-role service is safe to expose more broadly — escalation, lockout, and cleanup are all in place.
+**Checkpoint:** the custom-role service is safe to expose more broadly — escalation and cleanup are in place, and a fully privileged system administrator always remains available for recovery.
 
 ## Phase 17 — auth-data-exposure endpoint
 
@@ -190,9 +190,9 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Phase 21 — soft delete for users
 
-52. Migration: `deleted_at` on `users`.
-53. Exclude soft-deleted users (`deleted_at IS NULL`) from all three legs of the resolver (24). Depends on 24, 52.
-54. CI test (real Postgres): soft-deleted user with live rows in all three assignment tables resolves to zero permissions. Depends on 53.
+52. Migration: `deleted_at` on `users`, plus the user soft-delete operation and its `user:delete` permission. The delete runs in the same transaction as the global recovery check, takes the system-role-management lock, and rejects deleting a user when no other active user would retain every registered permission through system-scoped assignments.
+53. Exclude soft-deleted users (`deleted_at IS NULL`) from all three legs of the resolver (24) and from the fully privileged system-user recovery check. Retained system-role assignment rows do not make a soft-deleted user a valid recovery administrator. Depends on 24, 39, 52.
+54. CI test (real Postgres): a soft-deleted user with live rows in all three assignment tables resolves to zero permissions and does not satisfy the global recovery invariant. Cover rejection of deleting the final fully privileged active user and success when another such user remains. Depends on 53.
 
 **Checkpoint:** the CI test in task 54 passes.
 

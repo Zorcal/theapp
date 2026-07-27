@@ -28,9 +28,20 @@ Every assignment mutation takes the same per-user advisory lock, including boots
 Actor and target locks are acquired in UUID order to prevent deadlocks. The locks work even when a
 user has no assignments and are released when the transaction ends.
 
-Unassignments also take a system-role-management advisory lock before the user locks. If the role
-carries `system-role:assign` or `system-role:unassign`, each permission must remain available
-through another system-role assignment.
+Unassignments also take a system-role-management advisory lock before the user locks. A revoke is
+rejected unless at least one user will still hold every registered permission through the
+effective union of that user's remaining system-scoped assignments. The permissions may come from
+multiple system roles, but project- and organization-scoped assignments do not contribute.
+
+This invariant preserves a system administrator who can recover any lower scope through the
+ordinary APIs. The bootstrap operation is the explicit exception that establishes the first fully
+privileged user. New permissions must be granted through system-role seed data before they are
+needed in production so the recovery invariant remains satisfiable.
+
+Soft-deleting a user must take the same system-role-management lock and reject deletion when
+removing all of that user's effective permissions would leave no other fully privileged active
+user. Retained assignment rows do not make a soft-deleted user a recovery administrator because
+that user cannot authenticate or exercise those permissions.
 
 ## Custom-role authorization
 
@@ -61,6 +72,12 @@ project to control a reusable role would let it affect other projects or organiz
 Organization-scoped assignment changes use the same rule because their effect already spans every
 project in the organization. Project-scoped assignment changes are narrower and may be authorized
 by permissions held in that project.
+
+Projects and organizations are allowed to lose their last locally scoped role manager. The fully
+privileged system administrator retained by system-role unassignment can restore their access.
+This favors a single global recovery invariant over per-scope lockout checks; more granular
+self-service continuity can be added if operational experience shows that system-administrator
+intervention is too frequent.
 
 Missing users, projects, organizations, memberships, roles, or assignments are reported as not
 found without exposing cross-organization resources. Attempting to act on permissions the actor
