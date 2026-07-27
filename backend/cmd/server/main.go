@@ -258,9 +258,10 @@ func run(ctx context.Context, cfg Config) error {
 
 	// Setup cores.
 
+	pgdbTransactor := pgdb.NewTransactor(pgPool)
 	userCore := user.NewCore(pgUserStore)
-	rbacCore := rbac.NewCore(pgRBACStore, pgdb.NewTransactor(pgPool))
-	orgCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pgPool))
+	rbacCore := rbac.NewCore(pgRBACStore, pgdbTransactor)
+	orgCore := org.NewCore(pgOrgStore, pgdbTransactor)
 	authCoreCfg := auth.Config{
 		JWTKey:             []byte(cfg.Auth.JWTSecret),
 		JWTIssuer:          cfg.Auth.JWTIssuer,
@@ -272,7 +273,7 @@ func run(ctx context.Context, cfg Config) error {
 		AccessTokenTTL:     cfg.Auth.AccessTokenTTL,
 		RefreshTokenTTL:    cfg.Auth.RefreshTokenTTL,
 	}
-	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdb.NewTransactor(pgPool), authCoreCfg)
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdbTransactor, authCoreCfg)
 
 	// Setup DBOS.
 

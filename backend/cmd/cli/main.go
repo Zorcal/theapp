@@ -65,12 +65,13 @@ func run(ctx context.Context) error {
 	}
 	defer pgPool.Close()
 
+	pgdbTransactor := pgdb.NewTransactor(pgPool)
 	pgUserStore := pguser.NewStore(pgPool)
 	pgRBACStore := pgrbac.NewStore(pgPool)
 	pgOrgStore := pgorg.NewStore(pgPool)
 	userCore := user.NewCore(pgUserStore)
-	rbacCore := rbac.NewCore(pgRBACStore, pgdb.NewTransactor(pgPool))
-	orgCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pgPool))
+	rbacCore := rbac.NewCore(pgRBACStore, pgdbTransactor)
+	orgCore := org.NewCore(pgOrgStore, pgdbTransactor)
 
 	cmd := &cli.Command{
 		Name:                  "cli",
