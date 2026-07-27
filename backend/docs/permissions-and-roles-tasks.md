@@ -26,12 +26,12 @@ a later phase's schema up front — which matters because that shape may still c
 The CLI (`cmd/cli`) grows the same way, in its own dedicated phases rather than as tasks
 folded into whichever feature phase happens to need a new command: phase 1 stands the tool up with
 a `user create` command; phase 5 adds granting `superadmin`; phase 9 adds bootstrapping `theapp`/
-`dev`/`control`; phase 27 adds seeding the `robot` user. Each CLI phase depends only on the scaffold
+`dev`/`control`; phase 30 adds seeding the `robot` user. Each CLI phase depends only on the scaffold
 (phase 1) plus whatever core-layer function it wires up, never on another CLI phase.
 
 ## Phase 1 — CLI tool scaffold and user creation — done
 
-1. `cmd/cli` CLI scaffold ([urfave/cli](https://github.com/urfave/cli), shell completion, commands split into their own files under a `commands` package), alongside the existing `cmd/server` entrypoint. Every mutating command takes a required `--operator` flag (resolved by UUID or email, the same way any user lookup is) for actor attribution — it has no observable effect until `pgdb` sets `app.user_id` from it (phase 20) and auditing exists to record it (phase 25), but building it into the scaffold now means no later command has to retrofit it.
+1. `cmd/cli` CLI scaffold ([urfave/cli](https://github.com/urfave/cli), shell completion, commands split into their own files under a `commands` package), alongside the existing `cmd/server` entrypoint. Every mutating command takes a required `--operator` flag (resolved by UUID or email, the same way any user lookup is) for actor attribution — it has no observable effect until `pgdb` sets `app.user_id` from it (phase 24) and auditing exists to record it (phase 28), but building it into the scaffold now means no later command has to retrofit it.
 2. `user create` command, wired to the existing user-creation core logic. Depends on 1.
 
 Also delivered in this phase, beyond the original task list: a `db migrate` command (no `--operator` — it's schema DDL, not an audited data write, and it's what creates the `users` table in the first place); a `user list` command (paginated, no `--operator` since it's read-only); and `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) to seed a local bootstrap operator, since `--operator` always requiring an existing user means the very first one in a fresh environment can't come from the CLI itself.
@@ -157,102 +157,102 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** the custom-role service is safe to expose more broadly — escalation, lockout, and cleanup are all in place.
 
-## Phase 17 — org creation endpoint
+## Phase 17 — auth-data-exposure endpoint
 
-41. Proto schema: `schemas/organization.proto` (create/delete org). Run `make generate`.
-42. Org creation gRPC endpoint: wires 19 behind `org:create` scoped to `theapp/control`, plus the `theapp` org-membership check. The membership check resolves the `theapp` org by `mdl.SystemOrgName`, the same permanent authorization anchor used by system-role management. Depends on 25, 35, 41.
-43. Org creation request carries the default project's name (`CreateOrganization.ProjectName`), passed through to 19's `CreateOrganization`, which creates the organization, its control project, and the named default project. Depends on 42.
-44. Org creator assigned an admin role at org scope (see permissions-and-roles.md, "Creating organizations and projects"). Depends on 35, 42.
-
-**Checkpoint:** an organization can be created end-to-end via the API, seeded with a default project and an org-scoped admin assignment for its creator.
-
-## Phase 18 — project creation endpoint
-
-45. Proto schema: `schemas/project.proto` (create/delete project). Run `make generate`.
-46. Project creation gRPC endpoint: wires 19 behind `project:create`, anchored on the org's default project the same way `org:create` anchors on `theapp/control`. Depends on 25, 45.
-
-**Checkpoint:** a project can be created end-to-end via the API within an existing org.
-
-## Phase 19 — org/project deletion cascade cleanup
-
-47. Explicit cascade cleanup for org/project deletion (assignments and custom roles). Depends on 35, 42, 46.
-
-**Checkpoint:** deleting an org or project leaves no dangling assignment/role/mapping rows.
-
-## Phase 20 — pgdb transaction-local settings
-
-48. `pgdb`: set `app.project_id`, `app.user_id`, `app.trace_id` as `SET LOCAL` transaction-scoped settings, sourced from `ctx`.
-
-**Checkpoint:** a test transaction shows the three settings are visible via `current_setting()` and reset at commit/rollback.
-
-## Phase 21 — RLS on project-scoped resource tables
-
-49. RLS + `FORCE ROW LEVEL SECURITY` on project-scoped resource tables, keyed on `app.project_id`. Depends on 17, 48.
-50. CI test (real Postgres): app-role connection, set `app.project_id`, assert cross-project `SELECT` returns nothing. Depends on 49.
-
-**Checkpoint:** the CI test in task 50 passes.
-
-## Phase 22 — RLS on assignment tables and the cross-user listing function
-
-51. RLS on `project_role_assignments` / `org_role_assignments` / `system_role_assignments`, keyed on `app.user_id`. Depends on 9, 22, 48.
-52. `SECURITY DEFINER` function for "list everyone with a role in project X". Depends on 51.
-
-**Checkpoint:** assignment-table RLS holds, and the one function that legitimately needs to see across users works correctly.
-
-## Phase 23 — is_protected backstop
-
-53. `is_protected` columns + trigger on `organizations`/`projects`/`users`. Depends on 17.
-
-**Checkpoint:** deleting or renaming `theapp`/`dev`/`control`/`robot`/a protected user is rejected at the DB level.
-
-## Phase 24 — soft delete for users
-
-54. Migration: `deleted_at` on `users`.
-55. Exclude soft-deleted users (`deleted_at IS NULL`) from all three legs of the resolver (24). Depends on 24, 54.
-56. CI test (real Postgres): soft-deleted user with live rows in all three assignment tables resolves to zero permissions. Depends on 55.
-
-**Checkpoint:** the CI test in task 56 passes.
-
-## Phase 25 — auditing: the audit_log table and trigger
-
-57. Migration: `audit_log` table plus the generic audit trigger function and the `audit.enable(table, excluded_columns)` migration helper.
-58. Revoke `UPDATE`/`DELETE` on `audit_log` for the app's runtime DB role. Depends on 57.
-
-**Checkpoint:** `audit.enable` can be attached to a table (proven on one test table) and produces correctly-shaped, immutable rows.
-
-## Phase 26 — auditing: wire onto existing tables
-
-59. Wire `audit.enable(...)` onto every table introduced in phases 1–24 that should be audited, with `excluded_columns` for any secret-bearing columns. Depends on 48, 57.
-
-**Checkpoint:** every relevant table is audited.
-
-## Phase 27 — CLI: seed robot user
-
-60. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 59 lands.
-
-**Checkpoint:** the `robot` user exists and is used to attribute system-initiated audit rows.
-
-## Phase 28 — auth-data-exposure endpoint
-
-61. Extend `schemas/auth.proto` with the auth-data-exposure RPC. The response carries the caller's ID and email plus three effective permission sets: project permissions resolved from project-, organization-, and system-scope assignments for the selected project; organization permissions resolved from organization- and system-scope assignments for that project's organization; and system permissions resolved from system-scope assignments only. These sets expose where a permission is usable without exposing which role or assignment supplied it. Run `make generate`.
-62. Auth-data-exposure endpoint. Resolve all three permission sets for the authenticated caller and selected project so frontends can render project-, organization-, and system-scoped actions without treating a project-only grant as organization-wide authority. The endpoint requires project metadata because both the project and organization permission sets are relative to the selected project. Depends on 24, 61.
+41. Extend `schemas/auth.proto` with the auth-data-exposure RPC. The response carries the caller's ID and email plus three effective permission sets: project permissions resolved from project-, organization-, and system-scope assignments for the selected project; organization permissions resolved from organization- and system-scope assignments for that project's organization; and system permissions resolved from system-scope assignments only. These sets expose where a permission is usable without exposing which role or assignment supplied it. Run `make generate`.
+42. Auth-data-exposure endpoint. Resolve all three permission sets for the authenticated caller and selected project so frontends can render project-, organization-, and system-scoped actions without treating a project-only grant as organization-wide authority. The endpoint requires project metadata because both the project and organization permission sets are relative to the selected project. Depends on 24, 41.
 
 **Checkpoint:** the endpoint returns the caller's ID and email plus effective project-, organization-, and system-scoped permissions for the selected project.
 
-## Phase 29 — discover-accessible-projects endpoint
+## Phase 18 — discover-accessible-projects endpoint
 
-63. Extend `schemas/auth.proto` with the discover-accessible-projects RPC (paginated — a system-scoped caller resolves to every project in the system). Run `make generate`.
-64. Discover-accessible-projects endpoint. Depends on 24, 63.
+43. Extend `schemas/auth.proto` with the discover-accessible-projects RPC (paginated — a system-scoped caller resolves to every project in the system). Run `make generate`.
+44. Discover-accessible-projects endpoint. Depends on 24, 43.
 
 **Checkpoint:** the endpoint lists every project the caller has any role in, paginated.
 
-## Phase 30 — org-scoped user management endpoints
+## Phase 19 — org creation endpoint
 
-65. Extend `schemas/organization.proto` with a create-or-assign-user RPC: creates a user if none exists with the given email, then assigns them to the calling org; if the user already exists, only the org assignment happens. Anchored on the org's control project — the `x-project-id` metadata must be that project's ID. Run `make generate`. Depends on 41, 42.
-66. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an organization"). Also anchored on the org's control project; the request body additionally carries a project ID filter, resolved through the three-way union (24), not `org_membership`. Run `make generate`. Depends on 41, 42.
-67. Wire both endpoints behind the appropriate org-scoped permissions. Depends on 65, 66.
+45. Proto schema: `schemas/organization.proto` (create/delete org). Run `make generate`.
+46. Org creation gRPC endpoint: wires 19 behind `org:create` scoped to `theapp/control`, plus the `theapp` org-membership check. The membership check resolves the `theapp` org by `mdl.SystemOrgName`, the same permanent authorization anchor used by system-role management. Depends on 25, 35, 45.
+47. Org creation request carries the default project's name (`CreateOrganization.ProjectName`), passed through to 19's `CreateOrganization`, which creates the organization, its control project, and the named default project. Depends on 46.
+48. Org creator assigned an admin role at org scope (see permissions-and-roles.md, "Creating organizations and projects"). Depends on 35, 46.
+
+**Checkpoint:** an organization can be created end-to-end via the API, seeded with a default project and an org-scoped admin assignment for its creator.
+
+## Phase 20 — org-scoped user management endpoints
+
+49. Extend `schemas/organization.proto` with a create-or-assign-user RPC: creates a user if none exists with the given email, then assigns them to the calling org; if the user already exists, only the org assignment happens. Anchored on the org's control project — the `x-project-id` metadata must be that project's ID. Run `make generate`. Depends on 45, 46.
+50. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an organization"). Also anchored on the org's control project; the request body additionally carries a project ID filter, resolved through the three-way union (24), not `org_membership`. Run `make generate`. Depends on 45, 46.
+51. Wire both endpoints behind the appropriate org-scoped permissions. Depends on 49, 50.
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
+
+## Phase 21 — soft delete for users
+
+52. Migration: `deleted_at` on `users`.
+53. Exclude soft-deleted users (`deleted_at IS NULL`) from all three legs of the resolver (24). Depends on 24, 52.
+54. CI test (real Postgres): soft-deleted user with live rows in all three assignment tables resolves to zero permissions. Depends on 53.
+
+**Checkpoint:** the CI test in task 54 passes.
+
+## Phase 22 — project creation endpoint
+
+55. Proto schema: `schemas/project.proto` (create/delete project). Run `make generate`.
+56. Project creation gRPC endpoint: wires 19 behind `project:create`, anchored on the org's default project the same way `org:create` anchors on `theapp/control`. Depends on 25, 55.
+
+**Checkpoint:** a project can be created end-to-end via the API within an existing org.
+
+## Phase 23 — org/project deletion cascade cleanup
+
+57. Explicit cascade cleanup for org/project deletion (assignments and custom roles). Depends on 35, 46, 56.
+
+**Checkpoint:** deleting an org or project leaves no dangling assignment/role/mapping rows.
+
+## Phase 24 — pgdb transaction-local settings
+
+58. `pgdb`: set `app.project_id`, `app.user_id`, `app.trace_id` as `SET LOCAL` transaction-scoped settings, sourced from `ctx`.
+
+**Checkpoint:** a test transaction shows the three settings are visible via `current_setting()` and reset at commit/rollback.
+
+## Phase 25 — RLS on project-scoped resource tables
+
+59. RLS + `FORCE ROW LEVEL SECURITY` on project-scoped resource tables, keyed on `app.project_id`. Depends on 17, 58.
+60. CI test (real Postgres): app-role connection, set `app.project_id`, assert cross-project `SELECT` returns nothing. Depends on 59.
+
+**Checkpoint:** the CI test in task 60 passes.
+
+## Phase 26 — RLS on assignment tables and the cross-user listing function
+
+61. RLS on `project_role_assignments` / `org_role_assignments` / `system_role_assignments`, keyed on `app.user_id`. Depends on 9, 22, 58.
+62. `SECURITY DEFINER` function for "list everyone with a role in project X". Depends on 61.
+
+**Checkpoint:** assignment-table RLS holds, and the one function that legitimately needs to see across users works correctly.
+
+## Phase 27 — is_protected backstop
+
+63. `is_protected` columns + trigger on `organizations`/`projects`/`users`. Depends on 17.
+
+**Checkpoint:** deleting or renaming `theapp`/`dev`/`control`/`robot`/a protected user is rejected at the DB level.
+
+## Phase 28 — auditing: the audit_log table and trigger
+
+64. Migration: `audit_log` table plus the generic audit trigger function and the `audit.enable(table, excluded_columns)` migration helper.
+65. Revoke `UPDATE`/`DELETE` on `audit_log` for the app's runtime DB role. Depends on 64.
+
+**Checkpoint:** `audit.enable` can be attached to a table (proven on one test table) and produces correctly-shaped, immutable rows.
+
+## Phase 29 — auditing: wire onto existing tables
+
+66. Wire `audit.enable(...)` onto every table introduced in phases 1–27 that should be audited, with `excluded_columns` for any secret-bearing columns. Depends on 58, 64.
+
+**Checkpoint:** every relevant table is audited.
+
+## Phase 30 — CLI: seed robot user
+
+67. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 66 lands.
+
+**Checkpoint:** the `robot` user exists and is used to attribute system-initiated audit rows.
 
 ## Phase 31 — optimistic concurrency with ETags
 
@@ -263,8 +263,8 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Ongoing / cross-cutting
 
-70. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 21.
-71. Periodic sweep job for soft-deleted users' assignment rows past retention. Depends on 54, existing DBOS workflow infra (`internal/workflows`).
+70. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 25.
+71. Periodic sweep job for soft-deleted users' assignment rows past retention. Depends on 52, existing DBOS workflow infra (`internal/workflows`).
 72. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
 
 ## Notes
