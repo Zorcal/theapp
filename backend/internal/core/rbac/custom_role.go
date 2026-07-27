@@ -173,6 +173,8 @@ func (c *Core) CreateCustomRole(ctx context.Context, cr mdl.CreateCustomRole) (m
 // Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or
 // removed from the role at the org scope.
+// Returns [mdl.ErrLastRoleManager] if the change would remove the last custom-role manager in an
+// affected scope.
 func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error) {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -216,6 +218,11 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 				return mdl.ErrPermissionDenied
 			}
 
+			removed := removedPerms(permissionsFromPg(currentRole.PermissionNames), ur.Permissions)
+			if err := c.ensureCustomRoleManagementAccessRemains(ctx, userOrgPerms.OrgID, ur.ID, removed); err != nil {
+				return fmt.Errorf("ensure custom-role management access remains: %w", err)
+			}
+
 			role, err = c.roleStorer.UpdateCustomRole(ctx, updateCustomRoleToPg(ur, userOrgPerms.OrgID))
 			if err != nil {
 				return fmt.Errorf("update custom role with permission changes: %w", handleUpdateError(err))
@@ -242,6 +249,8 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 // Returns [mdl.ErrValidation] if the input contains overlapping or system-only permissions.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or
 // removed from the role at the org scope.
+// Returns [mdl.ErrLastRoleManager] if the change would remove the last custom-role manager in an
+// affected scope.
 func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -274,6 +283,11 @@ func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCu
 			return mdl.ErrPermissionDenied
 		}
 
+		removed := removedPerms(permissionsFromPg(currentRole.PermissionNames), nextPerms.Values())
+		if err := c.ensureCustomRoleManagementAccessRemains(ctx, userOrgPerms.OrgID, mrp.ID, removed); err != nil {
+			return fmt.Errorf("ensure custom-role management access remains: %w", err)
+		}
+
 		role, err = c.roleStorer.ModifyCustomRolePermissions(ctx, modifyCustomRolePermissionsToPg(mrp, userOrgPerms.OrgID))
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -293,6 +307,8 @@ func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCu
 // DeleteCustomRole deletes a custom role in the caller's organization.
 // Returns [mdl.ErrNotFound] if the role is not owned by the caller's organization.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
+// Returns [mdl.ErrLastRoleManager] if deletion would remove the last custom-role manager in an
+// affected scope.
 func (c *Core) DeleteCustomRole(ctx context.Context, roleID uuid.UUID) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -310,6 +326,10 @@ func (c *Core) DeleteCustomRole(ctx context.Context, roleID uuid.UUID) error {
 
 		if !mdl.IsPermissionSuperset(permissionsFromPg(userOrgPerms.PermissionNames), permissionsFromPg(role.PermissionNames)) {
 			return mdl.ErrPermissionDenied
+		}
+
+		if err := c.ensureCustomRoleManagementAccessRemains(ctx, userOrgPerms.OrgID, roleID, permissionsFromPg(role.PermissionNames)); err != nil {
+			return fmt.Errorf("ensure custom-role management access remains: %w", err)
 		}
 
 		if err := c.roleStorer.DeleteCustomRole(ctx, userOrgPerms.OrgID, roleID); err != nil {
@@ -378,6 +398,8 @@ func (c *Core) AssignCustomRoleToProject(ctx context.Context, targetUserID, role
 // Returns [mdl.ErrNotFound] if the membership or assignment does not exist, or the role belongs to
 // a different organization.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role at the project scope.
+// Returns [mdl.ErrLastRoleManager] if the change would remove the last custom-role manager in the
+// project.
 func (c *Core) UnassignCustomRoleFromProject(ctx context.Context, targetUserID, roleID uuid.UUID) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -406,6 +428,28 @@ func (c *Core) UnassignCustomRoleFromProject(ctx context.Context, targetUserID, 
 
 		if !mdl.IsPermissionSuperset(permissionsFromPg(userProjectPerms.PermissionNames), permissionsFromPg(role.PermissionNames)) {
 			return mdl.ErrPermissionDenied
+		}
+
+		removedManagementPerms := set.FromSlice(permissionsFromPg(role.PermissionNames)).
+			Intersection(set.FromSlice(mdl.ProjectCustomRoleManagementPermissions())).
+			Values()
+		if len(removedManagementPerms) > 0 {
+			if err := c.roleStorer.LockCustomRoleManagement(ctx); err != nil {
+				return fmt.Errorf("lock custom-role management: %w", err)
+			}
+
+			remain, err := c.roleStorer.ProjectCustomRolePermissionsRemainAfterUnassign(
+				ctx, targetUserID, roleID, *sess.ProjectID, permissionsToPg(removedManagementPerms),
+			)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("check project custom-role management access: %w", mdl.ErrNotFound)
+				}
+				return fmt.Errorf("check project custom-role management access: %w", err)
+			}
+			if !remain {
+				return mdl.ErrLastRoleManager
+			}
 		}
 
 		if err := c.roleStorer.UnassignCustomRoleFromProject(ctx, targetUserID, roleID, *sess.ProjectID); err != nil {
@@ -471,6 +515,8 @@ func (c *Core) AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID u
 // Returns [mdl.ErrNotFound] if the membership or assignment does not exist, or the role belongs to
 // a different organization.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role at the org scope.
+// Returns [mdl.ErrLastRoleManager] if the change would remove the last custom-role manager in the
+// organization.
 func (c *Core) UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -499,6 +545,28 @@ func (c *Core) UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, role
 
 		if !mdl.IsPermissionSuperset(permissionsFromPg(userOrgPerms.PermissionNames), permissionsFromPg(role.PermissionNames)) {
 			return mdl.ErrPermissionDenied
+		}
+
+		removedManagementPerms := set.FromSlice(permissionsFromPg(role.PermissionNames)).
+			Intersection(set.FromSlice(mdl.OrgCustomRoleManagementPermissions())).
+			Values()
+		if len(removedManagementPerms) > 0 {
+			if err := c.roleStorer.LockCustomRoleManagement(ctx); err != nil {
+				return fmt.Errorf("lock custom-role management: %w", err)
+			}
+
+			remain, err := c.roleStorer.OrgCustomRolePermissionsRemainAfterUnassign(
+				ctx, targetUserID, roleID, userOrgPerms.OrgID, permissionsToPg(removedManagementPerms),
+			)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("check organization custom-role management access: %w", mdl.ErrNotFound)
+				}
+				return fmt.Errorf("check organization custom-role management access: %w", err)
+			}
+			if !remain {
+				return mdl.ErrLastRoleManager
+			}
 		}
 
 		if err := c.roleStorer.UnassignCustomRoleFromOrg(ctx, targetUserID, roleID, userOrgPerms.OrgID); err != nil {
@@ -533,9 +601,41 @@ func (c *Core) customRolePermChangeContext(ctx context.Context, actorUserID uuid
 	return userOrgPerms, role, nil
 }
 
+func (c *Core) ensureCustomRoleManagementAccessRemains(ctx context.Context, orgID int, roleID uuid.UUID, removed []mdl.Permission) error {
+	removedSet := set.FromSlice(removed)
+	projectPerms := removedSet.Intersection(set.FromSlice(mdl.ProjectCustomRoleManagementPermissions())).Values()
+	orgPerms := removedSet.Intersection(set.FromSlice(mdl.OrgCustomRoleManagementPermissions())).Values()
+	if len(projectPerms) == 0 && len(orgPerms) == 0 {
+		return nil
+	}
+
+	if err := c.roleStorer.LockCustomRoleManagement(ctx); err != nil {
+		return fmt.Errorf("lock custom-role management: %w", err)
+	}
+
+	remain, err := c.roleStorer.CustomRoleManagementPermissionsRemainAfterRemoval(
+		ctx, orgID, roleID, permissionsToPg(projectPerms), permissionsToPg(orgPerms),
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.ErrNotFound
+		}
+		return fmt.Errorf("check custom-role management access: %w", err)
+	}
+	if !remain {
+		return mdl.ErrLastRoleManager
+	}
+
+	return nil
+}
+
 func changedPerms(curr, next []mdl.Permission) []mdl.Permission {
 	return set.
 		FromSlice(curr).
 		SymmetricDifference(set.FromSlice(next)).
 		Values()
+}
+
+func removedPerms(curr, next []mdl.Permission) []mdl.Permission {
+	return set.FromSlice(curr).Difference(set.FromSlice(next)).Values()
 }

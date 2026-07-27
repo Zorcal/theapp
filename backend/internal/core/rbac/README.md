@@ -62,6 +62,34 @@ Organization-scoped assignment changes use the same rule because their effect al
 project in the organization. Project-scoped assignment changes are narrower and may be authorized
 by permissions held in that project.
 
+Revoking an assignment, deleting a role, or removing permissions from a role is rejected when it
+would leave an affected scope without its custom-role management permissions. For an assignment
+limited to one project, the protected permissions are project assignment and unassignment. These
+permissions may be delegated through a role assigned in that project, allowing a project
+administrator to manage access there without receiving organization-wide authority. The target
+must still be an organization member, and the role and project must belong to the same
+organization; those constraints do not require the administrator's permission itself to come from
+an organization-scoped assignment. Another assignment in that project, an organization-scoped
+assignment in the project's organization, or a system-scoped system-role assignment can preserve
+the protected permissions.
+
+At organization scope, the protected permissions are role creation, update, deletion,
+organization assignment, and organization unassignment. Only another organization-scoped
+assignment in that organization or a system-scoped system-role assignment can preserve them; a
+project assignment is too narrow.
+
+Custom roles themselves cannot be assigned at system scope. A system-scoped system role carrying
+the relevant `custom-role:*` permission does count as a remaining holder because that authority can
+repair access in every project and organization. The replacement permissions need not all come
+from one user or one role, but each protected permission being removed must remain available
+through at least one applicable assignment.
+
+Deleting a role and editing its permissions are checked across every project and organization
+where the role is assigned. The role being changed is excluded as a replacement source because the
+change affects all of its assignments. A role can therefore be changed or deleted only when every
+protected permission it currently supplies remains available through a different role at every
+affected scope. Permissions unrelated to custom-role management do not trigger this lockout check.
+
 Missing users, projects, organizations, memberships, roles, or assignments are reported as not
 found without exposing cross-organization resources. Attempting to act on permissions the actor
 does not hold is reported as permission denied.

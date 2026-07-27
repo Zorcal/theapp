@@ -48,27 +48,32 @@ type CustomRoleCore interface {
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
+	// Returns [mdl.ErrLastRoleManager] if the change would remove the last custom-role manager.
 	UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error)
 	// ModifyCustomRolePermissions atomically changes permissions on a custom role.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
+	// Returns [mdl.ErrLastRoleManager] if the change would remove the last custom-role manager.
 	ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error)
 	// DeleteCustomRole deletes a custom role in the caller's organization.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
+	// Returns [mdl.ErrLastRoleManager] if deletion would remove the last custom-role manager.
 	DeleteCustomRole(ctx context.Context, customRoleID uuid.UUID) error
 	// AssignCustomRoleToProject assigns a custom role to a user in the caller's project.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	AssignCustomRoleToProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromProject unassigns a custom role from a user in the caller's project.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
+	// Returns [mdl.ErrLastRoleManager] if the change would remove the last custom-role manager.
 	UnassignCustomRoleFromProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// AssignCustomRoleToOrg assigns a custom role to a user across the caller's organization.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromOrg unassigns a custom role from a user across the caller's organization.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
+	// Returns [mdl.ErrLastRoleManager] if the change would remove the last custom-role manager.
 	UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
 }
 
@@ -254,6 +259,8 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 			})
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
+		case errors.Is(err, mdl.ErrLastRoleManager):
+			return nil, status.Error(codes.FailedPrecondition, "change would remove the last custom-role manager")
 		default:
 			return nil, fmt.Errorf("update role: %w", err)
 		}
@@ -278,6 +285,8 @@ func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.M
 			return nil, status.Error(codes.InvalidArgument, "invalid permission changes")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
+		case errors.Is(err, mdl.ErrLastRoleManager):
+			return nil, status.Error(codes.FailedPrecondition, "change would remove the last custom-role manager")
 		default:
 			return nil, fmt.Errorf("modify role permissions: %w", err)
 		}
@@ -299,6 +308,8 @@ func (s *customRoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRe
 			return nil, status.Errorf(codes.NotFound, "role %q not found", req.GetId())
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot delete role permissions")
+		case errors.Is(err, mdl.ErrLastRoleManager):
+			return nil, status.Error(codes.FailedPrecondition, "deletion would remove the last custom-role manager")
 		default:
 			return nil, fmt.Errorf("delete role: %w", err)
 		}
@@ -345,6 +356,8 @@ func (s *customRoleService) UnassignRoleFromProject(ctx context.Context, req *pb
 			return nil, status.Error(codes.NotFound, "project role assignment not found")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot revoke role permissions")
+		case errors.Is(err, mdl.ErrLastRoleManager):
+			return nil, status.Error(codes.FailedPrecondition, "unassignment would remove the last custom-role manager")
 		default:
 			return nil, fmt.Errorf("unassign role from project: %w", err)
 		}
@@ -391,6 +404,8 @@ func (s *customRoleService) UnassignRoleFromOrganization(ctx context.Context, re
 			return nil, status.Error(codes.NotFound, "organization role assignment not found")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot revoke role permissions")
+		case errors.Is(err, mdl.ErrLastRoleManager):
+			return nil, status.Error(codes.FailedPrecondition, "unassignment would remove the last custom-role manager")
 		default:
 			return nil, fmt.Errorf("unassign role from organization: %w", err)
 		}

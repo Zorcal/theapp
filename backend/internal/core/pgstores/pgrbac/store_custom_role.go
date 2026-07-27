@@ -9,6 +9,84 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
+// LockCustomRoleManagement serializes custom-role changes that could remove management access.
+// It must be called within a transaction.
+func (s *Store) LockCustomRoleManagement(ctx context.Context) error {
+	if err := pgdb.RunExec(ctx, s.pool, "SELECT pg_advisory_xact_lock(hashtext('rbac.custom-role-management'), 0)"); err != nil {
+		return fmt.Errorf("lock custom-role management: %w", err)
+	}
+
+	return nil
+}
+
+// ProjectCustomRolePermissionsRemainAfterUnassign reports whether every permission in permNames
+// is carried by another assignment in projectID.
+// Returns [sql.ErrNoRows] if the assignment does not exist.
+func (s *Store) ProjectCustomRolePermissionsRemainAfterUnassign(ctx context.Context, userID, roleID uuid.UUID, projectID int, permNames []string) (bool, error) {
+	q := projectCustomRolePermissionsRemainAfterUnassignQuery(userID, roleID, projectID, permNames)
+
+	var remain bool
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &remain); err != nil {
+			return fmt.Errorf("project custom-role permissions remain after unassign: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return remain, nil
+}
+
+// OrgCustomRolePermissionsRemainAfterUnassign reports whether every permission in permNames is
+// carried by another assignment in orgID.
+// Returns [sql.ErrNoRows] if the assignment does not exist.
+func (s *Store) OrgCustomRolePermissionsRemainAfterUnassign(ctx context.Context, userID, roleID uuid.UUID, orgID int, permNames []string) (bool, error) {
+	q := orgCustomRolePermissionsRemainAfterUnassignQuery(userID, roleID, orgID, permNames)
+
+	var remain bool
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &remain); err != nil {
+			return fmt.Errorf("organization custom-role permissions remain after unassign: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return remain, nil
+}
+
+// CustomRoleManagementPermissionsRemainAfterRemoval reports whether removing the given permissions
+// from a role leaves every affected project and organization with another holder.
+// Returns [sql.ErrNoRows] if the organization does not own the role.
+func (s *Store) CustomRoleManagementPermissionsRemainAfterRemoval(
+	ctx context.Context,
+	orgID int,
+	roleID uuid.UUID,
+	projectPermNames, orgPermNames []string,
+) (bool, error) {
+	q := customRoleManagementPermissionsRemainAfterRemovalQuery(orgID, roleID, projectPermNames, orgPermNames)
+
+	var remain bool
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &remain); err != nil {
+			return fmt.Errorf("custom-role management permissions remain after removal: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return remain, nil
+}
+
 // CreateCustomRole inserts an organization-owned role and its permissions.
 // Returns [sql.ErrNoRows] if the organization or any permission does not exist.
 // Returns [pgdb.ErrAlreadyExists] if the organization already has a role with that name.

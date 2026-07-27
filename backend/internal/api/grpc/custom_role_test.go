@@ -1048,6 +1048,19 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 			want: status.New(codes.PermissionDenied, "caller cannot change role permissions"),
 		},
 		{
+			name: "last role manager",
+			customRoleCore: &MockedCustomRoleCore{
+				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrLastRoleManager
+				},
+			},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.FailedPrecondition, "change would remove the last custom-role manager"),
+		},
+		{
 			name: "core error",
 			customRoleCore: &MockedCustomRoleCore{
 				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
@@ -1183,6 +1196,16 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 			want: status.New(codes.PermissionDenied, "caller cannot change role permissions"),
 		},
 		{
+			name: "last role manager",
+			customRoleCore: &MockedCustomRoleCore{
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrLastRoleManager
+				},
+			},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			want: status.New(codes.FailedPrecondition, "change would remove the last custom-role manager"),
+		},
+		{
 			name: "core error",
 			customRoleCore: &MockedCustomRoleCore{
 				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
@@ -1285,6 +1308,16 @@ func TestRoleService_DeleteRole_error(t *testing.T) {
 			},
 			in:   &pb.DeleteRoleRequest{Id: roleID.String()},
 			want: status.New(codes.PermissionDenied, "caller cannot delete role permissions"),
+		},
+		{
+			name: "last role manager",
+			customRoleCore: &MockedCustomRoleCore{
+				DeleteCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error {
+					return mdl.ErrLastRoleManager
+				},
+			},
+			in:   &pb.DeleteRoleRequest{Id: roleID.String()},
+			want: status.New(codes.FailedPrecondition, "deletion would remove the last custom-role manager"),
 		},
 		{
 			name: "core error",
@@ -1477,6 +1510,16 @@ func TestRoleService_UnassignRoleFromProject_error(t *testing.T) {
 			want: status.New(codes.PermissionDenied, "caller cannot revoke role permissions"),
 		},
 		{
+			name: "last role manager",
+			customRoleCore: &MockedCustomRoleCore{
+				UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrLastRoleManager
+				},
+			},
+			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.FailedPrecondition, "unassignment would remove the last custom-role manager"),
+		},
+		{
 			name: "core error",
 			customRoleCore: &MockedCustomRoleCore{
 				UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID) error {
@@ -1665,6 +1708,16 @@ func TestRoleService_UnassignRoleFromOrganization_error(t *testing.T) {
 			},
 			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
 			want: status.New(codes.PermissionDenied, "caller cannot revoke role permissions"),
+		},
+		{
+			name: "last role manager",
+			customRoleCore: &MockedCustomRoleCore{
+				UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID) error {
+					return mdl.ErrLastRoleManager
+				},
+			},
+			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: status.New(codes.FailedPrecondition, "unassignment would remove the last custom-role manager"),
 		},
 		{
 			name: "core error",

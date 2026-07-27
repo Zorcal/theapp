@@ -99,6 +99,27 @@ func SystemRoleManagementPermissions() []Permission {
 	}
 }
 
+// ProjectCustomRoleManagementPermissions returns the permissions required to manage custom-role
+// assignments at project scope.
+func ProjectCustomRoleManagementPermissions() []Permission {
+	return []Permission{
+		PermissionCustomRoleAssignProject,
+		PermissionCustomRoleUnassignProject,
+	}
+}
+
+// OrgCustomRoleManagementPermissions returns the permissions required to manage custom roles and
+// their assignments at organization scope.
+func OrgCustomRoleManagementPermissions() []Permission {
+	return []Permission{
+		PermissionCustomRoleCreate,
+		PermissionCustomRoleUpdate,
+		PermissionCustomRoleDelete,
+		PermissionCustomRoleAssignOrg,
+		PermissionCustomRoleUnassignOrg,
+	}
+}
+
 // IsPermissionSuperset reports whether held contains every permission in required.
 func IsPermissionSuperset(held, required []Permission) bool {
 	return set.FromSlice(held).IsSuperset(set.FromSlice(required))

@@ -580,6 +580,252 @@ func unassignCustomRoleFromOrgQuery(userID, roleID uuid.UUID, orgID int) pgdb.Ty
 	}
 }
 
+func projectCustomRolePermissionsRemainAfterUnassignQuery(userID, roleID uuid.UUID, projectID int, permNames []string) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{
+		"user_id":          userID,
+		"role_id":          roleID,
+		"project_id":       projectID,
+		"permission_names": permNames,
+	}
+
+	// Execution returns sql.ErrNoRows when the exact project assignment or its organization
+	// membership does not exist.
+	const sql = `
+		WITH
+			-- Resolve the exact assignment being removed and carry its organization into the
+			-- organization-scoped fallback leg.
+			excluded_assignment AS (
+				SELECT a.user_id, a.role_id, a.project_id, proj.org_id
+				FROM rbac.project_role_assignments AS a
+				JOIN useraccess.users AS u ON u.id = a.user_id
+				JOIN rbac.custom_roles AS r ON r.id = a.role_id
+				JOIN org.projects AS proj ON proj.id = a.project_id AND proj.org_id = r.org_id
+				JOIN org.org_membership AS m ON m.user_id = u.id AND m.org_id = proj.org_id
+				WHERE u.external_id = @user_id
+					AND r.external_id = @role_id
+					AND proj.id = @project_id
+			)
+		-- Every permission must remain available through another applicable assignment. Project
+		-- authorization includes direct project, organization, and system scope.
+		SELECT NOT EXISTS (
+			SELECT 1
+			FROM unnest(@permission_names::text[]) AS required(name)
+			WHERE NOT EXISTS (
+				-- Exclude only the exact project assignment being removed.
+				SELECT 1
+				FROM rbac.project_role_assignments AS a
+				JOIN org.org_membership AS m
+					ON m.user_id = a.user_id
+					AND m.org_id = excluded_assignment.org_id
+				JOIN rbac.custom_role_permissions AS rp ON rp.role_id = a.role_id
+				JOIN rbac.permissions AS p ON p.id = rp.permission_id
+				WHERE a.project_id = excluded_assignment.project_id
+					AND p.name = required.name
+					AND (a.user_id, a.role_id) != (
+						excluded_assignment.user_id,
+						excluded_assignment.role_id
+					)
+				UNION ALL
+				-- Organization assignments apply to every project in their organization.
+				SELECT 1
+				FROM rbac.org_role_assignments AS a
+				JOIN org.org_membership AS m ON m.user_id = a.user_id AND m.org_id = a.org_id
+				JOIN rbac.custom_role_permissions AS rp ON rp.role_id = a.role_id
+				JOIN rbac.permissions AS p ON p.id = rp.permission_id
+				WHERE a.org_id = excluded_assignment.org_id
+					AND p.name = required.name
+				UNION ALL
+				-- System assignments apply without project or organization membership.
+				SELECT 1
+				FROM rbac.system_role_assignments AS a
+				JOIN rbac.system_role_permissions AS rp ON rp.role_id = a.role_id
+				JOIN rbac.permissions AS p ON p.id = rp.permission_id
+				WHERE p.name = required.name
+			)
+		)
+		FROM excluded_assignment`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (bool, error) {
+			var remain bool
+			return remain, row.Scan(&remain)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func orgCustomRolePermissionsRemainAfterUnassignQuery(userID, roleID uuid.UUID, orgID int, permNames []string) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{
+		"user_id":          userID,
+		"role_id":          roleID,
+		"org_id":           orgID,
+		"permission_names": permNames,
+	}
+
+	// Execution returns sql.ErrNoRows when the exact organization assignment or its membership
+	// does not exist.
+	const sql = `
+		WITH
+			-- Resolve the exact assignment being removed while enforcing role ownership and
+			-- organization membership.
+			excluded_assignment AS (
+				SELECT a.user_id, a.role_id, a.org_id
+				FROM rbac.org_role_assignments AS a
+				JOIN useraccess.users AS u ON u.id = a.user_id
+				JOIN org.org_membership AS m ON m.user_id = u.id AND m.org_id = a.org_id
+				JOIN rbac.custom_roles AS r ON r.id = a.role_id AND r.org_id = a.org_id
+				WHERE u.external_id = @user_id
+					AND r.external_id = @role_id
+					AND a.org_id = @org_id
+			)
+		-- Every permission must remain available through another applicable organization- or
+		-- system-scoped assignment. Project-scoped assignments cannot preserve organization access.
+		SELECT NOT EXISTS (
+			SELECT 1
+			FROM unnest(@permission_names::text[]) AS required(name)
+			WHERE NOT EXISTS (
+				-- Exclude only the exact organization assignment being removed.
+				SELECT 1
+				FROM rbac.org_role_assignments AS a
+				JOIN org.org_membership AS m ON m.user_id = a.user_id AND m.org_id = a.org_id
+				JOIN rbac.custom_role_permissions AS rp ON rp.role_id = a.role_id
+				JOIN rbac.permissions AS p ON p.id = rp.permission_id
+				WHERE a.org_id = excluded_assignment.org_id
+					AND p.name = required.name
+					AND (a.user_id, a.role_id) != (
+						excluded_assignment.user_id,
+						excluded_assignment.role_id
+					)
+				UNION ALL
+				-- System assignments apply without organization membership.
+				SELECT 1
+				FROM rbac.system_role_assignments AS a
+				JOIN rbac.system_role_permissions AS rp ON rp.role_id = a.role_id
+				JOIN rbac.permissions AS p ON p.id = rp.permission_id
+				WHERE p.name = required.name
+			)
+		)
+		FROM excluded_assignment`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (bool, error) {
+			var remain bool
+			return remain, row.Scan(&remain)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func customRoleManagementPermissionsRemainAfterRemovalQuery(orgID int, roleID uuid.UUID, projectPermNames, orgPermNames []string) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{
+		"org_id":                   orgID,
+		"role_id":                  roleID,
+		"project_permission_names": projectPermNames,
+		"org_permission_names":     orgPermNames,
+	}
+
+	// Execution returns sql.ErrNoRows when the organization does not own the role.
+	const sql = `
+		WITH
+			-- Anchor the result on the organization-owned role so an unknown or foreign role
+			-- produces no row.
+			target_role AS (
+				SELECT id, org_id
+				FROM rbac.custom_roles
+				WHERE org_id = @org_id AND external_id = @role_id
+			),
+			-- Expand the removed project-management permissions across every project where the
+			-- role currently contributes them.
+			affected_project_permissions AS (
+				SELECT DISTINCT a.project_id, target_role.org_id, required.name
+				FROM target_role
+				JOIN rbac.project_role_assignments AS a ON a.role_id = target_role.id
+				CROSS JOIN unnest(@project_permission_names::text[]) AS required(name)
+			),
+			-- Expand the removed organization-management permissions across every organization
+			-- assignment of the role.
+			affected_org_permissions AS (
+				SELECT DISTINCT a.org_id, required.name
+				FROM target_role
+				JOIN rbac.org_role_assignments AS a ON a.role_id = target_role.id
+				CROSS JOIN unnest(@org_permission_names::text[]) AS required(name)
+			)
+		-- Removing a permission from a role removes it from all of that role's assignments, so
+		-- every affected scope must have the permission through a different role.
+		SELECT
+			NOT EXISTS (
+				SELECT 1
+				FROM affected_project_permissions AS affected
+				WHERE NOT EXISTS (
+					-- Direct project assignments only cover their own project.
+					SELECT 1
+					FROM rbac.project_role_assignments AS a
+					JOIN org.org_membership AS m
+						ON m.user_id = a.user_id
+						AND m.org_id = affected.org_id
+					JOIN rbac.custom_role_permissions AS rp ON rp.role_id = a.role_id
+					JOIN rbac.permissions AS p ON p.id = rp.permission_id
+					WHERE a.project_id = affected.project_id
+						AND a.role_id != target_role.id
+						AND p.name = affected.name
+					UNION ALL
+					-- Organization assignments cover every project in the organization.
+					SELECT 1
+					FROM rbac.org_role_assignments AS a
+					JOIN org.org_membership AS m ON m.user_id = a.user_id AND m.org_id = a.org_id
+					JOIN rbac.custom_role_permissions AS rp ON rp.role_id = a.role_id
+					JOIN rbac.permissions AS p ON p.id = rp.permission_id
+					WHERE a.org_id = affected.org_id
+						AND a.role_id != target_role.id
+						AND p.name = affected.name
+					UNION ALL
+					-- System assignments cover every project.
+					SELECT 1
+					FROM rbac.system_role_assignments AS a
+					JOIN rbac.system_role_permissions AS rp ON rp.role_id = a.role_id
+					JOIN rbac.permissions AS p ON p.id = rp.permission_id
+					WHERE p.name = affected.name
+				)
+			)
+			AND NOT EXISTS (
+				SELECT 1
+				FROM affected_org_permissions AS affected
+				WHERE NOT EXISTS (
+					-- Organization assignments preserve access within their organization.
+					SELECT 1
+					FROM rbac.org_role_assignments AS a
+					JOIN org.org_membership AS m ON m.user_id = a.user_id AND m.org_id = a.org_id
+					JOIN rbac.custom_role_permissions AS rp ON rp.role_id = a.role_id
+					JOIN rbac.permissions AS p ON p.id = rp.permission_id
+					WHERE a.org_id = affected.org_id
+						AND a.role_id != target_role.id
+						AND p.name = affected.name
+					UNION ALL
+					-- System assignments cover every organization.
+					SELECT 1
+					FROM rbac.system_role_assignments AS a
+					JOIN rbac.system_role_permissions AS rp ON rp.role_id = a.role_id
+					JOIN rbac.permissions AS p ON p.id = rp.permission_id
+					WHERE p.name = affected.name
+				)
+			)
+		FROM target_role`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (bool, error) {
+			var remain bool
+			return remain, row.Scan(&remain)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func userProjectCustomRolesQuery(userID uuid.UUID, projectID, pageSize, pageOffset int) pgdb.TypedQuery[CustomRole] {
 	params := pgx.NamedArgs{"user_id": userID, "project_id": projectID, "page_size": pageSize, "page_offset": pageOffset}
 	const sql = `
