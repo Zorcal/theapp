@@ -150,10 +150,10 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** custom-role grant, revoke, and permission edits enforce the correctly scoped superset rule.
 
-## Phase 16 — global recovery and custom-role cleanup
+## Phase 16 — global recovery and custom-role cleanup — done
 
-39. Strengthen system-role unassignment lockout so every revoke leaves at least one user holding every registered permission through the effective union of that user's remaining system-scoped assignments. Project- and organization-scoped assignments do not contribute. Custom-role revoke, deletion, and permission removal do not have per-scope last-manager guards; the retained fully privileged system administrator is the recovery path when a scope loses local management access. Depends on 29, 35, 37.
-40. Explicit project/org assignment-row cleanup on custom-role deletion. Depends on 35.
+39. Strengthen system-role unassignment lockout so every revoke leaves at least one user holding every registered permission through the effective union of that user's remaining system-scoped assignments. Project- and organization-scoped assignments do not contribute. Custom-role revoke, deletion, and permission removal do not have per-scope last-manager guards; the retained fully privileged system administrator is the recovery path when a scope loses local management access. This part is complete. Depends on 29, 35, 37.
+40. Explicit project/org assignment-row cleanup on custom-role deletion. This part is complete. Depends on 35.
 
 **Checkpoint:** the custom-role service is safe to expose more broadly — escalation and cleanup are in place, and a fully privileged system administrator always remains available for recovery.
 

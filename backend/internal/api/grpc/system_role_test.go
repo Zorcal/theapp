@@ -390,14 +390,14 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 			want: status.New(codes.PermissionDenied, codes.PermissionDenied.String()),
 		},
 		{
-			name: "last role manager",
+			name: "last fully privileged system administrator",
 			systemRoleCore: &MockedSystemRoleCore{
 				UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
-					return mdl.ErrLastRoleManager
+					return mdl.ErrLastFullyPrivilegedSystemAdmin
 				},
 			},
 			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
-			want: status.New(codes.FailedPrecondition, "cannot remove the last system role manager"),
+			want: status.New(codes.FailedPrecondition, "cannot remove the last fully privileged system administrator"),
 		},
 		{
 			name: "core error",

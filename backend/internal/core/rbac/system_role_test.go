@@ -91,10 +91,10 @@ func TestCore_integration_systemRoleAssignmentLifecycle(t *testing.T) {
 
 	testingx.AssertDiff(t, gotUnassignedRoles, wantUnassignedRoles)
 
-	// Preserve the final system-role management assignment.
+	// Preserve the final fully privileged system administrator.
 
-	if err := core.UnassignSystemRole(actorCtx, actor.ExternalID, "superadmin"); !errors.Is(err, mdl.ErrLastRoleManager) {
-		t.Errorf("UnassignSystemRole() last manager error = %v, want mdl.ErrLastRoleManager", err)
+	if err := core.UnassignSystemRole(actorCtx, actor.ExternalID, "superadmin"); !errors.Is(err, mdl.ErrLastFullyPrivilegedSystemAdmin) {
+		t.Errorf("UnassignSystemRole() last fully privileged system administrator error = %v, want mdl.ErrLastFullyPrivilegedSystemAdmin", err)
 	}
 }
 
@@ -468,6 +468,9 @@ func TestCore_UnassignSystemRole(t *testing.T) {
 		UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 			return []string{"user:read", "user:update"}, nil
 		},
+		FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
+			return true, nil
+		},
 		UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 			return nil
 		},
@@ -516,7 +519,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 			want: dbErr,
 		},
 		{
-			name: "last role manager",
+			name: "last fully privileged system administrator",
 			roleStorer: &MockedRoleStorer{
 				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
 				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
@@ -528,11 +531,11 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return []string{"system-role:assign", "system-role:unassign"}, nil
 				},
-				SystemPermissionsRemainAfterUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string, _ []string) (bool, error) {
+				FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
 					return false, nil
 				},
 			},
-			want: mdl.ErrLastRoleManager,
+			want: mdl.ErrLastFullyPrivilegedSystemAdmin,
 		},
 		{
 			name: "role not found",
@@ -567,8 +570,8 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, nil
 				},
-				UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
-					return sql.ErrNoRows
+				FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
+					return false, sql.ErrNoRows
 				},
 			},
 			want: mdl.ErrNotFound,
@@ -602,7 +605,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 			want: dbErr,
 		},
 		{
-			name: "permissions remain store error",
+			name: "fully privileged user check store error",
 			roleStorer: &MockedRoleStorer{
 				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
 				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
@@ -612,7 +615,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return []string{"system-role:assign"}, nil
 				},
-				SystemPermissionsRemainAfterUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string, _ []string) (bool, error) {
+				FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
 					return false, dbErr
 				},
 			},
@@ -628,6 +631,9 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				},
 				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, nil
+				},
+				FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
+					return true, nil
 				},
 				UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return dbErr

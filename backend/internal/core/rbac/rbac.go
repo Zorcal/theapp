@@ -101,10 +101,10 @@ type RoleStorer interface {
 	// system-role assignments.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	UserSystemPermissionsByExternalID(ctx context.Context, userID uuid.UUID) ([]string, error)
-	// SystemPermissionsRemainAfterUnassign reports whether every permission in permissionNames is
-	// carried by another system-role assignment.
+	// FullyPrivilegedUserRemainsAfterSystemRoleUnassign reports whether at least one user will hold
+	// every registered permission through the remaining system-role assignments.
 	// Returns [sql.ErrNoRows] if the assignment does not exist.
-	SystemPermissionsRemainAfterUnassign(ctx context.Context, userID uuid.UUID, roleName string, permissionNames []string) (bool, error)
+	FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx context.Context, userID uuid.UUID, roleName string) (bool, error)
 	// AssignSystemRole grants userID the system role named roleName at system scope.
 	// Returns [sql.ErrNoRows] if no user with that ID or system role named roleName exists.
 	// Returns [pgdb.ErrAlreadyExists] if userID already has the system role.

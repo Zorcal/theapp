@@ -45,6 +45,9 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			DeleteCustomRoleFunc: func(ctx context.Context, orgID int, roleID uuid.UUID) error {
 //				panic("mock out the DeleteCustomRole method")
 //			},
+//			FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(ctx context.Context, userID uuid.UUID, roleName string) (bool, error) {
+//				panic("mock out the FullyPrivilegedUserRemainsAfterSystemRoleUnassign method")
+//			},
 //			LockSystemRoleManagementFunc: func(ctx context.Context) error {
 //				panic("mock out the LockSystemRoleManagement method")
 //			},
@@ -59,9 +62,6 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			},
 //			ProjectPermissionsFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error) {
 //				panic("mock out the ProjectPermissions method")
-//			},
-//			SystemPermissionsRemainAfterUnassignFunc: func(ctx context.Context, userID uuid.UUID, roleName string, permissionNames []string) (bool, error) {
-//				panic("mock out the SystemPermissionsRemainAfterUnassign method")
 //			},
 //			SystemRoleByNameFunc: func(ctx context.Context, name string) (pgrbac.SystemRole, error) {
 //				panic("mock out the SystemRoleByName method")
@@ -136,6 +136,9 @@ type MockedRoleStorer struct {
 	// DeleteCustomRoleFunc mocks the DeleteCustomRole method.
 	DeleteCustomRoleFunc func(ctx context.Context, orgID int, roleID uuid.UUID) error
 
+	// FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc mocks the FullyPrivilegedUserRemainsAfterSystemRoleUnassign method.
+	FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc func(ctx context.Context, userID uuid.UUID, roleName string) (bool, error)
+
 	// LockSystemRoleManagementFunc mocks the LockSystemRoleManagement method.
 	LockSystemRoleManagementFunc func(ctx context.Context) error
 
@@ -150,9 +153,6 @@ type MockedRoleStorer struct {
 
 	// ProjectPermissionsFunc mocks the ProjectPermissions method.
 	ProjectPermissionsFunc func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error)
-
-	// SystemPermissionsRemainAfterUnassignFunc mocks the SystemPermissionsRemainAfterUnassign method.
-	SystemPermissionsRemainAfterUnassignFunc func(ctx context.Context, userID uuid.UUID, roleName string, permissionNames []string) (bool, error)
 
 	// SystemRoleByNameFunc mocks the SystemRoleByName method.
 	SystemRoleByNameFunc func(ctx context.Context, name string) (pgrbac.SystemRole, error)
@@ -272,6 +272,15 @@ type MockedRoleStorer struct {
 			// RoleID is the roleID argument value.
 			RoleID uuid.UUID
 		}
+		// FullyPrivilegedUserRemainsAfterSystemRoleUnassign holds details about calls to the FullyPrivilegedUserRemainsAfterSystemRoleUnassign method.
+		FullyPrivilegedUserRemainsAfterSystemRoleUnassign []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// RoleName is the roleName argument value.
+			RoleName string
+		}
 		// LockSystemRoleManagement holds details about calls to the LockSystemRoleManagement method.
 		LockSystemRoleManagement []struct {
 			// Ctx is the ctx argument value.
@@ -308,17 +317,6 @@ type MockedRoleStorer struct {
 			UserID uuid.UUID
 			// ProjectID is the projectID argument value.
 			ProjectID int
-		}
-		// SystemPermissionsRemainAfterUnassign holds details about calls to the SystemPermissionsRemainAfterUnassign method.
-		SystemPermissionsRemainAfterUnassign []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// UserID is the userID argument value.
-			UserID uuid.UUID
-			// RoleName is the roleName argument value.
-			RoleName string
-			// PermissionNames is the permissionNames argument value.
-			PermissionNames []string
 		}
 		// SystemRoleByName holds details about calls to the SystemRoleByName method.
 		SystemRoleByName []struct {
@@ -449,34 +447,34 @@ type MockedRoleStorer struct {
 			PageOffset int
 		}
 	}
-	lockAssignCustomRoleToOrg                sync.RWMutex
-	lockAssignCustomRoleToProject            sync.RWMutex
-	lockAssignSystemRole                     sync.RWMutex
-	lockCreateCustomRole                     sync.RWMutex
-	lockCustomRoleByExternalID               sync.RWMutex
-	lockCustomRoleCount                      sync.RWMutex
-	lockCustomRoles                          sync.RWMutex
-	lockDeleteCustomRole                     sync.RWMutex
-	lockLockSystemRoleManagement             sync.RWMutex
-	lockLockSystemRoleUser                   sync.RWMutex
-	lockModifyCustomRolePermissions          sync.RWMutex
-	lockOrgPermissionsByProjectID            sync.RWMutex
-	lockProjectPermissions                   sync.RWMutex
-	lockSystemPermissionsRemainAfterUnassign sync.RWMutex
-	lockSystemRoleByName                     sync.RWMutex
-	lockSystemRoleCount                      sync.RWMutex
-	lockSystemRoles                          sync.RWMutex
-	lockUnassignCustomRoleFromOrg            sync.RWMutex
-	lockUnassignCustomRoleFromProject        sync.RWMutex
-	lockUnassignSystemRole                   sync.RWMutex
-	lockUpdateCustomRole                     sync.RWMutex
-	lockUserOrgCustomRoleCount               sync.RWMutex
-	lockUserOrgCustomRoles                   sync.RWMutex
-	lockUserProjectCustomRoleCount           sync.RWMutex
-	lockUserProjectCustomRoles               sync.RWMutex
-	lockUserSystemPermissionsByExternalID    sync.RWMutex
-	lockUserSystemRoleCountByExternalID      sync.RWMutex
-	lockUserSystemRolesByExternalID          sync.RWMutex
+	lockAssignCustomRoleToOrg                             sync.RWMutex
+	lockAssignCustomRoleToProject                         sync.RWMutex
+	lockAssignSystemRole                                  sync.RWMutex
+	lockCreateCustomRole                                  sync.RWMutex
+	lockCustomRoleByExternalID                            sync.RWMutex
+	lockCustomRoleCount                                   sync.RWMutex
+	lockCustomRoles                                       sync.RWMutex
+	lockDeleteCustomRole                                  sync.RWMutex
+	lockFullyPrivilegedUserRemainsAfterSystemRoleUnassign sync.RWMutex
+	lockLockSystemRoleManagement                          sync.RWMutex
+	lockLockSystemRoleUser                                sync.RWMutex
+	lockModifyCustomRolePermissions                       sync.RWMutex
+	lockOrgPermissionsByProjectID                         sync.RWMutex
+	lockProjectPermissions                                sync.RWMutex
+	lockSystemRoleByName                                  sync.RWMutex
+	lockSystemRoleCount                                   sync.RWMutex
+	lockSystemRoles                                       sync.RWMutex
+	lockUnassignCustomRoleFromOrg                         sync.RWMutex
+	lockUnassignCustomRoleFromProject                     sync.RWMutex
+	lockUnassignSystemRole                                sync.RWMutex
+	lockUpdateCustomRole                                  sync.RWMutex
+	lockUserOrgCustomRoleCount                            sync.RWMutex
+	lockUserOrgCustomRoles                                sync.RWMutex
+	lockUserProjectCustomRoleCount                        sync.RWMutex
+	lockUserProjectCustomRoles                            sync.RWMutex
+	lockUserSystemPermissionsByExternalID                 sync.RWMutex
+	lockUserSystemRoleCountByExternalID                   sync.RWMutex
+	lockUserSystemRolesByExternalID                       sync.RWMutex
 }
 
 // AssignCustomRoleToOrg calls AssignCustomRoleToOrgFunc.
@@ -803,6 +801,46 @@ func (mock *MockedRoleStorer) DeleteCustomRoleCalls() []struct {
 	return calls
 }
 
+// FullyPrivilegedUserRemainsAfterSystemRoleUnassign calls FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc.
+func (mock *MockedRoleStorer) FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx context.Context, userID uuid.UUID, roleName string) (bool, error) {
+	if mock.FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc == nil {
+		panic("MockedRoleStorer.FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: method is nil but RoleStorer.FullyPrivilegedUserRemainsAfterSystemRoleUnassign was just called")
+	}
+	callInfo := struct {
+		Ctx      context.Context
+		UserID   uuid.UUID
+		RoleName string
+	}{
+		Ctx:      ctx,
+		UserID:   userID,
+		RoleName: roleName,
+	}
+	mock.lockFullyPrivilegedUserRemainsAfterSystemRoleUnassign.Lock()
+	mock.calls.FullyPrivilegedUserRemainsAfterSystemRoleUnassign = append(mock.calls.FullyPrivilegedUserRemainsAfterSystemRoleUnassign, callInfo)
+	mock.lockFullyPrivilegedUserRemainsAfterSystemRoleUnassign.Unlock()
+	return mock.FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc(ctx, userID, roleName)
+}
+
+// FullyPrivilegedUserRemainsAfterSystemRoleUnassignCalls gets all the calls that were made to FullyPrivilegedUserRemainsAfterSystemRoleUnassign.
+// Check the length with:
+//
+//	len(mockedRoleStorer.FullyPrivilegedUserRemainsAfterSystemRoleUnassignCalls())
+func (mock *MockedRoleStorer) FullyPrivilegedUserRemainsAfterSystemRoleUnassignCalls() []struct {
+	Ctx      context.Context
+	UserID   uuid.UUID
+	RoleName string
+} {
+	var calls []struct {
+		Ctx      context.Context
+		UserID   uuid.UUID
+		RoleName string
+	}
+	mock.lockFullyPrivilegedUserRemainsAfterSystemRoleUnassign.RLock()
+	calls = mock.calls.FullyPrivilegedUserRemainsAfterSystemRoleUnassign
+	mock.lockFullyPrivilegedUserRemainsAfterSystemRoleUnassign.RUnlock()
+	return calls
+}
+
 // LockSystemRoleManagement calls LockSystemRoleManagementFunc.
 func (mock *MockedRoleStorer) LockSystemRoleManagement(ctx context.Context) error {
 	if mock.LockSystemRoleManagementFunc == nil {
@@ -984,50 +1022,6 @@ func (mock *MockedRoleStorer) ProjectPermissionsCalls() []struct {
 	mock.lockProjectPermissions.RLock()
 	calls = mock.calls.ProjectPermissions
 	mock.lockProjectPermissions.RUnlock()
-	return calls
-}
-
-// SystemPermissionsRemainAfterUnassign calls SystemPermissionsRemainAfterUnassignFunc.
-func (mock *MockedRoleStorer) SystemPermissionsRemainAfterUnassign(ctx context.Context, userID uuid.UUID, roleName string, permissionNames []string) (bool, error) {
-	if mock.SystemPermissionsRemainAfterUnassignFunc == nil {
-		panic("MockedRoleStorer.SystemPermissionsRemainAfterUnassignFunc: method is nil but RoleStorer.SystemPermissionsRemainAfterUnassign was just called")
-	}
-	callInfo := struct {
-		Ctx             context.Context
-		UserID          uuid.UUID
-		RoleName        string
-		PermissionNames []string
-	}{
-		Ctx:             ctx,
-		UserID:          userID,
-		RoleName:        roleName,
-		PermissionNames: permissionNames,
-	}
-	mock.lockSystemPermissionsRemainAfterUnassign.Lock()
-	mock.calls.SystemPermissionsRemainAfterUnassign = append(mock.calls.SystemPermissionsRemainAfterUnassign, callInfo)
-	mock.lockSystemPermissionsRemainAfterUnassign.Unlock()
-	return mock.SystemPermissionsRemainAfterUnassignFunc(ctx, userID, roleName, permissionNames)
-}
-
-// SystemPermissionsRemainAfterUnassignCalls gets all the calls that were made to SystemPermissionsRemainAfterUnassign.
-// Check the length with:
-//
-//	len(mockedRoleStorer.SystemPermissionsRemainAfterUnassignCalls())
-func (mock *MockedRoleStorer) SystemPermissionsRemainAfterUnassignCalls() []struct {
-	Ctx             context.Context
-	UserID          uuid.UUID
-	RoleName        string
-	PermissionNames []string
-} {
-	var calls []struct {
-		Ctx             context.Context
-		UserID          uuid.UUID
-		RoleName        string
-		PermissionNames []string
-	}
-	mock.lockSystemPermissionsRemainAfterUnassign.RLock()
-	calls = mock.calls.SystemPermissionsRemainAfterUnassign
-	mock.lockSystemPermissionsRemainAfterUnassign.RUnlock()
 	return calls
 }
 

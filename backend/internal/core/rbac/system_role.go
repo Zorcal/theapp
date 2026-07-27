@@ -11,7 +11,6 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
-	"github.com/zorcal/theapp/backend/pkg/set"
 )
 
 // SystemRoles returns a page of system roles, along with the total count.
@@ -84,7 +83,8 @@ func (c *Core) AssignSystemRole(ctx context.Context, targetUserID uuid.UUID, rol
 // The actor is read from the auth session in ctx.
 // Returns [mdl.ErrNotFound] if the target user, role, or assignment does not exist.
 // Returns [mdl.ErrPermissionDenied] if the actor's system-scope permissions are not a superset of the role's.
-// Returns [mdl.ErrLastRoleManager] if the change would remove the last system-role management assignment.
+// Returns [mdl.ErrLastFullyPrivilegedSystemAdmin] if the change would leave no fully privileged
+// system administrator.
 func (c *Core) UnassignSystemRole(ctx context.Context, targetUserID uuid.UUID, roleName string) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -105,8 +105,8 @@ func (c *Core) UnassignSystemRole(ctx context.Context, targetUserID uuid.UUID, r
 			return fmt.Errorf("authorize system role change: %w", err)
 		}
 
-		if err := c.ensureSystemManagementAccessRemains(ctx, targetUserID, role); err != nil {
-			return fmt.Errorf("ensure system management access remains: %w", err)
+		if err := c.ensureFullyPrivilegedSystemUserRemains(ctx, targetUserID, role.Name); err != nil {
+			return fmt.Errorf("ensure fully privileged system user remains: %w", err)
 		}
 
 		if err := c.roleStorer.UnassignSystemRole(ctx, targetUserID, roleName); err != nil {
@@ -169,27 +169,20 @@ func (c *Core) authorizeSystemRoleChange(ctx context.Context, actorUserID uuid.U
 	return role, nil
 }
 
-// ensureSystemManagementAccessRemains rejects a revoke that would remove the last system-role
-// management permission. It must run inside the write transaction after the management and target
-// user locks are acquired.
-func (c *Core) ensureSystemManagementAccessRemains(ctx context.Context, targetUserID uuid.UUID, role pgrbac.SystemRole) error {
-	rolePerms := set.FromSlice(permissionsFromPg(role.PermissionNames))
-	managementPerms := set.FromSlice(mdl.SystemRoleManagementPermissions())
-	removedPerms := rolePerms.Intersection(managementPerms)
-	if removedPerms.Len() == 0 {
-		return nil
-	}
-
-	remain, err := c.roleStorer.SystemPermissionsRemainAfterUnassign(ctx, targetUserID, role.Name, permissionsToPg(removedPerms.Values()))
+// ensureFullyPrivilegedSystemUserRemains rejects a revoke that would leave no user holding every
+// registered permission at system scope. It must run inside the write transaction after the
+// management and target user locks are acquired.
+func (c *Core) ensureFullyPrivilegedSystemUserRemains(ctx context.Context, targetUserID uuid.UUID, roleName string) error {
+	remain, err := c.roleStorer.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, targetUserID, roleName)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.ErrNotFound
 		}
-		return fmt.Errorf("system management permissions after unassign: %w", err)
+		return fmt.Errorf("fully privileged system user after unassign: %w", err)
 	}
 
 	if !remain {
-		return mdl.ErrLastRoleManager
+		return mdl.ErrLastFullyPrivilegedSystemAdmin
 	}
 
 	return nil

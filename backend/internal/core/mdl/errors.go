@@ -15,9 +15,9 @@ var ErrAlreadyExists = errors.New("already exists")
 // ErrPermissionDenied is returned when the actor is not authorized to perform an operation.
 var ErrPermissionDenied = errors.New("permission denied")
 
-// ErrLastRoleManager is returned when a change would remove the last assignment carrying the
-// permissions needed to manage roles in its scope.
-var ErrLastRoleManager = errors.New("last role manager")
+// ErrLastFullyPrivilegedSystemAdmin is returned when a change would leave no user holding every
+// registered permission through system-scoped assignments.
+var ErrLastFullyPrivilegedSystemAdmin = errors.New("last fully privileged system administrator")
 
 // ErrTokenInvalid is returned when a magic-link or refresh token is expired,
 // consumed, revoked, or not found. A single sentinel avoids leaking which

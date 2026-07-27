@@ -90,15 +90,6 @@ func PermissionsAssignableToCustomRoles() []Permission {
 	}
 }
 
-// SystemRoleManagementPermissions returns the permissions required to manage system-role
-// assignments.
-func SystemRoleManagementPermissions() []Permission {
-	return []Permission{
-		PermissionSystemRoleAssign,
-		PermissionSystemRoleUnassign,
-	}
-}
-
 // IsPermissionSuperset reports whether held contains every permission in required.
 func IsPermissionSuperset(held, required []Permission) bool {
 	return set.FromSlice(held).IsSuperset(set.FromSlice(required))

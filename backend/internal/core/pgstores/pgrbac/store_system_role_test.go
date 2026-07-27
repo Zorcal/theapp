@@ -302,39 +302,108 @@ func TestStore_UnassignSystemRole(t *testing.T) {
 	testingx.AssertDiff(t, got, want)
 }
 
-func TestStore_SystemPermissionsRemainAfterUnassign(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	rbacStore := NewStore(pool)
-	userStore := pguser.NewStore(pool)
+func TestStore_FullyPrivilegedUserRemainsAfterSystemRoleUnassign(t *testing.T) {
+	t.Run("no fully privileged user remains", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		rbacStore := NewStore(pool)
+		userStore := pguser.NewStore(pool)
 
-	perms := []string{"system-role:assign", "system-role:unassign"}
+		manager := seedUser(t, userStore, "manager@test.com")
+		seedSystemRoleAssignment(t, rbacStore, manager.ExternalID, "superadmin")
 
-	manager := seedUser(t, userStore, "manager@test.com")
-	otherManager := seedUser(t, userStore, "other-manager@test.com")
+		got, err := rbacStore.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, manager.ExternalID, "superadmin")
+		if err != nil {
+			t.Fatalf("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() error = %v", err)
+		}
 
-	seedSystemRoleAssignment(t, rbacStore, manager.ExternalID, "superadmin")
+		if got {
+			t.Error("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() = true, want false")
+		}
+	})
 
-	got, err := rbacStore.SystemPermissionsRemainAfterUnassign(ctx, manager.ExternalID, "superadmin", perms)
-	if err != nil {
-		t.Fatalf("SystemPermissionsRemainAfterUnassign() before second assignment error = %v", err)
-	}
-	if got {
-		t.Error("SystemPermissionsRemainAfterUnassign() before second assignment = true, want false")
-	}
+	t.Run("another fully privileged role assignment remains", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		rbacStore := NewStore(pool)
+		userStore := pguser.NewStore(pool)
 
-	seedSystemRoleAssignment(t, rbacStore, otherManager.ExternalID, "superadmin")
+		manager := seedUser(t, userStore, "manager@test.com")
+		otherManager := seedUser(t, userStore, "other-manager@test.com")
+		seedSystemRoleAssignment(t, rbacStore, manager.ExternalID, "superadmin")
+		seedSystemRoleAssignment(t, rbacStore, otherManager.ExternalID, "superadmin")
 
-	got, err = rbacStore.SystemPermissionsRemainAfterUnassign(ctx, manager.ExternalID, "superadmin", perms)
-	if err != nil {
-		t.Fatalf("SystemPermissionsRemainAfterUnassign() after second assignment error = %v", err)
-	}
-	if !got {
-		t.Error("SystemPermissionsRemainAfterUnassign() after second assignment = false, want true")
-	}
+		got, err := rbacStore.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, manager.ExternalID, "superadmin")
+		if err != nil {
+			t.Fatalf("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() error = %v", err)
+		}
+
+		if !got {
+			t.Error("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() = false, want true")
+		}
+	})
+
+	t.Run("role unions are evaluated per user", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		rbacStore := NewStore(pool)
+		userStore := pguser.NewStore(pool)
+
+		manager := seedUser(t, userStore, "manager@test.com")
+		firstRecoveryUser := seedUser(t, userStore, "first-recovery@test.com")
+		secondRecoveryUser := seedUser(t, userStore, "second-recovery@test.com")
+		seedSystemRoleAssignment(t, rbacStore, manager.ExternalID, "superadmin")
+
+		// Create two complementary roles that collectively grant every permission, but assign
+		// them to different users. Neither user remains fully privileged after the manager's
+		// superadmin role is removed.
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO rbac.system_roles (external_id, name, created_at)
+			VALUES (gen_random_uuid(), 'recovery-a', NOW()), (gen_random_uuid(), 'recovery-b', NOW())`); err != nil {
+			t.Fatalf("seed split system roles error = %v", err)
+		}
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO rbac.system_role_permissions (role_id, permission_id)
+			SELECT r.id, p.id
+			FROM rbac.system_roles AS r
+			CROSS JOIN rbac.permissions AS p
+			WHERE (r.name = 'recovery-a' AND MOD(p.id, 2) = 0)
+				OR (r.name = 'recovery-b' AND MOD(p.id, 2) = 1)`); err != nil {
+			t.Fatalf("seed split system role permissions error = %v", err)
+		}
+		seedSystemRoleAssignment(t, rbacStore, firstRecoveryUser.ExternalID, "recovery-a")
+		seedSystemRoleAssignment(t, rbacStore, secondRecoveryUser.ExternalID, "recovery-b")
+
+		got, err := rbacStore.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, manager.ExternalID, "superadmin")
+		if err != nil {
+			t.Fatalf("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() error = %v", err)
+		}
+
+		if got {
+			t.Error("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() = true, want false")
+		}
+
+		// Move the second complementary role to the first recovery user so that user's
+		// permission union remains fully privileged after the manager's role is removed.
+		if err := rbacStore.UnassignSystemRole(ctx, secondRecoveryUser.ExternalID, "recovery-b"); err != nil {
+			t.Fatalf("UnassignSystemRole() error = %v", err)
+		}
+		if err := rbacStore.AssignSystemRole(ctx, firstRecoveryUser.ExternalID, "recovery-b"); err != nil {
+			t.Fatalf("AssignSystemRole() error = %v", err)
+		}
+
+		got, err = rbacStore.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, manager.ExternalID, "superadmin")
+		if err != nil {
+			t.Fatalf("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() error = %v", err)
+		}
+
+		if !got {
+			t.Error("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() = false, want true")
+		}
+	})
 }
 
-func TestStore_SystemPermissionsRemainAfterUnassign_error(t *testing.T) {
+func TestStore_FullyPrivilegedUserRemainsAfterSystemRoleUnassign_error(t *testing.T) {
 	t.Run("assignment not found", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
@@ -343,8 +412,8 @@ func TestStore_SystemPermissionsRemainAfterUnassign_error(t *testing.T) {
 
 		usr := seedUser(t, userStore, "no-assignment@test.com")
 
-		if _, err := rbacStore.SystemPermissionsRemainAfterUnassign(ctx, usr.ExternalID, "superadmin", []string{"system-role:assign"}); !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("SystemPermissionsRemainAfterUnassign() error = %v, want sql.ErrNoRows", err)
+		if _, err := rbacStore.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, usr.ExternalID, "superadmin"); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("FullyPrivilegedUserRemainsAfterSystemRoleUnassign() error = %v, want sql.ErrNoRows", err)
 		}
 	})
 }

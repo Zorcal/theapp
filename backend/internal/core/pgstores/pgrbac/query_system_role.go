@@ -132,37 +132,38 @@ func userSystemPermissionsByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[[]
 	}
 }
 
-func systemPermissionsRemainAfterUnassignQuery(userID uuid.UUID, roleName string, permNames []string) pgdb.TypedQuery[bool] {
+func fullyPrivilegedUserRemainsAfterSystemRoleUnassignQuery(userID uuid.UUID, roleName string) pgdb.TypedQuery[bool] {
 	params := pgx.NamedArgs{
-		"user_id":          userID,
-		"role_name":        roleName,
-		"permission_names": permNames,
+		"user_id":   userID,
+		"role_name": roleName,
 	}
+
+	// Execution returns sql.ErrNoRows when the exact system-role assignment does not exist.
 	const sql = `
 		WITH
 			-- Identify the exact assignment being considered for removal. Anchoring the final
 			-- result on this row makes a missing user, role, or assignment return sql.ErrNoRows.
 			excluded_assignment AS (
-			SELECT sra.user_id, sra.role_id
-			FROM rbac.system_role_assignments AS sra
-			JOIN useraccess.users AS u ON u.id = sra.user_id
-			JOIN rbac.system_roles AS r ON r.id = sra.role_id
-			WHERE u.external_id = @user_id
-				AND r.name = @role_name
-		)
-		SELECT NOT EXISTS (
-			SELECT 1
-			FROM unnest(@permission_names::text[]) AS required(name)
-			WHERE NOT EXISTS (
-				SELECT 1
+				SELECT sra.user_id, sra.role_id
 				FROM rbac.system_role_assignments AS sra
-				JOIN rbac.system_role_permissions AS rp ON rp.role_id = sra.role_id
-				JOIN rbac.permissions AS p ON p.id = rp.permission_id
-				WHERE p.name = required.name
-					AND (sra.user_id, sra.role_id) != (
-						excluded_assignment.user_id,
-						excluded_assignment.role_id
-					)
+				JOIN useraccess.users AS u ON u.id = sra.user_id
+				JOIN rbac.system_roles AS r ON r.id = sra.role_id
+				WHERE u.external_id = @user_id
+					AND r.name = @role_name
+			)
+		-- A user's remaining system-role permission union must cover the complete registry.
+		SELECT EXISTS (
+			SELECT sra.user_id
+			FROM rbac.system_role_assignments AS sra
+			JOIN rbac.system_role_permissions AS rp ON rp.role_id = sra.role_id
+			WHERE (sra.user_id, sra.role_id) != (
+				excluded_assignment.user_id,
+				excluded_assignment.role_id
+			)
+			GROUP BY sra.user_id
+			HAVING COUNT(DISTINCT rp.permission_id) = (
+				SELECT COUNT(*)
+				FROM rbac.permissions
 			)
 		)
 		FROM excluded_assignment`

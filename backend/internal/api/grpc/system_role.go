@@ -39,7 +39,8 @@ type SystemRoleCore interface {
 	// UnassignSystemRole revokes the system role named roleName from userID.
 	// Returns [mdl.ErrNotFound] if the user, system role, or assignment does not exist.
 	// Returns [mdl.ErrPermissionDenied] if the actor may not unassign the role.
-	// Returns [mdl.ErrLastRoleManager] if the change would remove the last role manager.
+	// Returns [mdl.ErrLastFullyPrivilegedSystemAdmin] if the change would leave no fully privileged
+	// system administrator.
 	UnassignSystemRole(ctx context.Context, userID uuid.UUID, roleName string) error
 }
 
@@ -133,8 +134,8 @@ func (s *systemRoleService) UnassignSystemRole(ctx context.Context, req *pb.Unas
 			return nil, status.Error(codes.NotFound, "system role assignment not found")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, codes.PermissionDenied.String())
-		case errors.Is(err, mdl.ErrLastRoleManager):
-			return nil, status.Error(codes.FailedPrecondition, "cannot remove the last system role manager")
+		case errors.Is(err, mdl.ErrLastFullyPrivilegedSystemAdmin):
+			return nil, status.Error(codes.FailedPrecondition, "cannot remove the last fully privileged system administrator")
 		default:
 			return nil, fmt.Errorf("unassign system role: %w", err)
 		}

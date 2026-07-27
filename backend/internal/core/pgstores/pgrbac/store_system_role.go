@@ -152,16 +152,16 @@ func (s *Store) UserSystemPermissionsByExternalID(ctx context.Context, userID uu
 	return names, nil
 }
 
-// SystemPermissionsRemainAfterUnassign reports whether every permission in permNames is
-// carried by another system-role assignment.
+// FullyPrivilegedUserRemainsAfterSystemRoleUnassign reports whether at least one user will hold
+// every registered permission through the remaining system-role assignments.
 // Returns [sql.ErrNoRows] if the assignment does not exist.
-func (s *Store) SystemPermissionsRemainAfterUnassign(ctx context.Context, userID uuid.UUID, roleName string, permNames []string) (bool, error) {
-	q := systemPermissionsRemainAfterUnassignQuery(userID, roleName, permNames)
+func (s *Store) FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx context.Context, userID uuid.UUID, roleName string) (bool, error) {
+	q := fullyPrivilegedUserRemainsAfterSystemRoleUnassignQuery(userID, roleName)
 
 	var remain bool
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &remain); err != nil {
-			return fmt.Errorf("system permissions remain after unassign: %w", err)
+			return fmt.Errorf("fully privileged system user remains after unassign: %w", err)
 		}
 		return nil
 	}
