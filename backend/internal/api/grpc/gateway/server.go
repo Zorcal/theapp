@@ -15,7 +15,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 )
 
-//go:embed openapi/auth.swagger.json openapi/permission.swagger.json openapi/role.swagger.json openapi/system_role.swagger.json openapi/user.swagger.json
+//go:embed openapi/auth.swagger.json openapi/permission.swagger.json openapi/project.swagger.json openapi/role.swagger.json openapi/system_role.swagger.json openapi/user.swagger.json
 var openapiFiles embed.FS
 
 // ServerConfig contains the dependencies for the HTTP gateway server.
@@ -65,10 +65,14 @@ func NewServer(cfg ServerConfig) (h http.Handler, teardown func(), retErr error)
 	if err := pb.RegisterPermissionServiceHandler(context.Background(), mux, conn); err != nil {
 		return nil, nil, fmt.Errorf("register permission service handler: %w", err)
 	}
+	if err := pb.RegisterProjectServiceHandler(context.Background(), mux, conn); err != nil {
+		return nil, nil, fmt.Errorf("register project service handler: %w", err)
+	}
 
 	allSpecs := []swaggerUISpec{
 		{Name: "Auth API", URL: "/v1/openapi/auth.json"},
 		{Name: "Permission API", URL: "/v1/openapi/permission.json"},
+		{Name: "Project API", URL: "/v1/openapi/project.json"},
 		{Name: "Role API", URL: "/v1/openapi/role.json"},
 		{Name: "System Role API", URL: "/v1/openapi/system-role.json"},
 		{Name: "User API", URL: "/v1/openapi/user.json"},
@@ -78,6 +82,7 @@ func NewServer(cfg ServerConfig) (h http.Handler, teardown func(), retErr error)
 	httpMux.Handle("/", mux)
 	httpMux.HandleFunc("/v1/openapi/auth.json", openapiHandler("openapi/auth.swagger.json"))
 	httpMux.HandleFunc("/v1/openapi/permission.json", openapiHandler("openapi/permission.swagger.json"))
+	httpMux.HandleFunc("/v1/openapi/project.json", openapiHandler("openapi/project.swagger.json"))
 	httpMux.HandleFunc("/v1/openapi/role.json", openapiHandler("openapi/role.swagger.json"))
 	httpMux.HandleFunc("/v1/openapi/system-role.json", openapiHandler("openapi/system_role.swagger.json"))
 	httpMux.HandleFunc("/v1/openapi/user.json", openapiHandler("openapi/user.swagger.json"))

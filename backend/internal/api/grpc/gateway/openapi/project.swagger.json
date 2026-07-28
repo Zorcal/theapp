@@ -1,0 +1,170 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "theapp Project API",
+    "version": "v1"
+  },
+  "tags": [
+    {
+      "name": "ProjectService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/projects": {
+      "get": {
+        "summary": "Lists the projects accessible to the authenticated caller.",
+        "operationId": "ProjectService_ListProjects",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListProjectsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of projects to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ProjectService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1ListProjectsResponse": {
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Project"
+          },
+          "description": "Projects accessible to the authenticated caller."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of accessible projects."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing accessible projects."
+    },
+    "v1Project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the project.",
+          "readOnly": true
+        },
+        "organizationId": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the organization that owns the project.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the project."
+        },
+        "isControl": {
+          "type": "boolean",
+          "description": "Whether the project anchors organization-level administrative operations.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the project was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the project was last updated.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "The ETag for the current version of the project. Helps to prevent\nsimultaneous updates of a project from overwriting each other (\"mid-air\ncollisions\").\n\nIf this is provided on update, it must match the server's ETag.",
+          "readOnly": true
+        }
+      },
+      "description": "Project represents a project within an organization."
+    }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "description": "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}
