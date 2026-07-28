@@ -10,7 +10,7 @@ down:
 	cd $(INFRA_DIR) && docker compose down
 
 .PHONY: generate
-generate: generate-go generate-proto
+generate: generate-proto generate-go
 
 .PHONY: generate-go
 generate-go:
