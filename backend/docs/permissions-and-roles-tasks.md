@@ -1,9 +1,9 @@
 # Permissions and roles — implementation tasks
 
-Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–15
+Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–17
 are complete. They established users/auth, organizations/projects, the RBAC schema, permission
 resolution, the bootstrap CLI, project-scoped enforcement, and the system- and custom-role APIs.
-Phase 16 is current: global recovery and custom-role cleanup.
+Phase 18 is current: discovering accessible projects.
 
 ## Working process
 
@@ -166,8 +166,8 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Phase 18 — discover-accessible-projects endpoint
 
-43. Extend `schemas/auth.proto` with the discover-accessible-projects RPC (paginated — a system-scoped caller resolves to every project in the system). Run `make generate`.
-44. Discover-accessible-projects endpoint. Depends on 24, 43.
+43. Add `schemas/project.proto` with `ProjectService` and a paginated list-projects RPC. The RPC lists only projects accessible to the caller; a system-scoped assignment resolves to every project in the system. It does not require project metadata because clients use it to select the project for subsequent calls. Run `make generate`.
+44. Accessible-project listing endpoint. Resolve access through direct project-, organization-, and system-scoped role assignments, deduplicate projects reached through multiple scopes, and return a stable paginated order. Depends on 24, 43.
 
 **Checkpoint:** the endpoint lists every project the caller has any role in, paginated.
 
@@ -198,7 +198,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Phase 22 — project creation endpoint
 
-55. Proto schema: `schemas/project.proto` (create/delete project). Run `make generate`.
+55. Extend `schemas/project.proto` and `ProjectService` with create/delete project RPCs. Run `make generate`.
 56. Project creation gRPC endpoint: wires 19 behind `project:create`, anchored on the org's default project the same way `org:create` anchors on `theapp/control`. Depends on 25, 55.
 
 **Checkpoint:** a project can be created end-to-end via the API within an existing org.

@@ -186,7 +186,7 @@ Project and organization scopes do not have separate last-manager guards. A cust
 
 ## Discovering accessible projects
 
-Since organization is mostly a hidden concept for clients, discovery is project-first: an endpoint lists the projects the caller has any role in (directly, or via an org- or system-wide scoped assignment), which is what a frontend uses to build a project switcher and to pick the `ProjectID` it sends as metadata on every subsequent call. Organization-level information is only included for the smaller set of users who administer an organization directly, rather than being a concept every client has to deal with.
+Since organization is mostly a hidden concept for clients, discovery is project-first: `ProjectService` lists the projects the caller has any role in (directly, or via an org- or system-wide scoped assignment), which is what a frontend uses to build a project switcher and to pick the `ProjectID` it sends as metadata on every subsequent call. This listing does not require project metadata because selecting a project is its purpose. Organization-level information is only included for the smaller set of users who administer an organization directly, rather than being a concept every client has to deal with.
 
 For most callers this list is small — a handful of projects at most — but a system-scoped assignment (`superadmin` and friends) resolves to every project in the system, since system scope is unconditional. This endpoint is therefore paginated like any other list endpoint returning a potentially unbounded set, rather than assuming the common case (a handful of projects) is the only case.
 
