@@ -307,7 +307,7 @@ func TestCore_AssignSystemRole(t *testing.T) {
 		SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 			return pgrbac.SystemRole{Name: "test-role", PermissionNames: []string{"user:read"}}, nil
 		},
-		UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+		SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 			return []string{"user:read", "user:update"}, nil
 		},
 		AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
@@ -354,7 +354,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, nil
 				},
 				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
@@ -390,7 +390,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{PermissionNames: []string{"user:read", "user:update"}}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return []string{"user:read"}, nil
 				},
 			},
@@ -403,7 +403,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, nil
 				},
 				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
@@ -419,7 +419,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, dbErr
 				},
 			},
@@ -432,7 +432,7 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, nil
 				},
 				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
@@ -465,7 +465,7 @@ func TestCore_UnassignSystemRole(t *testing.T) {
 		SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 			return pgrbac.SystemRole{Name: "test-role", PermissionNames: []string{"user:read"}}, nil
 		},
-		UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+		SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 			return []string{"user:read", "user:update"}, nil
 		},
 		FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
@@ -528,7 +528,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 						PermissionNames: []string{"system-role:assign", "system-role:unassign"},
 					}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return []string{"system-role:assign", "system-role:unassign"}, nil
 				},
 				FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
@@ -567,7 +567,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, nil
 				},
 				FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
@@ -584,7 +584,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{PermissionNames: []string{"user:read", "user:update"}}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return []string{"user:read"}, nil
 				},
 			},
@@ -598,7 +598,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, dbErr
 				},
 			},
@@ -612,7 +612,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{PermissionNames: []string{"system-role:assign"}}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return []string{"system-role:assign"}, nil
 				},
 				FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {
@@ -629,7 +629,7 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
 					return pgrbac.SystemRole{}, nil
 				},
-				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
 					return nil, nil
 				},
 				FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(_ context.Context, _ uuid.UUID, _ string) (bool, error) {

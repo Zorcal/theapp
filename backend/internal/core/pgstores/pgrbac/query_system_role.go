@@ -110,7 +110,7 @@ func userSystemRoleCountByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[int]
 	}
 }
 
-func userSystemPermissionsByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[[]string] {
+func systemPermissionNamesQuery(userID uuid.UUID) pgdb.TypedQuery[[]string] {
 	params := pgx.NamedArgs{"user_id": userID}
 	const sql = `
 		SELECT COALESCE(array_agg(DISTINCT p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}')

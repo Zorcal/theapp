@@ -155,7 +155,7 @@ func (c *Core) authorizeSystemRoleChange(ctx context.Context, actorUserID uuid.U
 		return pgrbac.SystemRole{}, fmt.Errorf("system role: %w", err)
 	}
 
-	actorPerms, err := c.roleStorer.UserSystemPermissionsByExternalID(ctx, actorUserID)
+	actorPerms, err := c.roleStorer.SystemPermissions(ctx, actorUserID)
 	if err != nil {
 		return pgrbac.SystemRole{}, fmt.Errorf("actor system permissions: %w", err)
 	}

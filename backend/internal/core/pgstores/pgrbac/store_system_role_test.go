@@ -164,7 +164,7 @@ func TestStore_UserSystemRoleCountByExternalID_error(t *testing.T) {
 	})
 }
 
-func TestStore_UserSystemPermissionsByExternalID(t *testing.T) {
+func TestStore_SystemPermissions(t *testing.T) {
 	t.Run("system scope", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
@@ -174,9 +174,9 @@ func TestStore_UserSystemPermissionsByExternalID(t *testing.T) {
 		usr := seedUser(t, userStore, "alice@test.com")
 		seedSystemRoleAssignment(t, rbacStore, usr.ExternalID, "superadmin")
 
-		got, err := rbacStore.UserSystemPermissionsByExternalID(ctx, usr.ExternalID)
+		got, err := rbacStore.SystemPermissions(ctx, usr.ExternalID)
 		if err != nil {
-			t.Fatalf("UserSystemPermissionsByExternalID() error = %v", err)
+			t.Fatalf("SystemPermissions() error = %v", err)
 		}
 
 		want := seededSystemRole(t, "superadmin").PermissionNames
@@ -200,27 +200,26 @@ func TestStore_UserSystemPermissionsByExternalID(t *testing.T) {
 		seedProjectRoleAssignment(t, ctx, rbacStore, usr.ExternalID, role.ExternalID, projectID)
 		seedOrgRoleAssignment(t, ctx, rbacStore, usr.ExternalID, role.ExternalID, orgID)
 
-		got, err := rbacStore.UserSystemPermissionsByExternalID(ctx, usr.ExternalID)
+		got, err := rbacStore.SystemPermissions(ctx, usr.ExternalID)
 		if err != nil {
-			t.Fatalf("UserSystemPermissionsByExternalID() error = %v", err)
+			t.Fatalf("SystemPermissions() error = %v", err)
 		}
 
-		// User was assigned a project role but not a system role.
-		if len(got) != 0 {
-			t.Errorf("UserSystemPermissionsByExternalID() = %v, want empty", got)
-		}
+		want := []string{}
+
+		testingx.AssertDiff(t, got, want)
 	})
 }
 
-func TestStore_UserSystemPermissionsByExternalID_error(t *testing.T) {
+func TestStore_SystemPermissions_error(t *testing.T) {
 	t.Run("user not found", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
 		rbacStore := NewStore(pool)
 
 		userID := uuid.New()
-		if _, err := rbacStore.UserSystemPermissionsByExternalID(ctx, userID); !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("UserSystemPermissionsByExternalID(%v) error = %v, want sql.ErrNoRows", userID, err)
+		if _, err := rbacStore.SystemPermissions(ctx, userID); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("SystemPermissions(%v) error = %v, want sql.ErrNoRows", userID, err)
 		}
 	})
 }

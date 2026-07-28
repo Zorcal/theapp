@@ -97,10 +97,9 @@ type RoleStorer interface {
 	// UserSystemRoleCountByExternalID returns the number of system roles assigned to userID.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	UserSystemRoleCountByExternalID(ctx context.Context, userID uuid.UUID) (int, error)
-	// UserSystemPermissionsByExternalID returns the names of the permissions userID holds through
-	// system-role assignments.
+	// SystemPermissions returns the names of the permissions held through system-role assignments.
 	// Returns [sql.ErrNoRows] if no such user exists.
-	UserSystemPermissionsByExternalID(ctx context.Context, userID uuid.UUID) ([]string, error)
+	SystemPermissions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	// FullyPrivilegedUserRemainsAfterSystemRoleUnassign reports whether at least one user will hold
 	// every registered permission through the remaining system-role assignments.
 	// Returns [sql.ErrNoRows] if the assignment does not exist.

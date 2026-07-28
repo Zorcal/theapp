@@ -131,11 +131,10 @@ func (s *Store) UserSystemRoleCountByExternalID(ctx context.Context, userID uuid
 	return count, nil
 }
 
-// UserSystemPermissionsByExternalID returns the names of the permissions userID holds through
-// system-scope role assignments only.
+// SystemPermissions returns the names of the permissions userID holds through system-scope role assignments only.
 // Returns [sql.ErrNoRows] if no such user exists.
-func (s *Store) UserSystemPermissionsByExternalID(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	q := userSystemPermissionsByExternalIDQuery(userID)
+func (s *Store) SystemPermissions(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	q := systemPermissionNamesQuery(userID)
 
 	var names []string
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {

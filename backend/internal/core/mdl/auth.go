@@ -36,6 +36,7 @@ type AuthContext struct {
 // AuthUser is the authenticated caller's identity and resolved permissions.
 type AuthUser struct {
 	UserID uuid.UUID
+	Email  string
 	// Permissions is the distinct union of permissions granted through every role UserID holds.
 	Permissions []Permission
 }

@@ -75,10 +75,14 @@ type UserStorer interface {
 
 // PermissionStorer defines the permission database operations required by Core.
 type PermissionStorer interface {
-	// UserSystemPermissionsByExternalID returns the names of the permissions userID holds through
-	// system-scope role assignments only.
+	// PermissionsByScope returns userID's resolved permission names for projectID at project,
+	// organization, and system scope.
+	// Returns [sql.ErrNoRows] if no such user or project exists.
+	PermissionsByScope(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.PermissionsByScope, error)
+	// SystemPermissions returns the names of the permissions held through system-scope role
+	// assignments only.
 	// Returns [sql.ErrNoRows] if no such user exists.
-	UserSystemPermissionsByExternalID(ctx context.Context, userID uuid.UUID) ([]string, error)
+	SystemPermissions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	// ProjectPermissions returns projectID's org and the names of the permissions userID holds for
 	// projectID, resolved from project-, org-, and system-scope role assignments.
 	// Returns [sql.ErrNoRows] if no such user or project exists.
@@ -304,8 +308,16 @@ func (c *Core) RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uu
 // A user with no role assignment relevant to projectID is not an error: the session resolves with
 // an empty (or system-scope-only) permission set, which permission-checking code rejects on its own.
 func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+	user, err := c.userStorer.UserByExternalID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthSession{}, mdl.ErrNotFound
+		}
+		return mdl.AuthSession{}, fmt.Errorf("user by external id: %w", err)
+	}
+
 	if projectID == nil {
-		perms, err := c.permissionStorer.UserSystemPermissionsByExternalID(ctx, userID)
+		perms, err := c.permissionStorer.SystemPermissions(ctx, user.ExternalID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return mdl.AuthSession{}, mdl.ErrNotFound
@@ -315,13 +327,14 @@ func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int
 
 		return mdl.AuthSession{
 			User: mdl.AuthUser{
-				UserID:      userID,
+				UserID:      user.ExternalID,
+				Email:       user.Email,
 				Permissions: permissionsFromPg(perms),
 			},
 		}, nil
 	}
 
-	perms, err := c.permissionStorer.ProjectPermissions(ctx, userID, *projectID)
+	perms, err := c.permissionStorer.ProjectPermissions(ctx, user.ExternalID, *projectID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.AuthSession{}, mdl.ErrNotFound
@@ -331,7 +344,8 @@ func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int
 
 	return mdl.AuthSession{
 		User: mdl.AuthUser{
-			UserID:      userID,
+			UserID:      user.ExternalID,
+			Email:       user.Email,
 			Permissions: permissionsFromPg(perms.PermissionNames),
 		},
 		ProjectID: projectID,
@@ -343,7 +357,15 @@ func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int
 // organization- and system-scope role assignments.
 // Returns [mdl.ErrNotFound] if no user or project with those IDs exists.
 func (c *Core) OrganizationAuthSession(ctx context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
-	orgPerms, err := c.permissionStorer.OrgPermissionsByProjectID(ctx, userID, projectID)
+	user, err := c.userStorer.UserByExternalID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthSession{}, mdl.ErrNotFound
+		}
+		return mdl.AuthSession{}, fmt.Errorf("user by external id: %w", err)
+	}
+
+	orgPerms, err := c.permissionStorer.OrgPermissionsByProjectID(ctx, user.ExternalID, projectID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.AuthSession{}, mdl.ErrNotFound
@@ -353,7 +375,8 @@ func (c *Core) OrganizationAuthSession(ctx context.Context, userID uuid.UUID, pr
 
 	return mdl.AuthSession{
 		User: mdl.AuthUser{
-			UserID:      userID,
+			UserID:      user.ExternalID,
+			Email:       user.Email,
 			Permissions: permissionsFromPg(orgPerms.PermissionNames),
 		},
 		ProjectID: &projectID,
@@ -372,44 +395,20 @@ func (c *Core) AuthContext(ctx context.Context) (mdl.AuthContext, error) {
 		return mdl.AuthContext{}, errors.New("project context missing")
 	}
 
-	user, err := c.userStorer.UserByExternalID(ctx, sess.User.UserID)
+	perms, err := c.permissionStorer.PermissionsByScope(ctx, sess.User.UserID, *sess.ProjectID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.AuthContext{}, mdl.ErrNotFound
 		}
-		return mdl.AuthContext{}, fmt.Errorf("user: %w", err)
-	}
-
-	projectPerms, err := c.permissionStorer.ProjectPermissions(ctx, sess.User.UserID, *sess.ProjectID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return mdl.AuthContext{}, mdl.ErrNotFound
-		}
-		return mdl.AuthContext{}, fmt.Errorf("project permissions: %w", err)
-	}
-
-	orgPerms, err := c.permissionStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, *sess.ProjectID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return mdl.AuthContext{}, mdl.ErrNotFound
-		}
-		return mdl.AuthContext{}, fmt.Errorf("organization permissions: %w", err)
-	}
-
-	systemPerms, err := c.permissionStorer.UserSystemPermissionsByExternalID(ctx, sess.User.UserID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return mdl.AuthContext{}, mdl.ErrNotFound
-		}
-		return mdl.AuthContext{}, fmt.Errorf("system permissions: %w", err)
+		return mdl.AuthContext{}, fmt.Errorf("permissions by scope: %w", err)
 	}
 
 	return mdl.AuthContext{
-		UserID:                  user.ExternalID,
-		Email:                   user.Email,
-		ProjectPermissions:      permissionsFromPg(projectPerms.PermissionNames),
-		OrganizationPermissions: permissionsFromPg(orgPerms.PermissionNames),
-		SystemPermissions:       permissionsFromPg(systemPerms),
+		UserID:                  sess.User.UserID,
+		Email:                   sess.User.Email,
+		ProjectPermissions:      permissionsFromPg(perms.ProjectPermissionNames),
+		OrganizationPermissions: permissionsFromPg(perms.OrgPermissionNames),
+		SystemPermissions:       permissionsFromPg(perms.SystemPermissionNames),
 	}, nil
 }
 

@@ -63,6 +63,9 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			ProjectPermissionsFunc: func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error) {
 //				panic("mock out the ProjectPermissions method")
 //			},
+//			SystemPermissionsFunc: func(ctx context.Context, userID uuid.UUID) ([]string, error) {
+//				panic("mock out the SystemPermissions method")
+//			},
 //			SystemRoleByNameFunc: func(ctx context.Context, name string) (pgrbac.SystemRole, error) {
 //				panic("mock out the SystemRoleByName method")
 //			},
@@ -95,9 +98,6 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			},
 //			UserProjectCustomRolesFunc: func(ctx context.Context, userID uuid.UUID, projectID int, pageSize int, pageOffset int) ([]pgrbac.CustomRole, error) {
 //				panic("mock out the UserProjectCustomRoles method")
-//			},
-//			UserSystemPermissionsByExternalIDFunc: func(ctx context.Context, userID uuid.UUID) ([]string, error) {
-//				panic("mock out the UserSystemPermissionsByExternalID method")
 //			},
 //			UserSystemRoleCountByExternalIDFunc: func(ctx context.Context, userID uuid.UUID) (int, error) {
 //				panic("mock out the UserSystemRoleCountByExternalID method")
@@ -154,6 +154,9 @@ type MockedRoleStorer struct {
 	// ProjectPermissionsFunc mocks the ProjectPermissions method.
 	ProjectPermissionsFunc func(ctx context.Context, userID uuid.UUID, projectID int) (pgrbac.ProjectPermissions, error)
 
+	// SystemPermissionsFunc mocks the SystemPermissions method.
+	SystemPermissionsFunc func(ctx context.Context, userID uuid.UUID) ([]string, error)
+
 	// SystemRoleByNameFunc mocks the SystemRoleByName method.
 	SystemRoleByNameFunc func(ctx context.Context, name string) (pgrbac.SystemRole, error)
 
@@ -186,9 +189,6 @@ type MockedRoleStorer struct {
 
 	// UserProjectCustomRolesFunc mocks the UserProjectCustomRoles method.
 	UserProjectCustomRolesFunc func(ctx context.Context, userID uuid.UUID, projectID int, pageSize int, pageOffset int) ([]pgrbac.CustomRole, error)
-
-	// UserSystemPermissionsByExternalIDFunc mocks the UserSystemPermissionsByExternalID method.
-	UserSystemPermissionsByExternalIDFunc func(ctx context.Context, userID uuid.UUID) ([]string, error)
 
 	// UserSystemRoleCountByExternalIDFunc mocks the UserSystemRoleCountByExternalID method.
 	UserSystemRoleCountByExternalIDFunc func(ctx context.Context, userID uuid.UUID) (int, error)
@@ -318,6 +318,13 @@ type MockedRoleStorer struct {
 			// ProjectID is the projectID argument value.
 			ProjectID int
 		}
+		// SystemPermissions holds details about calls to the SystemPermissions method.
+		SystemPermissions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+		}
 		// SystemRoleByName holds details about calls to the SystemRoleByName method.
 		SystemRoleByName []struct {
 			// Ctx is the ctx argument value.
@@ -421,13 +428,6 @@ type MockedRoleStorer struct {
 			// PageOffset is the pageOffset argument value.
 			PageOffset int
 		}
-		// UserSystemPermissionsByExternalID holds details about calls to the UserSystemPermissionsByExternalID method.
-		UserSystemPermissionsByExternalID []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// UserID is the userID argument value.
-			UserID uuid.UUID
-		}
 		// UserSystemRoleCountByExternalID holds details about calls to the UserSystemRoleCountByExternalID method.
 		UserSystemRoleCountByExternalID []struct {
 			// Ctx is the ctx argument value.
@@ -461,6 +461,7 @@ type MockedRoleStorer struct {
 	lockModifyCustomRolePermissions                       sync.RWMutex
 	lockOrgPermissionsByProjectID                         sync.RWMutex
 	lockProjectPermissions                                sync.RWMutex
+	lockSystemPermissions                                 sync.RWMutex
 	lockSystemRoleByName                                  sync.RWMutex
 	lockSystemRoleCount                                   sync.RWMutex
 	lockSystemRoles                                       sync.RWMutex
@@ -472,7 +473,6 @@ type MockedRoleStorer struct {
 	lockUserOrgCustomRoles                                sync.RWMutex
 	lockUserProjectCustomRoleCount                        sync.RWMutex
 	lockUserProjectCustomRoles                            sync.RWMutex
-	lockUserSystemPermissionsByExternalID                 sync.RWMutex
 	lockUserSystemRoleCountByExternalID                   sync.RWMutex
 	lockUserSystemRolesByExternalID                       sync.RWMutex
 }
@@ -1025,6 +1025,42 @@ func (mock *MockedRoleStorer) ProjectPermissionsCalls() []struct {
 	return calls
 }
 
+// SystemPermissions calls SystemPermissionsFunc.
+func (mock *MockedRoleStorer) SystemPermissions(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	if mock.SystemPermissionsFunc == nil {
+		panic("MockedRoleStorer.SystemPermissionsFunc: method is nil but RoleStorer.SystemPermissions was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+	}
+	mock.lockSystemPermissions.Lock()
+	mock.calls.SystemPermissions = append(mock.calls.SystemPermissions, callInfo)
+	mock.lockSystemPermissions.Unlock()
+	return mock.SystemPermissionsFunc(ctx, userID)
+}
+
+// SystemPermissionsCalls gets all the calls that were made to SystemPermissions.
+// Check the length with:
+//
+//	len(mockedRoleStorer.SystemPermissionsCalls())
+func (mock *MockedRoleStorer) SystemPermissionsCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+	}
+	mock.lockSystemPermissions.RLock()
+	calls = mock.calls.SystemPermissions
+	mock.lockSystemPermissions.RUnlock()
+	return calls
+}
+
 // SystemRoleByName calls SystemRoleByNameFunc.
 func (mock *MockedRoleStorer) SystemRoleByName(ctx context.Context, name string) (pgrbac.SystemRole, error) {
 	if mock.SystemRoleByNameFunc == nil {
@@ -1470,42 +1506,6 @@ func (mock *MockedRoleStorer) UserProjectCustomRolesCalls() []struct {
 	mock.lockUserProjectCustomRoles.RLock()
 	calls = mock.calls.UserProjectCustomRoles
 	mock.lockUserProjectCustomRoles.RUnlock()
-	return calls
-}
-
-// UserSystemPermissionsByExternalID calls UserSystemPermissionsByExternalIDFunc.
-func (mock *MockedRoleStorer) UserSystemPermissionsByExternalID(ctx context.Context, userID uuid.UUID) ([]string, error) {
-	if mock.UserSystemPermissionsByExternalIDFunc == nil {
-		panic("MockedRoleStorer.UserSystemPermissionsByExternalIDFunc: method is nil but RoleStorer.UserSystemPermissionsByExternalID was just called")
-	}
-	callInfo := struct {
-		Ctx    context.Context
-		UserID uuid.UUID
-	}{
-		Ctx:    ctx,
-		UserID: userID,
-	}
-	mock.lockUserSystemPermissionsByExternalID.Lock()
-	mock.calls.UserSystemPermissionsByExternalID = append(mock.calls.UserSystemPermissionsByExternalID, callInfo)
-	mock.lockUserSystemPermissionsByExternalID.Unlock()
-	return mock.UserSystemPermissionsByExternalIDFunc(ctx, userID)
-}
-
-// UserSystemPermissionsByExternalIDCalls gets all the calls that were made to UserSystemPermissionsByExternalID.
-// Check the length with:
-//
-//	len(mockedRoleStorer.UserSystemPermissionsByExternalIDCalls())
-func (mock *MockedRoleStorer) UserSystemPermissionsByExternalIDCalls() []struct {
-	Ctx    context.Context
-	UserID uuid.UUID
-} {
-	var calls []struct {
-		Ctx    context.Context
-		UserID uuid.UUID
-	}
-	mock.lockUserSystemPermissionsByExternalID.RLock()
-	calls = mock.calls.UserSystemPermissionsByExternalID
-	mock.lockUserSystemPermissionsByExternalID.RUnlock()
 	return calls
 }
 

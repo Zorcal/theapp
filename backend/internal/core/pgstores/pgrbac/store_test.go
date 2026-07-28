@@ -16,6 +16,89 @@ import (
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
 
+func TestStore_PermissionsByScope(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
+
+	user := seedUser(t, userStore, "permissions-by-scope@test.com")
+	org := seedOrg(t, orgStore, "permissions-by-scope-org")
+	project := seedProject(t, orgStore, org.ID, "permissions-by-scope-project")
+	seedOrgMembership(t, ctx, pool, user.ID, org.ID)
+	projectRole := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: org.ID, Name: "project reader", PermissionNames: []string{"custom-role:read"}})
+	orgRole := seedCustomRole(t, rbacStore, CreateCustomRole{OrgID: org.ID, Name: "organization updater", PermissionNames: []string{"custom-role:update"}})
+	seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, projectRole.ExternalID, project.ID)
+	seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, orgRole.ExternalID, org.ID)
+
+	// Create a narrowly scoped system role so each returned permission set proves which
+	// assignment scopes contribute to it without depending on the evolving superadmin role.
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO rbac.system_roles (external_id, name, created_at)
+		VALUES (gen_random_uuid(), 'user:system-read', NOW())`); err != nil {
+		t.Fatalf("seed system role error = %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO rbac.system_role_permissions (role_id, permission_id)
+		SELECT r.id, p.id
+		FROM rbac.system_roles AS r
+		JOIN rbac.permissions AS p ON p.name = 'user:read'
+		WHERE r.name = 'user:system-read'`); err != nil {
+		t.Fatalf("seed system role permissions error = %v", err)
+	}
+	seedSystemRoleAssignment(t, rbacStore, user.ExternalID, "user:system-read")
+
+	got, err := rbacStore.PermissionsByScope(ctx, user.ExternalID, project.ID)
+	if err != nil {
+		t.Fatalf("PermissionsByScope() error = %v", err)
+	}
+
+	want := PermissionsByScope{
+		ProjectPermissionNames: []string{"custom-role:read", "custom-role:update", "user:read"},
+		OrgPermissionNames:     []string{"custom-role:update", "user:read"},
+		SystemPermissionNames:  []string{"user:read"},
+	}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestStore_PermissionsByScope_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := NewStore(pool)
+	userStore := pguser.NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
+
+	user := seedUser(t, userStore, "permissions-by-scope-error@test.com")
+	org := seedOrg(t, orgStore, "permissions-by-scope-error-org")
+	project := seedProject(t, orgStore, org.ID, "permissions-by-scope-error-project")
+
+	tests := []struct {
+		name      string
+		userID    uuid.UUID
+		projectID int
+	}{
+		{
+			name:      "user missing",
+			userID:    uuid.New(),
+			projectID: project.ID,
+		},
+		{
+			name:      "project missing",
+			userID:    user.ExternalID,
+			projectID: -1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := rbacStore.PermissionsByScope(ctx, tt.userID, tt.projectID); !errors.Is(err, sql.ErrNoRows) {
+				t.Errorf("PermissionsByScope() error = %v, want sql.ErrNoRows", err)
+			}
+		})
+	}
+}
+
 func TestStore_ProjectPermissions(t *testing.T) {
 	t.Run("system scope, unconditional on project", func(t *testing.T) {
 		ctx := context.Background()

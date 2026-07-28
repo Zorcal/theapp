@@ -19,6 +19,41 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
+// PermissionsByScope returns userID's resolved permission names for projectID at project,
+// organization, and system scope in one database batch.
+// Returns [sql.ErrNoRows] if no such user or project exists.
+func (s *Store) PermissionsByScope(ctx context.Context, userID uuid.UUID, projectID int) (PermissionsByScope, error) {
+	projectPermsQ := projectPermissionsQuery(userID, projectID)
+	orgPermsQ := orgPermissionsByProjectIDQuery(userID, projectID)
+	systemPermNamesQ := systemPermissionNamesQuery(userID)
+
+	var projectPerms ProjectPermissions
+	var orgPerms OrgPermissions
+	var systemPermNames []string
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := projectPermsQ.Queue(ctx, b, &projectPerms); err != nil {
+			return fmt.Errorf("permissions by scope project permissions: %w", err)
+		}
+		if err := orgPermsQ.Queue(ctx, b, &orgPerms); err != nil {
+			return fmt.Errorf("permissions by scope organization permissions: %w", err)
+		}
+		if err := systemPermNamesQ.Queue(ctx, b, &systemPermNames); err != nil {
+			return fmt.Errorf("permissions by scope system permissions: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return PermissionsByScope{}, err
+	}
+
+	return PermissionsByScope{
+		ProjectPermissionNames: projectPerms.PermissionNames,
+		OrgPermissionNames:     orgPerms.PermissionNames,
+		SystemPermissionNames:  systemPermNames,
+	}, nil
+}
+
 // ProjectPermissions returns projectID's org and the names of the permissions userID holds for
 // projectID, resolved from project-, org-, and system-scope role assignments.
 // Returns [sql.ErrNoRows] if no such user or project exists.

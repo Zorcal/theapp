@@ -66,3 +66,10 @@ type OrgPermissions struct {
 	OrgID           int      `db:"org_id"`
 	PermissionNames []string `db:"permission_names"`
 }
+
+// PermissionsByScope contains a user's resolved permission names by scope.
+type PermissionsByScope struct {
+	ProjectPermissionNames []string
+	OrgPermissionNames     []string
+	SystemPermissionNames  []string
+}
