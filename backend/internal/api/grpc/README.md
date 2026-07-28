@@ -32,6 +32,12 @@ The `gateway/` package translates HTTP/JSON requests to gRPC calls using grpc-ga
 
 The spec (`gateway/openapi/openapi.swagger.json`) is generated from proto annotations — do not edit it by hand. Regenerate with `make generate` after changing `.proto` files.
 
+Every RPC documents each HTTP error status it can return through
+`openapiv2_operation.responses`, with `google.rpc.Status` as the response schema. Keep these
+responses synchronized with errors returned explicitly by the handler and errors returned
+implicitly by the interceptor chain. When either path introduces a new status for an RPC, update
+the corresponding `.proto` operation annotation and regenerate the OpenAPI artifacts.
+
 ## Testing
 
 ### Test harnesses

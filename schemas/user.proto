@@ -6,13 +6,12 @@ import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
 import "google/protobuf/empty.proto";
-import "google/protobuf/timestamp.proto";
 import "google/protobuf/field_mask.proto";
-
-option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
-
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   info: {
     title: "theapp User API"
@@ -41,15 +40,96 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service UserService {
   // Gets a user by ID.
   rpc GetUser(GetUserRequest) returns (User) {
-    option (google.api.http) = {
-      get: "/v1/users/{id}"
+    option (google.api.http) = {get: "/v1/users/{id}"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid user ID."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "User read access is missing."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "User not found."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
     };
   }
 
   // Lists users, optionally filtered and paginated.
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
-    option (google.api.http) = {
-      get: "/v1/users"
+    option (google.api.http) = {get: "/v1/users"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid pagination, ordering, or filtering."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "User read access is missing."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
     };
   }
 
@@ -59,6 +139,44 @@ service UserService {
       post: "/v1/users"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid user data or email already in use."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "User creation access is missing."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+    };
   }
 
   // Updates a user.
@@ -67,13 +185,63 @@ service UserService {
       patch: "/v1/users/{user.id}"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid user data or update mask."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "User update access is missing."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "User not found."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+    };
   }
 }
 
 // User represents a user in the system.
 message User {
   // Unique identifier for the user. Output only.
-  string id = 1 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+  string id = 1 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.field_info).format = UUID4
+  ];
 
   // Email address of the user.
   string email = 3;
@@ -96,13 +264,19 @@ message User {
   // collisions").
   //
   // If this is provided on update, it must match the server's ETag.
-  string etag = 6 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+  string etag = 6 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.field_info).format = UUID4
+  ];
 }
 
 // Request message for getting a user by ID.
 message GetUserRequest {
   // The ID of the user to retrieve.
-  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+  string id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
 }
 
 // Request message for updating a user.

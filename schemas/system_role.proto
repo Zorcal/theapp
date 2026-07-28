@@ -5,12 +5,11 @@ package theapp.v1;
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
+import "google/rpc/status.proto";
 import "permission.proto";
-
-option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
-
 import "protoc-gen-openapiv2/options/annotations.proto";
 
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   info: {
     title: "theapp System Role API"
@@ -42,10 +41,44 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service SystemRoleService {
   // Lists the system roles available to assign.
   rpc ListSystemRoles(ListSystemRolesRequest) returns (ListSystemRolesResponse) {
-    option (google.api.http) = {
-      get: "/v1/system-roles"
-    };
+    option (google.api.http) = {get: "/v1/system-roles"};
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid pagination or project metadata."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "System-role read access is missing or the project is not the system control project."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
       parameters: {
         headers: {
           name: "x-project-id"
@@ -64,6 +97,60 @@ service SystemRoleService {
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid input or project metadata."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Assignment authority is missing or the project is not the system control project."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "User or system role not found."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "System-role assignment already exists."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
       parameters: {
         headers: {
           name: "x-project-id"
@@ -82,6 +169,51 @@ service SystemRoleService {
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid input or project metadata, or unassignment would remove the last fully privileged system administrator."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Unassignment authority is missing or the project is not the system control project."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "System-role assignment not found."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
       parameters: {
         headers: {
           name: "x-project-id"
@@ -95,10 +227,53 @@ service SystemRoleService {
 
   // Lists the system roles a user holds.
   rpc ListSystemRoleAssignments(ListSystemRoleAssignmentsRequest) returns (ListSystemRoleAssignmentsResponse) {
-    option (google.api.http) = {
-      get: "/v1/system-role-assignments"
-    };
+    option (google.api.http) = {get: "/v1/system-role-assignments"};
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid input, pagination, or project metadata."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "System-role read access is missing or the project is not the system control project."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "User not found."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
       parameters: {
         headers: {
           name: "x-project-id"
@@ -147,7 +322,10 @@ message AssignSystemRoleRequest {
   string role_name = 1 [(google.api.field_behavior) = REQUIRED];
 
   // The ID of the user to assign the role to.
-  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+  string user_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
 }
 
 // Response message for assigning a system role.
@@ -159,7 +337,10 @@ message UnassignSystemRoleRequest {
   string role_name = 1 [(google.api.field_behavior) = REQUIRED];
 
   // The ID of the user to unassign the role from.
-  string user_id = 2 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+  string user_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
 }
 
 // Response message for unassigning a system role.
@@ -168,7 +349,10 @@ message UnassignSystemRoleResponse {}
 // Request message for listing a user's system role assignments.
 message ListSystemRoleAssignmentsRequest {
   // The ID of the user whose system role assignments to list.
-  string user_id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+  string user_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
 
   // Maximum number of assignments to return.
   int32 page_size = 2;

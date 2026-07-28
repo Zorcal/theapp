@@ -9,6 +9,7 @@ package pb
 import (
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
+	_ "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	_ "google.golang.org/protobuf/types/known/emptypb"
@@ -478,7 +479,7 @@ var File_user_proto protoreflect.FileDescriptor
 const file_user_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"user.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a google/protobuf/field_mask.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xc3\x02\n" +
+	"user.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xc3\x02\n" +
 	"\x04User\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12@\n" +
@@ -511,14 +512,68 @@ const file_user_proto_rawDesc = "" +
 	"\x05users\x18\x01 \x03(\v2\x0f.theapp.v1.UserR\x05users\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xe7\x02\n" +
-	"\vUserService\x12M\n" +
-	"\aGetUser\x12\x19.theapp.v1.GetUserRequest\x1a\x0f.theapp.v1.User\"\x16\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/users/{id}\x12Y\n" +
-	"\tListUsers\x12\x1b.theapp.v1.ListUsersRequest\x1a\x1c.theapp.v1.ListUsersResponse\"\x11\x82\xd3\xe4\x93\x02\v\x12\t/v1/users\x12Q\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xeb\v\n" +
+	"\vUserService\x12\xf3\x02\n" +
+	"\aGetUser\x12\x19.theapp.v1.GetUserRequest\x1a\x0f.theapp.v1.User\"\xbb\x02\x92A\xa1\x02J1\n" +
+	"\x03400\x12*\n" +
+	"\x10Invalid user ID.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ=\n" +
+	"\x03403\x126\n" +
+	"\x1cUser read access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ0\n" +
+	"\x03404\x12)\n" +
+	"\x0fUser not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/users/{id}\x12\xe8\x02\n" +
+	"\tListUsers\x12\x1b.theapp.v1.ListUsersRequest\x1a\x1c.theapp.v1.ListUsersResponse\"\x9f\x02\x92A\x8a\x02JL\n" +
+	"\x03400\x12E\n" +
+	"+Invalid pagination, ordering, or filtering.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ=\n" +
+	"\x03403\x126\n" +
+	"\x1cUser read access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\v\x12\t/v1/users\x12\xe3\x02\n" +
 	"\n" +
-	"CreateUser\x12\x1c.theapp.v1.CreateUserRequest\x1a\x0f.theapp.v1.User\"\x14\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/users\x12[\n" +
+	"CreateUser\x12\x1c.theapp.v1.CreateUserRequest\x1a\x0f.theapp.v1.User\"\xa5\x02\x92A\x8d\x02JK\n" +
+	"\x03400\x12D\n" +
+	"*Invalid user data or email already in use.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJA\n" +
+	"\x03403\x12:\n" +
+	" User creation access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/users\x12\x94\x03\n" +
 	"\n" +
-	"UpdateUser\x12\x1c.theapp.v1.UpdateUserRequest\x1a\x0f.theapp.v1.User\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/users/{user.id}B\xc7\x02\x92A\xa1\x01\x12\x15\n" +
+	"UpdateUser\x12\x1c.theapp.v1.UpdateUserRequest\x1a\x0f.theapp.v1.User\"\xd6\x02\x92A\xb4\x02JB\n" +
+	"\x03400\x12;\n" +
+	"!Invalid user data or update mask.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ?\n" +
+	"\x03403\x128\n" +
+	"\x1eUser update access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ0\n" +
+	"\x03404\x12)\n" +
+	"\x0fUser not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/users/{user.id}B\xc7\x02\x92A\xa1\x01\x12\x15\n" +
 	"\x0ftheapp User API2\x02v1Zv\n" +
 	"t\n" +
 	"\n" +

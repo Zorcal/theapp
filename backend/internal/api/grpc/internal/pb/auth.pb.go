@@ -9,6 +9,7 @@ package pb
 import (
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
+	_ "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -396,7 +397,7 @@ var File_auth_proto protoreflect.FileDescriptor
 const file_auth_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"auth.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x10permission.proto\"/\n" +
+	"auth.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17google/rpc/status.proto\x1a\x10permission.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"/\n" +
 	"\x17RequestMagicLinkRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\".\n" +
 	"\x16VerifyMagicLinkRequest\x12\x14\n" +
@@ -416,16 +417,67 @@ const file_auth_proto_rawDesc = "" +
 	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x03R\x05email\x12K\n" +
 	"\x13project_permissions\x18\x03 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x12projectPermissions\x12U\n" +
 	"\x18organization_permissions\x18\x04 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x17organizationPermissions\x12I\n" +
-	"\x12system_permissions\x18\x05 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x11systemPermissions2\xb2\a\n" +
-	"\vAuthService\x12\x9e\x02\n" +
-	"\x10RequestMagicLink\x12\".theapp.v1.RequestMagicLinkRequest\x1a\x16.google.protobuf.Empty\"\xcd\x01\x92A\xab\x01b\x00r\xa6\x01\n" +
+	"\x12system_permissions\x18\x05 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x11systemPermissions2\xf9\x0f\n" +
+	"\vAuthService\x12\x92\x03\n" +
+	"\x10RequestMagicLink\x12\".theapp.v1.RequestMagicLinkRequest\x1a\x16.google.protobuf.Empty\"\xc1\x02\x92A\x9f\x02J7\n" +
+	"\x03400\x120\n" +
+	"\x16Invalid email address.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Statusb\x00r\xa6\x01\n" +
 	"\xa3\x01\n" +
-	"\x11x-idempotency-key\x12\x8b\x01A client-generated UUID. Retrying the same request with the same key returns the original result instead of sending a second sign-in email.\x18\x01\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/v1/auth/magic-link\x12k\n" +
-	"\x0fVerifyMagicLink\x12!.theapp.v1.VerifyMagicLinkRequest\x1a\x14.theapp.v1.TokenPair\"\x1f\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/verify\x12r\n" +
-	"\x12RefreshAccessToken\x12$.theapp.v1.RefreshAccessTokenRequest\x1a\x14.theapp.v1.TokenPair\" \x92A\x02b\x00\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/auth/refresh\x12s\n" +
-	"\x12RevokeRefreshToken\x12$.theapp.v1.RevokeRefreshTokenRequest\x1a\x16.google.protobuf.Empty\"\x1f\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/revoke\x12l\n" +
-	"\x11RevokeAllSessions\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/v1/auth/sessions/revoke-all\x12\xbd\x01\n" +
-	"\x0eGetAuthContext\x12 .theapp.v1.GetAuthContextRequest\x1a\x16.theapp.v1.AuthContext\"q\x92AVrT\n" +
+	"\x11x-idempotency-key\x12\x8b\x01A client-generated UUID. Retrying the same request with the same key returns the original result instead of sending a second sign-in email.\x18\x01\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/v1/auth/magic-link\x12\xa5\x02\n" +
+	"\x0fVerifyMagicLink\x12!.theapp.v1.VerifyMagicLinkRequest\x1a\x14.theapp.v1.TokenPair\"\xd8\x01\x92A\xba\x01J1\n" +
+	"\x03400\x12*\n" +
+	"\x10Invalid request.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJH\n" +
+	"\x03401\x12A\n" +
+	"'Magic-link token is invalid or expired.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Statusb\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/verify\x12\xb3\x02\n" +
+	"\x12RefreshAccessToken\x12$.theapp.v1.RefreshAccessTokenRequest\x1a\x14.theapp.v1.TokenPair\"\xe0\x01\x92A\xc1\x01J1\n" +
+	"\x03400\x12*\n" +
+	"\x10Invalid request.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJO\n" +
+	"\x03401\x12H\n" +
+	".Refresh token is invalid, expired, or revoked.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Statusb\x00\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/auth/refresh\x12\xba\x02\n" +
+	"\x12RevokeRefreshToken\x12$.theapp.v1.RevokeRefreshTokenRequest\x1a\x16.google.protobuf.Empty\"\xe5\x01\x92A\xc7\x01J1\n" +
+	"\x03400\x12*\n" +
+	"\x10Invalid request.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJU\n" +
+	"\x03404\x12N\n" +
+	"4Refresh token does not exist or was already revoked.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Statusb\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/revoke\x12\xed\x01\n" +
+	"\x11RevokeAllSessions\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\xa7\x01\x92A}J@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/v1/auth/sessions/revoke-all\x12\xc9\x03\n" +
+	"\x0eGetAuthContext\x12 .theapp.v1.GetAuthContextRequest\x1a\x16.theapp.v1.AuthContext\"\xfc\x02\x92A\xe0\x02JE\n" +
+	"\x03400\x12>\n" +
+	"$Missing or invalid project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJD\n" +
+	"\x03404\x12=\n" +
+	"#Caller or project no longer exists.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrT\n" +
 	"R\n" +
 	"\fx-project-id\x12>ID of the project for which authorization context is resolved.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/auth/contextB\xc7\x02\x92A\xa1\x01\x12\x15\n" +
 	"\x0ftheapp Auth API2\x02v1Zv\n" +

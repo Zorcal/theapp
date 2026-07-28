@@ -6,10 +6,10 @@ import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
 import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
-
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   info: {
     title: "theapp Project API"
@@ -38,8 +38,35 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service ProjectService {
   // Lists the projects accessible to the authenticated caller.
   rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse) {
-    option (google.api.http) = {
-      get: "/v1/projects"
+    option (google.api.http) = {get: "/v1/projects"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid pagination."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
     };
   }
 }
@@ -69,7 +96,10 @@ message Project {
   // collisions").
   //
   // If this is provided on update, it must match the server's ETag.
-  string etag = 7 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+  string etag = 7 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.field_info).format = UUID4
+  ];
 }
 
 // Request message for listing accessible projects.

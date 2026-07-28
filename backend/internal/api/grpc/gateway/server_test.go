@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -19,6 +20,56 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/order"
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
+
+func TestOpenAPISpecs_documentErrors(t *testing.T) {
+	specPaths := []string{
+		"openapi/auth.swagger.json",
+		"openapi/permission.swagger.json",
+		"openapi/project.swagger.json",
+		"openapi/role.swagger.json",
+		"openapi/system_role.swagger.json",
+		"openapi/user.swagger.json",
+	}
+
+	for _, specPath := range specPaths {
+		specJSON, err := openapiFiles.ReadFile(specPath)
+		if err != nil {
+			t.Fatalf("ReadFile(%q) error = %v", specPath, err)
+		}
+
+		var spec struct {
+			Paths map[string]map[string]struct {
+				OperationID string `json:"operationId"`
+				Responses   map[string]struct {
+					Schema struct {
+						Ref string `json:"$ref"`
+					} `json:"schema"`
+				} `json:"responses"`
+			} `json:"paths"`
+		}
+		if err := json.Unmarshal(specJSON, &spec); err != nil {
+			t.Fatalf("Unmarshal(%q) error = %v", specPath, err)
+		}
+
+		for _, path := range spec.Paths {
+			for _, operation := range path {
+				documentedErrors := 0
+				for code, response := range operation.Responses {
+					if code == "200" || code == "default" {
+						continue
+					}
+					documentedErrors++
+					if got, want := response.Schema.Ref, "#/definitions/rpcStatus"; got != want {
+						t.Errorf("%s response %s schema = %q, want %q", operation.OperationID, code, got, want)
+					}
+				}
+				if documentedErrors == 0 {
+					t.Errorf("%s documented error count = 0, want greater than 0", operation.OperationID)
+				}
+			}
+		}
+	}
+}
 
 func TestNewServer(t *testing.T) {
 	ts := newTestGateway(t)

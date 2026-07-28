@@ -9,6 +9,7 @@ package pb
 import (
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
+	_ "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -202,7 +203,7 @@ var File_permission_proto protoreflect.FileDescriptor
 
 const file_permission_proto_rawDesc = "" +
 	"\n" +
-	"\x10permission.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x18\n" +
+	"\x10permission.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x18\n" +
 	"\x16ListPermissionsRequest\"R\n" +
 	"\x17ListPermissionsResponse\x127\n" +
 	"\vpermissions\x18\x01 \x03(\x0e2\x15.theapp.v1.PermissionR\vpermissions*\x96\x05\n" +
@@ -225,9 +226,21 @@ const file_permission_proto_rawDesc = "" +
 	"*PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION\x10\r\x120\n" +
 	",PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION\x10\x0e\x123\n" +
 	"/PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS\x10\x0f\x128\n" +
-	"4PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS\x10\x102\x86\x01\n" +
-	"\x11PermissionService\x12q\n" +
-	"\x0fListPermissions\x12!.theapp.v1.ListPermissionsRequest\x1a\".theapp.v1.ListPermissionsResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/permissionsB\xd3\x02\x92A\xa7\x01\x12\x1b\n" +
+	"4PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS\x10\x102\x82\x03\n" +
+	"\x11PermissionService\x12\xec\x02\n" +
+	"\x0fListPermissions\x12!.theapp.v1.ListPermissionsRequest\x1a\".theapp.v1.ListPermissionsResponse\"\x91\x02\x92A\xf6\x01J1\n" +
+	"\x03400\x12*\n" +
+	"\x10Invalid request.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJD\n" +
+	"\x03403\x12=\n" +
+	"#Custom-role read access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x11\x12\x0f/v1/permissionsB\xd3\x02\x92A\xa7\x01\x12\x1b\n" +
 	"\x15theapp Permission API2\x02v1Zv\n" +
 	"t\n" +
 	"\n" +

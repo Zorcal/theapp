@@ -9,6 +9,7 @@ package pb
 import (
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
+	_ "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -251,7 +252,7 @@ var File_project_proto protoreflect.FileDescriptor
 
 const file_project_proto_rawDesc = "" +
 	"\n" +
-	"\rproject.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xa9\x02\n" +
+	"\rproject.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xa9\x02\n" +
 	"\aProject\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\x05B\x03\xe0A\x03R\x02id\x12,\n" +
 	"\x0forganization_id\x18\x02 \x01(\x05B\x03\xe0A\x03R\x0eorganizationId\x12\x12\n" +
@@ -271,9 +272,18 @@ const file_project_proto_rawDesc = "" +
 	"\bprojects\x18\x01 \x03(\v2\x12.theapp.v1.ProjectR\bprojects\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2w\n" +
-	"\x0eProjectService\x12e\n" +
-	"\fListProjects\x12\x1e.theapp.v1.ListProjectsRequest\x1a\x1f.theapp.v1.ListProjectsResponse\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/projectsB\xcd\x02\x92A\xa4\x01\x12\x18\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xb0\x02\n" +
+	"\x0eProjectService\x12\x9d\x02\n" +
+	"\fListProjects\x12\x1e.theapp.v1.ListProjectsRequest\x1a\x1f.theapp.v1.ListProjectsResponse\"\xcb\x01\x92A\xb3\x01J4\n" +
+	"\x03400\x12-\n" +
+	"\x13Invalid pagination.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x0e\x12\f/v1/projectsB\xcd\x02\x92A\xa4\x01\x12\x18\n" +
 	"\x12theapp Project API2\x02v1Zv\n" +
 	"t\n" +
 	"\n" +

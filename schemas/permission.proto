@@ -3,10 +3,10 @@ syntax = "proto3";
 package theapp.v1;
 
 import "google/api/annotations.proto";
+import "google/rpc/status.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
-
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   info: {
     title: "theapp Permission API"
@@ -56,8 +56,44 @@ enum Permission {
 service PermissionService {
   // Lists permissions that may be granted through a custom role.
   rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse) {
-    option (google.api.http) = {
-      get: "/v1/permissions"
+    option (google.api.http) = {get: "/v1/permissions"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Custom-role read access is missing."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
     };
   }
 }

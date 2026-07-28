@@ -9,6 +9,7 @@ package pb
 import (
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
+	_ "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -1158,7 +1159,7 @@ var File_role_proto protoreflect.FileDescriptor
 const file_role_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x10permission.proto\"\x95\x02\n" +
+	"role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a\x10permission.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x95\x02\n" +
 	"\x04Role\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x127\n" +
@@ -1227,45 +1228,228 @@ const file_role_proto_rawDesc = "" +
 	"#UnassignRoleFromOrganizationRequest\x12$\n" +
 	"\arole_id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06roleId\x12$\n" +
 	"\auser_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06userId\"&\n" +
-	"$UnassignRoleFromOrganizationResponse2\xb3\x13\n" +
-	"\vRoleService\x12\x97\x01\n" +
+	"$UnassignRoleFromOrganizationResponse2\x997\n" +
+	"\vRoleService\x12\x84\x04\n" +
 	"\n" +
-	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"Z\x92ACrA\n" +
+	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"\xc6\x03\x92A\xae\x03JG\n" +
+	"\x03400\x12@\n" +
+	"&Invalid role data or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ[\n" +
+	"\x03403\x12T\n" +
+	":Role creation or permission-superset authority is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJF\n" +
+	"\x03404\x12?\n" +
+	"%Organization or permission not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/roles\x12\x93\x01\n" +
-	"\aGetRole\x12\x19.theapp.v1.GetRoleRequest\x1a\x0f.theapp.v1.Role\"\\\x92ACrA\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/roles\x12\xee\x03\n" +
+	"\aGetRole\x12\x19.theapp.v1.GetRoleRequest\x1a\x0f.theapp.v1.Role\"\xb6\x03\x92A\x9c\x03JE\n" +
+	"\x03400\x12>\n" +
+	"$Invalid role ID or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJD\n" +
+	"\x03403\x12=\n" +
+	"#Custom-role read access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJM\n" +
+	"\x03404\x12F\n" +
+	",Role not found in the selected organization.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/roles/{id}\x12\x9f\x01\n" +
-	"\tListRoles\x12\x1b.theapp.v1.ListRolesRequest\x1a\x1c.theapp.v1.ListRolesResponse\"W\x92ACrA\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/v1/roles/{id}\x12\xae\x03\n" +
+	"\tListRoles\x12\x1b.theapp.v1.ListRolesRequest\x1a\x1c.theapp.v1.ListRolesResponse\"\xe5\x02\x92A\xd0\x02JH\n" +
+	"\x03400\x12A\n" +
+	"'Invalid pagination or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJD\n" +
+	"\x03403\x12=\n" +
+	"#Custom-role read access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\v\x12\t/v1/roles\x12\xe6\x01\n" +
-	"\x1aListProjectRoleAssignments\x12,.theapp.v1.ListProjectRoleAssignmentsRequest\x1a-.theapp.v1.ListProjectRoleAssignmentsResponse\"k\x92ADrB\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\v\x12\t/v1/roles\x12\xdd\x04\n" +
+	"\x1aListProjectRoleAssignments\x12,.theapp.v1.ListProjectRoleAssignmentsRequest\x1a-.theapp.v1.ListProjectRoleAssignmentsResponse\"\xe1\x03\x92A\xb9\x03JR\n" +
+	"\x03400\x12K\n" +
+	"1Invalid user ID, pagination, or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJK\n" +
+	"\x03403\x12D\n" +
+	"*Project-assignment read access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJU\n" +
+	"\x03404\x12N\n" +
+	"4User, project, or organization membership not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrB\n" +
 	"@\n" +
-	"\fx-project-id\x12,ID of the project whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/project-role-assignments\x12\x8d\x02\n" +
-	"\x1fListOrganizationRoleAssignments\x121.theapp.v1.ListOrganizationRoleAssignmentsRequest\x1a2.theapp.v1.ListOrganizationRoleAssignmentsResponse\"\x82\x01\x92AVrT\n" +
+	"\fx-project-id\x12,ID of the project whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/v1/project-role-assignments\x12\xfe\x04\n" +
+	"\x1fListOrganizationRoleAssignments\x121.theapp.v1.ListOrganizationRoleAssignmentsRequest\x1a2.theapp.v1.ListOrganizationRoleAssignmentsResponse\"\xf3\x03\x92A\xc6\x03JR\n" +
+	"\x03400\x12K\n" +
+	"1Invalid user ID, pagination, or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJP\n" +
+	"\x03403\x12I\n" +
+	"/Organization-assignment read access is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJK\n" +
+	"\x03404\x12D\n" +
+	"*User or organization membership not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrT\n" +
 	"R\n" +
-	"\fx-project-id\x12>ID of a project in the organization whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02#\x12!/v1/organization-role-assignments\x12\xa1\x01\n" +
+	"\fx-project-id\x12>ID of a project in the organization whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02#\x12!/v1/organization-role-assignments\x12\xaf\x04\n" +
 	"\n" +
-	"UpdateRole\x12\x1c.theapp.v1.UpdateRoleRequest\x1a\x0f.theapp.v1.Role\"d\x92ACrA\n" +
+	"UpdateRole\x12\x1c.theapp.v1.UpdateRoleRequest\x1a\x0f.theapp.v1.Role\"\xf1\x03\x92A\xcf\x03JU\n" +
+	"\x03400\x12N\n" +
+	"4Invalid role data, update mask, or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJY\n" +
+	"\x03403\x12R\n" +
+	"8Role update or permission-superset authority is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ[\n" +
+	"\x03404\x12T\n" +
+	":Role or permission not found in the selected organization.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/roles/{role.id}\x12\xc4\x01\n" +
-	"\x15ModifyRolePermissions\x12'.theapp.v1.ModifyRolePermissionsRequest\x1a\x0f.theapp.v1.Role\"q\x92ACrA\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/roles/{role.id}\x12\xdc\x04\n" +
+	"\x15ModifyRolePermissions\x12'.theapp.v1.ModifyRolePermissionsRequest\x1a\x0f.theapp.v1.Role\"\x88\x04\x92A\xd9\x03J_\n" +
+	"\x03400\x12X\n" +
+	">Invalid or conflicting permission changes or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJY\n" +
+	"\x03403\x12R\n" +
+	"8Role update or permission-superset authority is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ[\n" +
+	"\x03404\x12T\n" +
+	":Role or permission not found in the selected organization.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02%:\x01*\" /v1/roles/{id}:modifyPermissions\x12\xa7\x01\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02%:\x01*\" /v1/roles/{id}:modifyPermissions\x12\x99\x04\n" +
 	"\n" +
-	"DeleteRole\x12\x1c.theapp.v1.DeleteRoleRequest\x1a\x1d.theapp.v1.DeleteRoleResponse\"\\\x92ACrA\n" +
+	"DeleteRole\x12\x1c.theapp.v1.DeleteRoleRequest\x1a\x1d.theapp.v1.DeleteRoleResponse\"\xcd\x03\x92A\xb3\x03JE\n" +
+	"\x03400\x12>\n" +
+	"$Invalid role ID or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ[\n" +
+	"\x03403\x12T\n" +
+	":Role deletion or permission-superset authority is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJM\n" +
+	"\x03404\x12F\n" +
+	",Role not found in the selected organization.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10*\x0e/v1/roles/{id}\x12\xd2\x01\n" +
-	"\x13AssignRoleToProject\x12%.theapp.v1.AssignRoleToProjectRequest\x1a&.theapp.v1.AssignRoleToProjectResponse\"l\x92AErC\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10*\x0e/v1/roles/{id}\x12\x95\x05\n" +
+	"\x13AssignRoleToProject\x12%.theapp.v1.AssignRoleToProjectRequest\x1a&.theapp.v1.AssignRoleToProjectResponse\"\xae\x04\x92A\x86\x04JA\n" +
+	"\x03400\x12:\n" +
+	" Invalid IDs or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJX\n" +
+	"\x03403\x12Q\n" +
+	"7Assignment or permission-superset authority is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ[\n" +
+	"\x03404\x12T\n" +
+	":User, role, project, or organization membership not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJH\n" +
+	"\x03409\x12A\n" +
+	"'Project role assignment already exists.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrC\n" +
 	"A\n" +
-	"\fx-project-id\x12-ID of the project where the role is assigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/v1/roles:assignToProject\x12\xe4\x01\n" +
-	"\x17UnassignRoleFromProject\x12).theapp.v1.UnassignRoleFromProjectRequest\x1a*.theapp.v1.UnassignRoleFromProjectResponse\"r\x92AGrE\n" +
+	"\fx-project-id\x12-ID of the project where the role is assigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/v1/roles:assignToProject\x12\xe2\x04\n" +
+	"\x17UnassignRoleFromProject\x12).theapp.v1.UnassignRoleFromProjectRequest\x1a*.theapp.v1.UnassignRoleFromProjectResponse\"\xef\x03\x92A\xc3\x03JA\n" +
+	"\x03400\x12:\n" +
+	" Invalid IDs or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJZ\n" +
+	"\x03403\x12S\n" +
+	"9Unassignment or permission-superset authority is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ^\n" +
+	"\x03404\x12W\n" +
+	"=Project role assignment or organization membership not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrE\n" +
 	"C\n" +
-	"\fx-project-id\x12/ID of the project where the role is unassigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/roles:unassignFromProject\x12\xf9\x01\n" +
-	"\x18AssignRoleToOrganization\x12*.theapp.v1.AssignRoleToOrganizationRequest\x1a+.theapp.v1.AssignRoleToOrganizationResponse\"\x83\x01\x92AWrU\n" +
+	"\fx-project-id\x12/ID of the project where the role is unassigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/v1/roles:unassignFromProject\x12\xc5\x05\n" +
+	"\x18AssignRoleToOrganization\x12*.theapp.v1.AssignRoleToOrganizationRequest\x1a+.theapp.v1.AssignRoleToOrganizationResponse\"\xcf\x04\x92A\xa2\x04JA\n" +
+	"\x03400\x12:\n" +
+	" Invalid IDs or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJe\n" +
+	"\x03403\x12^\n" +
+	"DOrganization assignment or permission-superset authority is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJS\n" +
+	"\x03404\x12L\n" +
+	"2User, role, organization, or membership not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJM\n" +
+	"\x03409\x12F\n" +
+	",Organization role assignment already exists.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrU\n" +
 	"S\n" +
-	"\fx-project-id\x12?ID of a project in the organization where the role is assigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02#:\x01*\"\x1e/v1/roles:assignToOrganization\x12\x8b\x02\n" +
-	"\x1cUnassignRoleFromOrganization\x12..theapp.v1.UnassignRoleFromOrganizationRequest\x1a/.theapp.v1.UnassignRoleFromOrganizationResponse\"\x89\x01\x92AYrW\n" +
+	"\fx-project-id\x12?ID of a project in the organization where the role is assigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02#:\x01*\"\x1e/v1/roles:assignToOrganization\x12\x8d\x05\n" +
+	"\x1cUnassignRoleFromOrganization\x12..theapp.v1.UnassignRoleFromOrganizationRequest\x1a/.theapp.v1.UnassignRoleFromOrganizationResponse\"\x8b\x04\x92A\xda\x03JA\n" +
+	"\x03400\x12:\n" +
+	" Invalid IDs or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJg\n" +
+	"\x03403\x12`\n" +
+	"FOrganization unassignment or permission-superset authority is missing.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJV\n" +
+	"\x03404\x12O\n" +
+	"5Organization role assignment or membership not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusrW\n" +
 	"U\n" +
 	"\fx-project-id\x12AID of a project in the organization where the role is unassigned.\x18\x03(\x01\x82\xd3\xe4\x93\x02':\x01*\"\"/v1/roles:unassignFromOrganizationB\xc7\x02\x92A\xa1\x01\x12\x15\n" +
 	"\x0ftheapp Role API2\x02v1Zv\n" +

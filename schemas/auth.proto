@@ -6,11 +6,11 @@ import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
 import "google/protobuf/empty.proto";
-import "protoc-gen-openapiv2/options/annotations.proto";
+import "google/rpc/status.proto";
 import "permission.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
-
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   info: {
     title: "theapp Auth API"
@@ -47,6 +47,24 @@ service AuthService {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       security: {}
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid email address."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
       parameters: {
         headers: {
           name: "x-idempotency-key"
@@ -66,6 +84,33 @@ service AuthService {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       security: {}
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Magic-link token is invalid or expired."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
     };
   }
 
@@ -78,6 +123,33 @@ service AuthService {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       security: {}
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Refresh token is invalid, expired, or revoked."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
     };
   }
 
@@ -89,6 +161,33 @@ service AuthService {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       security: {}
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Refresh token does not exist or was already revoked."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
     };
   }
 
@@ -99,15 +198,69 @@ service AuthService {
       post: "/v1/auth/sessions/revoke-all"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+    };
   }
 
   // GetAuthContext returns authorization context for the authenticated caller and selected
   // project.
   rpc GetAuthContext(GetAuthContextRequest) returns (AuthContext) {
-    option (google.api.http) = {
-      get: "/v1/auth/context"
-    };
+    option (google.api.http) = {get: "/v1/auth/context"};
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Missing or invalid project metadata."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Caller or project no longer exists."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
       parameters: {
         headers: {
           name: "x-project-id"
@@ -162,7 +315,10 @@ message TokenPair {
 // AuthContext contains authorization data for the authenticated caller and selected project.
 message AuthContext {
   // The caller's user ID.
-  string user_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+  string user_id = 1 [
+    (google.api.field_behavior) = OUTPUT_ONLY,
+    (google.api.field_info).format = UUID4
+  ];
 
   // The caller's email address.
   string email = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
