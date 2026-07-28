@@ -157,10 +157,10 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** the custom-role service is safe to expose more broadly — escalation and cleanup are in place, and a fully privileged system administrator always remains available for recovery.
 
-## Phase 17 — auth-data-exposure endpoint
+## Phase 17 — auth-context endpoint — done
 
-41. Extend `schemas/auth.proto` with the auth-data-exposure RPC. The response carries the caller's ID and email plus three effective permission sets: project permissions resolved from project-, organization-, and system-scope assignments for the selected project; organization permissions resolved from organization- and system-scope assignments for that project's organization; and system permissions resolved from system-scope assignments only. These sets expose where a permission is usable without exposing which role or assignment supplied it. Run `make generate`.
-42. Auth-data-exposure endpoint. Resolve all three permission sets for the authenticated caller and selected project so frontends can render project-, organization-, and system-scoped actions without treating a project-only grant as organization-wide authority. The endpoint requires project metadata because both the project and organization permission sets are relative to the selected project. Depends on 24, 41.
+41. Extend `schemas/auth.proto` with the auth-context RPC. The response carries the caller's ID and email plus three effective permission sets: project permissions resolved from project-, organization-, and system-scope assignments for the selected project; organization permissions resolved from organization- and system-scope assignments for that project's organization; and system permissions resolved from system-scope assignments only. These sets expose where a permission is usable without exposing which role or assignment supplied it. Run `make generate`. This part is complete.
+42. Auth-context endpoint. Resolve all three permission sets for the authenticated caller and selected project so frontends can render project-, organization-, and system-scoped actions without treating a project-only grant as organization-wide authority. The endpoint requires project metadata because both the project and organization permission sets are relative to the selected project. This part is complete. Depends on 24, 41.
 
 **Checkpoint:** the endpoint returns the caller's ID and email plus effective project-, organization-, and system-scoped permissions for the selected project.
 

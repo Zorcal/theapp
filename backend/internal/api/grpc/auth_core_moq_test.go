@@ -21,6 +21,9 @@ var _ AuthCore = &MockedAuthCore{}
 //
 //		// make and configure a mocked AuthCore
 //		mockedAuthCore := &MockedAuthCore{
+//			AuthContextFunc: func(ctx context.Context) (mdl.AuthContext, error) {
+//				panic("mock out the AuthContext method")
+//			},
 //			AuthSessionFunc: func(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
 //				panic("mock out the AuthSession method")
 //			},
@@ -46,6 +49,9 @@ var _ AuthCore = &MockedAuthCore{}
 //
 //	}
 type MockedAuthCore struct {
+	// AuthContextFunc mocks the AuthContext method.
+	AuthContextFunc func(ctx context.Context) (mdl.AuthContext, error)
+
 	// AuthSessionFunc mocks the AuthSession method.
 	AuthSessionFunc func(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error)
 
@@ -66,6 +72,11 @@ type MockedAuthCore struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AuthContext holds details about calls to the AuthContext method.
+		AuthContext []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// AuthSession holds details about calls to the AuthSession method.
 		AuthSession []struct {
 			// Ctx is the ctx argument value.
@@ -113,12 +124,45 @@ type MockedAuthCore struct {
 			Vml mdl.VerifyMagicLink
 		}
 	}
+	lockAuthContext                sync.RWMutex
 	lockAuthSession                sync.RWMutex
 	lockOrganizationAuthSession    sync.RWMutex
 	lockRefreshAccessToken         sync.RWMutex
 	lockRevokeAllUserRefreshTokens sync.RWMutex
 	lockRevokeRefreshToken         sync.RWMutex
 	lockVerifyMagicLink            sync.RWMutex
+}
+
+// AuthContext calls AuthContextFunc.
+func (mock *MockedAuthCore) AuthContext(ctx context.Context) (mdl.AuthContext, error) {
+	if mock.AuthContextFunc == nil {
+		panic("MockedAuthCore.AuthContextFunc: method is nil but AuthCore.AuthContext was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockAuthContext.Lock()
+	mock.calls.AuthContext = append(mock.calls.AuthContext, callInfo)
+	mock.lockAuthContext.Unlock()
+	return mock.AuthContextFunc(ctx)
+}
+
+// AuthContextCalls gets all the calls that were made to AuthContext.
+// Check the length with:
+//
+//	len(mockedAuthCore.AuthContextCalls())
+func (mock *MockedAuthCore) AuthContextCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockAuthContext.RLock()
+	calls = mock.calls.AuthContext
+	mock.lockAuthContext.RUnlock()
+	return calls
 }
 
 // AuthSession calls AuthSessionFunc.

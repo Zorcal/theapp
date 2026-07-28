@@ -51,6 +51,9 @@ type AuthCore interface {
 	// projectID's organization.
 	// Returns [mdl.ErrNotFound] if no user or project with those IDs exists.
 	OrganizationAuthSession(ctx context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error)
+	// AuthContext returns authorization context for the authenticated caller and selected project.
+	// Returns [mdl.ErrNotFound] if the caller or selected project no longer exists.
+	AuthContext(ctx context.Context) (mdl.AuthContext, error)
 }
 
 //go:generate moq -rm -fmt goimports -out workflow_auth_core_moq_test.go . WorkflowAuthCore:MockedWorkflowAuthCore
@@ -135,4 +138,20 @@ func (s *authService) RevokeAllSessions(ctx context.Context, req *emptypb.Empty)
 	}
 
 	return &emptypb.Empty{}, nil
+}
+
+func (s *authService) GetAuthContext(ctx context.Context, req *pb.GetAuthContextRequest) (*pb.AuthContext, error) {
+	if err := validate.GetAuthContext(req); err != nil {
+		return nil, fmt.Errorf("validate get auth context request: %w", err)
+	}
+
+	authCtx, err := s.authCore.AuthContext(ctx)
+	if err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "auth context not found")
+		}
+		return nil, fmt.Errorf("get auth context: %w", err)
+	}
+
+	return conv.AuthContextToPB(authCtx), nil
 }

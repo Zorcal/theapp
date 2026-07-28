@@ -361,6 +361,58 @@ func (c *Core) OrganizationAuthSession(ctx context.Context, userID uuid.UUID, pr
 	}, nil
 }
 
+// AuthContext returns authorization context for the authenticated caller and selected project.
+// Returns [mdl.ErrNotFound] if the caller or selected project no longer exists.
+func (c *Core) AuthContext(ctx context.Context) (mdl.AuthContext, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return mdl.AuthContext{}, errors.New("auth session missing")
+	}
+	if sess.ProjectID == nil {
+		return mdl.AuthContext{}, errors.New("project context missing")
+	}
+
+	user, err := c.userStorer.UserByExternalID(ctx, sess.User.UserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthContext{}, mdl.ErrNotFound
+		}
+		return mdl.AuthContext{}, fmt.Errorf("user: %w", err)
+	}
+
+	projectPerms, err := c.permissionStorer.ProjectPermissions(ctx, sess.User.UserID, *sess.ProjectID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthContext{}, mdl.ErrNotFound
+		}
+		return mdl.AuthContext{}, fmt.Errorf("project permissions: %w", err)
+	}
+
+	orgPerms, err := c.permissionStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, *sess.ProjectID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthContext{}, mdl.ErrNotFound
+		}
+		return mdl.AuthContext{}, fmt.Errorf("organization permissions: %w", err)
+	}
+
+	systemPerms, err := c.permissionStorer.UserSystemPermissionsByExternalID(ctx, sess.User.UserID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.AuthContext{}, mdl.ErrNotFound
+		}
+		return mdl.AuthContext{}, fmt.Errorf("system permissions: %w", err)
+	}
+
+	return mdl.AuthContext{
+		UserID:                  user.ExternalID,
+		Email:                   user.Email,
+		ProjectPermissions:      permissionsFromPg(projectPerms.PermissionNames),
+		OrganizationPermissions: permissionsFromPg(orgPerms.PermissionNames),
+		SystemPermissions:       permissionsFromPg(systemPerms),
+	}, nil
+}
+
 // issueTokenPair mints a signed JWT access token and a new opaque refresh token, persists the refresh token,
 // and returns both.
 func (c *Core) issueTokenPair(ctx context.Context, userID int, userExternalID uuid.UUID) (mdl.AuthTokenPair, error) {

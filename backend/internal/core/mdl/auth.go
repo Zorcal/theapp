@@ -24,6 +24,15 @@ type AuthTokenPair struct {
 	ExpiresIn time.Duration
 }
 
+// AuthContext contains authorization data for the authenticated caller and selected project.
+type AuthContext struct {
+	UserID                  uuid.UUID
+	Email                   string
+	ProjectPermissions      []Permission
+	OrganizationPermissions []Permission
+	SystemPermissions       []Permission
+}
+
 // AuthUser is the authenticated caller's identity and resolved permissions.
 type AuthUser struct {
 	UserID uuid.UUID

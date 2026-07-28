@@ -3,8 +3,11 @@ syntax = "proto3";
 package theapp.v1;
 
 import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
 import "google/protobuf/empty.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
+import "permission.proto";
 
 option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
 
@@ -97,6 +100,24 @@ service AuthService {
       body: "*"
     };
   }
+
+  // GetAuthContext returns authorization context for the authenticated caller and selected
+  // project.
+  rpc GetAuthContext(GetAuthContextRequest) returns (AuthContext) {
+    option (google.api.http) = {
+      get: "/v1/auth/context"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the project for which authorization context is resolved."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
 }
 
 // Request message for RequestMagicLink.
@@ -123,6 +144,9 @@ message RevokeRefreshTokenRequest {
   string refresh_token = 1;
 }
 
+// Request message for retrieving the caller's authorization context.
+message GetAuthContextRequest {}
+
 // TokenPair holds a short-lived JWT access token and a long-lived refresh token.
 message TokenPair {
   // JWT bearer token. Include as: Authorization: Bearer <access_token>.
@@ -133,4 +157,22 @@ message TokenPair {
 
   // Remaining lifetime of access_token in seconds.
   int64 expires_in = 3;
+}
+
+// AuthContext contains authorization data for the authenticated caller and selected project.
+message AuthContext {
+  // The caller's user ID.
+  string user_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY, (google.api.field_info).format = UUID4];
+
+  // The caller's email address.
+  string email = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Permissions effective in the selected project.
+  repeated Permission project_permissions = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Permissions effective in the selected project's organization.
+  repeated Permission organization_permissions = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Permissions effective system-wide.
+  repeated Permission system_permissions = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

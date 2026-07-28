@@ -75,6 +75,7 @@ var organizationScopedPermissions = set.Set[mdl.Permission]{
 // entry, so a missing entry can never be mistaken for "deliberately open".
 var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.AuthService/RevokeAllSessions": {},
+	"/theapp.v1.AuthService/GetAuthContext":    {},
 
 	"/theapp.v1.UserService/GetUser":    {mdl.PermissionUserRead},
 	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},

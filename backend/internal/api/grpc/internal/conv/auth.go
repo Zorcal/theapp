@@ -13,6 +13,16 @@ func TokenPairToPB(p mdl.AuthTokenPair) *pb.TokenPair {
 	}
 }
 
+func AuthContextToPB(authCtx mdl.AuthContext) *pb.AuthContext {
+	return &pb.AuthContext{
+		UserId:                  authCtx.UserID.String(),
+		Email:                   authCtx.Email,
+		ProjectPermissions:      PermissionsToPB(authCtx.ProjectPermissions),
+		OrganizationPermissions: PermissionsToPB(authCtx.OrganizationPermissions),
+		SystemPermissions:       PermissionsToPB(authCtx.SystemPermissions),
+	}
+}
+
 func VerifyMagicLinkFromPB(req *pb.VerifyMagicLinkRequest) mdl.VerifyMagicLink {
 	return mdl.VerifyMagicLink{Token: req.GetToken()}
 }

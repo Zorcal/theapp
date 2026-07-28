@@ -16,6 +16,38 @@
     "application/json"
   ],
   "paths": {
+    "/v1/auth/context": {
+      "get": {
+        "summary": "GetAuthContext returns authorization context for the authenticated caller and selected\nproject.",
+        "operationId": "AuthService_GetAuthContext",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AuthContext"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "x-project-id",
+            "description": "ID of the project for which authorization context is resolved.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
     "/v1/auth/magic-link": {
       "post": {
         "summary": "RequestMagicLink sends a sign-in link to the given email address.\nIf no account exists for the address, one is created automatically.\nAlways returns success to avoid leaking whether the address is registered.",
@@ -229,6 +261,70 @@
           }
         }
       }
+    },
+    "v1AuthContext": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The caller's user ID.",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "The caller's email address.",
+          "readOnly": true
+        },
+        "projectPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective in the selected project.",
+          "readOnly": true
+        },
+        "organizationPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective in the selected project's organization.",
+          "readOnly": true
+        },
+        "systemPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective system-wide.",
+          "readOnly": true
+        }
+      },
+      "description": "AuthContext contains authorization data for the authenticated caller and selected project."
+    },
+    "v1Permission": {
+      "type": "string",
+      "enum": [
+        "PERMISSION_UNSPECIFIED",
+        "PERMISSION_USER_READ",
+        "PERMISSION_USER_CREATE",
+        "PERMISSION_USER_UPDATE",
+        "PERMISSION_SYSTEM_ROLE_READ",
+        "PERMISSION_SYSTEM_ROLE_ASSIGN",
+        "PERMISSION_SYSTEM_ROLE_UNASSIGN",
+        "PERMISSION_CUSTOM_ROLE_CREATE",
+        "PERMISSION_CUSTOM_ROLE_READ",
+        "PERMISSION_CUSTOM_ROLE_UPDATE",
+        "PERMISSION_CUSTOM_ROLE_DELETE",
+        "PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT",
+        "PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT",
+        "PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION",
+        "PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION",
+        "PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS",
+        "PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS"
+      ],
+      "default": "PERMISSION_UNSPECIFIED",
+      "description": "Permission is a capability that can be granted through a role."
     },
     "v1RefreshAccessTokenRequest": {
       "type": "object",

@@ -208,6 +208,43 @@ func (x *RevokeRefreshTokenRequest) GetRefreshToken() string {
 	return ""
 }
 
+// Request message for retrieving the caller's authorization context.
+type GetAuthContextRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAuthContextRequest) Reset() {
+	*x = GetAuthContextRequest{}
+	mi := &file_auth_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAuthContextRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAuthContextRequest) ProtoMessage() {}
+
+func (x *GetAuthContextRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAuthContextRequest.ProtoReflect.Descriptor instead.
+func (*GetAuthContextRequest) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{4}
+}
+
 // TokenPair holds a short-lived JWT access token and a long-lived refresh token.
 type TokenPair struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -223,7 +260,7 @@ type TokenPair struct {
 
 func (x *TokenPair) Reset() {
 	*x = TokenPair{}
-	mi := &file_auth_proto_msgTypes[4]
+	mi := &file_auth_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -235,7 +272,7 @@ func (x *TokenPair) String() string {
 func (*TokenPair) ProtoMessage() {}
 
 func (x *TokenPair) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_proto_msgTypes[4]
+	mi := &file_auth_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -248,7 +285,7 @@ func (x *TokenPair) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenPair.ProtoReflect.Descriptor instead.
 func (*TokenPair) Descriptor() ([]byte, []int) {
-	return file_auth_proto_rawDescGZIP(), []int{4}
+	return file_auth_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TokenPair) GetAccessToken() string {
@@ -272,12 +309,94 @@ func (x *TokenPair) GetExpiresIn() int64 {
 	return 0
 }
 
+// AuthContext contains authorization data for the authenticated caller and selected project.
+type AuthContext struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The caller's user ID.
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// The caller's email address.
+	Email string `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	// Permissions effective in the selected project.
+	ProjectPermissions []Permission `protobuf:"varint,3,rep,packed,name=project_permissions,json=projectPermissions,proto3,enum=theapp.v1.Permission" json:"project_permissions,omitempty"`
+	// Permissions effective in the selected project's organization.
+	OrganizationPermissions []Permission `protobuf:"varint,4,rep,packed,name=organization_permissions,json=organizationPermissions,proto3,enum=theapp.v1.Permission" json:"organization_permissions,omitempty"`
+	// Permissions effective system-wide.
+	SystemPermissions []Permission `protobuf:"varint,5,rep,packed,name=system_permissions,json=systemPermissions,proto3,enum=theapp.v1.Permission" json:"system_permissions,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AuthContext) Reset() {
+	*x = AuthContext{}
+	mi := &file_auth_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthContext) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthContext) ProtoMessage() {}
+
+func (x *AuthContext) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthContext.ProtoReflect.Descriptor instead.
+func (*AuthContext) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AuthContext) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *AuthContext) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *AuthContext) GetProjectPermissions() []Permission {
+	if x != nil {
+		return x.ProjectPermissions
+	}
+	return nil
+}
+
+func (x *AuthContext) GetOrganizationPermissions() []Permission {
+	if x != nil {
+		return x.OrganizationPermissions
+	}
+	return nil
+}
+
+func (x *AuthContext) GetSystemPermissions() []Permission {
+	if x != nil {
+		return x.SystemPermissions
+	}
+	return nil
+}
+
 var File_auth_proto protoreflect.FileDescriptor
 
 const file_auth_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"auth.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"/\n" +
+	"auth.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x10permission.proto\"/\n" +
 	"\x17RequestMagicLinkRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\".\n" +
 	"\x16VerifyMagicLinkRequest\x12\x14\n" +
@@ -285,12 +404,19 @@ const file_auth_proto_rawDesc = "" +
 	"\x19RefreshAccessTokenRequest\x12#\n" +
 	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"@\n" +
 	"\x19RevokeRefreshTokenRequest\x12#\n" +
-	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"r\n" +
+	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"\x17\n" +
+	"\x15GetAuthContextRequest\"r\n" +
 	"\tTokenPair\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
 	"\n" +
-	"expires_in\x18\x03 \x01(\x03R\texpiresIn2\xf2\x05\n" +
+	"expires_in\x18\x03 \x01(\x03R\texpiresIn\"\xbd\x02\n" +
+	"\vAuthContext\x12$\n" +
+	"\auser_id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06userId\x12\x19\n" +
+	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x03R\x05email\x12K\n" +
+	"\x13project_permissions\x18\x03 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x12projectPermissions\x12U\n" +
+	"\x18organization_permissions\x18\x04 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x17organizationPermissions\x12I\n" +
+	"\x12system_permissions\x18\x05 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x11systemPermissions2\xb2\a\n" +
 	"\vAuthService\x12\x9e\x02\n" +
 	"\x10RequestMagicLink\x12\".theapp.v1.RequestMagicLinkRequest\x1a\x16.google.protobuf.Empty\"\xcd\x01\x92A\xab\x01b\x00r\xa6\x01\n" +
 	"\xa3\x01\n" +
@@ -298,7 +424,10 @@ const file_auth_proto_rawDesc = "" +
 	"\x0fVerifyMagicLink\x12!.theapp.v1.VerifyMagicLinkRequest\x1a\x14.theapp.v1.TokenPair\"\x1f\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/verify\x12r\n" +
 	"\x12RefreshAccessToken\x12$.theapp.v1.RefreshAccessTokenRequest\x1a\x14.theapp.v1.TokenPair\" \x92A\x02b\x00\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/v1/auth/refresh\x12s\n" +
 	"\x12RevokeRefreshToken\x12$.theapp.v1.RevokeRefreshTokenRequest\x1a\x16.google.protobuf.Empty\"\x1f\x92A\x02b\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/revoke\x12l\n" +
-	"\x11RevokeAllSessions\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/v1/auth/sessions/revoke-allB\xc7\x02\x92A\xa1\x01\x12\x15\n" +
+	"\x11RevokeAllSessions\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/v1/auth/sessions/revoke-all\x12\xbd\x01\n" +
+	"\x0eGetAuthContext\x12 .theapp.v1.GetAuthContextRequest\x1a\x16.theapp.v1.AuthContext\"q\x92AVrT\n" +
+	"R\n" +
+	"\fx-project-id\x12>ID of the project for which authorization context is resolved.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/auth/contextB\xc7\x02\x92A\xa1\x01\x12\x15\n" +
 	"\x0ftheapp Auth API2\x02v1Zv\n" +
 	"t\n" +
 	"\n" +
@@ -321,31 +450,39 @@ func file_auth_proto_rawDescGZIP() []byte {
 	return file_auth_proto_rawDescData
 }
 
-var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_auth_proto_goTypes = []any{
 	(*RequestMagicLinkRequest)(nil),   // 0: theapp.v1.RequestMagicLinkRequest
 	(*VerifyMagicLinkRequest)(nil),    // 1: theapp.v1.VerifyMagicLinkRequest
 	(*RefreshAccessTokenRequest)(nil), // 2: theapp.v1.RefreshAccessTokenRequest
 	(*RevokeRefreshTokenRequest)(nil), // 3: theapp.v1.RevokeRefreshTokenRequest
-	(*TokenPair)(nil),                 // 4: theapp.v1.TokenPair
-	(*emptypb.Empty)(nil),             // 5: google.protobuf.Empty
+	(*GetAuthContextRequest)(nil),     // 4: theapp.v1.GetAuthContextRequest
+	(*TokenPair)(nil),                 // 5: theapp.v1.TokenPair
+	(*AuthContext)(nil),               // 6: theapp.v1.AuthContext
+	(Permission)(0),                   // 7: theapp.v1.Permission
+	(*emptypb.Empty)(nil),             // 8: google.protobuf.Empty
 }
 var file_auth_proto_depIdxs = []int32{
-	0, // 0: theapp.v1.AuthService.RequestMagicLink:input_type -> theapp.v1.RequestMagicLinkRequest
-	1, // 1: theapp.v1.AuthService.VerifyMagicLink:input_type -> theapp.v1.VerifyMagicLinkRequest
-	2, // 2: theapp.v1.AuthService.RefreshAccessToken:input_type -> theapp.v1.RefreshAccessTokenRequest
-	3, // 3: theapp.v1.AuthService.RevokeRefreshToken:input_type -> theapp.v1.RevokeRefreshTokenRequest
-	5, // 4: theapp.v1.AuthService.RevokeAllSessions:input_type -> google.protobuf.Empty
-	5, // 5: theapp.v1.AuthService.RequestMagicLink:output_type -> google.protobuf.Empty
-	4, // 6: theapp.v1.AuthService.VerifyMagicLink:output_type -> theapp.v1.TokenPair
-	4, // 7: theapp.v1.AuthService.RefreshAccessToken:output_type -> theapp.v1.TokenPair
-	5, // 8: theapp.v1.AuthService.RevokeRefreshToken:output_type -> google.protobuf.Empty
-	5, // 9: theapp.v1.AuthService.RevokeAllSessions:output_type -> google.protobuf.Empty
-	5, // [5:10] is the sub-list for method output_type
-	0, // [0:5] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	7, // 0: theapp.v1.AuthContext.project_permissions:type_name -> theapp.v1.Permission
+	7, // 1: theapp.v1.AuthContext.organization_permissions:type_name -> theapp.v1.Permission
+	7, // 2: theapp.v1.AuthContext.system_permissions:type_name -> theapp.v1.Permission
+	0, // 3: theapp.v1.AuthService.RequestMagicLink:input_type -> theapp.v1.RequestMagicLinkRequest
+	1, // 4: theapp.v1.AuthService.VerifyMagicLink:input_type -> theapp.v1.VerifyMagicLinkRequest
+	2, // 5: theapp.v1.AuthService.RefreshAccessToken:input_type -> theapp.v1.RefreshAccessTokenRequest
+	3, // 6: theapp.v1.AuthService.RevokeRefreshToken:input_type -> theapp.v1.RevokeRefreshTokenRequest
+	8, // 7: theapp.v1.AuthService.RevokeAllSessions:input_type -> google.protobuf.Empty
+	4, // 8: theapp.v1.AuthService.GetAuthContext:input_type -> theapp.v1.GetAuthContextRequest
+	8, // 9: theapp.v1.AuthService.RequestMagicLink:output_type -> google.protobuf.Empty
+	5, // 10: theapp.v1.AuthService.VerifyMagicLink:output_type -> theapp.v1.TokenPair
+	5, // 11: theapp.v1.AuthService.RefreshAccessToken:output_type -> theapp.v1.TokenPair
+	8, // 12: theapp.v1.AuthService.RevokeRefreshToken:output_type -> google.protobuf.Empty
+	8, // 13: theapp.v1.AuthService.RevokeAllSessions:output_type -> google.protobuf.Empty
+	6, // 14: theapp.v1.AuthService.GetAuthContext:output_type -> theapp.v1.AuthContext
+	9, // [9:15] is the sub-list for method output_type
+	3, // [3:9] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_auth_proto_init() }
@@ -353,13 +490,14 @@ func file_auth_proto_init() {
 	if File_auth_proto != nil {
 		return
 	}
+	file_permission_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

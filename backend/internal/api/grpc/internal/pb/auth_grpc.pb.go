@@ -25,6 +25,7 @@ const (
 	AuthService_RefreshAccessToken_FullMethodName = "/theapp.v1.AuthService/RefreshAccessToken"
 	AuthService_RevokeRefreshToken_FullMethodName = "/theapp.v1.AuthService/RevokeRefreshToken"
 	AuthService_RevokeAllSessions_FullMethodName  = "/theapp.v1.AuthService/RevokeAllSessions"
+	AuthService_GetAuthContext_FullMethodName     = "/theapp.v1.AuthService/GetAuthContext"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -47,6 +48,9 @@ type AuthServiceClient interface {
 	// RevokeAllSessions revokes all active refresh tokens for the authenticated user, ending all sessions.
 	// Requires a valid access token.
 	RevokeAllSessions(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetAuthContext returns authorization context for the authenticated caller and selected
+	// project.
+	GetAuthContext(ctx context.Context, in *GetAuthContextRequest, opts ...grpc.CallOption) (*AuthContext, error)
 }
 
 type authServiceClient struct {
@@ -107,6 +111,16 @@ func (c *authServiceClient) RevokeAllSessions(ctx context.Context, in *emptypb.E
 	return out, nil
 }
 
+func (c *authServiceClient) GetAuthContext(ctx context.Context, in *GetAuthContextRequest, opts ...grpc.CallOption) (*AuthContext, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthContext)
+	err := c.cc.Invoke(ctx, AuthService_GetAuthContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations should embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -127,6 +141,9 @@ type AuthServiceServer interface {
 	// RevokeAllSessions revokes all active refresh tokens for the authenticated user, ending all sessions.
 	// Requires a valid access token.
 	RevokeAllSessions(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	// GetAuthContext returns authorization context for the authenticated caller and selected
+	// project.
+	GetAuthContext(context.Context, *GetAuthContextRequest) (*AuthContext, error)
 }
 
 // UnimplementedAuthServiceServer should be embedded to have
@@ -150,6 +167,9 @@ func (UnimplementedAuthServiceServer) RevokeRefreshToken(context.Context, *Revok
 }
 func (UnimplementedAuthServiceServer) RevokeAllSessions(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeAllSessions not implemented")
+}
+func (UnimplementedAuthServiceServer) GetAuthContext(context.Context, *GetAuthContextRequest) (*AuthContext, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAuthContext not implemented")
 }
 func (UnimplementedAuthServiceServer) testEmbeddedByValue() {}
 
@@ -261,6 +281,24 @@ func _AuthService_RevokeAllSessions_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_GetAuthContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAuthContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetAuthContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetAuthContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetAuthContext(ctx, req.(*GetAuthContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -287,6 +325,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeAllSessions",
 			Handler:    _AuthService_RevokeAllSessions_Handler,
+		},
+		{
+			MethodName: "GetAuthContext",
+			Handler:    _AuthService_GetAuthContext_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -67,3 +67,10 @@ func RevokeAllSessions(req *emptypb.Empty) error {
 	}
 	return nil
 }
+
+func GetAuthContext(req *pb.GetAuthContextRequest) error {
+	if req == nil {
+		return requiredRequest("request")
+	}
+	return nil
+}

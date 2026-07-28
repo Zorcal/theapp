@@ -148,3 +148,23 @@ func TestRevokeAllSessions_error(t *testing.T) {
 	}
 	runValidationErrorTests(t, "RevokeAllSessions", RevokeAllSessions, tests)
 }
+
+func TestGetAuthContext(t *testing.T) {
+	if err := GetAuthContext(&pb.GetAuthContextRequest{}); err != nil {
+		t.Errorf("GetAuthContext() error = %v, want nil", err)
+	}
+}
+
+func TestGetAuthContext_error(t *testing.T) {
+	tests := []validationTest[*pb.GetAuthContextRequest]{
+		{
+			name: "nil request",
+			in:   nil,
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
+				field:       "request",
+				description: "required",
+			}),
+		},
+	}
+	runValidationErrorTests(t, "GetAuthContext", GetAuthContext, tests)
+}

@@ -107,9 +107,9 @@ This is deliberately one-directional: `seed.sql` only ever inserts. Removing a p
 
 This means a permission or system-role grant removed from `seed.sql` stays exactly as real as before until that manual step runs — nothing filters it out elsewhere. This is an accepted tradeoff given how rarely a permission or system role is removed outright, against how dangerous an automatic destructive step tied to every startup would be. If removals ever stop being rare enough for a hand-run SQL snippet, this cleanup can move into a `cmd/cli` command instead.
 
-## Exposing auth data to clients
+## Exposing authorization context to clients
 
-The auth service exposes an endpoint that returns the authenticated caller's ID and email plus
+The auth service exposes authorization context that includes the authenticated caller's ID and email plus
 effective project-, organization-, and system-scoped permission sets — not full profile data. The
 project set combines project-, organization-, and system-scope assignments for the selected
 project; the organization set combines organization- and system-scope assignments for that

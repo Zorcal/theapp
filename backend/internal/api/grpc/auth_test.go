@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
@@ -452,6 +454,151 @@ func TestAuthService_RevokeAllSessions_error(t *testing.T) {
 			got, ok := status.FromError(err)
 			if !ok {
 				t.Fatalf("RevokeAllSessions() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Code(), tt.want.Code(), defaultDiffOpts())
+		})
+	}
+}
+
+func TestAuthService_GetAuthContext(t *testing.T) {
+	userID := uuid.New()
+	mockedOutput := mdl.AuthContext{
+		UserID:                  userID,
+		Email:                   "alice@test.com",
+		ProjectPermissions:      []mdl.Permission{mdl.PermissionCustomRoleRead, mdl.PermissionCustomRoleUpdate},
+		OrganizationPermissions: []mdl.Permission{mdl.PermissionCustomRoleUpdate},
+		SystemPermissions:       []mdl.Permission{mdl.PermissionUserRead},
+	}
+	authCore := &MockedAuthCore{
+		AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+			return mdl.AuthSession{
+				User: mdl.AuthUser{
+					UserID:      userID,
+					Permissions: mockedOutput.ProjectPermissions,
+				},
+				ProjectID: projectID,
+				OrgID:     new(1),
+			}, nil
+		},
+		AuthContextFunc: func(_ context.Context) (mdl.AuthContext, error) {
+			return mockedOutput, nil
+		},
+	}
+	srvTest := NewServerTest(t, ServerConfig{
+		Log:      testingx.NewLogger(t),
+		AuthCore: authCore,
+	})
+
+	got, err := srvTest.authServiceClient.GetAuthContext(authCtxForUserAtProject(t, t.Context(), userID, testProjectID), &pb.GetAuthContextRequest{})
+	if err != nil {
+		t.Fatalf("GetAuthContext() error = %v", err)
+	}
+
+	want := &pb.AuthContext{
+		UserId:                  mockedOutput.UserID.String(),
+		Email:                   mockedOutput.Email,
+		ProjectPermissions:      []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ, pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
+		OrganizationPermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
+		SystemPermissions:       []pb.Permission{pb.Permission_PERMISSION_USER_READ},
+	}
+
+	testingx.AssertDiff(t, got, want, cmp.Options{
+		defaultDiffOpts(),
+		protocmp.SortRepeatedFields(&pb.AuthContext{}, "project_permissions", "organization_permissions", "system_permissions"),
+	})
+}
+
+func TestAuthService_GetAuthContext_error(t *testing.T) {
+	tests := []struct {
+		name     string
+		authCore AuthCore
+		ctxFunc  func(*testing.T) context.Context
+		want     *status.Status
+	}{
+		{
+			name:     "no JWT",
+			authCore: &MockedAuthCore{},
+			want:     status.New(codes.Unauthenticated, ""),
+		},
+		{
+			name: "project metadata missing",
+			authCore: &MockedAuthCore{
+				AuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ *int) (mdl.AuthSession, error) {
+					return mdl.AuthSession{}, nil
+				},
+			},
+			ctxFunc: func(t *testing.T) context.Context {
+				t.Helper()
+				ctx := authCtxForTestUser(t, t.Context())
+				md, _ := metadata.FromOutgoingContext(ctx)
+				md = md.Copy()
+				md.Delete(projectMetadataKey)
+				return metadata.NewOutgoingContext(t.Context(), md)
+			},
+			want: status.New(codes.InvalidArgument, ""),
+		},
+		{
+			name: "auth context not found",
+			authCore: &MockedAuthCore{
+				AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+					return mdl.AuthSession{
+						User:      mdl.AuthUser{UserID: userID},
+						ProjectID: projectID,
+						OrgID:     new(1),
+					}, nil
+				},
+				AuthContextFunc: func(_ context.Context) (mdl.AuthContext, error) {
+					return mdl.AuthContext{}, mdl.ErrNotFound
+				},
+			},
+			ctxFunc: func(t *testing.T) context.Context {
+				t.Helper()
+				return authCtxForTestUser(t, t.Context())
+			},
+			want: status.New(codes.NotFound, "auth context not found"),
+		},
+		{
+			name: "core error",
+			authCore: &MockedAuthCore{
+				AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
+					return mdl.AuthSession{
+						User:      mdl.AuthUser{UserID: userID},
+						ProjectID: projectID,
+						OrgID:     new(1),
+					}, nil
+				},
+				AuthContextFunc: func(_ context.Context) (mdl.AuthContext, error) {
+					return mdl.AuthContext{}, errors.New("boom")
+				},
+			},
+			ctxFunc: func(t *testing.T) context.Context {
+				t.Helper()
+				return authCtxForTestUser(t, t.Context())
+			},
+			want: status.New(codes.Internal, "Internal"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srvTest := NewServerTest(t, ServerConfig{
+				Log:      testingx.NewLogger(t),
+				AuthCore: tt.authCore,
+			})
+
+			ctx := t.Context()
+			if tt.ctxFunc != nil {
+				ctx = tt.ctxFunc(t)
+			}
+
+			_, err := srvTest.authServiceClient.GetAuthContext(ctx, &pb.GetAuthContextRequest{})
+			if err == nil {
+				t.Fatal("GetAuthContext() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("GetAuthContext() error = %q, want a gRPC status error", err)
 			}
 
 			testingx.AssertDiff(t, got.Code(), tt.want.Code(), defaultDiffOpts())

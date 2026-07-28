@@ -1052,6 +1052,245 @@ func TestCore_OrganizationAuthSession_error(t *testing.T) {
 	}
 }
 
+func TestCore_AuthContext(t *testing.T) {
+	userID := uuid.New()
+	projectID := 42
+	orgID := 5
+	userStorer := &MockedUserStorer{
+		UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+			return pguser.User{
+				ExternalID: userID,
+				Email:      "alice@test.com",
+			}, nil
+		},
+	}
+	permissionStorer := &MockedPermissionStorer{
+		ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+			return pgrbac.ProjectPermissions{
+				OrgID:           orgID,
+				PermissionNames: []string{"custom-role:read", "custom-role:update"},
+			}, nil
+		},
+		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+			return pgrbac.OrgPermissions{
+				OrgID:           orgID,
+				PermissionNames: []string{"custom-role:read"},
+			}, nil
+		},
+		UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+			return []string{"user:read"}, nil
+		},
+	}
+	core := NewCore(&MockedAuthStorer{}, userStorer, permissionStorer, immediateTransactor{}, testConfig())
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User: mdl.AuthUser{
+			UserID:      userID,
+			Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+		},
+		ProjectID: &projectID,
+		OrgID:     &orgID,
+	})
+
+	got, err := core.AuthContext(ctx)
+	if err != nil {
+		t.Fatalf("AuthContext() error = %v", err)
+	}
+
+	want := mdl.AuthContext{
+		UserID:                  userID,
+		Email:                   "alice@test.com",
+		ProjectPermissions:      []mdl.Permission{mdl.PermissionCustomRoleRead, mdl.PermissionCustomRoleUpdate},
+		OrganizationPermissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+		SystemPermissions:       []mdl.Permission{mdl.PermissionUserRead},
+	}
+
+	testingx.AssertDiff(t, got, want)
+}
+
+func TestCore_AuthContext_error(t *testing.T) {
+	dbErr := errors.New("db error")
+	userID := uuid.New()
+	projectID := 42
+	orgID := 5
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User:      mdl.AuthUser{UserID: userID},
+		ProjectID: &projectID,
+		OrgID:     &orgID,
+	})
+	mockedUser := pguser.User{
+		ExternalID: userID,
+		Email:      "alice@test.com",
+	}
+	mockedProjectPerms := pgrbac.ProjectPermissions{OrgID: orgID}
+	mockedOrgPerms := pgrbac.OrgPermissions{OrgID: orgID}
+
+	tests := []struct {
+		name             string
+		userStorer       *MockedUserStorer
+		permissionStorer *MockedPermissionStorer
+		want             error
+	}{
+		{
+			name: "user not found",
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{}, sql.ErrNoRows
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{},
+			want:             mdl.ErrNotFound,
+		},
+		{
+			name: "user store error",
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{}, dbErr
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{},
+			want:             dbErr,
+		},
+		{
+			name: "project not found",
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return mockedUser, nil
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "project permissions store error",
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return mockedUser, nil
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "project or organization not found",
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return mockedUser, nil
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return mockedProjectPerms, nil
+				},
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "organization permissions store error",
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return mockedUser, nil
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return mockedProjectPerms, nil
+				},
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "user not found while resolving system permissions",
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return mockedUser, nil
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return mockedProjectPerms, nil
+				},
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return mockedOrgPerms, nil
+				},
+				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+					return nil, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "system permissions store error",
+			userStorer: &MockedUserStorer{
+				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return mockedUser, nil
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return mockedProjectPerms, nil
+				},
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return mockedOrgPerms, nil
+				},
+				UserSystemPermissionsByExternalIDFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+					return nil, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(&MockedAuthStorer{}, tt.userStorer, tt.permissionStorer, immediateTransactor{}, testConfig())
+
+			if _, err := core.AuthContext(ctx); !errors.Is(err, tt.want) {
+				t.Errorf("AuthContext() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		tests := []struct {
+			name string
+			ctx  context.Context //nolint:containedctx // table test, each case supplies its own fixed ctx.
+		}{
+			{
+				name: "auth session missing",
+				ctx:  t.Context(),
+			},
+			{
+				name: "project context missing",
+				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+					User: mdl.AuthUser{UserID: userID},
+				}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				core := NewCore(&MockedAuthStorer{}, &MockedUserStorer{}, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
+
+				if _, err := core.AuthContext(tt.ctx); err == nil {
+					t.Error("AuthContext() error = nil, want error")
+				}
+			})
+		}
+	})
+}
+
 func TestCore_txRollback(t *testing.T) {
 	// Verifies that a failure inside the transaction rolls back the preceding
 	// write, leaving the credential reusable on retry.
