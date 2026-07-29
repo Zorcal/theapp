@@ -36,7 +36,6 @@ func (s *Store) CreateCustomRole(ctx context.Context, cr CreateCustomRole) (Cust
 // does not exist.
 // Returns [pgdb.ErrAlreadyExists] if the organization already has a role with that name.
 func (s *Store) UpdateCustomRole(ctx context.Context, ur UpdateCustomRole) (CustomRole, error) {
-	validatePermsQ := validateCustomRolePermsQuery(ur.OrgID, ur.ExternalID, ur.PermissionNames)
 	updateQ := updateCustomRoleQuery(ur)
 	deletePermsQ := deleteCustomRolePermissionsQuery(ur.OrgID, ur.ExternalID)
 	insertPermsQ := insertCustomRolePermissionsQuery(ur.ExternalID, ur.PermissionNames)
@@ -44,14 +43,8 @@ func (s *Store) UpdateCustomRole(ctx context.Context, ur UpdateCustomRole) (Cust
 
 	var role CustomRole
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if ur.Fields.PermissionNames {
-			// The ID is only a result sink so ExpectOne returns sql.ErrNoRows on failed validation.
-			var validatedRoleIDSink int
-			if err := validatePermsQ.Queue(ctx, b, &validatedRoleIDSink); err != nil {
-				return fmt.Errorf("validate custom role permissions: %w", err)
-			}
-		}
-		// The ID is only a result sink so ExpectOne returns sql.ErrNoRows when no role was updated.
+		// The ID is only a result sink so ExpectOne returns sql.ErrNoRows when the role or a selected
+		// permission does not exist.
 		var updatedRoleIDSink int
 		if err := updateQ.Queue(ctx, b, &updatedRoleIDSink); err != nil {
 			return fmt.Errorf("update custom role: %w", err)

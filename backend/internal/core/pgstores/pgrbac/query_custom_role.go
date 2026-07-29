@@ -60,64 +60,45 @@ func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
 	}
 }
 
-// updateCustomRoleQuery updates fields stored on the custom role row. Its caller must validate and
-// replace selected permission names with separate queries in the same transaction.
+// updateCustomRoleQuery updates fields stored on the custom role row. Permission replacement is
+// gated on resolving every requested permission name; its caller replaces the join-table rows with
+// separate queries in the same transaction.
 func updateCustomRoleQuery(ur UpdateCustomRole) pgdb.TypedQuery[int] {
 	params := pgx.NamedArgs{
 		"org_id":  ur.OrgID,
 		"role_id": ur.ExternalID,
 	}
-	var setClauses []string
 
+	var (
+		setClauses []string
+		// fromClause gates the update on resolving the complete permission set when replacement is
+		// selected. It remains empty for updates that do not touch permissions.
+		fromClause string
+	)
 	if ur.Fields.Name {
 		setClauses = append(setClauses, "name = @name")
 		params["name"] = ur.Name
 	}
+	if ur.Fields.PermissionNames {
+		params["permission_names"] = ur.PermissionNames
+		fromClause = "FROM rbac.resolve_permissions(@permission_names::text[]) AS resolved_permissions"
+	}
 
 	setClauses = append(setClauses, "updated_at = NOW()", "etag = gen_random_uuid()")
 
-	// Execution returns sql.ErrNoRows when the organization does not own the role and
-	// pgdb.ErrAlreadyExists when the organization already has the role name.
+	// Execution returns sql.ErrNoRows when the organization does not own the role or any requested
+	// permission does not exist, and pgdb.ErrAlreadyExists when the organization already has the
+	// role name.
 	sql := fmt.Sprintf(
 		`UPDATE rbac.custom_roles
 		SET %[1]s
+		%[2]s
 		WHERE org_id = @org_id
 			AND external_id = @role_id
 		RETURNING id`,
 		strings.Join(setClauses, ", "),
+		fromClause,
 	)
-
-	return pgdb.TypedQuery[int]{
-		SQL:  sql,
-		Args: params,
-		Scan: func(row pgx.CollectableRow) (int, error) {
-			var id int
-			return id, row.Scan(&id)
-		},
-		Expect: pgdb.ExpectOne,
-	}
-}
-
-func validateCustomRolePermsQuery(orgID int, roleID uuid.UUID, permNames []string) pgdb.TypedQuery[int] {
-	params := pgx.NamedArgs{
-		"org_id":           orgID,
-		"role_id":          roleID,
-		"permission_names": permNames,
-	}
-
-	// Execution returns sql.ErrNoRows when the organization does not own the role or any requested
-	// permission does not exist.
-	const sql = `
-		WITH
-			resolved_permissions AS (
-				SELECT permission_ids
-				FROM rbac.resolve_permissions(@permission_names::text[])
-			)
-		SELECT r.id
-		FROM rbac.custom_roles AS r
-		CROSS JOIN resolved_permissions
-		WHERE r.org_id = @org_id
-			AND r.external_id = @role_id`
 
 	return pgdb.TypedQuery[int]{
 		SQL:  sql,
