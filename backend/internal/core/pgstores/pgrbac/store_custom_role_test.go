@@ -29,9 +29,13 @@ func TestStore_CreateCustomRole(t *testing.T) {
 	org := seedOrg(t, orgStore, "custom-role-org")
 
 	got, err := rbacStore.CreateCustomRole(ctx, pgrbac.CreateCustomRole{
-		OrgID:           org.ID,
-		Name:            "project manager",
-		PermissionNames: []string{"custom-role:update", "custom-role:read"},
+		OrgID: org.ID,
+		Name:  "project manager",
+		PermissionNames: []string{
+			"custom-role:update",
+			"custom-role:read",
+			"custom-role:read", // Test deduplication
+		},
 	})
 	if err != nil {
 		t.Fatalf("CreateCustomRole() error = %v", err)

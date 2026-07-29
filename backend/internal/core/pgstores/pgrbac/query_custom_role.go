@@ -21,57 +21,36 @@ func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
 	// exist, and pgdb.ErrAlreadyExists when the organization already has the role name.
 	const sql = `
 		WITH
-			-- Convert the input array into a deduplicated set of permission names.
-			requested_permissions AS (
-				SELECT DISTINCT name
-				FROM unnest(@permission_names::text[]) AS requested(name)
+			resolved_permissions AS (
+				SELECT permission_ids, permission_names
+				FROM rbac.resolve_permissions(@permission_names::text[])
 			),
-			-- Resolve requested names to the permission IDs used by the join table.
-			valid_permissions AS (
-				SELECT id, name
-				FROM rbac.permission_ids(@permission_names::text[])
-			),
-			-- Insert only when the organization and every requested permission exist.
 			new_role AS (
 				INSERT INTO rbac.custom_roles (external_id, org_id, name, created_at, etag)
 				SELECT gen_random_uuid(), o.id, @name, NOW(), gen_random_uuid()
 				FROM org.organizations AS o
+				CROSS JOIN resolved_permissions
 				WHERE o.id = @org_id
-					AND NOT EXISTS (
-						SELECT 1
-						FROM requested_permissions AS requested
-						LEFT JOIN valid_permissions AS valid ON valid.name = requested.name
-						WHERE valid.id IS NULL
-					)
 				RETURNING id, external_id, org_id, name, created_at, updated_at, etag
 			),
-			-- Pair the new role with every validated permission. The CROSS JOIN produces no rows
-			-- when new_role is empty, preserving the organization and permission validation gate.
 			inserted_permissions AS (
 				INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
-				SELECT new_role.id, valid_permissions.id
+				SELECT new_role.id, permission.id
 				FROM new_role
-				CROSS JOIN valid_permissions
+				CROSS JOIN resolved_permissions
+				CROSS JOIN LATERAL unnest(resolved_permissions.permission_ids) AS permission(id)
 				RETURNING permission_id
 			)
-		-- Return the role with the permission rows that were actually inserted.
 		SELECT
 			new_role.id,
 			new_role.external_id,
 			new_role.name,
-			COALESCE(
-				(
-					SELECT array_agg(valid_permissions.name ORDER BY valid_permissions.name)
-					FROM inserted_permissions
-					JOIN valid_permissions
-						ON valid_permissions.id = inserted_permissions.permission_id
-				),
-				'{}'
-			) AS permission_names,
+			resolved_permissions.permission_names,
 			new_role.created_at,
 			new_role.updated_at,
 			new_role.etag
-		FROM new_role`
+		FROM new_role
+		CROSS JOIN resolved_permissions`
 
 	return pgdb.TypedQuery[CustomRole]{
 		SQL:    sql,
@@ -130,27 +109,15 @@ func validateCustomRolePermsQuery(orgID int, roleID uuid.UUID, permNames []strin
 	// permission does not exist.
 	const sql = `
 		WITH
-			-- Deduplicate the complete replacement permission set before validating it.
-			requested_permissions AS (
-				SELECT DISTINCT name
-				FROM unnest(@permission_names::text[]) AS requested(name)
-			),
-			-- Resolve every requested permission name against the permission registry.
-			valid_permissions AS (
-				SELECT name
-				FROM rbac.permission_ids(@permission_names::text[])
+			resolved_permissions AS (
+				SELECT permission_ids
+				FROM rbac.resolve_permissions(@permission_names::text[])
 			)
-		-- Return the role id only when it belongs to the organization and every permission exists.
 		SELECT r.id
 		FROM rbac.custom_roles AS r
+		CROSS JOIN resolved_permissions
 		WHERE r.org_id = @org_id
-			AND r.external_id = @role_id
-			AND NOT EXISTS (
-				SELECT 1
-				FROM requested_permissions AS requested
-				LEFT JOIN valid_permissions AS valid ON valid.name = requested.name
-				WHERE valid.name IS NULL
-			)`
+			AND r.external_id = @role_id`
 
 	return pgdb.TypedQuery[int]{
 		SQL:  sql,
@@ -169,7 +136,8 @@ func insertCustomRolePermissionsQuery(roleID uuid.UUID, permNames []string) pgdb
 		INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
 		SELECT r.id, permission.id
 		FROM rbac.custom_roles AS r
-		CROSS JOIN rbac.permission_ids(@permission_names::text[]) AS permission
+		CROSS JOIN rbac.resolve_permissions(@permission_names::text[]) AS resolved
+		CROSS JOIN LATERAL unnest(resolved.permission_ids) AS permission(id)
 		WHERE r.external_id = @role_id
 		RETURNING permission_id`
 
@@ -198,34 +166,26 @@ func modifyCustomRolePermissionsQuery(mp ModifyCustomRolePermissions) pgdb.Typed
 	// permission does not exist.
 	const sql = `
 		WITH
-			-- Combine the add/remove arrays solely to validate every requested permission name.
-			-- This is not a replacement permission set for the role.
-			requested_permissions AS (
-				SELECT DISTINCT name
-				FROM unnest(
-					@add_permission_names::text[] || @remove_permission_names::text[]
-				) AS requested(name)
-			),
-			-- Resolve every requested permission name to the permission ID used by the join table.
-			valid_permissions AS (
-				SELECT id, name
-				FROM rbac.permission_ids(
+			resolved_permissions AS (
+				SELECT permission_ids, permission_names
+				FROM rbac.resolve_permissions(
 					@add_permission_names::text[] || @remove_permission_names::text[]
 				)
 			),
-			-- Gate every mutation behind role ownership and permission validation. An empty
-			-- target_role prevents all subsequent permission and metadata changes.
+			valid_permissions AS (
+				SELECT permission.id, permission.name
+				FROM resolved_permissions
+				CROSS JOIN LATERAL unnest(
+					resolved_permissions.permission_ids,
+					resolved_permissions.permission_names
+				) AS permission(id, name)
+			),
 			target_role AS (
 				SELECT r.id
 				FROM rbac.custom_roles AS r
+				CROSS JOIN resolved_permissions
 				WHERE r.org_id = @org_id
 					AND r.external_id = @role_id
-					AND NOT EXISTS (
-						SELECT 1
-						FROM requested_permissions AS requested
-						LEFT JOIN valid_permissions AS valid ON valid.name = requested.name
-						WHERE valid.id IS NULL
-					)
 			),
 			-- Removing a permission the role does not hold produces no row.
 			removed_permissions AS (

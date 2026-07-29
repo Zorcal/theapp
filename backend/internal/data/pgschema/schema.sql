@@ -133,22 +133,6 @@ $_$;
 
 
 --
--- Name: permission_ids(text[]); Type: FUNCTION; Schema: rbac; Owner: -
---
-
-CREATE FUNCTION rbac.permission_ids(permission_names text[]) RETURNS TABLE(id integer, name text)
-    LANGUAGE sql STABLE STRICT
-    AS $_$
-    SELECT permission.id, permission.name
-    FROM rbac.permissions AS permission
-    JOIN (
-        SELECT DISTINCT requested.name
-        FROM unnest($1) AS requested(name)
-    ) AS requested ON requested.name = permission.name
-$_$;
-
-
---
 -- Name: project_permission_ids(integer, integer); Type: FUNCTION; Schema: rbac; Owner: -
 --
 
@@ -167,6 +151,36 @@ CREATE FUNCTION rbac.project_permission_ids(target_user_id integer, target_proje
     FROM org.projects AS project
     CROSS JOIN LATERAL rbac.org_permission_ids($1, project.org_id) AS permission
     WHERE project.id = $2
+$_$;
+
+
+--
+-- Name: resolve_permissions(text[]); Type: FUNCTION; Schema: rbac; Owner: -
+--
+
+CREATE FUNCTION rbac.resolve_permissions(requested_permission_names text[]) RETURNS TABLE(permission_ids integer[], permission_names text[])
+    LANGUAGE sql STABLE
+    AS $_$
+    WITH requested_permissions AS (
+        SELECT DISTINCT requested.name
+        FROM unnest(COALESCE($1, '{}')) AS requested(name)
+    )
+    SELECT
+        COALESCE(
+            array_agg(permission.id ORDER BY requested.name)
+                FILTER (WHERE permission.id IS NOT NULL),
+            '{}'
+        ) AS permission_ids,
+        COALESCE(
+            array_agg(requested.name ORDER BY requested.name)
+                FILTER (WHERE requested.name IS NOT NULL),
+            '{}'
+        ) AS permission_names
+    FROM requested_permissions AS requested
+    LEFT JOIN rbac.permissions AS permission ON permission.name = requested.name
+    -- The LEFT JOIN retains unknown names with a NULL permission ID. Equal counts therefore mean
+    -- every distinct requested name resolved; otherwise the function returns no row.
+    HAVING COUNT(requested.name) = COUNT(permission.id)
 $_$;
 
 
