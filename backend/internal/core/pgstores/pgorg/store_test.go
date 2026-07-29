@@ -542,6 +542,57 @@ func TestProtectControlProjectTrigger(t *testing.T) {
 	})
 }
 
+// TODO: Exercise the membership-removal store operation here once it exists; until then these
+// direct deletes prove that callers cannot leave role assignments dangling.
+func TestOrgMembershipDeletionWithRoleAssignments(t *testing.T) {
+	t.Run("project role assignment", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		orgStore := pgorg.NewStore(pool)
+		userStore := pguser.NewStore(pool)
+		rbacStore := pgrbac.NewStore(pool)
+
+		org := seedOrg(t, orgStore, "project-assignment-membership-org")
+		project := seedProject(t, orgStore, org.ID, "project")
+		user := seedUser(t, userStore, "project-assignment-membership@test.com")
+		seedOrgMembership(t, pool, user.ID, org.ID)
+		role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "project-role"})
+		seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, role.ExternalID, project.ID)
+
+		if _, err := pool.Exec(
+			ctx,
+			"DELETE FROM org.org_membership WHERE user_id = $1 AND org_id = $2",
+			user.ID,
+			org.ID,
+		); err == nil {
+			t.Error("membership deletion succeeded with a project role assignment, want foreign key error")
+		}
+	})
+
+	t.Run("organization role assignment", func(t *testing.T) {
+		ctx := context.Background()
+		pool := pgtest.New(t, ctx)
+		orgStore := pgorg.NewStore(pool)
+		userStore := pguser.NewStore(pool)
+		rbacStore := pgrbac.NewStore(pool)
+
+		org := seedOrg(t, orgStore, "org-assignment-membership-org")
+		user := seedUser(t, userStore, "org-assignment-membership@test.com")
+		seedOrgMembership(t, pool, user.ID, org.ID)
+		role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "org-role"})
+		seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, role.ExternalID, org.ID)
+
+		if _, err := pool.Exec(
+			ctx,
+			"DELETE FROM org.org_membership WHERE user_id = $1 AND org_id = $2",
+			user.ID,
+			org.ID,
+		); err == nil {
+			t.Error("membership deletion succeeded with an organization role assignment, want foreign key error")
+		}
+	})
+}
+
 func seedOrg(t *testing.T, orgStore *pgorg.Store, name string) pgorg.Organization {
 	t.Helper()
 

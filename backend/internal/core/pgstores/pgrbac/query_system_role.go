@@ -115,9 +115,8 @@ func systemPermissionNamesQuery(userID uuid.UUID) pgdb.TypedQuery[[]string] {
 	const sql = `
 		SELECT COALESCE(array_agg(DISTINCT p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}')
 		FROM useraccess.users AS u
-		LEFT JOIN rbac.system_role_assignments AS sra ON sra.user_id = u.id
-		LEFT JOIN rbac.system_role_permissions AS rp ON rp.role_id = sra.role_id
-		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
+		LEFT JOIN LATERAL rbac.system_permission_ids(u.id) AS granted ON true
+		LEFT JOIN rbac.permissions AS p ON p.id = granted.permission_id
 		WHERE u.external_id = @user_id
 		GROUP BY u.id`
 

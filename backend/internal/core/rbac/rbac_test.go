@@ -127,6 +127,7 @@ func seedOrgScopedRoleWithAllPermissions(t *testing.T, ctx context.Context, pool
 	if err != nil {
 		t.Fatalf("seed organization: %v", err)
 	}
+	seedOrgMembership(t, ctx, pool, userID, org.ID)
 
 	// Give an org-scoped custom role every permission in the database, the same set seeded for superadmin.
 	role, err := rbacStore.CreateCustomRole(ctx, pgrbac.CreateCustomRole{

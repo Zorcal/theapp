@@ -1037,10 +1037,7 @@ func TestStore_UnassignCustomRoleFromProject_error(t *testing.T) {
 		org := seedOrg(t, orgStore, "nonmember-unassign-custom-role-project-org")
 		project := seedProject(t, orgStore, org.ID, "project")
 		user := seedUser(t, userStore, "nonmember-unassign-project@test.com")
-		seedOrgMembership(t, ctx, pool, user.ID, org.ID)
 		role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "reader"})
-		seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, role.ExternalID, project.ID)
-		deleteOrgMembership(t, ctx, pool, user.ID, org.ID)
 
 		if err := rbacStore.UnassignCustomRoleFromProject(ctx, user.ExternalID, role.ExternalID, project.ID); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("UnassignCustomRoleFromProject() error = %v, want sql.ErrNoRows", err)
@@ -1189,10 +1186,7 @@ func TestStore_UnassignCustomRoleFromOrg_error(t *testing.T) {
 
 		org := seedOrg(t, orgStore, "nonmember-unassign-custom-role-org")
 		user := seedUser(t, userStore, "nonmember-unassign-org@test.com")
-		seedOrgMembership(t, ctx, pool, user.ID, org.ID)
 		role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "reader"})
-		seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, role.ExternalID, org.ID)
-		deleteOrgMembership(t, ctx, pool, user.ID, org.ID)
 
 		if err := rbacStore.UnassignCustomRoleFromOrg(ctx, user.ExternalID, role.ExternalID, org.ID); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("UnassignCustomRoleFromOrg() error = %v, want sql.ErrNoRows", err)

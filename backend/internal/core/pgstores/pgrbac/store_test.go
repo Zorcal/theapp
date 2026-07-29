@@ -245,36 +245,6 @@ func TestStore_ProjectPermissions(t *testing.T) {
 		testingx.AssertDiff(t, got, want)
 	})
 
-	t.Run("membership removal suppresses project and org scope", func(t *testing.T) {
-		ctx := context.Background()
-		pool := pgtest.New(t, ctx)
-		rbacStore := pgrbac.NewStore(pool)
-		userStore := pguser.NewStore(pool)
-		orgStore := pgorg.NewStore(pool)
-
-		usr := seedUser(t, userStore, "alice@test.com")
-		org := seedOrg(t, orgStore, "acme")
-		project := seedProject(t, orgStore, org.ID, "acme-project")
-		seedOrgMembership(t, ctx, pool, usr.ID, org.ID)
-		projectRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "project-role", PermissionNames: []string{"user:read"}})
-		orgRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "org-role", PermissionNames: []string{"user:create"}})
-		seedProjectRoleAssignment(t, ctx, rbacStore, usr.ExternalID, projectRole.ExternalID, project.ID)
-		seedOrgRoleAssignment(t, ctx, rbacStore, usr.ExternalID, orgRole.ExternalID, org.ID)
-		deleteOrgMembership(t, ctx, pool, usr.ID, org.ID)
-
-		got, err := rbacStore.ProjectPermissions(ctx, usr.ExternalID, project.ID)
-		if err != nil {
-			t.Fatalf("ProjectPermissions() error = %v", err)
-		}
-
-		want := pgrbac.ProjectPermissions{
-			OrgID:           org.ID,
-			PermissionNames: []string{},
-		}
-
-		testingx.AssertDiff(t, got, want)
-	})
-
 	t.Run("no assignments", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
@@ -413,34 +383,6 @@ func TestStore_OrgPermissionsByProjectID(t *testing.T) {
 		want := pgrbac.OrgPermissions{
 			OrgID:           org.ID,
 			PermissionNames: []string{"user:create"},
-		}
-
-		testingx.AssertDiff(t, got, want)
-	})
-
-	t.Run("membership removal suppresses organization scope", func(t *testing.T) {
-		ctx := context.Background()
-		pool := pgtest.New(t, ctx)
-		rbacStore := pgrbac.NewStore(pool)
-		userStore := pguser.NewStore(pool)
-		orgStore := pgorg.NewStore(pool)
-
-		user := seedUser(t, userStore, "org-permissions-membership@test.com")
-		org := seedOrg(t, orgStore, "org-permissions-membership-org")
-		project := seedProject(t, orgStore, org.ID, "project")
-		seedOrgMembership(t, ctx, pool, user.ID, org.ID)
-		role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "org role", PermissionNames: []string{"user:create"}})
-		seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, role.ExternalID, org.ID)
-		deleteOrgMembership(t, ctx, pool, user.ID, org.ID)
-
-		got, err := rbacStore.OrgPermissionsByProjectID(ctx, user.ExternalID, project.ID)
-		if err != nil {
-			t.Fatalf("OrgPermissionsByProjectID() error = %v", err)
-		}
-
-		want := pgrbac.OrgPermissions{
-			OrgID:           org.ID,
-			PermissionNames: []string{},
 		}
 
 		testingx.AssertDiff(t, got, want)
@@ -651,24 +593,6 @@ func seedOrgMembership(
 		orgID,
 	); err != nil {
 		t.Fatalf("seed org membership (user %d, org %d): %v", userID, orgID, err)
-	}
-}
-
-func deleteOrgMembership(
-	t *testing.T,
-	ctx context.Context,
-	pool *pgxpool.Pool,
-	userID, orgID int,
-) {
-	t.Helper()
-
-	if _, err := pool.Exec(
-		ctx,
-		"DELETE FROM org.org_membership WHERE user_id = $1 AND org_id = $2",
-		userID,
-		orgID,
-	); err != nil {
-		t.Fatalf("delete org membership (user %d, org %d): %v", userID, orgID, err)
 	}
 }
 

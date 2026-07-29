@@ -94,8 +94,9 @@ covered by a primary key or another index.
 3. Adjust primary keys and indexes for user-first resolution, target-first discovery, foreign-key
    checks, and explicit cleanup.
 4. Update assignment writes and test seed helpers to supply the organization ID.
-5. Cover database rejection of cross-organization and non-member assignments while retaining
-   observable store/core behavior tests.
+5. Cover non-member and cross-organization behavior through the supported store/core APIs.
+   Successful assignment tests exercise the foreign keys; do not bypass the store merely to force
+   a constraint error that supported call sequences cannot produce.
 
 ### 2. Add permission-name lookup
 

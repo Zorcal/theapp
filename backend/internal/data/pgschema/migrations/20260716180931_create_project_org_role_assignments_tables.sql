@@ -1,39 +1,50 @@
 -- migrate:up
 
 CREATE TABLE rbac.project_role_assignments (
-    user_id INTEGER NOT NULL REFERENCES useraccess.users (id)
-    , role_id INTEGER NOT NULL REFERENCES rbac.custom_roles (id)
-    , project_id INTEGER NOT NULL REFERENCES org.projects (id)
-    , PRIMARY KEY (user_id, role_id, project_id)
+    user_id INTEGER NOT NULL
+    , project_id INTEGER NOT NULL
+    , role_id INTEGER NOT NULL
+    , org_id INTEGER NOT NULL
+    -- User-first ordering serves per-request permission resolution and accessible-project
+    -- discovery; project_id second serves user/project role listing and mutation. role_id last
+    -- completes assignment identity. org_id is derived and protected by the composite foreign
+    -- keys, so including it would not distinguish another valid assignment.
+    , PRIMARY KEY (user_id, project_id, role_id)
+    , FOREIGN KEY (org_id, user_id) REFERENCES org.org_membership (org_id, user_id)
+    , FOREIGN KEY (project_id, org_id) REFERENCES org.projects (id, org_id)
+    , FOREIGN KEY (role_id, org_id) REFERENCES rbac.custom_roles (id, org_id)
 );
 
--- project_role_assignments is filtered by (user_id, project_id) when resolving a caller's
--- project-scoped permissions, a query run on every project-scoped request. role_id sits between
--- those two columns in the primary key above, so it can't serve this filter as a direct index
--- lookup; without this index, Postgres narrows to the user's rows via the primary key and then
--- checks project_id on every one of them, across all of that user's roles and projects.
--- This index keeps serving that lookup only as long as the query still filters on both user_id
--- and project_id as plain equality comparisons against these columns.
-CREATE INDEX project_role_assignments_user_id_project_id_idx ON rbac.project_role_assignments (user_id, project_id);
+-- Serves project-first assignment/user listings and explicit project deletion cleanup. Permission
+-- resolution uses the primary key's (user_id, project_id) prefix instead.
+CREATE INDEX project_role_assignments_project_id_user_id_idx ON rbac.project_role_assignments (project_id, user_id);
 
--- Custom-role deletion removes every assignment for the role. The primary key starts with
--- user_id, so it cannot serve a role_id-only lookup or the role_id foreign-key check efficiently.
+-- Serves explicit membership cleanup and the membership foreign-key check when a (user, org)
+-- membership is deleted. Project permission resolution uses the primary key instead.
+CREATE INDEX project_role_assignments_user_id_org_id_idx ON rbac.project_role_assignments (user_id, org_id);
+
+-- Serves explicit custom-role deletion cleanup and the role foreign-key check; no primary-key
+-- prefix starts with role_id.
 CREATE INDEX project_role_assignments_role_id_idx ON rbac.project_role_assignments (role_id);
 
 CREATE TABLE rbac.org_role_assignments (
-    user_id INTEGER NOT NULL REFERENCES useraccess.users (id)
-    , role_id INTEGER NOT NULL REFERENCES rbac.custom_roles (id)
-    , org_id INTEGER NOT NULL REFERENCES org.organizations (id)
-    , PRIMARY KEY (user_id, role_id, org_id)
+    user_id INTEGER NOT NULL
+    , org_id INTEGER NOT NULL
+    , role_id INTEGER NOT NULL
+    -- User-first ordering serves per-request organization permission resolution and accessible-
+    -- project discovery; org_id second serves user/organization role listing and mutation.
+    -- role_id last completes assignment identity.
+    , PRIMARY KEY (user_id, org_id, role_id)
+    , FOREIGN KEY (org_id, user_id) REFERENCES org.org_membership (org_id, user_id)
+    , FOREIGN KEY (role_id, org_id) REFERENCES rbac.custom_roles (id, org_id)
 );
 
--- org_role_assignments is filtered by (user_id, org_id) when resolving a caller's org-scope
--- grants. role_id sits between those two columns in the primary key above, so it can't serve
--- this filter as a direct index lookup without this index.
-CREATE INDEX org_role_assignments_user_id_org_id_idx ON rbac.org_role_assignments (user_id, org_id);
+-- Serves organization-first assignment/user listings and explicit organization deletion cleanup.
+-- Permission resolution uses the primary key's (user_id, org_id) prefix instead.
+CREATE INDEX org_role_assignments_org_id_user_id_idx ON rbac.org_role_assignments (org_id, user_id);
 
--- Custom-role deletion removes every assignment for the role. The primary key starts with
--- user_id, so it cannot serve a role_id-only lookup or the role_id foreign-key check efficiently.
+-- Serves explicit custom-role deletion cleanup and the role foreign-key check; no primary-key
+-- prefix starts with role_id.
 CREATE INDEX org_role_assignments_role_id_idx ON rbac.org_role_assignments (role_id);
 
 
