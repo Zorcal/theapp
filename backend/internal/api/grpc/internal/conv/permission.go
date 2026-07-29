@@ -13,6 +13,7 @@ var permissionToPB = map[mdl.Permission]pb.Permission{
 	mdl.PermissionSystemRoleRead:                   pb.Permission_PERMISSION_SYSTEM_ROLE_READ,
 	mdl.PermissionSystemRoleAssign:                 pb.Permission_PERMISSION_SYSTEM_ROLE_ASSIGN,
 	mdl.PermissionSystemRoleUnassign:               pb.Permission_PERMISSION_SYSTEM_ROLE_UNASSIGN,
+	mdl.PermissionProjectDiscoverAll:               pb.Permission_PERMISSION_PROJECT_DISCOVER_ALL,
 	mdl.PermissionCustomRoleCreate:                 pb.Permission_PERMISSION_CUSTOM_ROLE_CREATE,
 	mdl.PermissionCustomRoleRead:                   pb.Permission_PERMISSION_CUSTOM_ROLE_READ,
 	mdl.PermissionCustomRoleUpdate:                 pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE,

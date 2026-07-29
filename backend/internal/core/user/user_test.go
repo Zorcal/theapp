@@ -79,8 +79,8 @@ func TestCore_integration(t *testing.T) {
 	}
 	testingx.AssertDiff(t, got, updated)
 
-	// Users — updated user appears in results
-	usrs, count, err := core.Users(ctx, mdl.UserFilter{}, nil, 10, 0)
+	// Users — updated user appears in filtered results
+	usrs, count, err := core.Users(ctx, mdl.UserFilter{Name: " Alice "}, nil, 10, 0)
 	if err != nil {
 		t.Fatalf("Users() error = %v", err)
 	}

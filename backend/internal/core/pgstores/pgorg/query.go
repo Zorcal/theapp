@@ -1,10 +1,18 @@
 package pgorg
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
+
+// permissionNameProjectDiscoverAll identifies the system-only permission that enables global
+// project discovery.
+const permissionNameProjectDiscoverAll = "project:discover-all"
 
 func createOrganizationQuery(co CreateOrganization) pgdb.TypedQuery[Organization] {
 	params := pgx.NamedArgs{"name": co.Name, "control_project_name": co.ControlProjectName}
@@ -19,8 +27,8 @@ func createOrganizationQuery(co CreateOrganization) pgdb.TypedQuery[Organization
 				RETURNING id, name, created_at, updated_at
 			),
 			new_control_project AS (
-				INSERT INTO org.projects (org_id, name, is_control, created_at)
-				SELECT id, @control_project_name, true, NOW() FROM new_org
+				INSERT INTO org.projects (org_id, name, is_control, created_at, etag)
+				SELECT id, @control_project_name, true, NOW(), gen_random_uuid() FROM new_org
 				RETURNING id, org_id
 			)
 		SELECT new_org.id, new_org.name, new_org.created_at, new_org.updated_at, new_control_project.id AS control_project_id
@@ -54,7 +62,7 @@ func organizationByNameQuery(name string) pgdb.TypedQuery[Organization] {
 func projectByNameQuery(orgID int, name string) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{"org_id": orgID, "name": name}
 	const sql = `
-		SELECT id, org_id, name, is_control, created_at, updated_at
+		SELECT id, org_id, name, is_control, created_at, updated_at, etag
 		FROM org.projects
 		WHERE org_id = @org_id AND lower(name) = lower(@name)`
 
@@ -69,7 +77,7 @@ func projectByNameQuery(orgID int, name string) pgdb.TypedQuery[Project] {
 func projectByIDQuery(id int) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{"id": id}
 	const sql = `
-		SELECT id, org_id, name, is_control, created_at, updated_at
+		SELECT id, org_id, name, is_control, created_at, updated_at, etag
 		FROM org.projects
 		WHERE id = @id`
 
@@ -87,11 +95,11 @@ func createProjectQuery(cp CreateProject) pgdb.TypedQuery[Project] {
 	// Resolve cp.OrgID via a join rather than depending on the org_id foreign key, so an unknown org yields zero rows
 	// instead of a distinct constraint-violation error.
 	const sql = `
-		INSERT INTO org.projects (org_id, name, is_control, created_at)
-		SELECT o.id, @name, false, NOW()
+		INSERT INTO org.projects (org_id, name, is_control, created_at, etag)
+		SELECT o.id, @name, false, NOW(), gen_random_uuid()
 		FROM org.organizations AS o
 		WHERE o.id = @org_id
-		RETURNING id, org_id, name, is_control, created_at, updated_at`
+		RETURNING id, org_id, name, is_control, created_at, updated_at, etag`
 
 	return pgdb.TypedQuery[Project]{
 		SQL:    sql,
@@ -99,4 +107,159 @@ func createProjectQuery(cp CreateProject) pgdb.TypedQuery[Project] {
 		Scan:   pgx.RowToStructByName[Project],
 		Expect: pgdb.ExpectOne,
 	}
+}
+
+func accessibleProjectsQuery(userID uuid.UUID, filter ProjectFilter, pageSize, pageOffset int) pgdb.TypedQuery[Project] {
+	params := pgx.NamedArgs{
+		"user_id":                 userID,
+		"page_size":               pageSize,
+		"page_offset":             pageOffset,
+		"discover_all_permission": permissionNameProjectDiscoverAll,
+	}
+
+	// Each assignment scope contributes project IDs to the union, which also deduplicates projects
+	// reached through multiple scopes. Project- and organization-scoped assignments require current
+	// organization membership; system assignments apply to every project only through the explicit
+	// global-discovery permission.
+	sql := fmt.Sprintf(`
+		WITH
+			target_user AS (
+				SELECT id
+				FROM useraccess.users
+				WHERE external_id = @user_id
+			),
+			accessible_project_ids AS (
+				-- A direct project assignment contributes only its project and requires current
+				-- membership in the organization that owns it.
+				SELECT assignment.project_id
+				FROM target_user AS target
+				JOIN rbac.project_role_assignments AS assignment ON assignment.user_id = target.id
+				JOIN org.projects AS project ON project.id = assignment.project_id
+				JOIN org.org_membership AS membership
+					ON membership.user_id = target.id AND membership.org_id = project.org_id
+
+				UNION
+
+				-- An organization assignment contributes every project owned by that organization
+				-- and requires current membership there.
+				SELECT project.id
+				FROM target_user AS target
+				JOIN rbac.org_role_assignments AS assignment ON assignment.user_id = target.id
+				JOIN org.org_membership AS membership
+					ON membership.user_id = target.id AND membership.org_id = assignment.org_id
+				JOIN org.projects AS project ON project.org_id = assignment.org_id
+
+				UNION
+
+				-- A system assignment carrying project:discover-all contributes every project
+				-- without an organization-membership prerequisite.
+				SELECT project.id
+				FROM org.projects AS project
+				WHERE EXISTS (
+					SELECT 1
+					FROM target_user AS target
+					JOIN rbac.system_role_assignments AS assignment ON assignment.user_id = target.id
+					JOIN rbac.system_role_permissions AS role_permission ON role_permission.role_id = assignment.role_id
+					JOIN rbac.permissions AS permission
+						ON permission.id = role_permission.permission_id
+						AND permission.name = @discover_all_permission
+				)
+			)
+		SELECT project.id, project.org_id, project.name, project.is_control, project.created_at, project.updated_at, project.etag
+		FROM accessible_project_ids AS accessible
+		JOIN org.projects AS project ON project.id = accessible.project_id
+		%s
+		ORDER BY project.name, project.org_id
+		LIMIT @page_size OFFSET @page_offset`, whereClause(filter, params))
+
+	return pgdb.TypedQuery[Project]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[Project],
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func accessibleProjectCountQuery(userID uuid.UUID, filter ProjectFilter) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{
+		"user_id":                 userID,
+		"discover_all_permission": permissionNameProjectDiscoverAll,
+	}
+
+	// Anchor the result on target_user so an existing user without assignments returns zero while a
+	// missing user returns no row. The accessible-project union matches the list query exactly.
+	sql := fmt.Sprintf(`
+		WITH
+			target_user AS (
+				SELECT id
+				FROM useraccess.users
+				WHERE external_id = @user_id
+			),
+			accessible_project_ids AS (
+				-- A direct project assignment contributes only its project and requires current
+				-- membership in the organization that owns it.
+				SELECT assignment.project_id
+				FROM target_user AS target
+				JOIN rbac.project_role_assignments AS assignment ON assignment.user_id = target.id
+				JOIN org.projects AS project ON project.id = assignment.project_id
+				JOIN org.org_membership AS membership
+					ON membership.user_id = target.id AND membership.org_id = project.org_id
+
+				UNION
+
+				-- An organization assignment contributes every project owned by that organization
+				-- and requires current membership there.
+				SELECT project.id
+				FROM target_user AS target
+				JOIN rbac.org_role_assignments AS assignment ON assignment.user_id = target.id
+				JOIN org.org_membership AS membership
+					ON membership.user_id = target.id AND membership.org_id = assignment.org_id
+				JOIN org.projects AS project ON project.org_id = assignment.org_id
+
+				UNION
+
+				-- A system assignment carrying project:discover-all contributes every project
+				-- without an organization-membership prerequisite.
+				SELECT project.id
+				FROM org.projects AS project
+				WHERE EXISTS (
+					SELECT 1
+					FROM target_user AS target
+					JOIN rbac.system_role_assignments AS assignment ON assignment.user_id = target.id
+					JOIN rbac.system_role_permissions AS role_permission ON role_permission.role_id = assignment.role_id
+					JOIN rbac.permissions AS permission
+						ON permission.id = role_permission.permission_id
+						AND permission.name = @discover_all_permission
+				)
+			)
+		SELECT count(project.id)
+		FROM target_user AS target
+		LEFT JOIN accessible_project_ids AS accessible ON true
+		LEFT JOIN (
+			SELECT id
+			FROM org.projects AS project
+			%s
+		) AS project ON project.id = accessible.project_id
+		GROUP BY target.id`, whereClause(filter, params))
+
+	return pgdb.TypedQuery[int]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowTo[int],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+// whereClause builds an optional WHERE clause from f, adding any required
+// named parameters to params as a side effect.
+func whereClause(f ProjectFilter, params pgx.NamedArgs) string {
+	var clauses []string
+	if name := strings.TrimSpace(f.Name); name != "" {
+		params["name_prefix"] = name + "%"
+		clauses = append(clauses, "project.name ILIKE @name_prefix")
+	}
+	if len(clauses) == 0 {
+		return ""
+	}
+	return "WHERE " + strings.Join(clauses, " AND ")
 }

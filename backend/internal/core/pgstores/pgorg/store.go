@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -125,4 +126,47 @@ func (s *Store) ProjectByName(ctx context.Context, orgID int, name string) (Proj
 	}
 
 	return project, nil
+}
+
+// AccessibleProjects returns the projects reachable through any role assignment held by userID
+// that match filter, ordered by name and organization ID. An empty result cannot distinguish a
+// missing user from a user without accessible projects, so callers are expected to use it together
+// with AccessibleProjectCount.
+func (s *Store) AccessibleProjects(ctx context.Context, userID uuid.UUID, filter ProjectFilter, pageSize, pageOffset int) ([]Project, error) {
+	q := accessibleProjectsQuery(userID, filter, pageSize, pageOffset)
+
+	var projects []Project
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.QueueMany(ctx, b, &projects); err != nil {
+			return fmt.Errorf("accessible projects: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return nil, err
+	}
+
+	return projects, nil
+}
+
+// AccessibleProjectCount returns the number of projects matching filter that are reachable through
+// any role assignment held by userID.
+// Returns sql.ErrNoRows if no such user exists.
+func (s *Store) AccessibleProjectCount(ctx context.Context, userID uuid.UUID, filter ProjectFilter) (int, error) {
+	q := accessibleProjectCountQuery(userID, filter)
+
+	var count int
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &count); err != nil {
+			return fmt.Errorf("accessible project count: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

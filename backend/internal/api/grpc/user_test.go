@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/data/order"
@@ -584,6 +585,11 @@ func TestUserService_ListUsers(t *testing.T) {
 func TestUserService_ListUsers_error(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
+	pageToken, err := conv.EncodePageToken(1, "email", &pb.UserFilter{Email: "alice"})
+	if err != nil {
+		t.Fatalf("EncodePageToken() error = %v", err)
+	}
+
 	tests := []struct {
 		name     string
 		userCore UserCore
@@ -595,6 +601,26 @@ func TestUserService_ListUsers_error(t *testing.T) {
 			userCore: &MockedUserCore{},
 			in:       &pb.ListUsersRequest{PageToken: "!!!not-base64!!!"},
 			want:     status.New(codes.InvalidArgument, "invalid page_token"),
+		},
+		{
+			name:     "page token order by mismatch",
+			userCore: &MockedUserCore{},
+			in: &pb.ListUsersRequest{
+				PageToken: pageToken,
+				OrderBy:   "updated_at",
+				Filter:    &pb.UserFilter{Email: "alice"},
+			},
+			want: status.New(codes.InvalidArgument, "page_token order_by mismatch"),
+		},
+		{
+			name:     "page token filter mismatch",
+			userCore: &MockedUserCore{},
+			in: &pb.ListUsersRequest{
+				PageToken: pageToken,
+				OrderBy:   "email",
+				Filter:    &pb.UserFilter{Email: "bob"},
+			},
+			want: status.New(codes.InvalidArgument, "page_token filter mismatch"),
 		},
 		{
 			name: "core error",

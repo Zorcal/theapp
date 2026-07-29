@@ -10,6 +10,7 @@ INSERT INTO rbac.permissions (name) VALUES
     ('system-role:read'),
     ('system-role:assign'),
     ('system-role:unassign'),
+    ('project:discover-all'),
     ('custom-role:create'),
     ('custom-role:read'),
     ('custom-role:update'),

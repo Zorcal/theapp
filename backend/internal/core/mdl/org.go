@@ -1,6 +1,10 @@
 package mdl
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // SystemOrgName is the name of the well-known organization that anchors system administration.
 const SystemOrgName = "theapp"
@@ -41,6 +45,13 @@ type Project struct {
 	IsControl bool
 	CreatedAt time.Time
 	UpdatedAt *time.Time
+	ETag      uuid.UUID
+}
+
+// ProjectFilter holds optional prefix-match criteria for listing projects.
+// Empty string fields are ignored.
+type ProjectFilter struct {
+	Name string
 }
 
 // CreateProject holds the fields needed to create a new project.

@@ -85,7 +85,12 @@ Table tests are a subtest structured as a data-driven loop; the naming rule abov
 
 ### Mocks
 
-- Use mock callbacks to provide configured results and errors. Don't assert arguments inside them merely to verify that values were forwarded; prefer assertions on observable behavior and integration tests. Assert mock arguments only when the interaction itself is part of the contract.
+- Use mock callbacks to provide configured results and errors. Don't assert callback arguments or examine mock call
+  history merely to verify that values were forwarded between collaborators; those are white-box tests of the current
+  call graph, not observable behavior. Prefer assertions on returned values, errors, and persisted state, and use
+  integration tests when behavior depends on values crossing a layer boundary. Assert mock interactions only in the
+  rare case where the interaction itself is the contract, such as a required external side effect with no other
+  observable result.
 
 ```go
 // Good

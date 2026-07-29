@@ -309,6 +309,7 @@ func run(ctx context.Context, cfg Config) error {
 		SystemRoleCore:             rbacCore,
 		SystemRoleOrganizationCore: orgCore,
 		CustomRoleCore:             rbacCore,
+		ProjectCore:                orgCore,
 		WorkflowAuthCore:           authWorkflowCore,
 		JWTKey:                     []byte(cfg.Auth.JWTSecret),
 		JWTIssuer:                  cfg.Auth.JWTIssuer,

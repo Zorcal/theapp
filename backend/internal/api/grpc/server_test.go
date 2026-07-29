@@ -55,6 +55,7 @@ type ServerTest struct {
 	systemRoleServiceClient pb.SystemRoleServiceClient
 	customRoleServiceClient pb.RoleServiceClient
 	permissionServiceClient pb.PermissionServiceClient
+	projectServiceClient    pb.ProjectServiceClient
 }
 
 // NewServerTest starts a gRPC server with the given config over an in-memory transport and returns
@@ -110,6 +111,7 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
 		customRoleServiceClient: pb.NewRoleServiceClient(conn),
 		permissionServiceClient: pb.NewPermissionServiceClient(conn),
+		projectServiceClient:    pb.NewProjectServiceClient(conn),
 	}
 }
 
@@ -121,6 +123,7 @@ type ServerIntegrationTest struct {
 	systemRoleServiceClient pb.SystemRoleServiceClient
 	customRoleServiceClient pb.RoleServiceClient
 	permissionServiceClient pb.PermissionServiceClient
+	projectServiceClient    pb.ProjectServiceClient
 	emailSender             *testingx.CaptureEmailSender
 	userStore               *pguser.Store
 	orgStore                *pgorg.Store
@@ -161,7 +164,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdb.NewTransactor(pool), authCoreCfg)
 	userCore := user.NewCore(pgUserStore)
 	rbacCore := rbac.NewCore(pgRBACStore, pgdb.NewTransactor(pool))
-	systemRoleOrganizationCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pool))
+	orgCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pool))
 
 	dbosCtx := dbostest.New(t, context.Background(), pool)
 
@@ -174,8 +177,9 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		UserCore:                   userCore,
 		AuthCore:                   authCore,
 		SystemRoleCore:             rbacCore,
-		SystemRoleOrganizationCore: systemRoleOrganizationCore,
+		SystemRoleOrganizationCore: orgCore,
 		CustomRoleCore:             rbacCore,
+		ProjectCore:                orgCore,
 		WorkflowAuthCore:           workflowAuthCore,
 		JWTKey:                     testJWTKey,
 		JWTIssuer:                  testJWTIssuer,
@@ -188,6 +192,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
 		customRoleServiceClient: pb.NewRoleServiceClient(conn),
 		permissionServiceClient: pb.NewPermissionServiceClient(conn),
+		projectServiceClient:    pb.NewProjectServiceClient(conn),
 		emailSender:             emailSender,
 		userStore:               pgUserStore,
 		orgStore:                pgOrgStore,

@@ -135,7 +135,9 @@ type ListProjectsRequest struct {
 	// Maximum number of projects to return.
 	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// Token for fetching the next page of results.
-	PageToken     string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Filter criteria. All fields are optional; omitted fields match all projects.
+	Filter        *ProjectFilter `protobuf:"bytes,3,opt,name=filter,proto3" json:"filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -184,6 +186,59 @@ func (x *ListProjectsRequest) GetPageToken() string {
 	return ""
 }
 
+func (x *ListProjectsRequest) GetFilter() *ProjectFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+// Filter criteria for listing projects.
+type ProjectFilter struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Match projects whose name starts with this prefix.
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProjectFilter) Reset() {
+	*x = ProjectFilter{}
+	mi := &file_project_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProjectFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProjectFilter) ProtoMessage() {}
+
+func (x *ProjectFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_project_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProjectFilter.ProtoReflect.Descriptor instead.
+func (*ProjectFilter) Descriptor() ([]byte, []int) {
+	return file_project_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ProjectFilter) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 // Response message for listing accessible projects.
 type ListProjectsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -199,7 +254,7 @@ type ListProjectsResponse struct {
 
 func (x *ListProjectsResponse) Reset() {
 	*x = ListProjectsResponse{}
-	mi := &file_project_proto_msgTypes[2]
+	mi := &file_project_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -211,7 +266,7 @@ func (x *ListProjectsResponse) String() string {
 func (*ListProjectsResponse) ProtoMessage() {}
 
 func (x *ListProjectsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_project_proto_msgTypes[2]
+	mi := &file_project_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -224,7 +279,7 @@ func (x *ListProjectsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectsResponse.ProtoReflect.Descriptor instead.
 func (*ListProjectsResponse) Descriptor() ([]byte, []int) {
-	return file_project_proto_rawDescGZIP(), []int{2}
+	return file_project_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListProjectsResponse) GetProjects() []*Project {
@@ -263,11 +318,14 @@ const file_project_proto_rawDesc = "" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x1f\n" +
-	"\x04etag\x18\a \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"Q\n" +
+	"\x04etag\x18\a \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"\x83\x01\n" +
 	"\x13ListProjectsRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\x02 \x01(\tR\tpageToken\"\x8d\x01\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\x120\n" +
+	"\x06filter\x18\x03 \x01(\v2\x18.theapp.v1.ProjectFilterR\x06filter\"#\n" +
+	"\rProjectFilter\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x8d\x01\n" +
 	"\x14ListProjectsResponse\x12.\n" +
 	"\bprojects\x18\x01 \x03(\v2\x12.theapp.v1.ProjectR\bprojects\x12\x1d\n" +
 	"\n" +
@@ -306,24 +364,26 @@ func file_project_proto_rawDescGZIP() []byte {
 	return file_project_proto_rawDescData
 }
 
-var file_project_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_project_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_project_proto_goTypes = []any{
 	(*Project)(nil),               // 0: theapp.v1.Project
 	(*ListProjectsRequest)(nil),   // 1: theapp.v1.ListProjectsRequest
-	(*ListProjectsResponse)(nil),  // 2: theapp.v1.ListProjectsResponse
-	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
+	(*ProjectFilter)(nil),         // 2: theapp.v1.ProjectFilter
+	(*ListProjectsResponse)(nil),  // 3: theapp.v1.ListProjectsResponse
+	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
 }
 var file_project_proto_depIdxs = []int32{
-	3, // 0: theapp.v1.Project.create_time:type_name -> google.protobuf.Timestamp
-	3, // 1: theapp.v1.Project.update_time:type_name -> google.protobuf.Timestamp
-	0, // 2: theapp.v1.ListProjectsResponse.projects:type_name -> theapp.v1.Project
-	1, // 3: theapp.v1.ProjectService.ListProjects:input_type -> theapp.v1.ListProjectsRequest
-	2, // 4: theapp.v1.ProjectService.ListProjects:output_type -> theapp.v1.ListProjectsResponse
-	4, // [4:5] is the sub-list for method output_type
-	3, // [3:4] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	4, // 0: theapp.v1.Project.create_time:type_name -> google.protobuf.Timestamp
+	4, // 1: theapp.v1.Project.update_time:type_name -> google.protobuf.Timestamp
+	2, // 2: theapp.v1.ListProjectsRequest.filter:type_name -> theapp.v1.ProjectFilter
+	0, // 3: theapp.v1.ListProjectsResponse.projects:type_name -> theapp.v1.Project
+	1, // 4: theapp.v1.ProjectService.ListProjects:input_type -> theapp.v1.ListProjectsRequest
+	3, // 5: theapp.v1.ProjectService.ListProjects:output_type -> theapp.v1.ListProjectsResponse
+	5, // [5:6] is the sub-list for method output_type
+	4, // [4:5] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_project_proto_init() }
@@ -337,7 +397,7 @@ func file_project_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_project_proto_rawDesc), len(file_project_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

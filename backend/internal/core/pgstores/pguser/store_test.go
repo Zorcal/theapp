@@ -200,13 +200,18 @@ func TestStore_UserCount(t *testing.T) {
 		},
 		{
 			name:   "email prefix filter",
-			filter: Filter{Email: "alice"},
+			filter: Filter{Email: " alice "},
 			want:   1,
 		},
 		{
 			name:   "name prefix filter",
-			filter: Filter{Name: "Bob"},
+			filter: Filter{Name: " Bob "},
 			want:   1,
+		},
+		{
+			name:   "whitespace-only filter counts all",
+			filter: Filter{Email: " ", Name: " "},
+			want:   2,
 		},
 		{
 			name:   "filter with no matches",
@@ -290,14 +295,14 @@ func TestStore_Users(t *testing.T) {
 		},
 		{
 			name:       "filter by email prefix",
-			filter:     Filter{Email: "alice"},
+			filter:     Filter{Email: " alice "},
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []User{alice},
 		},
 		{
 			name:       "filter by name prefix",
-			filter:     Filter{Name: "Bob"},
+			filter:     Filter{Name: " Bob "},
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []User{bob},
@@ -305,12 +310,19 @@ func TestStore_Users(t *testing.T) {
 		{
 			name: "filter by email and name prefix",
 			filter: Filter{
-				Email: "c",
-				Name:  "Charlie",
+				Email: " c ",
+				Name:  " Charlie ",
 			},
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []User{charlie},
+		},
+		{
+			name:       "whitespace-only filter",
+			filter:     Filter{Email: " ", Name: " "},
+			pageSize:   10,
+			pageOffset: 0,
+			want:       []User{charlie, alice, bob},
 		},
 		{
 			name:       "filter with no matches returns empty",

@@ -109,6 +109,15 @@ message ListProjectsRequest {
 
   // Token for fetching the next page of results.
   string page_token = 2;
+
+  // Filter criteria. All fields are optional; omitted fields match all projects.
+  ProjectFilter filter = 3;
+}
+
+// Filter criteria for listing projects.
+message ProjectFilter {
+  // Match projects whose name starts with this prefix.
+  string name = 1;
 }
 
 // Response message for listing accessible projects.

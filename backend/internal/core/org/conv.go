@@ -42,5 +42,18 @@ func projectFromPg(p pgorg.Project) mdl.Project {
 		IsControl: p.IsControl,
 		CreatedAt: p.CreatedAt,
 		UpdatedAt: p.UpdatedAt,
+		ETag:      p.ETag,
 	}
+}
+
+func projectsFromPg(projects []pgorg.Project) []mdl.Project {
+	result := make([]mdl.Project, len(projects))
+	for i, project := range projects {
+		result[i] = projectFromPg(project)
+	}
+	return result
+}
+
+func projectFilterToPg(filter mdl.ProjectFilter) pgorg.ProjectFilter {
+	return pgorg.ProjectFilter{Name: filter.Name}
 }

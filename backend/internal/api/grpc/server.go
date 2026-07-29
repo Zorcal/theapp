@@ -24,6 +24,7 @@ type ServerConfig struct {
 	SystemRoleCore             SystemRoleCore
 	SystemRoleOrganizationCore SystemRoleOrganizationCore
 	CustomRoleCore             CustomRoleCore
+	ProjectCore                ProjectCore
 	WorkflowAuthCore           WorkflowAuthCore
 	// JWTKey is the HMAC secret used to validate access tokens.
 	JWTKey      []byte
@@ -49,7 +50,8 @@ var publicMethods = set.Set[string]{
 var noProjectMethods = set.Set[string]{
 	"/theapp.v1.AuthService/RevokeAllSessions": {},
 
-	// UserService is a system-wide directory, not a project- or org-scoped resource.
+	"/theapp.v1.ProjectService/ListProjects": {},
+
 	"/theapp.v1.UserService/GetUser":    {},
 	"/theapp.v1.UserService/ListUsers":  {},
 	"/theapp.v1.UserService/CreateUser": {},
@@ -76,6 +78,8 @@ var organizationScopedPermissions = set.Set[mdl.Permission]{
 var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.AuthService/RevokeAllSessions": {},
 	"/theapp.v1.AuthService/GetAuthContext":    {},
+
+	"/theapp.v1.ProjectService/ListProjects": {},
 
 	"/theapp.v1.UserService/GetUser":    {mdl.PermissionUserRead},
 	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},
@@ -153,6 +157,10 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	})
 
 	pb.RegisterPermissionServiceServer(srv, &permissionService{})
+
+	pb.RegisterProjectServiceServer(srv, &projectService{
+		projectCore: cfg.ProjectCore,
+	})
 
 	if cfg.Reflection {
 		reflection.Register(srv)

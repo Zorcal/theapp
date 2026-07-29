@@ -24,6 +24,9 @@ const (
 	PermissionSystemRoleUnassign Permission = "system-role:unassign"
 )
 
+// PermissionProjectDiscoverAll allows a system-scoped role to make every project discoverable.
+const PermissionProjectDiscoverAll Permission = "project:discover-all"
+
 // All custom role service permissions. They authorize role management only within the organization
 // resolved from the request's project context.
 const (
@@ -48,6 +51,7 @@ func AllPermissions() []Permission {
 		PermissionSystemRoleRead,
 		PermissionSystemRoleAssign,
 		PermissionSystemRoleUnassign,
+		PermissionProjectDiscoverAll,
 		PermissionCustomRoleCreate,
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
@@ -71,6 +75,7 @@ func SystemOnlyPermissions() []Permission {
 		PermissionSystemRoleRead,
 		PermissionSystemRoleAssign,
 		PermissionSystemRoleUnassign,
+		PermissionProjectDiscoverAll,
 	}
 }
 

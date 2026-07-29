@@ -149,12 +149,12 @@ func userCountQuery(filter Filter) pgdb.TypedQuery[int] {
 // named parameters to params as a side effect.
 func whereClause(f Filter, params pgx.NamedArgs) string {
 	var clauses []string
-	if f.Email != "" {
-		params["email_prefix"] = f.Email + "%"
+	if email := strings.TrimSpace(f.Email); email != "" {
+		params["email_prefix"] = email + "%"
 		clauses = append(clauses, "email ILIKE @email_prefix")
 	}
-	if f.Name != "" {
-		params["name_prefix"] = f.Name + "%"
+	if name := strings.TrimSpace(f.Name); name != "" {
+		params["name_prefix"] = name + "%"
 		clauses = append(clauses, "name ILIKE @name_prefix")
 	}
 	if len(clauses) == 0 {

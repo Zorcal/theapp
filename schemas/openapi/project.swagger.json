@@ -67,6 +67,13 @@
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "filter.name",
+            "description": "Match projects whose name starts with this prefix.",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -176,6 +183,16 @@
         }
       },
       "description": "Project represents a project within an organization."
+    },
+    "v1ProjectFilter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Match projects whose name starts with this prefix."
+        }
+      },
+      "description": "Filter criteria for listing projects."
     }
   },
   "securityDefinitions": {

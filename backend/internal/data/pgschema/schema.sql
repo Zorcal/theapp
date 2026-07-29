@@ -129,7 +129,8 @@ CREATE TABLE org.projects (
     name text NOT NULL,
     is_control boolean NOT NULL,
     created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone
+    updated_at timestamp with time zone,
+    etag uuid NOT NULL
 );
 
 
@@ -496,6 +497,14 @@ ALTER TABLE ONLY org.organizations
 
 
 --
+-- Name: projects projects_etag_key; Type: CONSTRAINT; Schema: org; Owner: -
+--
+
+ALTER TABLE ONLY org.projects
+    ADD CONSTRAINT projects_etag_key UNIQUE (etag);
+
+
+--
 -- Name: projects projects_pkey; Type: CONSTRAINT; Schema: org; Owner: -
 --
 
@@ -677,6 +686,20 @@ ALTER TABLE ONLY useraccess.users
 
 ALTER TABLE ONLY useraccess.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: projects_name_org_id_idx; Type: INDEX; Schema: org; Owner: -
+--
+
+CREATE INDEX projects_name_org_id_idx ON org.projects USING btree (name, org_id);
+
+
+--
+-- Name: projects_name_trgm_idx; Type: INDEX; Schema: org; Owner: -
+--
+
+CREATE INDEX projects_name_trgm_idx ON org.projects USING gin (name public.gin_trgm_ops);
 
 
 --

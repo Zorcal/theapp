@@ -164,10 +164,10 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** the endpoint returns the caller's ID and email plus effective project-, organization-, and system-scoped permissions for the selected project.
 
-## Phase 18 — discover-accessible-projects endpoint
+## Phase 18 — discover-accessible-projects endpoint — done
 
-43. Add `schemas/project.proto` with `ProjectService` and a paginated list-projects RPC. The RPC lists only projects accessible to the caller; a system-scoped assignment resolves to every project in the system. It does not require project metadata because clients use it to select the project for subsequent calls. Run `make generate`.
-44. Accessible-project listing endpoint. Resolve access through direct project-, organization-, and system-scoped role assignments, deduplicate projects reached through multiple scopes, and return a stable paginated order. Depends on 24, 43.
+43. Add `schemas/project.proto` with `ProjectService` and a paginated list-projects RPC. The RPC lists only projects accessible to the caller; a system-scoped assignment resolves to every project only when its role carries the system-only `project:discover-all` permission. It does not require project metadata because clients use it to select the project for subsequent calls. Run `make generate`. This part is complete.
+44. Accessible-project listing endpoint. Resolve access through direct project and organization assignments plus system assignments carrying `project:discover-all`, deduplicate projects reached through multiple scopes, and return a stable paginated order. This part is complete. Depends on 24, 43.
 
 **Checkpoint:** the endpoint lists every project the caller has any role in, paginated.
 
@@ -182,8 +182,8 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 ## Phase 20 — org-scoped user management endpoints
 
-49. Extend `schemas/organization.proto` with a create-or-assign-user RPC: creates a user if none exists with the given email, then assigns them to the calling org; if the user already exists, only the org assignment happens. Anchored on the org's control project — the `x-project-id` metadata must be that project's ID. Run `make generate`. Depends on 45, 46.
-50. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an organization"). Also anchored on the org's control project; the request body additionally carries a project ID filter, resolved through the three-way union (24), not `org_membership`. Run `make generate`. Depends on 45, 46.
+49. Extend `schemas/organization.proto` with a create-or-assign-user RPC: creates a user if none exists with the given email, then assigns them to the calling org; if the user already exists, only the org assignment happens. Add the organization-store membership operation used by this flow and replace direct membership inserts in test seed helpers with it. Anchored on the org's control project — the `x-project-id` metadata must be that project's ID. Run `make generate`. Depends on 45, 46.
+50. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an organization"). Also anchored on the org's control project; the request body additionally carries a project ID filter, resolved through the three-way union (24), not `org_membership`. Add reverse-lookup indexes on `org_membership(org_id)`, `project_role_assignments(project_id)`, and `org_role_assignments(org_id)` for these organization/project-first lookups and the later deletion cleanup. Run `make generate`. Depends on 45, 46.
 51. Wire both endpoints behind the appropriate org-scoped permissions. Depends on 49, 50.
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.

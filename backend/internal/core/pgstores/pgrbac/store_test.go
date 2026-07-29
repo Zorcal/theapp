@@ -566,6 +566,7 @@ func seededSystemRoles() []SystemRole {
 				"custom-role:unassign-org",
 				"custom-role:unassign-project",
 				"custom-role:update",
+				"project:discover-all",
 				"system-role:assign",
 				"system-role:read",
 				"system-role:unassign",

@@ -1,6 +1,10 @@
 package pgorg
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Organization represents an organization in the database.
 type Organization struct {
@@ -26,6 +30,13 @@ type Project struct {
 	IsControl bool       `db:"is_control"`
 	CreatedAt time.Time  `db:"created_at"`
 	UpdatedAt *time.Time `db:"updated_at"`
+	ETag      uuid.UUID  `db:"etag"`
+}
+
+// ProjectFilter holds optional prefix-match criteria for listing projects.
+// Empty string fields are ignored.
+type ProjectFilter struct {
+	Name string
 }
 
 // CreateProject holds the fields required to create a new project in the database.

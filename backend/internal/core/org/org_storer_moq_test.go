@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 )
 
@@ -20,6 +21,12 @@ var _ OrgStorer = &MockedOrgStorer{}
 //
 //		// make and configure a mocked OrgStorer
 //		mockedOrgStorer := &MockedOrgStorer{
+//			AccessibleProjectCountFunc: func(ctx context.Context, userID uuid.UUID, filter pgorg.Filter) (int, error) {
+//				panic("mock out the AccessibleProjectCount method")
+//			},
+//			AccessibleProjectsFunc: func(ctx context.Context, userID uuid.UUID, filter pgorg.Filter, pageSize int, pageOffset int) ([]pgorg.Project, error) {
+//				panic("mock out the AccessibleProjects method")
+//			},
 //			CreateOrganizationFunc: func(ctx context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
 //				panic("mock out the CreateOrganization method")
 //			},
@@ -39,6 +46,12 @@ var _ OrgStorer = &MockedOrgStorer{}
 //
 //	}
 type MockedOrgStorer struct {
+	// AccessibleProjectCountFunc mocks the AccessibleProjectCount method.
+	AccessibleProjectCountFunc func(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter) (int, error)
+
+	// AccessibleProjectsFunc mocks the AccessibleProjects method.
+	AccessibleProjectsFunc func(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter, pageSize int, pageOffset int) ([]pgorg.Project, error)
+
 	// CreateOrganizationFunc mocks the CreateOrganization method.
 	CreateOrganizationFunc func(ctx context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error)
 
@@ -53,6 +66,28 @@ type MockedOrgStorer struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AccessibleProjectCount holds details about calls to the AccessibleProjectCount method.
+		AccessibleProjectCount []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// Filter is the filter argument value.
+			Filter pgorg.ProjectFilter
+		}
+		// AccessibleProjects holds details about calls to the AccessibleProjects method.
+		AccessibleProjects []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// Filter is the filter argument value.
+			Filter pgorg.ProjectFilter
+			// PageSize is the pageSize argument value.
+			PageSize int
+			// PageOffset is the pageOffset argument value.
+			PageOffset int
+		}
 		// CreateOrganization holds details about calls to the CreateOrganization method.
 		CreateOrganization []struct {
 			// Ctx is the ctx argument value.
@@ -84,10 +119,100 @@ type MockedOrgStorer struct {
 			Name string
 		}
 	}
-	lockCreateOrganization sync.RWMutex
-	lockCreateProject      sync.RWMutex
-	lockOrganizationByName sync.RWMutex
-	lockProjectByName      sync.RWMutex
+	lockAccessibleProjectCount sync.RWMutex
+	lockAccessibleProjects     sync.RWMutex
+	lockCreateOrganization     sync.RWMutex
+	lockCreateProject          sync.RWMutex
+	lockOrganizationByName     sync.RWMutex
+	lockProjectByName          sync.RWMutex
+}
+
+// AccessibleProjectCount calls AccessibleProjectCountFunc.
+func (mock *MockedOrgStorer) AccessibleProjectCount(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter) (int, error) {
+	if mock.AccessibleProjectCountFunc == nil {
+		panic("MockedOrgStorer.AccessibleProjectCountFunc: method is nil but OrgStorer.AccessibleProjectCount was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		Filter pgorg.ProjectFilter
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		Filter: filter,
+	}
+	mock.lockAccessibleProjectCount.Lock()
+	mock.calls.AccessibleProjectCount = append(mock.calls.AccessibleProjectCount, callInfo)
+	mock.lockAccessibleProjectCount.Unlock()
+	return mock.AccessibleProjectCountFunc(ctx, userID, filter)
+}
+
+// AccessibleProjectCountCalls gets all the calls that were made to AccessibleProjectCount.
+// Check the length with:
+//
+//	len(mockedOrgStorer.AccessibleProjectCountCalls())
+func (mock *MockedOrgStorer) AccessibleProjectCountCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	Filter pgorg.ProjectFilter
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		Filter pgorg.ProjectFilter
+	}
+	mock.lockAccessibleProjectCount.RLock()
+	calls = mock.calls.AccessibleProjectCount
+	mock.lockAccessibleProjectCount.RUnlock()
+	return calls
+}
+
+// AccessibleProjects calls AccessibleProjectsFunc.
+func (mock *MockedOrgStorer) AccessibleProjects(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter, pageSize int, pageOffset int) ([]pgorg.Project, error) {
+	if mock.AccessibleProjectsFunc == nil {
+		panic("MockedOrgStorer.AccessibleProjectsFunc: method is nil but OrgStorer.AccessibleProjects was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		UserID     uuid.UUID
+		Filter     pgorg.ProjectFilter
+		PageSize   int
+		PageOffset int
+	}{
+		Ctx:        ctx,
+		UserID:     userID,
+		Filter:     filter,
+		PageSize:   pageSize,
+		PageOffset: pageOffset,
+	}
+	mock.lockAccessibleProjects.Lock()
+	mock.calls.AccessibleProjects = append(mock.calls.AccessibleProjects, callInfo)
+	mock.lockAccessibleProjects.Unlock()
+	return mock.AccessibleProjectsFunc(ctx, userID, filter, pageSize, pageOffset)
+}
+
+// AccessibleProjectsCalls gets all the calls that were made to AccessibleProjects.
+// Check the length with:
+//
+//	len(mockedOrgStorer.AccessibleProjectsCalls())
+func (mock *MockedOrgStorer) AccessibleProjectsCalls() []struct {
+	Ctx        context.Context
+	UserID     uuid.UUID
+	Filter     pgorg.ProjectFilter
+	PageSize   int
+	PageOffset int
+} {
+	var calls []struct {
+		Ctx        context.Context
+		UserID     uuid.UUID
+		Filter     pgorg.ProjectFilter
+		PageSize   int
+		PageOffset int
+	}
+	mock.lockAccessibleProjects.RLock()
+	calls = mock.calls.AccessibleProjects
+	mock.lockAccessibleProjects.RUnlock()
+	return calls
 }
 
 // CreateOrganization calls CreateOrganizationFunc.
