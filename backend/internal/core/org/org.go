@@ -33,7 +33,7 @@ type OrgStorer interface {
 	// Returns [sql.ErrNoRows] if no such project exists.
 	ProjectByName(ctx context.Context, orgID int, name string) (pgorg.Project, error)
 	// AccessibleProjects returns a page and total count of projects reachable through any role
-	// assignment held by userID that match filter, ordered by name and organization ID.
+	// assignment held by userID that match filter, ordered by organization ID and natural name.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	AccessibleProjects(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter, pageSize, pageOffset int) ([]pgorg.Project, int, error)
 }

@@ -124,7 +124,7 @@ func accessibleProjectsQuery(userID uuid.UUID, filter ProjectFilter, pageSize, p
 		CROSS JOIN LATERAL rbac.accessible_project_ids(target.id) AS accessible
 		JOIN org.projects AS project ON project.id = accessible.project_id
 		%s
-		ORDER BY project.name, project.org_id
+		ORDER BY project.org_id, project.name COLLATE org.project_name_natural
 		LIMIT @page_size OFFSET @page_offset`, whereClause(filter, params))
 
 	return pgdb.TypedQuery[Project]{

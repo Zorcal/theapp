@@ -21,8 +21,12 @@ CREATE UNIQUE INDEX projects_org_id_control_key ON org.projects (org_id) WHERE i
 -- the assignment organization. The primary key on id alone cannot be a composite FK target.
 ALTER TABLE org.projects ADD CONSTRAINT projects_id_org_id_key UNIQUE (id, org_id);
 
--- Matches the stable name-then-organization ordering used by accessible-project pagination.
-CREATE INDEX projects_name_org_id_idx ON org.projects (name, org_id);
+-- Treats digit runs in project names numerically so pagination orders project-2 before project-10.
+CREATE COLLATION org.project_name_natural (provider = icu, locale = 'und-u-kn');
+
+-- Matches the stable organization-then-natural-name ordering used by accessible-project
+-- pagination.
+CREATE INDEX projects_org_id_name_idx ON org.projects (org_id, name COLLATE org.project_name_natural);
 
 -- Supports the case-insensitive name prefix predicate used by accessible-project list/count
 -- queries; the ordering B-tree cannot serve ILIKE.

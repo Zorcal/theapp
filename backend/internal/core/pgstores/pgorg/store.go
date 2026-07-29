@@ -129,7 +129,7 @@ func (s *Store) ProjectByName(ctx context.Context, orgID int, name string) (Proj
 }
 
 // AccessibleProjects returns a page and total count of projects reachable through any role
-// assignment held by userID that match filter, ordered by name and organization ID.
+// assignment held by userID that match filter, ordered by organization ID and natural name.
 // Returns [sql.ErrNoRows] if no such user exists.
 func (s *Store) AccessibleProjects(ctx context.Context, userID uuid.UUID, filter ProjectFilter, pageSize, pageOffset int) ([]Project, int, error) {
 	projectsQ := accessibleProjectsQuery(userID, filter, pageSize, pageOffset)

@@ -37,6 +37,13 @@ CREATE SCHEMA useraccess;
 
 
 --
+-- Name: project_name_natural; Type: COLLATION; Schema: org; Owner: -
+--
+
+CREATE COLLATION org.project_name_natural (provider = icu, locale = 'und-u-kn');
+
+
+--
 -- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -817,13 +824,6 @@ CREATE INDEX org_membership_user_id_idx ON org.org_membership USING btree (user_
 
 
 --
--- Name: projects_name_org_id_idx; Type: INDEX; Schema: org; Owner: -
---
-
-CREATE INDEX projects_name_org_id_idx ON org.projects USING btree (name, org_id);
-
-
---
 -- Name: projects_name_trgm_idx; Type: INDEX; Schema: org; Owner: -
 --
 
@@ -842,6 +842,13 @@ CREATE UNIQUE INDEX projects_org_id_control_key ON org.projects USING btree (org
 --
 
 CREATE UNIQUE INDEX projects_org_id_lower_name_key ON org.projects USING btree (org_id, lower(name));
+
+
+--
+-- Name: projects_org_id_name_idx; Type: INDEX; Schema: org; Owner: -
+--
+
+CREATE INDEX projects_org_id_name_idx ON org.projects USING btree (org_id, name COLLATE org.project_name_natural);
 
 
 --
