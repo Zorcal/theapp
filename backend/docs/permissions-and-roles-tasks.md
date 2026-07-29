@@ -3,8 +3,8 @@
 Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–18
 are complete. They established users/auth, organizations/projects, the RBAC schema, permission
 resolution, the bootstrap CLI, project-scoped enforcement, the system- and custom-role APIs, and
-accessible-project discovery. The RBAC query restructuring described in
-docs/rbac-query-restructuring.md is the current work before phase 19.
+accessible-project discovery. The subsequent RBAC query restructuring established structural
+tenant isolation and shared permission-resolution and effective-access relations.
 
 ## Working process
 
@@ -172,33 +172,73 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** the endpoint lists every project the caller has any role in, paginated.
 
-## RBAC query restructuring — current
+## RBAC query restructuring — done
 
-Before phase 19, strengthen assignment tenant keys, add the set-oriented permission-name lookup,
-and centralize the effective system, organization, project, and accessible-project relations.
-Preserve integer permission primary keys, separate assignment scope tables, explicit deletion with
-`NO ACTION` foreign keys, and live authorization state. Paginated list and total-count queries
-remain separate SQL statements but are queued in one batch to avoid a second database round trip;
-this work adds no performance testing. The complete sequence and future-phase interactions are in
-docs/rbac-query-restructuring.md.
+Assignment tenant keys now structurally enforce membership and organization ownership. The
+set-oriented permission-name lookup and canonical system, organization, project, and
+accessible-project relations keep permission and access queries consistent. Integer permission
+primary keys, separate assignment scope tables, explicit deletion with `NO ACTION` foreign keys,
+and live authorization state remain part of the model. Paginated list and total-count queries
+remain separate SQL statements but are queued in one batch to avoid a second database round trip.
 
 **Checkpoint:** existing observable behavior is unchanged, cross-organization assignment state is
 rejected structurally, and all effective-access consumers use the canonical SQL relations.
 
 ## Phase 19 — org creation endpoint
 
-45. Proto schema: `schemas/organization.proto` (create/delete org). Run `make generate`.
-46. Org creation gRPC endpoint: wires 19 behind `org:create` scoped to `theapp/control`, plus the `theapp` org-membership check. The membership check resolves the `theapp` org by `mdl.SystemOrgName`, the same permanent authorization anchor used by system-role management. Depends on 25, 35, 45.
+45. Proto schema: add organization creation to `schemas/organization.proto`. Organization deletion
+    remains part of phase 23. Run `make generate`.
+46. Org creation gRPC endpoint: wires `Core.CreateOrganization` behind `org:create` scoped to
+    `theapp/control`, plus the `theapp` org-membership check. The membership check resolves the
+    `theapp` org by `mdl.SystemOrgName`, the same permanent authorization anchor used by system-role
+    management. Depends on 25, 35, 45.
 47. Org creation request carries the default project's name (`CreateOrganization.ProjectName`), passed through to 19's `CreateOrganization`, which creates the organization, its control project, and the named default project. Depends on 46.
-48. Org creator assigned an admin role at org scope (see permissions-and-roles.md, "Creating organizations and projects"). Depends on 35, 46.
+48. Add managed organization roles and assignment-scope metadata before bootstrapping the creator:
+    - Add nullable `custom_roles.managed_key`, initially allowing `organization_admin`, and a
+      partial unique index enforcing at most one organization-admin role per organization.
+    - Expose managed roles as `ROLE_KIND_ORGANIZATION_ADMIN` and ordinary roles as
+      `ROLE_KIND_CUSTOM`; do not expose the database key. Return each role's minimum assignment
+      scope.
+    - Classify each permission by its minimum assignment scope and return
+      `PermissionDescriptor` resources from the permission catalog. Reject assigning a role
+      containing an organization-scoped permission to a project with `FailedPrecondition`.
+    - Reject deletion and permission mutation for managed roles in the core regardless of the
+      caller's permissions. Permit authorized display-name updates and organization-scope
+      assignment and unassignment; reconciliation identifies the role by `managed_key`, never by
+      its editable name.
+    - In the organization-creation transaction, add the creator as an organization member, create
+      the managed organization-admin role, and assign it to the creator at organization scope. The
+      role initially holds `project:create`, the four custom-role definition permissions, and the
+      read/assign/unassign permissions for both organization- and project-scoped role assignments.
+      Use a dedicated bootstrap operation that can only create this canonical managed definition;
+      do not expose a general unchecked role-creation operation. Add the organization-membership
+      store operation needed by this workflow rather than inserting membership rows directly.
+    Depends on 35, 46.
 
 **Checkpoint:** an organization can be created end-to-end via the API, seeded with a default project and an org-scoped admin assignment for its creator.
 
 ## Phase 20 — org-scoped user management endpoints
 
-49. Extend `schemas/organization.proto` with a create-or-assign-user RPC: creates a user if none exists with the given email, then assigns them to the calling org; if the user already exists, only the org assignment happens. Add the organization-store membership operation used by this flow and replace direct membership inserts in test seed helpers with it. Anchored on the org's control project — the `x-project-id` metadata must be that project's ID. Run `make generate`. Depends on 45, 46.
-50. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an organization"). Also anchored on the org's control project; the request body additionally carries a project ID filter, resolved through the canonical effective-access relation introduced by the RBAC query restructuring, not `org_membership`. Add any organization/project-first indexes still needed for this listing and later deletion cleanup after accounting for the restructuring's final composite keys. Run `make generate`. Depends on 45, 46.
-51. Wire both endpoints behind the appropriate org-scoped permissions. Depends on 49, 50.
+49. Extend `schemas/organization.proto` with a create-or-assign-user RPC: create a user if none exists
+    with the given email, then add that user to the calling organization; if the user already
+    exists, only the organization membership is added. Reuse the organization-membership store
+    operation from phase 19 and replace direct membership inserts in test seed helpers with it.
+    Anchor the endpoint on the organization's control project — the `x-project-id` metadata must be
+    that project's ID. Run `make generate`. Depends on 45, 46, 48.
+50. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from
+    `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an
+    organization"). Also anchor it on the organization's control project; the request body
+    additionally carries a project ID filter, resolved through the canonical effective-access
+    relation rather than `org_membership`. Add any organization/project-first indexes still needed
+    for this listing and later deletion cleanup after accounting for the final composite keys. Run
+    `make generate`. Depends on 45, 46.
+51. Add the organization-scoped user-management permissions, include them in newly created
+    organization-admin roles, and wire both endpoints behind them. After permission seeding, run an
+    idempotent, add-only reconciliation that grants the new permissions to every role identified by
+    `managed_key = 'organization_admin'`. Test multiple organizations and a second reconciliation
+    run. Permission removal remains an explicit migration or administrative cleanup so mixed
+    application versions cannot remove one another's grants during a rolling deployment. Depends
+    on 49, 50.
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
 

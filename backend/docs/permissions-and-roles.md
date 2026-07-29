@@ -49,13 +49,45 @@ The project ID is sent as request metadata rather than as a field on each RPC's 
 
 `superadmin` holds every permission in the system. This isn't a code-level bypass of the permission check — `superadmin` is a role like any other, with a real `system_role_permissions` row for every permission, so its grants are visible as ordinary data rather than a special case in the interceptor. Beyond it, a set of other system roles might be hardcoded in the codebase and seeded at startup, scoped to a narrower slice of permissions than superadmin — for example a `useradmin` role limited to user-management permissions, or a `rolesadmin` role limited to role-management permissions (the exact set is still open, these are illustrative). Without at least one assigned role a user can authenticate but cannot call any protected endpoint.
 
-System roles are hardcoded and seeded at startup, and are structurally distinct from the project-specific custom roles an organization can define through `RoleService` (see "Custom role management" below). `SystemRoleService` can list and assign/unassign the seeded definitions, but it has no create, update, or delete operation. `RoleService` operates only on custom roles. The split is reflected in the API, core/store operations, permission namespaces, and database tables, so a system role can never be edited or deleted through the custom-role API and drift from what the codebase expects it to be.
+System roles are hardcoded and seeded at startup, and are structurally distinct from the
+organization-owned roles exposed through `RoleService` (see "Custom role management" below).
+`SystemRoleService` can list and assign/unassign the seeded definitions, but it has no create,
+update, or delete operation. `RoleService` operates only on organization-owned roles. Most are
+user-defined custom roles; the organization-admin role is a managed definition maintained by the
+application. The split is reflected in the API, core/store operations, permission namespaces, and
+database tables, so a system role can never be edited or deleted through the custom-role API and
+drift from what the codebase expects it to be.
 
 System and custom roles live in separate tables, `rbac.system_roles` and `rbac.custom_roles`. A write path aimed at custom roles has no `rbac.system_roles` row to reach, so a system role's identity can't be mutated by a write aimed at a custom role, or vice versa — the separation is structural, enforced by the schema itself rather than a trigger.
 
 Each role table has its own permission join table, `system_role_permissions` and `custom_role_permissions`, rather than a column on `system_roles`/`custom_roles` itself. Table separation says nothing about these join tables — a write path that bypassed the role service could still insert or delete a system role's permission rows without touching `system_roles` itself. This is a deliberate gap rather than an oversight: see "Database backstops vs. application checks" under "Enforcement" below for why they don't get the same treatment.
 
-A custom role is itself owned by exactly one organization — `custom_roles` carries a `NOT NULL org_id`; system roles have no owner and are visible system-wide. Every `RoleService` operation that touches a custom role — create, edit, delete, and critically assign/unassign — checks that the role's `org_id` matches the org the target assignment resolves to (the org itself, for an org-scoped assignment; the project's org, for a project-scoped one). Without this, nothing would stop one organization's admin from assigning another organization's custom role ID to a project in their own org — the superset check in "Privilege escalation" below still bounds what permissions that grants, but the assignment itself, and the ability to list or reference another org's role definitions to find an ID to assign, would cross a tenant boundary the rest of this document is otherwise careful to enforce everywhere else. Role listing for the "assign a role" UI is filtered by the caller's org for the same reason: a role belonging to another org should never be discoverable, not just unassignable. This ownership check also changes what "delete a custom role" means in "Custom role management" below — deleting a role only ever cleans up assignment rows within its own org, never another org's, precisely because cross-org assignment is rejected at grant time rather than something cleanup has to account for after the fact.
+A custom role is itself owned by exactly one organization — `custom_roles` carries a `NOT NULL
+org_id`; system roles have no owner and are visible system-wide. Every `RoleService` operation that
+touches an organization-owned role checks that the role's `org_id` matches the organization the
+target assignment resolves to (the organization itself, for an org-scoped assignment; the
+project's organization, for a project-scoped one). Without this, nothing would stop one
+organization's admin from assigning another organization's role ID to a project in their own
+organization. Role listing for the assignment UI is filtered by the caller's organization for the
+same reason: a role belonging to another organization should never be discoverable, not merely
+unassignable.
+
+The managed organization-admin definition lives in `rbac.custom_roles` because its permissions
+resolve through organization assignments exactly like any other organization-owned role. A
+nullable stable identifier such as `managed_key = 'organization_admin'` distinguishes it from
+user-defined roles without turning its display name into an identifier. A partial unique index
+allows at most one such role per organization. In the API this maps to
+`ROLE_KIND_ORGANIZATION_ADMIN`; ordinary roles map to `ROLE_KIND_CUSTOM`. The database key is not
+part of the public contract.
+
+A managed organization role behaves like a system role only in the lifecycle of its semantic
+definition: the application owns its managed identity, permission set, existence, and assignment
+scope. Ordinary core and API operations cannot delete it or modify its permissions. Its display
+name remains organization-editable because reconciliation identifies it by `managed_key`, not by
+presentation text. It is not a system-scoped role. It remains owned by one organization, may
+contain only custom-role-assignable permissions, is assigned through `org_role_assignments`, and
+never enters `system_role_assignments`. Authorized administrators may rename it and assign or
+unassign it at organization scope.
 
 System roles, like permissions (see "Permission seeding" below), are seed data rather than something reconciled at runtime: adding one is a change to the seed data, applied on the next startup; removing one — or shrinking which permissions it's granted — needs a manual cleanup step against the database, since the seed step only ever inserts. Until that cleanup runs, a removed system role (or a permission removed from one) stays exactly as real as it was before the code change, including in `AuthUser.Permissions` resolution — there's no code-side filtering trying to treat it as already gone. See `internal/core/rbac/README.md` for the manual cleanup procedure.
 
@@ -64,6 +96,16 @@ System roles, like permissions (see "Permission seeding" below), are seed data r
 Role assignment normally targets one project, matching the project-scoped model above. `superadmin` is the exception this model has to account for: assigning it per project individually wouldn't scale, since every new project would need its own `superadmin` assignment for existing internal staff. Rather than making `superadmin` a global permission exception, role assignment has three scopes: `project`, `org`, and `system`.
 
 Org-wide scope is a real need beyond just accommodating `superadmin`: an organization's own admin/owner should have access to every project under their organization, including ones created after the role was assigned, without being re-assigned each time a new project is created. System-wide scope, by contrast, is only ever used by the system roles (`superadmin` and friends) — a customer-defined custom role has no reason to reach across organizations it doesn't own.
+
+Permissions also declare the narrowest assignment scope at which they are meaningful. A
+project-scoped permission may be carried by either a project or organization assignment; an
+organization-scoped permission may only be carried by an organization assignment; and a
+system-scoped permission may only be carried by a system role. A role's minimum assignment scope
+is the broadest scope required by any permission it contains. A mixed role containing even one
+organization-scoped permission is therefore organization-only. Project assignment rejects such a
+role with a failed-precondition error rather than accepting an assignment whose organization
+permissions could never authorize an organization-scoped operation. The managed
+organization-admin role is always organization-only.
 
 Each scope is its own table rather than one table with a scope column: `project_role_assignments` (user, role, project ID), `org_role_assignments` (user, role, org ID), and `system_role_assignments` (user, role — no project or org at all). Forcing all three into a single table would mean a project ID column that means "the target" for project scope but "administered under, target derived by lookup" for org scope, and nothing at all for system scope — three different meanings behind one column. Separate tables let each row only carry the columns its scope actually needs, so granting `superadmin` is just a row in `system_role_assignments`, with no project to invent for it.
 
@@ -136,7 +178,15 @@ Unassigning also preserves a global recovery path: after any system-role revoke,
 
 ## Custom role management
 
-Custom roles are managed through a separate `RoleService`: creating, editing, and deleting organization-owned role definitions, and assigning or unassigning them at project or org scope. This is kept separate from the user service because role assignment is a many-to-many mutation; folding it into the user service's field-mask-based update would mean replacing a user's entire role list on every write, silently dropping concurrent assignments made by other admins. It is also separate from `SystemRoleService`: custom roles never enter `system_role_assignments`, and system roles never enter project/org assignment tables.
+Organization-owned roles are exposed through a separate `RoleService`: creating, editing, and
+deleting user-defined role definitions, and assigning or unassigning compatible roles at project
+or organization scope. Managed definitions are returned by its read and assignment operations but
+rejected by every definition-mutation operation. This is kept separate from the user service
+because role assignment is a many-to-many mutation; folding it into the user service's
+field-mask-based update would mean replacing a user's entire role list on every write, silently
+dropping concurrent assignments made by other admins. It is also separate from
+`SystemRoleService`: organization-owned roles never enter `system_role_assignments`, and system
+roles never enter project/org assignment tables.
 
 Custom-role endpoints use their own `custom-role:*` permission namespace. Definition operations use `custom-role:create`, `custom-role:read`, `custom-role:update`, and `custom-role:delete`. Project assignment operations use `custom-role:assign-project`, `custom-role:unassign-project`, and `custom-role:read-project-assignments`; organization assignment operations use `custom-role:assign-org`, `custom-role:unassign-org`, and `custom-role:read-org-assignments`. The two paginated assignment-list endpoints require a target user ID and return complete custom-role resources for exactly one scope. This separation lets organization administrators delegate project-level role management and visibility without also delegating organization-wide assignment authority or visibility. These permissions are introduced with `RoleService`, not predeclared by the system-role phase.
 
@@ -146,17 +196,43 @@ Permissions for system-wide services, including `user:*` and `system-role:*`, ca
 
 A custom `Role` likewise embeds its permissions. `UpdateRole` can replace the complete permission set, while `ModifyRolePermissions` atomically adds and removes selected permissions without requiring the caller to reproduce set logic. Adding an existing permission or removing an absent one is a no-op; including the same permission in both lists is invalid. This deliberately differs from AIP-144's separate, non-idempotent add/remove methods to make multi-permission changes atomic. ETags are returned but not yet enforced on mutations; their future use is documented in `schemas/README.md`.
 
-A separate `schemas/permission.proto` owns the static `Permission` enum used by every API message that exposes permissions, including system roles, custom roles, permission modifications, the permission catalog, and auth data. Generated frontend clients can therefore use enum values for authorization-dependent rendering instead of redefining the backend's permission strings. The database and core model retain readable permission names such as `user:read`; exhaustive conversion tests require every protobuf enum value to map to exactly one model permission and every model permission to map back, preventing the two registries from drifting.
+A separate `schemas/permission.proto` owns the static `Permission` enum used by every API message
+that exposes permissions, including system roles, custom roles, permission modifications, the
+permission catalog, and auth data. It also defines `AssignmentScope`. Generated frontend clients
+can therefore use enum values for authorization-dependent rendering and scope compatibility
+instead of redefining backend strings and classification rules. The database and core model retain
+readable permission names such as `user:read`; exhaustive conversion tests require every protobuf
+enum value and scope classification to map to the model and back without drift.
 
 Permission enum values are public API identifiers rather than secrets. Authorization remains correct when a caller knows every identifier, and permission names stay at the level of product capabilities rather than exposing sensitive implementation details. Once shipped, renaming or removing an enum value follows the same compatibility rules as any other public schema change. Avoiding discovery of system-only identifiers would require separate public and internal schemas; filtering a response cannot hide values already present in generated clients and schema descriptors, and that separation is not warranted here.
 
-The same schema defines a read-only `PermissionService` that exposes the permissions available for custom roles to administrative UIs. It omits system-only permissions because system-role definitions cannot be created or edited through the API; callers only assign or unassign complete seeded system roles, whose responses already embed their permissions. The caller's auth data likewise contains only permissions that caller holds. Project and organization are assignment scopes of a custom role, not separate permission scopes: every permission returned by the catalog can be granted through either project- or org-scoped assignment. Keeping the catalog outside `RoleService` avoids presenting permission definitions as state owned by an organization or by one role.
+The same schema defines a read-only `PermissionService` that exposes
+`PermissionDescriptor` resources containing the permission and its minimum assignment scope.
+It omits system-only permissions because system-role definitions cannot be created or edited
+through the API; callers only assign or unassign complete seeded system roles, whose responses
+already embed their permissions. `Role` similarly exposes `RoleKind` and its derived minimum
+assignment scope. Keeping the catalog outside `RoleService` avoids presenting permission
+definitions as state owned by an organization or by one role.
+
+The administrative UI groups permission choices by scope and marks organization-only choices.
+Selecting one updates the role preview to explain that the role can only be assigned to the
+organization. Project assignment pickers show incompatible roles disabled with that explanation
+rather than silently hiding them. Managed organization-admin roles carry a managed badge, allow
+display-name editing, and disable permission editing and deletion. These are usability rules; the
+backend remains authoritative for both mutability and assignment-scope validation.
 
 The customer-facing Swagger UI should eventually publish only customer-supported services. Internal surfaces such as `UserService` and `SystemRoleService` remain in the shared backend and internal API documentation but are omitted from the customer Swagger bundle to avoid suggesting that customers should integrate with them. Both bundles are generated from the same protobuf definitions; service visibility is documentation and SDK hygiene, not an authorization boundary, so every omitted RPC remains fully permission-gated.
 
-Because role assignment is scoped to a project, assigning or unassigning a role also requires a project ID, and the exposed auth data for a client (see above) needs to be resolved for the project the client is currently working in, not just for the user.
+Role assignment requests carry project metadata to establish the active project or organization
+authorization context. The assignment target remains explicit: either that project or its
+organization. The exposed auth data for a client likewise resolves against the project the client
+is currently working in, not just the user.
 
-Deleting a custom role leaves behind its rows in `project_role_assignments` (and `org_role_assignments`, if it was ever granted at that scope) unless they're removed in the same transaction — otherwise a user's resolved permissions would silently reference a role ID that no longer exists. `RoleService` deletes these assignment rows explicitly as part of role deletion, the same explicit-cleanup approach used for organization/project deletion below, rather than relying on a cascading foreign key.
+Deleting a user-defined custom role leaves behind its rows in `project_role_assignments` and
+`org_role_assignments` unless they're removed in the same transaction. `RoleService` deletes these
+assignment rows explicitly as part of role deletion, the same explicit-cleanup approach used for
+organization/project deletion below, rather than relying on a cascading foreign key. Managed role
+definitions cannot enter this operation.
 
 ## Privilege escalation
 
@@ -184,7 +260,15 @@ System-role revocation is also checked against a recovery rule that is independe
 
 The recovery invariant is enforced by the system-role service rather than a database trigger. A complete trigger-based version would need to coordinate assignment deletion, permission-registry changes, system-role grant changes, and the bootstrap transition from no administrator to the first one. System-role definitions and their permissions are seed-managed rather than mutable through the API, so serializing the ordinary unassignment path provides the required runtime guarantee without duplicating seed and bootstrap rules in database code.
 
-Project and organization scopes do not have separate last-manager guards. A custom role may be unassigned, deleted, or stripped of management permissions even when that removes the last locally scoped administrator. The retained fully privileged system administrator can restore access through the ordinary APIs. This deliberately favors one global recovery invariant over substantially more complex checks across every custom-role assignment and affected scope. If relying on system-administrator intervention becomes an operational problem, local continuity guards can be added from observed requirements rather than anticipated ones.
+Project and organization scopes do not have separate last-manager guards. A managed
+organization-admin assignment may be removed, and a user-defined role may be unassigned, deleted,
+or stripped of management permissions, even when that removes the last locally scoped
+administrator. The managed organization-admin definition itself remains available, and the
+retained fully privileged system administrator can restore an assignment through the ordinary
+API. This deliberately favors one global recovery invariant over substantially more complex checks
+across every custom-role assignment and affected scope. If relying on system-administrator
+intervention becomes an operational problem, local continuity guards can be added from observed
+requirements rather than anticipated ones.
 
 ## Discovering accessible projects
 
@@ -200,13 +284,48 @@ Holding `org:create` isn't enough on its own, though: the caller must also actua
 
 When an organization is created, it is seeded with a default project — its name supplied explicitly alongside the organization's, rather than always matching it — so a newly created organization is immediately usable without a separate "create your first project" step.
 
-Once an organization exists, the internal user who created it (or whoever they designate) is assigned an admin role scoped to that organization — not to its default project. Org scope, not project scope, matters here: the same rationale as "Role assignment scope" above, an org's own admin needs access to every project under it, including ones created after this initial assignment, without being re-assigned each time a new project is created. That role holds the ordinary `project:create` permission; resolving it for a project-creation call anchors on the org's default project the same way `org:create` anchors on `theapp/control` — the `ProjectID` metadata sent is the default project's ID, which resolves to the org via the project→org lookup, and the org-scoped assignment grants `project:create` through that same three-way union used everywhere else.
+Organization creation also makes the creator an organization member, creates an
+organization-admin custom role, and assigns that role to the creator at organization scope in the
+same transaction. Org scope, not project scope, matters here: an organization administrator needs
+authority across every project in the organization, including projects created after the initial
+assignment, without being assigned again for each project.
+
+The organization-admin role can CRUD the organization's custom-role definitions and manage role
+assignments at both organization and project scope. It therefore holds `custom-role:create`,
+`custom-role:read`, `custom-role:update`, `custom-role:delete`,
+`custom-role:read-org-assignments`, `custom-role:assign-org`,
+`custom-role:unassign-org`, `custom-role:read-project-assignments`,
+`custom-role:assign-project`, and `custom-role:unassign-project`. It also holds the ordinary
+`project:create` permission. Project creation anchors on the organization's default project the
+same way organization creation anchors on `theapp/control`: the metadata project resolves the
+organization, and the organization-scoped assignment grants authority through the canonical
+project permission relation.
+
+The canonical organization-admin permission set is defined once for new organization creation.
+After permission seeding, an idempotent add-only reconciliation grants any missing canonical
+permissions to every `organization_admin` managed role, so capabilities introduced after launch
+reach existing organizations as well as new ones. Reconciliation never removes grants: permission
+removal uses an explicit migration or administrative cleanup so different application versions
+cannot remove one another's permissions during a rolling deployment.
 
 ## Managing users within an organization
 
 `UserService` itself has no organization or project concept — it's a system-wide directory (see "AuthSession" above). Managing which users belong to which organization is a separate, org-scoped concern, exposed through `OrgService` rather than `UserService`.
 
-Creating a user and adding them to an organization is a single endpoint: given an email, it creates the user if none exists, then assigns them to the calling org — if the user already exists, only the org assignment happens. The endpoint is anchored on the org's control project, requiring the `x-project-id` metadata to be that project's ID (`org.projects.is_control = true`), the same way org creation itself anchors on `theapp/control` (see "Creating organizations and projects" above) — every org-level administrative action resolves through its control project rather than an arbitrary member project.
+Creating a user and adding them to an organization is a single endpoint: given an email, it creates
+the system user if none exists, then adds that user to the calling organization. If the user already
+exists in the system, the endpoint only adds the organization membership; it never creates a
+duplicate user. The endpoint is anchored on the organization's control project, requiring the
+`x-project-id` metadata to be that project's ID (`org.projects.is_control = true`), the same way
+organization creation itself anchors on `theapp/control` (see "Creating organizations and
+projects" above). Every organization-level administrative action resolves through its control
+project rather than an arbitrary member project.
+
+The organization-admin role receives the organization-scoped permissions for creating, viewing,
+updating, and removing organization users as those operations are introduced. Adding a new
+organization-user capability must update both the permissions used for newly created
+organization-admin roles and the rollout path for existing organizations; it must not leave older
+organizations with a permanently weaker administrator role.
 
 Listing users scoped to an organization is a separate endpoint from `UserService.ListUsers`, for the same reason it's a distinct endpoint above: it's an org-level concern, not part of the user directory. It's likewise anchored on the org's control project via `x-project-id`. Unlike the create-or-assign endpoint, the project ID isn't only used for permission anchoring here — the request body also carries a project ID filter, letting the caller ask "which users have a role in project X", resolved through the same three-way union used for permission resolution everywhere else, rather than through `org_membership` (which only answers "belongs to the org," not "has a role in this specific project").
 
