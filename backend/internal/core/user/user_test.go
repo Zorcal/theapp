@@ -530,7 +530,7 @@ func TestCore_Users(t *testing.T) {
 		{
 			name: "returns converted users and total count",
 			userStorer: &MockedUserStorer{
-				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
+				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, int, error) {
 					return []pguser.User{
 						{
 							ExternalID: aliceID,
@@ -547,10 +547,7 @@ func TestCore_Users(t *testing.T) {
 							UpdatedAt:  &updatedAt,
 							ETag:       bobETag,
 						},
-					}, nil
-				},
-				UserCountFunc: func(_ context.Context, _ pguser.Filter) (int, error) {
-					return 42, nil
+					}, 42, nil
 				},
 			},
 			orderBys: []order.By[mdl.UserOrderByField]{order.NewBy(mdl.UserOrderByFieldEmail, order.DirectionAsc)},
@@ -608,26 +605,11 @@ func TestCore_Users_error(t *testing.T) {
 		{
 			name: "query users error",
 			userStorer: &MockedUserStorer{
-				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
-					return nil, errors.New("db error")
-				},
-				UserCountFunc: func(_ context.Context, _ pguser.Filter) (int, error) {
-					return 0, nil
+				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, int, error) {
+					return nil, 0, errors.New("db error")
 				},
 			},
 			wantErrStrs: []string{"query users", "db error"},
-		},
-		{
-			name: "user count error",
-			userStorer: &MockedUserStorer{
-				UsersFunc: func(_ context.Context, _ pguser.Filter, _ []order.By[pguser.OrderByField], _, _ int) ([]pguser.User, error) {
-					return nil, nil
-				},
-				UserCountFunc: func(_ context.Context, _ pguser.Filter) (int, error) {
-					return 0, errors.New("db error")
-				},
-			},
-			wantErrStrs: []string{"user count", "db error"},
 		},
 	}
 	for _, tt := range tests {

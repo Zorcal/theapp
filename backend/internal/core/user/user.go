@@ -26,8 +26,7 @@ type UserStorer interface {
 	// UserByEmail returns the user with the given email address.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	UserByEmail(ctx context.Context, email string) (pguser.User, error)
-	Users(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize, pageOffset int) ([]pguser.User, error)
-	UserCount(ctx context.Context, filter pguser.Filter) (int, error)
+	Users(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize, pageOffset int) ([]pguser.User, int, error)
 	// CreateUser inserts a new user and returns it.
 	// Returns [pgdb.ErrAlreadyExists] if a user with the same email already exists.
 	CreateUser(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
@@ -127,14 +126,9 @@ func (c *Core) Users(ctx context.Context, filter mdl.UserFilter, orderBys []orde
 
 	pgFilter := filterToPg(filter)
 
-	pgUsers, err := c.userStorer.Users(ctx, pgFilter, pgOrderBys, pageSize, pageOffset)
+	pgUsers, count, err := c.userStorer.Users(ctx, pgFilter, pgOrderBys, pageSize, pageOffset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("query users: %w", err)
-	}
-
-	count, err := c.userStorer.UserCount(ctx, pgFilter)
-	if err != nil {
-		return nil, 0, fmt.Errorf("user count: %w", err)
 	}
 
 	return usersFromPg(pgUsers), count, nil

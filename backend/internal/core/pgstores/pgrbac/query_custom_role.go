@@ -28,9 +28,8 @@ func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
 			),
 			-- Resolve requested names to the permission IDs used by the join table.
 			valid_permissions AS (
-				SELECT p.id, p.name
-				FROM rbac.permissions AS p
-				JOIN requested_permissions AS requested ON requested.name = p.name
+				SELECT id, name
+				FROM rbac.permission_ids(@permission_names::text[])
 			),
 			-- Insert only when the organization and every requested permission exist.
 			new_role AS (
@@ -138,9 +137,8 @@ func validateCustomRolePermsQuery(orgID int, roleID uuid.UUID, permNames []strin
 			),
 			-- Resolve every requested permission name against the permission registry.
 			valid_permissions AS (
-				SELECT p.name
-				FROM rbac.permissions AS p
-				JOIN requested_permissions AS requested ON requested.name = p.name
+				SELECT name
+				FROM rbac.permission_ids(@permission_names::text[])
 			)
 		-- Return the role id only when it belongs to the organization and every permission exists.
 		SELECT r.id
@@ -169,11 +167,10 @@ func insertCustomRolePermissionsQuery(roleID uuid.UUID, permNames []string) pgdb
 	params := pgx.NamedArgs{"role_id": roleID, "permission_names": permNames}
 	const sql = `
 		INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
-		SELECT r.id, p.id
+		SELECT r.id, permission.id
 		FROM rbac.custom_roles AS r
-		CROSS JOIN rbac.permissions AS p
+		CROSS JOIN rbac.permission_ids(@permission_names::text[]) AS permission
 		WHERE r.external_id = @role_id
-			AND p.name = ANY(@permission_names::text[])
 		RETURNING permission_id`
 
 	return pgdb.TypedQuery[int]{
@@ -211,9 +208,10 @@ func modifyCustomRolePermissionsQuery(mp ModifyCustomRolePermissions) pgdb.Typed
 			),
 			-- Resolve every requested permission name to the permission ID used by the join table.
 			valid_permissions AS (
-				SELECT p.id, p.name
-				FROM rbac.permissions AS p
-				JOIN requested_permissions AS requested ON requested.name = p.name
+				SELECT id, name
+				FROM rbac.permission_ids(
+					@add_permission_names::text[] || @remove_permission_names::text[]
+				)
 			),
 			-- Gate every mutation behind role ownership and permission validation. An empty
 			-- target_role prevents all subsequent permission and metadata changes.
@@ -440,8 +438,8 @@ func assignCustomRoleToProjectQuery(userID, roleID uuid.UUID, projectID int) pgd
 		"project_id": projectID,
 	}
 	const sql = `
-		INSERT INTO rbac.project_role_assignments (user_id, role_id, project_id)
-		SELECT u.id, r.id, p.id
+		INSERT INTO rbac.project_role_assignments (user_id, project_id, role_id, org_id)
+		SELECT u.id, p.id, r.id, p.org_id
 		FROM (
 			SELECT id
 			FROM useraccess.users

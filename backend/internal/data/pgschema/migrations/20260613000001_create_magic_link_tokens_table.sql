@@ -8,7 +8,8 @@ CREATE TABLE useraccess.magic_link_tokens (
     , created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Covers lookups by user_id and the latest-token query (i.e. ORDER BY created_at DESC LIMIT 1).
+-- Supports finding a user's newest magic-link token without sorting
+-- (WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) and user-scoped token cleanup.
 CREATE INDEX magic_link_tokens_user_id_created_at_idx ON useraccess.magic_link_tokens (user_id, created_at DESC);
 
 -- migrate:down

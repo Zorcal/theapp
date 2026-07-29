@@ -34,10 +34,7 @@ var _ UserStorer = &MockedUserStorer{}
 //			UserByExternalIDFunc: func(ctx context.Context, id uuid.UUID) (pguser.User, error) {
 //				panic("mock out the UserByExternalID method")
 //			},
-//			UserCountFunc: func(ctx context.Context, filter pguser.Filter) (int, error) {
-//				panic("mock out the UserCount method")
-//			},
-//			UsersFunc: func(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error) {
+//			UsersFunc: func(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, int, error) {
 //				panic("mock out the Users method")
 //			},
 //		}
@@ -59,11 +56,8 @@ type MockedUserStorer struct {
 	// UserByExternalIDFunc mocks the UserByExternalID method.
 	UserByExternalIDFunc func(ctx context.Context, id uuid.UUID) (pguser.User, error)
 
-	// UserCountFunc mocks the UserCount method.
-	UserCountFunc func(ctx context.Context, filter pguser.Filter) (int, error)
-
 	// UsersFunc mocks the Users method.
-	UsersFunc func(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error)
+	UsersFunc func(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -95,13 +89,6 @@ type MockedUserStorer struct {
 			// ID is the id argument value.
 			ID uuid.UUID
 		}
-		// UserCount holds details about calls to the UserCount method.
-		UserCount []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Filter is the filter argument value.
-			Filter pguser.Filter
-		}
 		// Users holds details about calls to the Users method.
 		Users []struct {
 			// Ctx is the ctx argument value.
@@ -120,7 +107,6 @@ type MockedUserStorer struct {
 	lockUpdateUser       sync.RWMutex
 	lockUserByEmail      sync.RWMutex
 	lockUserByExternalID sync.RWMutex
-	lockUserCount        sync.RWMutex
 	lockUsers            sync.RWMutex
 }
 
@@ -268,44 +254,8 @@ func (mock *MockedUserStorer) UserByExternalIDCalls() []struct {
 	return calls
 }
 
-// UserCount calls UserCountFunc.
-func (mock *MockedUserStorer) UserCount(ctx context.Context, filter pguser.Filter) (int, error) {
-	if mock.UserCountFunc == nil {
-		panic("MockedUserStorer.UserCountFunc: method is nil but UserStorer.UserCount was just called")
-	}
-	callInfo := struct {
-		Ctx    context.Context
-		Filter pguser.Filter
-	}{
-		Ctx:    ctx,
-		Filter: filter,
-	}
-	mock.lockUserCount.Lock()
-	mock.calls.UserCount = append(mock.calls.UserCount, callInfo)
-	mock.lockUserCount.Unlock()
-	return mock.UserCountFunc(ctx, filter)
-}
-
-// UserCountCalls gets all the calls that were made to UserCount.
-// Check the length with:
-//
-//	len(mockedUserStorer.UserCountCalls())
-func (mock *MockedUserStorer) UserCountCalls() []struct {
-	Ctx    context.Context
-	Filter pguser.Filter
-} {
-	var calls []struct {
-		Ctx    context.Context
-		Filter pguser.Filter
-	}
-	mock.lockUserCount.RLock()
-	calls = mock.calls.UserCount
-	mock.lockUserCount.RUnlock()
-	return calls
-}
-
 // Users calls UsersFunc.
-func (mock *MockedUserStorer) Users(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, error) {
+func (mock *MockedUserStorer) Users(ctx context.Context, filter pguser.Filter, orderBys []order.By[pguser.OrderByField], pageSize int, pageOffset int) ([]pguser.User, int, error) {
 	if mock.UsersFunc == nil {
 		panic("MockedUserStorer.UsersFunc: method is nil but UserStorer.Users was just called")
 	}

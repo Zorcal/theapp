@@ -10,6 +10,9 @@ Each package contains `store.go`, `model.go`, and `query.go`. Split any of these
 - The struct and constructor may carry additional fields, but a `*pgxpool.Pool` is always required.
 - Store methods (e.g. `InsertUser()`, `QueryUsers()`) live here as well.
 - Group database calls using `pgdb.RunBatch()` or `pgdb.RunBatchTx()` (for transactional work).
+- A paginated list method returns both its page and the total number of matching rows. Keep the
+  page and count as separate typed queries, but queue both in one `pgdb.RunBatch()` call so they
+  share a single database round trip.
 - Each method follows this top-down structure:
 
 ```go

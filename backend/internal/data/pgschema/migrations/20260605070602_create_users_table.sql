@@ -10,14 +10,18 @@ CREATE TABLE useraccess.users (
     , etag UUID UNIQUE NOT NULL
 );
 
--- GIN trigram indexes support ILIKE prefix filtering on email and name.
--- The unique B-tree on email cannot serve case-insensitive scans.
+-- Supports the case-insensitive email prefix predicate used by paginated user list/count queries;
+-- the unique B-tree on email cannot serve ILIKE.
 CREATE INDEX users_email_trgm_idx ON useraccess.users USING GIN (email gin_trgm_ops);
+
+-- Supports the case-insensitive name prefix predicate used by paginated user list/count queries.
 CREATE INDEX users_name_trgm_idx ON useraccess.users USING GIN (name gin_trgm_ops);
 
--- B-tree indexes support ordering by created_at and updated_at.
--- email ordering uses the existing unique index; id ordering uses the primary key.
+-- Supports paginated user lists ordered by creation time.
 CREATE INDEX users_created_at_idx ON useraccess.users (created_at);
+
+-- Supports paginated user lists ordered by last update time, including PostgreSQL's default
+-- placement of NULL values.
 CREATE INDEX users_updated_at_idx ON useraccess.users (updated_at);
 
 

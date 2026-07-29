@@ -182,57 +182,6 @@ func TestStore_CreateUser_error(t *testing.T) {
 	})
 }
 
-func TestStore_UserCount(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	store := pguser.NewStore(pool)
-
-	seedUser(t, store, "alice@test.com", "Alice Smith")
-	seedUser(t, store, "bob@test.com", "Bob Jones")
-
-	tests := []struct {
-		name   string
-		filter pguser.Filter
-		want   int
-	}{
-		{
-			name: "no filter counts all",
-			want: 2,
-		},
-		{
-			name:   "email prefix filter",
-			filter: pguser.Filter{Email: " alice "},
-			want:   1,
-		},
-		{
-			name:   "name prefix filter",
-			filter: pguser.Filter{Name: " Bob "},
-			want:   1,
-		},
-		{
-			name:   "whitespace-only filter counts all",
-			filter: pguser.Filter{Email: " ", Name: " "},
-			want:   2,
-		},
-		{
-			name:   "filter with no matches",
-			filter: pguser.Filter{Email: "nobody"},
-			want:   0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := store.UserCount(ctx, tt.filter)
-			if err != nil {
-				t.Fatalf("UserCount() error = %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("UserCount(%+v) = %d, want %d", tt.filter, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestStore_Users(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
@@ -253,12 +202,14 @@ func TestStore_Users(t *testing.T) {
 		pageSize   int
 		pageOffset int
 		want       []pguser.User
+		wantCount  int
 	}{
 		{
 			name:       "no order defaults to insert order",
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []pguser.User{charlie, alice, bob},
+			wantCount:  3,
 		},
 		{
 			name:       "order by email asc",
@@ -266,6 +217,7 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []pguser.User{alice, bob, charlie},
+			wantCount:  3,
 		},
 		{
 			name:       "order by email desc",
@@ -273,6 +225,7 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []pguser.User{charlie, bob, alice},
+			wantCount:  3,
 		},
 		{
 			name:       "first page",
@@ -280,6 +233,7 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   2,
 			pageOffset: 0,
 			want:       []pguser.User{alice, bob},
+			wantCount:  3,
 		},
 		{
 			name:       "second page",
@@ -287,12 +241,14 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   2,
 			pageOffset: 2,
 			want:       []pguser.User{charlie},
+			wantCount:  3,
 		},
 		{
 			name:       "offset past end returns empty",
 			pageSize:   10,
 			pageOffset: 10,
 			want:       []pguser.User{},
+			wantCount:  3,
 		},
 		{
 			name:       "filter by email prefix",
@@ -300,6 +256,7 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []pguser.User{alice},
+			wantCount:  1,
 		},
 		{
 			name:       "filter by name prefix",
@@ -307,6 +264,7 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []pguser.User{bob},
+			wantCount:  1,
 		},
 		{
 			name: "filter by email and name prefix",
@@ -317,6 +275,7 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []pguser.User{charlie},
+			wantCount:  1,
 		},
 		{
 			name:       "whitespace-only filter",
@@ -324,6 +283,7 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []pguser.User{charlie, alice, bob},
+			wantCount:  3,
 		},
 		{
 			name:       "filter with no matches returns empty",
@@ -331,16 +291,20 @@ func TestStore_Users(t *testing.T) {
 			pageSize:   10,
 			pageOffset: 0,
 			want:       []pguser.User{},
+			wantCount:  0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := store.Users(ctx, tt.filter, tt.orderBys, tt.pageSize, tt.pageOffset)
+			got, gotCount, err := store.Users(ctx, tt.filter, tt.orderBys, tt.pageSize, tt.pageOffset)
 			if err != nil {
 				t.Fatalf("Users() error = %v", err)
 			}
 
 			testingx.AssertDiff(t, got, tt.want, diffOpts...)
+			if gotCount != tt.wantCount {
+				t.Errorf("Users() total count = %d, want %d", gotCount, tt.wantCount)
+			}
 		})
 	}
 }

@@ -24,10 +24,9 @@ func NewStore(pool *pgxpool.Pool) *Store {
 
 // GetOrCreateUserByEmail returns the user with the given email, creating one if none exists.
 func (s *Store) GetOrCreateUserByEmail(ctx context.Context, email string) (User, error) {
-	var user User
-
 	q := getOrCreateUserByEmailQuery(email)
 
+	var user User
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &user); err != nil {
 			return fmt.Errorf("get or create user by email: %w", err)
@@ -45,10 +44,9 @@ func (s *Store) GetOrCreateUserByEmail(ctx context.Context, email string) (User,
 // UserByEmail returns the user with the given email address.
 // Returns [sql.ErrNoRows] if no such user exists.
 func (s *Store) UserByEmail(ctx context.Context, email string) (User, error) {
-	var user User
-
 	q := userByEmailQuery(email)
 
+	var user User
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &user); err != nil {
 			return fmt.Errorf("user by email: %w", err)
@@ -66,10 +64,9 @@ func (s *Store) UserByEmail(ctx context.Context, email string) (User, error) {
 // UserByExternalID returns the user with the given external ID.
 // Returns [sql.ErrNoRows] if no such user exists.
 func (s *Store) UserByExternalID(ctx context.Context, id uuid.UUID) (User, error) {
-	var user User
-
 	q := userByExternalIDQuery(id)
 
+	var user User
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &user); err != nil {
 			return fmt.Errorf("user by external id: %w", err)
@@ -84,31 +81,18 @@ func (s *Store) UserByExternalID(ctx context.Context, id uuid.UUID) (User, error
 	return user, nil
 }
 
-func (s *Store) Users(ctx context.Context, filter Filter, orderBys []order.By[OrderByField], pageSize, pageOffset int) ([]User, error) {
-	var users []User
-
+func (s *Store) Users(ctx context.Context, filter Filter, orderBys []order.By[OrderByField], pageSize, pageOffset int) ([]User, int, error) {
 	usersQ := usersQuery(filter, orderBys, pageSize, pageOffset)
+	countQ := userCountQuery(filter)
 
+	var (
+		users []User
+		count int
+	)
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := usersQ.QueueMany(ctx, b, &users); err != nil {
 			return fmt.Errorf("query users: %w", err)
 		}
-		return nil
-	}
-
-	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return nil, err
-	}
-
-	return users, nil
-}
-
-func (s *Store) UserCount(ctx context.Context, filter Filter) (int, error) {
-	var count int
-
-	countQ := userCountQuery(filter)
-
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := countQ.Queue(ctx, b, &count); err != nil {
 			return fmt.Errorf("user count: %w", err)
 		}
@@ -116,19 +100,18 @@ func (s *Store) UserCount(ctx context.Context, filter Filter) (int, error) {
 	}
 
 	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 
-	return count, nil
+	return users, count, nil
 }
 
 // UpdateUser updates the user with the given external ID and returns the updated user.
 // Returns [sql.ErrNoRows] if no such user exists.
 func (s *Store) UpdateUser(ctx context.Context, uu UpdateUser) (User, error) {
-	var user User
-
 	updateQ := updateUserQuery(uu)
 
+	var user User
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := updateQ.Queue(ctx, b, &user); err != nil {
 			return fmt.Errorf("update user: %w", err)
@@ -146,10 +129,9 @@ func (s *Store) UpdateUser(ctx context.Context, uu UpdateUser) (User, error) {
 // MarkEmailVerified sets email_verified_at to the current time for the user with the given external ID.
 // Returns [sql.ErrNoRows] if no such user exists.
 func (s *Store) MarkEmailVerified(ctx context.Context, externalID uuid.UUID) error {
-	var user User
-
 	q := markEmailVerifiedQuery(externalID)
 
+	var user User
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &user); err != nil {
 			return fmt.Errorf("mark email verified: %w", err)
@@ -165,10 +147,9 @@ func (s *Store) MarkEmailVerified(ctx context.Context, externalID uuid.UUID) err
 }
 
 func (s *Store) CreateUser(ctx context.Context, cu CreateUser) (User, error) {
-	var user User
-
 	insertQ := createUserQuery(cu)
 
+	var user User
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := insertQ.Queue(ctx, b, &user); err != nil {
 			return fmt.Errorf("create user: %w", err)
