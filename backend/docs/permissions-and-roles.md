@@ -107,6 +107,15 @@ role with a failed-precondition error rather than accepting an assignment whose 
 permissions could never authorize an organization-scoped operation. The managed
 organization-admin role is always organization-only.
 
+The same invariant applies when a role's permissions change. Adding an organization-scoped
+permission to a role that still has project assignments is rejected with a failed-precondition
+error; the administrator must explicitly remove those project assignments and retry rather than
+having a permission edit silently revoke access. Project assignment and permission mutation lock
+the same custom-role row in their transactions. This serializes the compatibility check with the
+write, so a concurrent project assignment cannot race with a change that makes the role
+organization-only. Consequently, every supported operation preserves the invariant that an
+organization-only role has no project assignment rows.
+
 Each scope is its own table rather than one table with a scope column: `project_role_assignments` (user, role, project ID), `org_role_assignments` (user, role, org ID), and `system_role_assignments` (user, role — no project or org at all). Forcing all three into a single table would mean a project ID column that means "the target" for project scope but "administered under, target derived by lookup" for org scope, and nothing at all for system scope — three different meanings behind one column. Separate tables let each row only carry the columns its scope actually needs, so granting `superadmin` is just a row in `system_role_assignments`, with no project to invent for it.
 
 Organization membership is the tenant boundary for every custom-role assignment. A user must be a current member of the role's owning organization before receiving or giving up either a project- or org-scoped role. Membership alone grants no access; it only makes custom-role assignments eligible to contribute permissions. Both assignment tables carry the target organization ID. Composite foreign keys tie each assignment to the user's membership and the custom role's organization, and additionally tie a project assignment to the project's organization. Membership removal explicitly deletes every project- and org-scoped assignment before deleting the membership, in the same transaction, so those scopes stop contributing permissions because their assignments no longer exist. The foreign keys use their default `NO ACTION` behavior, so an incomplete cleanup is rejected rather than leaving permission resolution to compensate for dangling assignments.

@@ -789,7 +789,14 @@ service RoleService {
   }
 }
 
-// Role is a custom role owned by an organization.
+// RoleKind identifies who owns an organization role's definition.
+enum RoleKind {
+  ROLE_KIND_UNSPECIFIED = 0;
+  ROLE_KIND_CUSTOM = 1;
+  ROLE_KIND_ORGANIZATION_ADMIN = 2;
+}
+
+// Role is an organization-owned role.
 message Role {
   // Unique identifier for the role.
   string id = 1 [
@@ -814,6 +821,12 @@ message Role {
     (google.api.field_behavior) = OUTPUT_ONLY,
     (google.api.field_info).format = UUID4
   ];
+
+  // Identifies whether the definition is user-managed or application-managed.
+  RoleKind kind = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Narrowest scope at which this role may be assigned.
+  AssignmentScope minimum_assignment_scope = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // Request message for creating a custom role.

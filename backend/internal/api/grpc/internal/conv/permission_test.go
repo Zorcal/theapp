@@ -1,6 +1,7 @@
 package conv
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
@@ -77,6 +78,58 @@ func TestPermissionFromPB(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPermissionsFromPB(t *testing.T) {
+	tests := []struct {
+		name   string
+		in     []pb.Permission
+		want   []mdl.Permission
+		wantOK bool
+	}{
+		{
+			name:   "known",
+			in:     []pb.Permission{pb.Permission_PERMISSION_USER_READ},
+			want:   []mdl.Permission{mdl.PermissionUserRead},
+			wantOK: true,
+		},
+		{
+			name:   "unknown",
+			in:     []pb.Permission{pb.Permission(999)},
+			wantOK: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := PermissionsFromPB(tt.in)
+			if ok != tt.wantOK {
+				t.Fatalf("PermissionsFromPB(%v) ok = %t, want %t", tt.in, ok, tt.wantOK)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("PermissionsFromPB(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPermissionsToPB_panicsForUnknownPermission(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("PermissionsToPB() did not panic")
+		}
+	}()
+
+	PermissionsToPB([]mdl.Permission{"unknown"})
+}
+
+func TestAssignmentScopeToPB_panicsForUnknownScope(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("AssignmentScopeToPB() did not panic")
+		}
+	}()
+
+	AssignmentScopeToPB(mdl.AssignmentScope(999))
 }
 
 func TestPermissionConversions_exhaustive(t *testing.T) {

@@ -23,6 +23,6 @@ func (s *permissionService) ListPermissions(
 	}
 
 	return &pb.ListPermissionsResponse{
-		Permissions: conv.PermissionsToPB(mdl.PermissionsAssignableToCustomRoles()),
+		Permissions: conv.PermissionDescriptorsToPB(mdl.CustomRolePermissionDescriptors()),
 	}, nil
 }

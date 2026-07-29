@@ -1,12 +1,33 @@
 package mdl
 
-import "github.com/zorcal/theapp/backend/pkg/set"
+import (
+	"fmt"
+	"slices"
+
+	"github.com/zorcal/theapp/backend/pkg/set"
+	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
+)
 
 // The full set of permissions defined by the system. Every protected endpoint's required permissions are drawn from
 // this list. This list and AllPermissions() below must stay in sync with what's seeded into the database.
 
 // Permission is a single named capability an endpoint can require the caller to hold.
 type Permission string
+
+// AssignmentScope is the narrowest scope at which a permission or role is meaningful.
+type AssignmentScope int
+
+const (
+	AssignmentScopeProject AssignmentScope = iota + 1
+	AssignmentScopeOrganization
+	AssignmentScopeSystem
+)
+
+// PermissionDescriptor describes a custom-role-assignable permission.
+type PermissionDescriptor struct {
+	Permission             Permission
+	MinimumAssignmentScope AssignmentScope
+}
 
 // All user service permissions. User permissions are system-wide rather than project- or org-scoped — they can only be
 // granted through a system-scope role assignment.
@@ -93,6 +114,51 @@ func PermissionsAssignableToCustomRoles() []Permission {
 		PermissionCustomRoleReadProjectAssignments,
 		PermissionCustomRoleReadOrgAssignments,
 	}
+}
+
+// PermissionAssignmentScope returns the narrowest scope at which permission is meaningful.
+func PermissionAssignmentScope(permission Permission) AssignmentScope {
+	if slices.Contains(SystemOnlyPermissions(), permission) {
+		return AssignmentScopeSystem
+	}
+	switch permission {
+	case PermissionCustomRoleCreate,
+		PermissionCustomRoleRead,
+		PermissionCustomRoleUpdate,
+		PermissionCustomRoleDelete,
+		PermissionCustomRoleAssignOrg,
+		PermissionCustomRoleUnassignOrg,
+		PermissionCustomRoleReadOrgAssignments:
+		return AssignmentScopeOrganization
+	case PermissionCustomRoleAssignProject,
+		PermissionCustomRoleUnassignProject,
+		PermissionCustomRoleReadProjectAssignments:
+		return AssignmentScopeProject
+	default:
+		// Permissions are defined by the backend's closed permission registry. Reaching this
+		// branch means a permission was added without defining its assignment behavior.
+		panic(fmt.Sprintf("unsupported permission: %q", permission))
+	}
+}
+
+// CustomRolePermissionDescriptors returns the permissions available to custom roles with their
+// minimum assignment scopes.
+func CustomRolePermissionDescriptors() []PermissionDescriptor {
+	return slicesx.Map(PermissionsAssignableToCustomRoles(), func(p Permission) PermissionDescriptor {
+		return PermissionDescriptor{
+			Permission:             p,
+			MinimumAssignmentScope: PermissionAssignmentScope(p),
+		}
+	})
+}
+
+// MinimumAssignmentScope returns the broadest minimum scope required by permissions.
+func MinimumAssignmentScope(permissions []Permission) AssignmentScope {
+	scope := AssignmentScopeProject
+	for _, permission := range permissions {
+		scope = max(scope, PermissionAssignmentScope(permission))
+	}
+	return scope
 }
 
 // IsPermissionSuperset reports whether held contains every permission in required.

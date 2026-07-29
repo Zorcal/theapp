@@ -45,6 +45,7 @@ func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
 			new_role.id,
 			new_role.external_id,
 			new_role.name,
+			NULL::text AS managed_key,
 			resolved_permissions.permission_names,
 			new_role.created_at,
 			new_role.updated_at,
@@ -312,6 +313,7 @@ func customRolesQuery(orgID, pageSize, pageOffset int) pgdb.TypedQuery[CustomRol
 			r.id,
 			r.external_id,
 			r.name,
+			r.managed_key,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names,
 			r.created_at,
 			r.updated_at,
@@ -339,6 +341,7 @@ func customRoleByExternalIDQuery(orgID int, roleID uuid.UUID) pgdb.TypedQuery[Cu
 			r.id,
 			r.external_id,
 			r.name,
+			r.managed_key,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names,
 			r.created_at,
 			r.updated_at,
@@ -353,6 +356,27 @@ func customRoleByExternalIDQuery(orgID int, roleID uuid.UUID) pgdb.TypedQuery[Cu
 		SQL:    sql,
 		Args:   params,
 		Scan:   pgx.RowToStructByName[CustomRole],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func customRoleHasProjectAssignmentsQuery(roleID uuid.UUID) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{"role_id": roleID}
+	const sql = `
+		SELECT EXISTS (
+			SELECT 1
+			FROM rbac.project_role_assignments AS assignment
+			JOIN rbac.custom_roles AS role ON role.id = assignment.role_id
+			WHERE role.external_id = @role_id
+		)`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (bool, error) {
+			var exists bool
+			return exists, row.Scan(&exists)
+		},
 		Expect: pgdb.ExpectOne,
 	}
 }
@@ -526,6 +550,7 @@ func userProjectCustomRolesQuery(userID uuid.UUID, projectID, pageSize, pageOffs
 			r.id,
 			r.external_id,
 			r.name,
+			r.managed_key,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}'),
 			r.created_at,
 			r.updated_at,
@@ -547,7 +572,7 @@ func userProjectCustomRolesQuery(userID uuid.UUID, projectID, pageSize, pageOffs
 		Args: params,
 		Scan: func(row pgx.CollectableRow) (CustomRole, error) {
 			var role CustomRole
-			return role, row.Scan(&role.ID, &role.ExternalID, &role.Name, &role.PermissionNames, &role.CreatedAt, &role.UpdatedAt, &role.ETag)
+			return role, row.Scan(&role.ID, &role.ExternalID, &role.Name, &role.ManagedKey, &role.PermissionNames, &role.CreatedAt, &role.UpdatedAt, &role.ETag)
 		},
 		Expect: pgdb.ExpectMany,
 	}
@@ -582,6 +607,7 @@ func userOrgCustomRolesQuery(userID uuid.UUID, orgID, pageSize, pageOffset int) 
 			r.id,
 			r.external_id,
 			r.name,
+			r.managed_key,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}'),
 			r.created_at,
 			r.updated_at,
@@ -602,7 +628,7 @@ func userOrgCustomRolesQuery(userID uuid.UUID, orgID, pageSize, pageOffset int) 
 		Args: params,
 		Scan: func(row pgx.CollectableRow) (CustomRole, error) {
 			var role CustomRole
-			return role, row.Scan(&role.ID, &role.ExternalID, &role.Name, &role.PermissionNames, &role.CreatedAt, &role.UpdatedAt, &role.ETag)
+			return role, row.Scan(&role.ID, &role.ExternalID, &role.Name, &role.ManagedKey, &role.PermissionNames, &role.CreatedAt, &role.UpdatedAt, &role.ETag)
 		},
 		Expect: pgdb.ExpectMany,
 	}

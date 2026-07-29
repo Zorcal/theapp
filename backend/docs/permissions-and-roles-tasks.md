@@ -201,7 +201,12 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
       scope.
     - Classify each permission by its minimum assignment scope and return
       `PermissionDescriptor` resources from the permission catalog. Reject assigning a role
-      containing an organization-scoped permission to a project with `FailedPrecondition`.
+      containing an organization-scoped permission to a project with `FailedPrecondition`. Acquire
+      the same transaction-level advisory lock keyed by custom role during project assignment and
+      permission mutation. Reject a permission change that would make a role organization-only
+      while project assignments still exist; the caller must explicitly remove those assignments
+      and retry. Preserve the invariant that organization-only roles have no project assignment
+      rows.
     - Reject deletion and permission mutation for managed roles in the core regardless of the
       caller's permissions. Permit authorized display-name updates and organization-scope
       assignment and unassignment; reconciliation identifies the role by `managed_key`, never by

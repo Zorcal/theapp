@@ -1,6 +1,8 @@
 package conv
 
 import (
+	"fmt"
+
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
@@ -48,19 +50,51 @@ func PermissionFromPB(permission pb.Permission) (mdl.Permission, bool) {
 }
 
 func PermissionsToPB(permissions []mdl.Permission) []pb.Permission {
-	return slicesx.Map(permissions, func(permission mdl.Permission) pb.Permission {
-		result, _ := PermissionToPB(permission)
-		return result
+	return slicesx.Map(permissions, mustPermissionToPB)
+}
+
+func PermissionsFromPB(permissions []pb.Permission) ([]mdl.Permission, bool) {
+	result := make([]mdl.Permission, 0, len(permissions))
+	for _, permission := range permissions {
+		modelPermission, ok := PermissionFromPB(permission)
+		if !ok {
+			return nil, false
+		}
+		result = append(result, modelPermission)
+	}
+	return result, true
+}
+
+func AssignmentScopeToPB(scope mdl.AssignmentScope) pb.AssignmentScope {
+	switch scope {
+	case mdl.AssignmentScopeProject:
+		return pb.AssignmentScope_ASSIGNMENT_SCOPE_PROJECT
+	case mdl.AssignmentScopeOrganization:
+		return pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION
+	case mdl.AssignmentScopeSystem:
+		return pb.AssignmentScope_ASSIGNMENT_SCOPE_SYSTEM
+	default:
+		// Assignment scopes are derived from the backend's closed permission registry. Reaching
+		// this branch means a model value was added without updating the API conversion.
+		panic(fmt.Sprintf("unsupported assignment scope: %d", scope))
+	}
+}
+
+func PermissionDescriptorsToPB(descriptors []mdl.PermissionDescriptor) []*pb.PermissionDescriptor {
+	return slicesx.Map(descriptors, func(desc mdl.PermissionDescriptor) *pb.PermissionDescriptor {
+		return &pb.PermissionDescriptor{
+			Permission:             mustPermissionToPB(desc.Permission),
+			MinimumAssignmentScope: AssignmentScopeToPB(desc.MinimumAssignmentScope),
+		}
 	})
 }
 
-func PermissionsFromPB(permissions []pb.Permission) []mdl.Permission {
-	return slicesx.Map(permissions, func(permission pb.Permission) mdl.Permission {
-		result, _ := PermissionFromPB(permission)
-		return result
-	})
-}
-
-func permsFromPB(perms []pb.Permission) []mdl.Permission {
-	return PermissionsFromPB(perms)
+func mustPermissionToPB(permission mdl.Permission) pb.Permission {
+	result, ok := PermissionToPB(permission)
+	if !ok {
+		// Model permissions come from the backend's closed permission registry. Reaching this
+		// branch means a model value was added without updating the API conversion.
+		panic(fmt.Sprintf("unsupported permission: %q", permission))
+	}
+	return result
 }

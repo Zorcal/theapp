@@ -158,6 +158,8 @@ func (c *Core) CreateCustomRole(ctx context.Context, cr mdl.CreateCustomRole) (m
 // Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or
 // removed from the role at the org scope.
+// Returns [mdl.ErrInvalidAssignmentScope] if the update would make a role with project assignments
+// require organization scope.
 func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error) {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -195,10 +197,17 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 			if err != nil {
 				return fmt.Errorf("get permission change context: %w", err)
 			}
+			if currentRole.ManagedKey != nil {
+				return mdl.ErrManagedRole
+			}
 
 			changedPerms := changedPerms(permissionsFromPg(currentRole.PermissionNames), ur.Permissions)
 			if !mdl.IsPermissionSuperset(permissionsFromPg(userOrgPerms.PermissionNames), changedPerms) {
 				return mdl.ErrPermissionDenied
+			}
+
+			if err := c.validateCustomRoleAssignmentScope(ctx, ur.ID, ur.Permissions); err != nil {
+				return fmt.Errorf("validate custom role assignment scope: %w", err)
 			}
 
 			role, err = c.roleStorer.UpdateCustomRole(ctx, updateCustomRoleToPg(ur, userOrgPerms.OrgID))
@@ -227,6 +236,8 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 // Returns [mdl.ErrValidation] if the input contains overlapping or system-only permissions.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or
 // removed from the role at the org scope.
+// Returns [mdl.ErrInvalidAssignmentScope] if the change would make a role with project assignments
+// require organization scope.
 func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
 	if !ok {
@@ -249,6 +260,9 @@ func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCu
 		if err != nil {
 			return fmt.Errorf("get permission change context: %w", err)
 		}
+		if currentRole.ManagedKey != nil {
+			return mdl.ErrManagedRole
+		}
 
 		nextPerms := set.FromSlice(permissionsFromPg(currentRole.PermissionNames)).
 			Add(mrp.AddPermissions...).
@@ -257,6 +271,10 @@ func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCu
 		changedPerms := changedPerms(permissionsFromPg(currentRole.PermissionNames), nextPerms.Values())
 		if !mdl.IsPermissionSuperset(permissionsFromPg(userOrgPerms.PermissionNames), changedPerms) {
 			return mdl.ErrPermissionDenied
+		}
+
+		if err := c.validateCustomRoleAssignmentScope(ctx, mrp.ID, nextPerms.Values()); err != nil {
+			return fmt.Errorf("validate custom role assignment scope: %w", err)
 		}
 
 		role, err = c.roleStorer.ModifyCustomRolePermissions(ctx, modifyCustomRolePermissionsToPg(mrp, userOrgPerms.OrgID))
@@ -291,6 +309,9 @@ func (c *Core) DeleteCustomRole(ctx context.Context, roleID uuid.UUID) error {
 		userOrgPerms, role, err := c.customRolePermChangeContext(ctx, sess.User.UserID, *sess.ProjectID, roleID)
 		if err != nil {
 			return fmt.Errorf("get permission change context: %w", err)
+		}
+		if role.ManagedKey != nil {
+			return mdl.ErrManagedRole
 		}
 
 		if !mdl.IsPermissionSuperset(permissionsFromPg(userOrgPerms.PermissionNames), permissionsFromPg(role.PermissionNames)) {
@@ -334,6 +355,9 @@ func (c *Core) AssignCustomRoleToProject(ctx context.Context, targetUserID, role
 			}
 			return fmt.Errorf("get actor project permissions: %w", err)
 		}
+		if err := c.roleStorer.LockCustomRole(ctx, roleID); err != nil {
+			return fmt.Errorf("lock custom role: %w", err)
+		}
 
 		role, err := c.roleStorer.CustomRoleByExternalID(ctx, userProjectPerms.OrgID, roleID)
 		if err != nil {
@@ -341,6 +365,9 @@ func (c *Core) AssignCustomRoleToProject(ctx context.Context, targetUserID, role
 				return fmt.Errorf("get custom role: %w", mdl.ErrNotFound)
 			}
 			return fmt.Errorf("get custom role: %w", err)
+		}
+		if mdl.MinimumAssignmentScope(permissionsFromPg(role.PermissionNames)) > mdl.AssignmentScopeProject {
+			return mdl.ErrInvalidAssignmentScope
 		}
 
 		if !mdl.IsPermissionSuperset(permissionsFromPg(userProjectPerms.PermissionNames), permissionsFromPg(role.PermissionNames)) {
@@ -507,6 +534,10 @@ func (c *Core) customRolePermChangeContext(ctx context.Context, actorUserID uuid
 		return pgrbac.OrgPermissions{}, pgrbac.CustomRole{}, fmt.Errorf("get actor organization permissions: %w", err)
 	}
 
+	if err := c.roleStorer.LockCustomRole(ctx, roleID); err != nil {
+		return pgrbac.OrgPermissions{}, pgrbac.CustomRole{}, fmt.Errorf("lock custom role: %w", err)
+	}
+
 	role, err := c.roleStorer.CustomRoleByExternalID(ctx, userOrgPerms.OrgID, roleID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -516,6 +547,22 @@ func (c *Core) customRolePermChangeContext(ctx context.Context, actorUserID uuid
 	}
 
 	return userOrgPerms, role, nil
+}
+
+func (c *Core) validateCustomRoleAssignmentScope(ctx context.Context, roleID uuid.UUID, permissions []mdl.Permission) error {
+	if mdl.MinimumAssignmentScope(permissions) == mdl.AssignmentScopeProject {
+		return nil
+	}
+
+	hasProjectAssignments, err := c.roleStorer.CustomRoleHasProjectAssignments(ctx, roleID)
+	if err != nil {
+		return fmt.Errorf("check custom role project assignments: %w", err)
+	}
+	if hasProjectAssignments {
+		return mdl.ErrInvalidAssignmentScope
+	}
+
+	return nil
 }
 
 func changedPerms(curr, next []mdl.Permission) []mdl.Permission {

@@ -151,7 +151,7 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 	seedSystemRoleAssignment(t, ctx, pool, actor.ID, "superadmin")
 	user := seedUser(t, ctx, userStore, "custom-role-assignment@test.com", "Target User")
 	seedOrgMembership(t, ctx, pool, user.ID, org.ID)
-	role := seedCustomRole(t, ctx, roleStore, org.ID, "reader", []mdl.Permission{mdl.PermissionCustomRoleRead})
+	role := seedCustomRole(t, ctx, roleStore, org.ID, "role reader", []mdl.Permission{mdl.PermissionCustomRoleReadProjectAssignments})
 
 	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
 		User:      mdl.AuthUser{UserID: actor.ExternalID},
@@ -206,7 +206,7 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 		t.Fatalf("AssignCustomRoleToProject() error = %v", err)
 	}
 
-	assertProjectPermNames(firstProject.ID, []string{"custom-role:read"})
+	assertProjectPermNames(firstProject.ID, []string{"custom-role:read-project-assignments"})
 	assertProjectRoles([]mdl.CustomRole{customRoleFromPg(role)})
 
 	if err := core.UnassignCustomRoleFromProject(roleCtx, user.ExternalID, role.ExternalID); err != nil {
@@ -222,8 +222,8 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 		t.Fatalf("AssignCustomRoleToOrg() error = %v", err)
 	}
 
-	assertProjectPermNames(firstProject.ID, []string{"custom-role:read"})
-	assertProjectPermNames(secondProject.ID, []string{"custom-role:read"})
+	assertProjectPermNames(firstProject.ID, []string{"custom-role:read-project-assignments"})
+	assertProjectPermNames(secondProject.ID, []string{"custom-role:read-project-assignments"})
 	assertOrgRoles([]mdl.CustomRole{customRoleFromPg(role)})
 
 	if err := core.UnassignCustomRoleFromOrg(roleCtx, user.ExternalID, role.ExternalID); err != nil {
@@ -241,7 +241,8 @@ func TestCore_CustomRoles(t *testing.T) {
 		ID:              1,
 		ExternalID:      uuid.New(),
 		Name:            "project manager",
-		PermissionNames: []string{"custom-role:read"},
+		ManagedKey:      new(mdl.ManagedRoleKeyOrganizationAdmin),
+		PermissionNames: []string{"custom-role:read-project-assignments"},
 		CreatedAt:       time.Now(),
 		ETag:            uuid.New(),
 	}
@@ -265,6 +266,7 @@ func TestCore_CustomRoles(t *testing.T) {
 		{
 			ID:          mockOutput.ExternalID,
 			Name:        mockOutput.Name,
+			Kind:        mdl.RoleKindOrganizationAdmin,
 			Permissions: permissionsFromPg(mockOutput.PermissionNames),
 			CreatedAt:   mockOutput.CreatedAt,
 			UpdatedAt:   mockOutput.UpdatedAt,
@@ -819,59 +821,157 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 }
 
 func TestCore_UpdateCustomRole(t *testing.T) {
-	actorID := uuid.New()
 	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: actorID},
+		User:      mdl.AuthUser{UserID: uuid.New()},
 		ProjectID: new(7),
 		OrgID:     new(42),
 	})
-	mockOutput := pgrbac.CustomRole{
-		ID:              1,
-		ExternalID:      uuid.New(),
-		Name:            "project manager",
-		PermissionNames: []string{"custom-role:read"},
-		CreatedAt:       time.Now(),
-		ETag:            uuid.New(),
-	}
-	roleStorer := &MockedRoleStorer{
-		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
-			return pgrbac.OrgPermissions{
-				OrgID:           42,
-				PermissionNames: []string{"custom-role:create", "custom-role:delete"},
-			}, nil
-		},
-		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-		},
-		UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
-			return mockOutput, nil
-		},
-	}
-	core := NewCore(roleStorer, immediateTransactor{})
 
-	got, err := core.UpdateCustomRole(ctx, mdl.UpdateCustomRole{
-		ID: uuid.New(),
-		Fields: mdl.CustomRoleUpdateFields{
-			Name:        true,
-			Permissions: true,
+	tests := []struct {
+		name       string
+		in         mdl.UpdateCustomRole
+		roleStorer *MockedRoleStorer
+		want       mdl.CustomRole
+	}{
+		{
+			name: "ordinary role name",
+			in: mdl.UpdateCustomRole{
+				ID:     uuid.New(),
+				Fields: mdl.CustomRoleUpdateFields{Name: true},
+				Name:   "Project Managers",
+			},
+			roleStorer: &MockedRoleStorer{
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{
+						ExternalID: uuid.MustParse("2ec5feec-2207-4f43-915c-a22c567ff803"),
+						Name:       "Project Managers",
+						ETag:       uuid.MustParse("a8353b25-6eb8-4ea0-9bed-f4f2842a4d38"),
+					}, nil
+				},
+			},
+			want: mdl.CustomRole{
+				ID:          uuid.MustParse("2ec5feec-2207-4f43-915c-a22c567ff803"),
+				Name:        "Project Managers",
+				Permissions: []mdl.Permission{},
+				ETag:        "a8353b25-6eb8-4ea0-9bed-f4f2842a4d38",
+			},
 		},
-		Name:        "project lead",
-		Permissions: []mdl.Permission{mdl.PermissionCustomRoleCreate},
-	})
-	if err != nil {
-		t.Fatalf("UpdateCustomRole() error = %v", err)
+		{
+			name: "managed role name",
+			in: mdl.UpdateCustomRole{
+				ID:     uuid.New(),
+				Fields: mdl.CustomRoleUpdateFields{Name: true},
+				Name:   "Administrators",
+			},
+			roleStorer: &MockedRoleStorer{
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{
+						ExternalID: uuid.MustParse("6629358c-8472-431e-a518-7b87d279ff34"),
+						Name:       "Administrators",
+						ManagedKey: new(mdl.ManagedRoleKeyOrganizationAdmin),
+						ETag:       uuid.MustParse("e76ad1e5-5df3-49eb-9895-e36aacac3bfc"),
+					}, nil
+				},
+			},
+			want: mdl.CustomRole{
+				ID:          uuid.MustParse("6629358c-8472-431e-a518-7b87d279ff34"),
+				Name:        "Administrators",
+				Kind:        mdl.RoleKindOrganizationAdmin,
+				Permissions: []mdl.Permission{},
+				ETag:        "e76ad1e5-5df3-49eb-9895-e36aacac3bfc",
+			},
+		},
+		{
+			name: "project-scoped permissions",
+			in: mdl.UpdateCustomRole{
+				ID:          uuid.New(),
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleUnassignProject},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID: 42,
+						PermissionNames: []string{
+							"custom-role:assign-project",
+							"custom-role:unassign-project",
+						},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:assign-project"}}, nil
+				},
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{
+						ExternalID:      uuid.MustParse("3b860b53-85ed-48c9-ae7b-9e0b71970f61"),
+						Name:            "Project Managers",
+						PermissionNames: []string{"custom-role:unassign-project"},
+						ETag:            uuid.MustParse("3b47a21a-4628-40ec-9842-d4c3dd634e8a"),
+					}, nil
+				},
+			},
+			want: mdl.CustomRole{
+				ID:          uuid.MustParse("3b860b53-85ed-48c9-ae7b-9e0b71970f61"),
+				Name:        "Project Managers",
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleUnassignProject},
+				ETag:        "3b47a21a-4628-40ec-9842-d4c3dd634e8a",
+			},
+		},
+		{
+			name: "organization-scoped permissions",
+			in: mdl.UpdateCustomRole{
+				ID: uuid.New(),
+				Fields: mdl.CustomRoleUpdateFields{
+					Name:        true,
+					Permissions: true,
+				},
+				Name:        "Role Managers",
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleCreate},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:create", "custom-role:delete"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
+				},
+				CustomRoleHasProjectAssignmentsFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, nil
+				},
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{
+						ExternalID:      uuid.MustParse("5fd3a88e-967e-4cf6-a979-01e8e1b6093b"),
+						Name:            "Role Managers",
+						PermissionNames: []string{"custom-role:create"},
+						ETag:            uuid.MustParse("c7e72654-db11-46f9-850a-24342954e789"),
+					}, nil
+				},
+			},
+			want: mdl.CustomRole{
+				ID:          uuid.MustParse("5fd3a88e-967e-4cf6-a979-01e8e1b6093b"),
+				Name:        "Role Managers",
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleCreate},
+				ETag:        "c7e72654-db11-46f9-850a-24342954e789",
+			},
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
 
-	want := mdl.CustomRole{
-		ID:          mockOutput.ExternalID,
-		Name:        mockOutput.Name,
-		Permissions: permissionsFromPg(mockOutput.PermissionNames),
-		CreatedAt:   mockOutput.CreatedAt,
-		UpdatedAt:   mockOutput.UpdatedAt,
-		ETag:        mockOutput.ETag.String(),
+			got, err := core.UpdateCustomRole(ctx, tt.in)
+			if err != nil {
+				t.Fatalf("UpdateCustomRole(%+v) error = %v", tt.in, err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want)
+		})
 	}
-
-	testingx.AssertDiff(t, got, want)
 }
 
 func TestCore_UpdateCustomRole_error(t *testing.T) {
@@ -919,6 +1019,7 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
@@ -932,11 +1033,26 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, dbErr
 				},
 			},
 			want: dbErr,
+		},
+		{
+			name: "managed role permissions",
+			in:   mdl.UpdateCustomRole{Fields: mdl.CustomRoleUpdateFields{Permissions: true}},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{ManagedKey: new(mdl.ManagedRoleKeyOrganizationAdmin)}, nil
+				},
+			},
+			want: mdl.ErrManagedRole,
 		},
 		{
 			name: "permission denied",
@@ -951,11 +1067,58 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 						PermissionNames: nil, // Missing custom-role:read
 					}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, nil
 				},
 			},
 			want: mdl.ErrPermissionDenied,
+		},
+		{
+			name: "project assignments require project scope",
+			in: mdl.UpdateCustomRole{
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:read"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				CustomRoleHasProjectAssignmentsFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return true, nil
+				},
+			},
+			want: mdl.ErrInvalidAssignmentScope,
+		},
+		{
+			name: "check project assignments",
+			in: mdl.UpdateCustomRole{
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:read"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				CustomRoleHasProjectAssignmentsFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, dbErr
+				},
+			},
+			want: dbErr,
 		},
 		{
 			name: "role not found",
@@ -1049,55 +1212,149 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 }
 
 func TestCore_ModifyCustomRolePermissions(t *testing.T) {
-	actorID := uuid.New()
 	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: actorID},
+		User:      mdl.AuthUser{UserID: uuid.New()},
 		ProjectID: new(7),
 		OrgID:     new(42),
 	})
-	mockOutput := pgrbac.CustomRole{
-		ID:              1,
-		ExternalID:      uuid.New(),
-		Name:            "project manager",
-		PermissionNames: []string{"custom-role:read"},
-		CreatedAt:       time.Now(),
-		ETag:            uuid.New(),
-	}
-	roleStorer := &MockedRoleStorer{
-		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
-			return pgrbac.OrgPermissions{
-				OrgID:           42,
-				PermissionNames: []string{"custom-role:read", "custom-role:delete"},
-			}, nil
-		},
-		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:delete"}}, nil
-		},
-		ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
-			return mockOutput, nil
-		},
-	}
-	core := NewCore(roleStorer, immediateTransactor{})
 
-	got, err := core.ModifyCustomRolePermissions(ctx, mdl.ModifyCustomRolePermissions{
-		ID:                uuid.New(),
-		AddPermissions:    []mdl.Permission{mdl.PermissionCustomRoleRead},
-		RemovePermissions: []mdl.Permission{mdl.PermissionCustomRoleDelete},
-	})
-	if err != nil {
-		t.Fatalf("ModifyCustomRolePermissions() error = %v", err)
+	tests := []struct {
+		name       string
+		in         mdl.ModifyCustomRolePermissions
+		roleStorer *MockedRoleStorer
+		want       mdl.CustomRole
+	}{
+		{
+			name: "add project-scoped permission",
+			in: mdl.ModifyCustomRolePermissions{
+				ID:             uuid.New(),
+				AddPermissions: []mdl.Permission{mdl.PermissionCustomRoleUnassignProject},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:unassign-project"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:assign-project"}}, nil
+				},
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{
+						ExternalID: uuid.MustParse("214e698b-d02a-48c2-a349-0557fc3dd82b"),
+						Name:       "Project Managers",
+						PermissionNames: []string{
+							"custom-role:assign-project",
+							"custom-role:unassign-project",
+						},
+						ETag: uuid.MustParse("3a97b311-24bf-4fc8-99b3-f81aeefb8171"),
+					}, nil
+				},
+			},
+			want: mdl.CustomRole{
+				ID:   uuid.MustParse("214e698b-d02a-48c2-a349-0557fc3dd82b"),
+				Name: "Project Managers",
+				Permissions: []mdl.Permission{
+					mdl.PermissionCustomRoleAssignProject,
+					mdl.PermissionCustomRoleUnassignProject,
+				},
+				ETag: "3a97b311-24bf-4fc8-99b3-f81aeefb8171",
+			},
+		},
+		{
+			name: "add organization-scoped permission",
+			in: mdl.ModifyCustomRolePermissions{
+				ID:             uuid.New(),
+				AddPermissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:read"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:assign-project"}}, nil
+				},
+				CustomRoleHasProjectAssignmentsFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, nil
+				},
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{
+						ExternalID: uuid.MustParse("f81b5428-e372-41cf-85b5-e9f963b30f63"),
+						Name:       "Role Managers",
+						PermissionNames: []string{
+							"custom-role:assign-project",
+							"custom-role:read",
+						},
+						ETag: uuid.MustParse("45fdf829-5b27-474a-9e38-0bb7db01da9c"),
+					}, nil
+				},
+			},
+			want: mdl.CustomRole{
+				ID:   uuid.MustParse("f81b5428-e372-41cf-85b5-e9f963b30f63"),
+				Name: "Role Managers",
+				Permissions: []mdl.Permission{
+					mdl.PermissionCustomRoleAssignProject,
+					mdl.PermissionCustomRoleRead,
+				},
+				ETag: "45fdf829-5b27-474a-9e38-0bb7db01da9c",
+			},
+		},
+		{
+			name: "add and remove permissions",
+			in: mdl.ModifyCustomRolePermissions{
+				ID:                uuid.New(),
+				AddPermissions:    []mdl.Permission{mdl.PermissionCustomRoleUnassignProject},
+				RemovePermissions: []mdl.Permission{mdl.PermissionCustomRoleAssignProject},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID: 42,
+						PermissionNames: []string{
+							"custom-role:assign-project",
+							"custom-role:unassign-project",
+						},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:assign-project"}}, nil
+				},
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{
+						ExternalID:      uuid.MustParse("925a816b-b884-45ae-b6de-b33a330827b3"),
+						Name:            "Project Managers",
+						PermissionNames: []string{"custom-role:unassign-project"},
+						ETag:            uuid.MustParse("8238dd1d-5f91-48d1-86b2-344642477ac8"),
+					}, nil
+				},
+			},
+			want: mdl.CustomRole{
+				ID:          uuid.MustParse("925a816b-b884-45ae-b6de-b33a330827b3"),
+				Name:        "Project Managers",
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleUnassignProject},
+				ETag:        "8238dd1d-5f91-48d1-86b2-344642477ac8",
+			},
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
 
-	want := mdl.CustomRole{
-		ID:          mockOutput.ExternalID,
-		Name:        mockOutput.Name,
-		Permissions: permissionsFromPg(mockOutput.PermissionNames),
-		CreatedAt:   mockOutput.CreatedAt,
-		UpdatedAt:   mockOutput.UpdatedAt,
-		ETag:        mockOutput.ETag.String(),
+			got, err := core.ModifyCustomRolePermissions(ctx, tt.in)
+			if err != nil {
+				t.Fatalf("ModifyCustomRolePermissions(%+v) error = %v", tt.in, err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want)
+		})
 	}
-
-	testingx.AssertDiff(t, got, want)
 }
 
 func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
@@ -1144,6 +1401,7 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
@@ -1157,11 +1415,26 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, dbErr
 				},
 			},
 			want: dbErr,
+		},
+		{
+			name: "managed role",
+			in:   mdl.ModifyCustomRolePermissions{},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{ManagedKey: new(mdl.ManagedRoleKeyOrganizationAdmin)}, nil
+				},
+			},
+			want: mdl.ErrManagedRole,
 		},
 		{
 			name: "permission denied",
@@ -1175,11 +1448,56 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 						PermissionNames: nil, // Missing custom-role:read
 					}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, nil
 				},
 			},
 			want: mdl.ErrPermissionDenied,
+		},
+		{
+			name: "project assignments require project scope",
+			in: mdl.ModifyCustomRolePermissions{
+				AddPermissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:read"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				CustomRoleHasProjectAssignmentsFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return true, nil
+				},
+			},
+			want: mdl.ErrInvalidAssignmentScope,
+		},
+		{
+			name: "check project assignments",
+			in: mdl.ModifyCustomRolePermissions{
+				AddPermissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:read"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				CustomRoleHasProjectAssignmentsFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, dbErr
+				},
+			},
+			want: dbErr,
 		},
 		{
 			name: "permission missing during update",
@@ -1188,6 +1506,7 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, nil
 				},
@@ -1204,6 +1523,7 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, nil
 				},
@@ -1267,6 +1587,7 @@ func TestCore_DeleteCustomRole(t *testing.T) {
 		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 			return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
 		},
+		LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 			return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
 		},
@@ -1313,11 +1634,24 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 			want: dbErr,
 		},
 		{
+			name: "lock role",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error {
+					return dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
 			name: "role not found",
 			roleStorer: &MockedRoleStorer{
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
@@ -1330,11 +1664,25 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, dbErr
 				},
 			},
 			want: dbErr,
+		},
+		{
+			name: "managed role",
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{OrgID: 42}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{ManagedKey: new(mdl.ManagedRoleKeyOrganizationAdmin)}, nil
+				},
+			},
+			want: mdl.ErrManagedRole,
 		},
 		{
 			name: "permission denied",
@@ -1345,6 +1693,7 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 						PermissionNames: nil, // Missing custom-role:read
 					}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
 				},
@@ -1357,6 +1706,7 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
 				},
@@ -1372,6 +1722,7 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 					return pgrbac.OrgPermissions{OrgID: 42, PermissionNames: []string{"custom-role:read"}}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
 				},
@@ -1432,14 +1783,15 @@ func TestCore_AssignCustomRoleToProject(t *testing.T) {
 		User:      mdl.AuthUser{UserID: actorID},
 		ProjectID: new(42),
 	})
-	mockedRole := pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}
+	mockedRole := pgrbac.CustomRole{PermissionNames: []string{"custom-role:read-project-assignments"}}
 	roleStorer := &MockedRoleStorer{
 		ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
 			return pgrbac.ProjectPermissions{
 				OrgID:           7,
-				PermissionNames: []string{"custom-role:read", "custom-role:update"},
+				PermissionNames: []string{"custom-role:read-project-assignments", "custom-role:assign-project"},
 			}, nil
 		},
+		LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 		CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 			return mockedRole, nil
 		},
@@ -1484,6 +1836,7 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
 					return pgrbac.ProjectPermissions{OrgID: 7}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
@@ -1496,6 +1849,7 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
 					return pgrbac.ProjectPermissions{OrgID: 7}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{}, dbErr
 				},
@@ -1508,25 +1862,43 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
 					return pgrbac.ProjectPermissions{
 						OrgID:           7,
-						PermissionNames: []string{"custom-role:read"},
+						PermissionNames: []string{"custom-role:read-project-assignments"},
 					}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
 					return pgrbac.CustomRole{
-						PermissionNames: []string{"custom-role:read", "custom-role:update"},
+						PermissionNames: []string{"custom-role:read-project-assignments", "custom-role:assign-project"},
 					}, nil
 				},
 			},
 			want: mdl.ErrPermissionDenied,
 		},
 		{
+			name: "organization-only role",
+			roleStorer: &MockedRoleStorer{
+				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
+					return pgrbac.ProjectPermissions{
+						OrgID:           7,
+						PermissionNames: []string{"custom-role:read"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+				},
+			},
+			want: mdl.ErrInvalidAssignmentScope,
+		},
+		{
 			name: "assignment target not found",
 			roleStorer: &MockedRoleStorer{
 				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
-					return pgrbac.ProjectPermissions{OrgID: 7, PermissionNames: []string{"custom-role:read"}}, nil
+					return pgrbac.ProjectPermissions{OrgID: 7, PermissionNames: []string{"custom-role:read-project-assignments"}}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read-project-assignments"}}, nil
 				},
 				AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
 					return sql.ErrNoRows
@@ -1538,10 +1910,11 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 			name: "already assigned",
 			roleStorer: &MockedRoleStorer{
 				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
-					return pgrbac.ProjectPermissions{OrgID: 7, PermissionNames: []string{"custom-role:read"}}, nil
+					return pgrbac.ProjectPermissions{OrgID: 7, PermissionNames: []string{"custom-role:read-project-assignments"}}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read-project-assignments"}}, nil
 				},
 				AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
 					return pgdb.ErrAlreadyExists
@@ -1553,10 +1926,11 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 			name: "store",
 			roleStorer: &MockedRoleStorer{
 				ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
-					return pgrbac.ProjectPermissions{OrgID: 7, PermissionNames: []string{"custom-role:read"}}, nil
+					return pgrbac.ProjectPermissions{OrgID: 7, PermissionNames: []string{"custom-role:read-project-assignments"}}, nil
 				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
-					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}, nil
+					return pgrbac.CustomRole{PermissionNames: []string{"custom-role:read-project-assignments"}}, nil
 				},
 				AssignCustomRoleToProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
 					return dbErr

@@ -15,6 +15,12 @@ var ErrAlreadyExists = errors.New("already exists")
 // ErrPermissionDenied is returned when the actor is not authorized to perform an operation.
 var ErrPermissionDenied = errors.New("permission denied")
 
+// ErrManagedRole is returned when an operation would mutate an application-managed role definition.
+var ErrManagedRole = errors.New("managed role definition")
+
+// ErrInvalidAssignmentScope is returned when a role cannot be assigned at the requested scope.
+var ErrInvalidAssignmentScope = errors.New("invalid role assignment scope")
+
 // ErrLastFullyPrivilegedSystemAdmin is returned when a change would leave no user holding every
 // registered permission through system-scoped assignments.
 var ErrLastFullyPrivilegedSystemAdmin = errors.New("last fully privileged system administrator")

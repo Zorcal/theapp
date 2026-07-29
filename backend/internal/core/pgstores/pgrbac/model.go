@@ -11,6 +11,7 @@ type CustomRole struct {
 	ID              int        `db:"id"`
 	ExternalID      uuid.UUID  `db:"external_id"`
 	Name            string     `db:"name"`
+	ManagedKey      *string    `db:"managed_key"`
 	PermissionNames []string   `db:"permission_names"`
 	CreatedAt       time.Time  `db:"created_at"`
 	UpdatedAt       *time.Time `db:"updated_at"`

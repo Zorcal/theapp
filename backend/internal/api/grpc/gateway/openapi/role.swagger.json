@@ -965,6 +965,16 @@
               "type": "string",
               "description": "ETag for the current version of the role.",
               "readOnly": true
+            },
+            "kind": {
+              "$ref": "#/definitions/v1RoleKind",
+              "description": "Identifies whether the definition is user-managed or application-managed.",
+              "readOnly": true
+            },
+            "minimumAssignmentScope": {
+              "$ref": "#/definitions/v1AssignmentScope",
+              "description": "Narrowest scope at which this role may be assigned.",
+              "readOnly": true
             }
           },
           "description": "The role to update.",
@@ -1058,6 +1068,17 @@
     "v1AssignRoleToProjectResponse": {
       "type": "object",
       "description": "Response message for assigning a custom role in a project."
+    },
+    "v1AssignmentScope": {
+      "type": "string",
+      "enum": [
+        "ASSIGNMENT_SCOPE_UNSPECIFIED",
+        "ASSIGNMENT_SCOPE_PROJECT",
+        "ASSIGNMENT_SCOPE_ORGANIZATION",
+        "ASSIGNMENT_SCOPE_SYSTEM"
+      ],
+      "default": "ASSIGNMENT_SCOPE_UNSPECIFIED",
+      "description": "AssignmentScope is the narrowest scope at which a permission or role is meaningful."
     },
     "v1CreateRoleRequest": {
       "type": "object",
@@ -1205,9 +1226,29 @@
           "type": "string",
           "description": "ETag for the current version of the role.",
           "readOnly": true
+        },
+        "kind": {
+          "$ref": "#/definitions/v1RoleKind",
+          "description": "Identifies whether the definition is user-managed or application-managed.",
+          "readOnly": true
+        },
+        "minimumAssignmentScope": {
+          "$ref": "#/definitions/v1AssignmentScope",
+          "description": "Narrowest scope at which this role may be assigned.",
+          "readOnly": true
         }
       },
-      "description": "Role is a custom role owned by an organization."
+      "description": "Role is an organization-owned role."
+    },
+    "v1RoleKind": {
+      "type": "string",
+      "enum": [
+        "ROLE_KIND_UNSPECIFIED",
+        "ROLE_KIND_CUSTOM",
+        "ROLE_KIND_ORGANIZATION_ADMIN"
+      ],
+      "default": "ROLE_KIND_UNSPECIFIED",
+      "description": "RoleKind identifies who owns an organization role's definition."
     },
     "v1UnassignRoleFromOrganizationRequest": {
       "type": "object",

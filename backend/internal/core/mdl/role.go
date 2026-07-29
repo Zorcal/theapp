@@ -22,10 +22,37 @@ type SystemRole struct {
 type CustomRole struct {
 	ID          uuid.UUID
 	Name        string
+	Kind        RoleKind
 	Permissions []Permission
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
 	ETag        string
+}
+
+// RoleKind identifies who owns an organization role's definition.
+type RoleKind int
+
+const (
+	RoleKindCustom RoleKind = iota
+	RoleKindOrganizationAdmin
+)
+
+// ManagedRoleKeyOrganizationAdmin is the stable database identity of the application-managed
+// organization administrator role.
+const ManagedRoleKeyOrganizationAdmin = "organization_admin"
+
+// MinimumAssignmentScope returns the narrowest scope at which the role may be assigned.
+func (cr CustomRole) MinimumAssignmentScope() AssignmentScope {
+	switch cr.Kind {
+	case RoleKindCustom:
+		return MinimumAssignmentScope(cr.Permissions)
+	case RoleKindOrganizationAdmin:
+		return AssignmentScopeOrganization
+	default:
+		// Role kinds are defined by the backend's closed managed-role registry. Reaching this
+		// branch means a role kind was added without defining its assignment behavior.
+		panic(fmt.Sprintf("unsupported role kind: %d", cr.Kind))
+	}
 }
 
 // CreateCustomRole holds the fields needed to create a custom role.

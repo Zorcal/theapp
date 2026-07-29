@@ -19,17 +19,17 @@ func TestPermissionService_ListPermissions(t *testing.T) {
 	}
 
 	want := &pb.ListPermissionsResponse{
-		Permissions: []pb.Permission{
-			pb.Permission_PERMISSION_CUSTOM_ROLE_CREATE,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_READ,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS,
-			pb.Permission_PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS,
+		Permissions: []*pb.PermissionDescriptor{
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_CREATE, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_READ, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_PROJECT},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_PROJECT},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_PROJECT},
+			{Permission: pb.Permission_PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
 		},
 	}
 

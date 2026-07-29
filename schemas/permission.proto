@@ -53,6 +53,20 @@ enum Permission {
   PERMISSION_PROJECT_DISCOVER_ALL = 17;
 }
 
+// AssignmentScope is the narrowest scope at which a permission or role is meaningful.
+enum AssignmentScope {
+  ASSIGNMENT_SCOPE_UNSPECIFIED = 0;
+  ASSIGNMENT_SCOPE_PROJECT = 1;
+  ASSIGNMENT_SCOPE_ORGANIZATION = 2;
+  ASSIGNMENT_SCOPE_SYSTEM = 3;
+}
+
+// PermissionDescriptor describes a custom-role-assignable permission.
+message PermissionDescriptor {
+  Permission permission = 1;
+  AssignmentScope minimum_assignment_scope = 2;
+}
+
 // PermissionService exposes permissions available for custom roles.
 service PermissionService {
   // Lists permissions that may be granted through a custom role.
@@ -105,5 +119,5 @@ message ListPermissionsRequest {}
 // Response message for listing custom-role-assignable permissions.
 message ListPermissionsResponse {
   // Permissions that may be granted through a custom role.
-  repeated Permission permissions = 1;
+  repeated PermissionDescriptor permissions = 1;
 }

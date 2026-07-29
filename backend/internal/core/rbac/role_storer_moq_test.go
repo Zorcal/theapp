@@ -36,6 +36,9 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			CustomRoleByExternalIDFunc: func(ctx context.Context, orgID int, roleID uuid.UUID) (pgrbac.CustomRole, error) {
 //				panic("mock out the CustomRoleByExternalID method")
 //			},
+//			CustomRoleHasProjectAssignmentsFunc: func(ctx context.Context, roleID uuid.UUID) (bool, error) {
+//				panic("mock out the CustomRoleHasProjectAssignments method")
+//			},
 //			CustomRolesFunc: func(ctx context.Context, orgID int, pageSize int, pageOffset int) ([]pgrbac.CustomRole, int, error) {
 //				panic("mock out the CustomRoles method")
 //			},
@@ -44,6 +47,9 @@ var _ RoleStorer = &MockedRoleStorer{}
 //			},
 //			FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc: func(ctx context.Context, userID uuid.UUID, roleName string) (bool, error) {
 //				panic("mock out the FullyPrivilegedUserRemainsAfterSystemRoleUnassign method")
+//			},
+//			LockCustomRoleFunc: func(ctx context.Context, roleID uuid.UUID) error {
+//				panic("mock out the LockCustomRole method")
 //			},
 //			LockSystemRoleManagementFunc: func(ctx context.Context) error {
 //				panic("mock out the LockSystemRoleManagement method")
@@ -112,6 +118,9 @@ type MockedRoleStorer struct {
 	// CustomRoleByExternalIDFunc mocks the CustomRoleByExternalID method.
 	CustomRoleByExternalIDFunc func(ctx context.Context, orgID int, roleID uuid.UUID) (pgrbac.CustomRole, error)
 
+	// CustomRoleHasProjectAssignmentsFunc mocks the CustomRoleHasProjectAssignments method.
+	CustomRoleHasProjectAssignmentsFunc func(ctx context.Context, roleID uuid.UUID) (bool, error)
+
 	// CustomRolesFunc mocks the CustomRoles method.
 	CustomRolesFunc func(ctx context.Context, orgID int, pageSize int, pageOffset int) ([]pgrbac.CustomRole, int, error)
 
@@ -120,6 +129,9 @@ type MockedRoleStorer struct {
 
 	// FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc mocks the FullyPrivilegedUserRemainsAfterSystemRoleUnassign method.
 	FullyPrivilegedUserRemainsAfterSystemRoleUnassignFunc func(ctx context.Context, userID uuid.UUID, roleName string) (bool, error)
+
+	// LockCustomRoleFunc mocks the LockCustomRole method.
+	LockCustomRoleFunc func(ctx context.Context, roleID uuid.UUID) error
 
 	// LockSystemRoleManagementFunc mocks the LockSystemRoleManagement method.
 	LockSystemRoleManagementFunc func(ctx context.Context) error
@@ -215,6 +227,13 @@ type MockedRoleStorer struct {
 			// RoleID is the roleID argument value.
 			RoleID uuid.UUID
 		}
+		// CustomRoleHasProjectAssignments holds details about calls to the CustomRoleHasProjectAssignments method.
+		CustomRoleHasProjectAssignments []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+		}
 		// CustomRoles holds details about calls to the CustomRoles method.
 		CustomRoles []struct {
 			// Ctx is the ctx argument value.
@@ -243,6 +262,13 @@ type MockedRoleStorer struct {
 			UserID uuid.UUID
 			// RoleName is the roleName argument value.
 			RoleName string
+		}
+		// LockCustomRole holds details about calls to the LockCustomRole method.
+		LockCustomRole []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
 		}
 		// LockSystemRoleManagement holds details about calls to the LockSystemRoleManagement method.
 		LockSystemRoleManagement []struct {
@@ -385,9 +411,11 @@ type MockedRoleStorer struct {
 	lockAssignSystemRole                                  sync.RWMutex
 	lockCreateCustomRole                                  sync.RWMutex
 	lockCustomRoleByExternalID                            sync.RWMutex
+	lockCustomRoleHasProjectAssignments                   sync.RWMutex
 	lockCustomRoles                                       sync.RWMutex
 	lockDeleteCustomRole                                  sync.RWMutex
 	lockFullyPrivilegedUserRemainsAfterSystemRoleUnassign sync.RWMutex
+	lockLockCustomRole                                    sync.RWMutex
 	lockLockSystemRoleManagement                          sync.RWMutex
 	lockLockSystemRoleUser                                sync.RWMutex
 	lockModifyCustomRolePermissions                       sync.RWMutex
@@ -609,6 +637,42 @@ func (mock *MockedRoleStorer) CustomRoleByExternalIDCalls() []struct {
 	return calls
 }
 
+// CustomRoleHasProjectAssignments calls CustomRoleHasProjectAssignmentsFunc.
+func (mock *MockedRoleStorer) CustomRoleHasProjectAssignments(ctx context.Context, roleID uuid.UUID) (bool, error) {
+	if mock.CustomRoleHasProjectAssignmentsFunc == nil {
+		panic("MockedRoleStorer.CustomRoleHasProjectAssignmentsFunc: method is nil but RoleStorer.CustomRoleHasProjectAssignments was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		RoleID uuid.UUID
+	}{
+		Ctx:    ctx,
+		RoleID: roleID,
+	}
+	mock.lockCustomRoleHasProjectAssignments.Lock()
+	mock.calls.CustomRoleHasProjectAssignments = append(mock.calls.CustomRoleHasProjectAssignments, callInfo)
+	mock.lockCustomRoleHasProjectAssignments.Unlock()
+	return mock.CustomRoleHasProjectAssignmentsFunc(ctx, roleID)
+}
+
+// CustomRoleHasProjectAssignmentsCalls gets all the calls that were made to CustomRoleHasProjectAssignments.
+// Check the length with:
+//
+//	len(mockedRoleStorer.CustomRoleHasProjectAssignmentsCalls())
+func (mock *MockedRoleStorer) CustomRoleHasProjectAssignmentsCalls() []struct {
+	Ctx    context.Context
+	RoleID uuid.UUID
+} {
+	var calls []struct {
+		Ctx    context.Context
+		RoleID uuid.UUID
+	}
+	mock.lockCustomRoleHasProjectAssignments.RLock()
+	calls = mock.calls.CustomRoleHasProjectAssignments
+	mock.lockCustomRoleHasProjectAssignments.RUnlock()
+	return calls
+}
+
 // CustomRoles calls CustomRolesFunc.
 func (mock *MockedRoleStorer) CustomRoles(ctx context.Context, orgID int, pageSize int, pageOffset int) ([]pgrbac.CustomRole, int, error) {
 	if mock.CustomRolesFunc == nil {
@@ -730,6 +794,42 @@ func (mock *MockedRoleStorer) FullyPrivilegedUserRemainsAfterSystemRoleUnassignC
 	mock.lockFullyPrivilegedUserRemainsAfterSystemRoleUnassign.RLock()
 	calls = mock.calls.FullyPrivilegedUserRemainsAfterSystemRoleUnassign
 	mock.lockFullyPrivilegedUserRemainsAfterSystemRoleUnassign.RUnlock()
+	return calls
+}
+
+// LockCustomRole calls LockCustomRoleFunc.
+func (mock *MockedRoleStorer) LockCustomRole(ctx context.Context, roleID uuid.UUID) error {
+	if mock.LockCustomRoleFunc == nil {
+		panic("MockedRoleStorer.LockCustomRoleFunc: method is nil but RoleStorer.LockCustomRole was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		RoleID uuid.UUID
+	}{
+		Ctx:    ctx,
+		RoleID: roleID,
+	}
+	mock.lockLockCustomRole.Lock()
+	mock.calls.LockCustomRole = append(mock.calls.LockCustomRole, callInfo)
+	mock.lockLockCustomRole.Unlock()
+	return mock.LockCustomRoleFunc(ctx, roleID)
+}
+
+// LockCustomRoleCalls gets all the calls that were made to LockCustomRole.
+// Check the length with:
+//
+//	len(mockedRoleStorer.LockCustomRoleCalls())
+func (mock *MockedRoleStorer) LockCustomRoleCalls() []struct {
+	Ctx    context.Context
+	RoleID uuid.UUID
+} {
+	var calls []struct {
+		Ctx    context.Context
+		RoleID uuid.UUID
+	}
+	mock.lockLockCustomRole.RLock()
+	calls = mock.calls.LockCustomRole
+	mock.lockLockCustomRole.RUnlock()
 	return calls
 }
 

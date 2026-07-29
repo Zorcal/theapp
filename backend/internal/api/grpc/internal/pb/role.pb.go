@@ -26,7 +26,57 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Role is a custom role owned by an organization.
+// RoleKind identifies who owns an organization role's definition.
+type RoleKind int32
+
+const (
+	RoleKind_ROLE_KIND_UNSPECIFIED        RoleKind = 0
+	RoleKind_ROLE_KIND_CUSTOM             RoleKind = 1
+	RoleKind_ROLE_KIND_ORGANIZATION_ADMIN RoleKind = 2
+)
+
+// Enum value maps for RoleKind.
+var (
+	RoleKind_name = map[int32]string{
+		0: "ROLE_KIND_UNSPECIFIED",
+		1: "ROLE_KIND_CUSTOM",
+		2: "ROLE_KIND_ORGANIZATION_ADMIN",
+	}
+	RoleKind_value = map[string]int32{
+		"ROLE_KIND_UNSPECIFIED":        0,
+		"ROLE_KIND_CUSTOM":             1,
+		"ROLE_KIND_ORGANIZATION_ADMIN": 2,
+	}
+)
+
+func (x RoleKind) Enum() *RoleKind {
+	p := new(RoleKind)
+	*p = x
+	return p
+}
+
+func (x RoleKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (RoleKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_role_proto_enumTypes[0].Descriptor()
+}
+
+func (RoleKind) Type() protoreflect.EnumType {
+	return &file_role_proto_enumTypes[0]
+}
+
+func (x RoleKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use RoleKind.Descriptor instead.
+func (RoleKind) EnumDescriptor() ([]byte, []int) {
+	return file_role_proto_rawDescGZIP(), []int{0}
+}
+
+// Role is an organization-owned role.
 type Role struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unique identifier for the role.
@@ -40,9 +90,13 @@ type Role struct {
 	// Timestamp when the role was last updated.
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
 	// ETag for the current version of the role.
-	Etag          string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Etag string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
+	// Identifies whether the definition is user-managed or application-managed.
+	Kind RoleKind `protobuf:"varint,7,opt,name=kind,proto3,enum=theapp.v1.RoleKind" json:"kind,omitempty"`
+	// Narrowest scope at which this role may be assigned.
+	MinimumAssignmentScope AssignmentScope `protobuf:"varint,8,opt,name=minimum_assignment_scope,json=minimumAssignmentScope,proto3,enum=theapp.v1.AssignmentScope" json:"minimum_assignment_scope,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *Role) Reset() {
@@ -115,6 +169,20 @@ func (x *Role) GetEtag() string {
 		return x.Etag
 	}
 	return ""
+}
+
+func (x *Role) GetKind() RoleKind {
+	if x != nil {
+		return x.Kind
+	}
+	return RoleKind_ROLE_KIND_UNSPECIFIED
+}
+
+func (x *Role) GetMinimumAssignmentScope() AssignmentScope {
+	if x != nil {
+		return x.MinimumAssignmentScope
+	}
+	return AssignmentScope_ASSIGNMENT_SCOPE_UNSPECIFIED
 }
 
 // Request message for creating a custom role.
@@ -1159,7 +1227,7 @@ var File_role_proto protoreflect.FileDescriptor
 const file_role_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a\x10permission.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x95\x02\n" +
+	"role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a\x10permission.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x9e\x03\n" +
 	"\x04Role\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x127\n" +
@@ -1168,7 +1236,9 @@ const file_role_proto_rawDesc = "" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12\x1f\n" +
-	"\x04etag\x18\x06 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"=\n" +
+	"\x04etag\x18\x06 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\x12,\n" +
+	"\x04kind\x18\a \x01(\x0e2\x13.theapp.v1.RoleKindB\x03\xe0A\x03R\x04kind\x12Y\n" +
+	"\x18minimum_assignment_scope\x18\b \x01(\x0e2\x1a.theapp.v1.AssignmentScopeB\x03\xe0A\x03R\x16minimumAssignmentScope\"=\n" +
 	"\x11CreateRoleRequest\x12(\n" +
 	"\x04role\x18\x01 \x01(\v2\x0f.theapp.v1.RoleB\x03\xe0A\x02R\x04role\"-\n" +
 	"\x0eGetRoleRequest\x12\x1b\n" +
@@ -1228,7 +1298,11 @@ const file_role_proto_rawDesc = "" +
 	"#UnassignRoleFromOrganizationRequest\x12$\n" +
 	"\arole_id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06roleId\x12$\n" +
 	"\auser_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x06userId\"&\n" +
-	"$UnassignRoleFromOrganizationResponse2\x997\n" +
+	"$UnassignRoleFromOrganizationResponse*]\n" +
+	"\bRoleKind\x12\x19\n" +
+	"\x15ROLE_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10ROLE_KIND_CUSTOM\x10\x01\x12 \n" +
+	"\x1cROLE_KIND_ORGANIZATION_ADMIN\x10\x022\x997\n" +
 	"\vRoleService\x12\x84\x04\n" +
 	"\n" +
 	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"\xc6\x03\x92A\xae\x03JG\n" +
@@ -1474,74 +1548,79 @@ func file_role_proto_rawDescGZIP() []byte {
 	return file_role_proto_rawDescData
 }
 
+var file_role_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_role_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_role_proto_goTypes = []any{
-	(*Role)(nil),                                    // 0: theapp.v1.Role
-	(*CreateRoleRequest)(nil),                       // 1: theapp.v1.CreateRoleRequest
-	(*GetRoleRequest)(nil),                          // 2: theapp.v1.GetRoleRequest
-	(*ListRolesRequest)(nil),                        // 3: theapp.v1.ListRolesRequest
-	(*ListRolesResponse)(nil),                       // 4: theapp.v1.ListRolesResponse
-	(*ListProjectRoleAssignmentsRequest)(nil),       // 5: theapp.v1.ListProjectRoleAssignmentsRequest
-	(*ListProjectRoleAssignmentsResponse)(nil),      // 6: theapp.v1.ListProjectRoleAssignmentsResponse
-	(*ListOrganizationRoleAssignmentsRequest)(nil),  // 7: theapp.v1.ListOrganizationRoleAssignmentsRequest
-	(*ListOrganizationRoleAssignmentsResponse)(nil), // 8: theapp.v1.ListOrganizationRoleAssignmentsResponse
-	(*UpdateRoleRequest)(nil),                       // 9: theapp.v1.UpdateRoleRequest
-	(*ModifyRolePermissionsRequest)(nil),            // 10: theapp.v1.ModifyRolePermissionsRequest
-	(*DeleteRoleRequest)(nil),                       // 11: theapp.v1.DeleteRoleRequest
-	(*DeleteRoleResponse)(nil),                      // 12: theapp.v1.DeleteRoleResponse
-	(*AssignRoleToProjectRequest)(nil),              // 13: theapp.v1.AssignRoleToProjectRequest
-	(*AssignRoleToProjectResponse)(nil),             // 14: theapp.v1.AssignRoleToProjectResponse
-	(*UnassignRoleFromProjectRequest)(nil),          // 15: theapp.v1.UnassignRoleFromProjectRequest
-	(*UnassignRoleFromProjectResponse)(nil),         // 16: theapp.v1.UnassignRoleFromProjectResponse
-	(*AssignRoleToOrganizationRequest)(nil),         // 17: theapp.v1.AssignRoleToOrganizationRequest
-	(*AssignRoleToOrganizationResponse)(nil),        // 18: theapp.v1.AssignRoleToOrganizationResponse
-	(*UnassignRoleFromOrganizationRequest)(nil),     // 19: theapp.v1.UnassignRoleFromOrganizationRequest
-	(*UnassignRoleFromOrganizationResponse)(nil),    // 20: theapp.v1.UnassignRoleFromOrganizationResponse
-	(Permission)(0),                                 // 21: theapp.v1.Permission
-	(*timestamppb.Timestamp)(nil),                   // 22: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),                   // 23: google.protobuf.FieldMask
+	(RoleKind)(0),                                   // 0: theapp.v1.RoleKind
+	(*Role)(nil),                                    // 1: theapp.v1.Role
+	(*CreateRoleRequest)(nil),                       // 2: theapp.v1.CreateRoleRequest
+	(*GetRoleRequest)(nil),                          // 3: theapp.v1.GetRoleRequest
+	(*ListRolesRequest)(nil),                        // 4: theapp.v1.ListRolesRequest
+	(*ListRolesResponse)(nil),                       // 5: theapp.v1.ListRolesResponse
+	(*ListProjectRoleAssignmentsRequest)(nil),       // 6: theapp.v1.ListProjectRoleAssignmentsRequest
+	(*ListProjectRoleAssignmentsResponse)(nil),      // 7: theapp.v1.ListProjectRoleAssignmentsResponse
+	(*ListOrganizationRoleAssignmentsRequest)(nil),  // 8: theapp.v1.ListOrganizationRoleAssignmentsRequest
+	(*ListOrganizationRoleAssignmentsResponse)(nil), // 9: theapp.v1.ListOrganizationRoleAssignmentsResponse
+	(*UpdateRoleRequest)(nil),                       // 10: theapp.v1.UpdateRoleRequest
+	(*ModifyRolePermissionsRequest)(nil),            // 11: theapp.v1.ModifyRolePermissionsRequest
+	(*DeleteRoleRequest)(nil),                       // 12: theapp.v1.DeleteRoleRequest
+	(*DeleteRoleResponse)(nil),                      // 13: theapp.v1.DeleteRoleResponse
+	(*AssignRoleToProjectRequest)(nil),              // 14: theapp.v1.AssignRoleToProjectRequest
+	(*AssignRoleToProjectResponse)(nil),             // 15: theapp.v1.AssignRoleToProjectResponse
+	(*UnassignRoleFromProjectRequest)(nil),          // 16: theapp.v1.UnassignRoleFromProjectRequest
+	(*UnassignRoleFromProjectResponse)(nil),         // 17: theapp.v1.UnassignRoleFromProjectResponse
+	(*AssignRoleToOrganizationRequest)(nil),         // 18: theapp.v1.AssignRoleToOrganizationRequest
+	(*AssignRoleToOrganizationResponse)(nil),        // 19: theapp.v1.AssignRoleToOrganizationResponse
+	(*UnassignRoleFromOrganizationRequest)(nil),     // 20: theapp.v1.UnassignRoleFromOrganizationRequest
+	(*UnassignRoleFromOrganizationResponse)(nil),    // 21: theapp.v1.UnassignRoleFromOrganizationResponse
+	(Permission)(0),                                 // 22: theapp.v1.Permission
+	(*timestamppb.Timestamp)(nil),                   // 23: google.protobuf.Timestamp
+	(AssignmentScope)(0),                            // 24: theapp.v1.AssignmentScope
+	(*fieldmaskpb.FieldMask)(nil),                   // 25: google.protobuf.FieldMask
 }
 var file_role_proto_depIdxs = []int32{
-	21, // 0: theapp.v1.Role.permissions:type_name -> theapp.v1.Permission
-	22, // 1: theapp.v1.Role.create_time:type_name -> google.protobuf.Timestamp
-	22, // 2: theapp.v1.Role.update_time:type_name -> google.protobuf.Timestamp
-	0,  // 3: theapp.v1.CreateRoleRequest.role:type_name -> theapp.v1.Role
-	0,  // 4: theapp.v1.ListRolesResponse.roles:type_name -> theapp.v1.Role
-	0,  // 5: theapp.v1.ListProjectRoleAssignmentsResponse.roles:type_name -> theapp.v1.Role
-	0,  // 6: theapp.v1.ListOrganizationRoleAssignmentsResponse.roles:type_name -> theapp.v1.Role
-	0,  // 7: theapp.v1.UpdateRoleRequest.role:type_name -> theapp.v1.Role
-	23, // 8: theapp.v1.UpdateRoleRequest.update_mask:type_name -> google.protobuf.FieldMask
-	21, // 9: theapp.v1.ModifyRolePermissionsRequest.add_permissions:type_name -> theapp.v1.Permission
-	21, // 10: theapp.v1.ModifyRolePermissionsRequest.remove_permissions:type_name -> theapp.v1.Permission
-	1,  // 11: theapp.v1.RoleService.CreateRole:input_type -> theapp.v1.CreateRoleRequest
-	2,  // 12: theapp.v1.RoleService.GetRole:input_type -> theapp.v1.GetRoleRequest
-	3,  // 13: theapp.v1.RoleService.ListRoles:input_type -> theapp.v1.ListRolesRequest
-	5,  // 14: theapp.v1.RoleService.ListProjectRoleAssignments:input_type -> theapp.v1.ListProjectRoleAssignmentsRequest
-	7,  // 15: theapp.v1.RoleService.ListOrganizationRoleAssignments:input_type -> theapp.v1.ListOrganizationRoleAssignmentsRequest
-	9,  // 16: theapp.v1.RoleService.UpdateRole:input_type -> theapp.v1.UpdateRoleRequest
-	10, // 17: theapp.v1.RoleService.ModifyRolePermissions:input_type -> theapp.v1.ModifyRolePermissionsRequest
-	11, // 18: theapp.v1.RoleService.DeleteRole:input_type -> theapp.v1.DeleteRoleRequest
-	13, // 19: theapp.v1.RoleService.AssignRoleToProject:input_type -> theapp.v1.AssignRoleToProjectRequest
-	15, // 20: theapp.v1.RoleService.UnassignRoleFromProject:input_type -> theapp.v1.UnassignRoleFromProjectRequest
-	17, // 21: theapp.v1.RoleService.AssignRoleToOrganization:input_type -> theapp.v1.AssignRoleToOrganizationRequest
-	19, // 22: theapp.v1.RoleService.UnassignRoleFromOrganization:input_type -> theapp.v1.UnassignRoleFromOrganizationRequest
-	0,  // 23: theapp.v1.RoleService.CreateRole:output_type -> theapp.v1.Role
-	0,  // 24: theapp.v1.RoleService.GetRole:output_type -> theapp.v1.Role
-	4,  // 25: theapp.v1.RoleService.ListRoles:output_type -> theapp.v1.ListRolesResponse
-	6,  // 26: theapp.v1.RoleService.ListProjectRoleAssignments:output_type -> theapp.v1.ListProjectRoleAssignmentsResponse
-	8,  // 27: theapp.v1.RoleService.ListOrganizationRoleAssignments:output_type -> theapp.v1.ListOrganizationRoleAssignmentsResponse
-	0,  // 28: theapp.v1.RoleService.UpdateRole:output_type -> theapp.v1.Role
-	0,  // 29: theapp.v1.RoleService.ModifyRolePermissions:output_type -> theapp.v1.Role
-	12, // 30: theapp.v1.RoleService.DeleteRole:output_type -> theapp.v1.DeleteRoleResponse
-	14, // 31: theapp.v1.RoleService.AssignRoleToProject:output_type -> theapp.v1.AssignRoleToProjectResponse
-	16, // 32: theapp.v1.RoleService.UnassignRoleFromProject:output_type -> theapp.v1.UnassignRoleFromProjectResponse
-	18, // 33: theapp.v1.RoleService.AssignRoleToOrganization:output_type -> theapp.v1.AssignRoleToOrganizationResponse
-	20, // 34: theapp.v1.RoleService.UnassignRoleFromOrganization:output_type -> theapp.v1.UnassignRoleFromOrganizationResponse
-	23, // [23:35] is the sub-list for method output_type
-	11, // [11:23] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	22, // 0: theapp.v1.Role.permissions:type_name -> theapp.v1.Permission
+	23, // 1: theapp.v1.Role.create_time:type_name -> google.protobuf.Timestamp
+	23, // 2: theapp.v1.Role.update_time:type_name -> google.protobuf.Timestamp
+	0,  // 3: theapp.v1.Role.kind:type_name -> theapp.v1.RoleKind
+	24, // 4: theapp.v1.Role.minimum_assignment_scope:type_name -> theapp.v1.AssignmentScope
+	1,  // 5: theapp.v1.CreateRoleRequest.role:type_name -> theapp.v1.Role
+	1,  // 6: theapp.v1.ListRolesResponse.roles:type_name -> theapp.v1.Role
+	1,  // 7: theapp.v1.ListProjectRoleAssignmentsResponse.roles:type_name -> theapp.v1.Role
+	1,  // 8: theapp.v1.ListOrganizationRoleAssignmentsResponse.roles:type_name -> theapp.v1.Role
+	1,  // 9: theapp.v1.UpdateRoleRequest.role:type_name -> theapp.v1.Role
+	25, // 10: theapp.v1.UpdateRoleRequest.update_mask:type_name -> google.protobuf.FieldMask
+	22, // 11: theapp.v1.ModifyRolePermissionsRequest.add_permissions:type_name -> theapp.v1.Permission
+	22, // 12: theapp.v1.ModifyRolePermissionsRequest.remove_permissions:type_name -> theapp.v1.Permission
+	2,  // 13: theapp.v1.RoleService.CreateRole:input_type -> theapp.v1.CreateRoleRequest
+	3,  // 14: theapp.v1.RoleService.GetRole:input_type -> theapp.v1.GetRoleRequest
+	4,  // 15: theapp.v1.RoleService.ListRoles:input_type -> theapp.v1.ListRolesRequest
+	6,  // 16: theapp.v1.RoleService.ListProjectRoleAssignments:input_type -> theapp.v1.ListProjectRoleAssignmentsRequest
+	8,  // 17: theapp.v1.RoleService.ListOrganizationRoleAssignments:input_type -> theapp.v1.ListOrganizationRoleAssignmentsRequest
+	10, // 18: theapp.v1.RoleService.UpdateRole:input_type -> theapp.v1.UpdateRoleRequest
+	11, // 19: theapp.v1.RoleService.ModifyRolePermissions:input_type -> theapp.v1.ModifyRolePermissionsRequest
+	12, // 20: theapp.v1.RoleService.DeleteRole:input_type -> theapp.v1.DeleteRoleRequest
+	14, // 21: theapp.v1.RoleService.AssignRoleToProject:input_type -> theapp.v1.AssignRoleToProjectRequest
+	16, // 22: theapp.v1.RoleService.UnassignRoleFromProject:input_type -> theapp.v1.UnassignRoleFromProjectRequest
+	18, // 23: theapp.v1.RoleService.AssignRoleToOrganization:input_type -> theapp.v1.AssignRoleToOrganizationRequest
+	20, // 24: theapp.v1.RoleService.UnassignRoleFromOrganization:input_type -> theapp.v1.UnassignRoleFromOrganizationRequest
+	1,  // 25: theapp.v1.RoleService.CreateRole:output_type -> theapp.v1.Role
+	1,  // 26: theapp.v1.RoleService.GetRole:output_type -> theapp.v1.Role
+	5,  // 27: theapp.v1.RoleService.ListRoles:output_type -> theapp.v1.ListRolesResponse
+	7,  // 28: theapp.v1.RoleService.ListProjectRoleAssignments:output_type -> theapp.v1.ListProjectRoleAssignmentsResponse
+	9,  // 29: theapp.v1.RoleService.ListOrganizationRoleAssignments:output_type -> theapp.v1.ListOrganizationRoleAssignmentsResponse
+	1,  // 30: theapp.v1.RoleService.UpdateRole:output_type -> theapp.v1.Role
+	1,  // 31: theapp.v1.RoleService.ModifyRolePermissions:output_type -> theapp.v1.Role
+	13, // 32: theapp.v1.RoleService.DeleteRole:output_type -> theapp.v1.DeleteRoleResponse
+	15, // 33: theapp.v1.RoleService.AssignRoleToProject:output_type -> theapp.v1.AssignRoleToProjectResponse
+	17, // 34: theapp.v1.RoleService.UnassignRoleFromProject:output_type -> theapp.v1.UnassignRoleFromProjectResponse
+	19, // 35: theapp.v1.RoleService.AssignRoleToOrganization:output_type -> theapp.v1.AssignRoleToOrganizationResponse
+	21, // 36: theapp.v1.RoleService.UnassignRoleFromOrganization:output_type -> theapp.v1.UnassignRoleFromOrganizationResponse
+	25, // [25:37] is the sub-list for method output_type
+	13, // [13:25] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_role_proto_init() }
@@ -1555,13 +1634,14 @@ func file_role_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_role_proto_rawDesc), len(file_role_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_role_proto_goTypes,
 		DependencyIndexes: file_role_proto_depIdxs,
+		EnumInfos:         file_role_proto_enumTypes,
 		MessageInfos:      file_role_proto_msgTypes,
 	}.Build()
 	File_role_proto = out.File

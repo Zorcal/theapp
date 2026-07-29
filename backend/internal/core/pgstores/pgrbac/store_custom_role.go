@@ -188,6 +188,40 @@ func (s *Store) CustomRoleByExternalID(ctx context.Context, orgID int, roleID uu
 	return role, nil
 }
 
+// CustomRoleHasProjectAssignments reports whether a custom role has any project-scope
+// assignments.
+func (s *Store) CustomRoleHasProjectAssignments(ctx context.Context, roleID uuid.UUID) (bool, error) {
+	q := customRoleHasProjectAssignmentsQuery(roleID)
+
+	var hasAssignments bool
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &hasAssignments); err != nil {
+			return fmt.Errorf("custom role has project assignments: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return hasAssignments, nil
+}
+
+// LockCustomRole acquires a transaction-level advisory lock that serializes assignment and
+// permission changes for roleID.
+func (s *Store) LockCustomRole(ctx context.Context, roleID uuid.UUID) error {
+	const query = `
+		SELECT pg_advisory_xact_lock(hashtext('rbac.custom-role'), id)
+		FROM rbac.custom_roles
+		WHERE external_id = $1`
+	if err := pgdb.RunExec(ctx, s.pool, query, roleID); err != nil {
+		return fmt.Errorf("lock custom role: %w", err)
+	}
+
+	return nil
+}
+
 // AssignCustomRoleToProject grants an organization member an organization-owned role in projectID.
 // Returns [sql.ErrNoRows] if the user, role, project, or membership does not exist, or the role and
 // project belong to different organizations.

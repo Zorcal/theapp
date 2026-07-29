@@ -35,6 +35,11 @@ type RoleStorer interface {
 	// CustomRoleByExternalID returns an organization's role with the given external ID.
 	// Returns [sql.ErrNoRows] if the organization does not own such a role.
 	CustomRoleByExternalID(ctx context.Context, orgID int, roleID uuid.UUID) (pgrbac.CustomRole, error)
+	// CustomRoleHasProjectAssignments reports whether a role has any project-scope assignments.
+	CustomRoleHasProjectAssignments(ctx context.Context, roleID uuid.UUID) (bool, error)
+	// LockCustomRole acquires a transaction-level advisory lock that serializes assignment and
+	// permission changes for roleID.
+	LockCustomRole(ctx context.Context, roleID uuid.UUID) error
 	// CustomRoles returns a page and total count of an organization's custom roles.
 	CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, int, error)
 	// UserProjectCustomRoles returns a page and total count of custom roles assigned directly to

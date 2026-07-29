@@ -48,18 +48,26 @@ type CustomRoleCore interface {
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
+	// Returns [mdl.ErrManagedRole] if the role is application-managed.
+	// Returns [mdl.ErrInvalidAssignmentScope] if the update would make a role with project
+	// assignments require organization scope.
 	UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error)
 	// ModifyCustomRolePermissions atomically changes permissions on a custom role.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
+	// Returns [mdl.ErrManagedRole] if the role is application-managed.
+	// Returns [mdl.ErrInvalidAssignmentScope] if the change would make a role with project
+	// assignments require organization scope.
 	ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error)
 	// DeleteCustomRole deletes a custom role in the caller's organization.
 	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
+	// Returns [mdl.ErrManagedRole] if the role is application-managed.
 	DeleteCustomRole(ctx context.Context, customRoleID uuid.UUID) error
 	// AssignCustomRoleToProject assigns a custom role to a user in the caller's project.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
+	// Returns [mdl.ErrInvalidAssignmentScope] if the role contains an organization-scoped permission.
 	AssignCustomRoleToProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromProject unassigns a custom role from a user in the caller's project.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
@@ -77,7 +85,12 @@ func (s *customRoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRe
 		return nil, fmt.Errorf("validate create role request: %w", err)
 	}
 
-	role, err := s.customRoleCore.CreateCustomRole(ctx, conv.CreateCustomRoleFromPB(req.GetRole()))
+	createRole, ok := conv.CreateCustomRoleFromPB(req.GetRole())
+	if !ok {
+		return nil, errors.New("validated role contains an unknown permission")
+	}
+
+	role, err := s.customRoleCore.CreateCustomRole(ctx, createRole)
 	if err != nil {
 		switch {
 		case errors.Is(err, mdl.ErrValidation):
@@ -241,7 +254,12 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 
 	roleID := uuid.MustParse(req.GetRole().GetId())
 
-	role, err := s.customRoleCore.UpdateCustomRole(ctx, conv.UpdateCustomRoleFromPB(req, roleID))
+	updateRole, ok := conv.UpdateCustomRoleFromPB(req, roleID)
+	if !ok {
+		return nil, errors.New("validated role contains an unknown permission")
+	}
+
+	role, err := s.customRoleCore.UpdateCustomRole(ctx, updateRole)
 	if err != nil {
 		switch {
 		case errors.Is(err, mdl.ErrNotFound):
@@ -254,6 +272,10 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 			})
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
+		case errors.Is(err, mdl.ErrManagedRole):
+			return nil, status.Error(codes.FailedPrecondition, "managed role definitions cannot be updated")
+		case errors.Is(err, mdl.ErrInvalidAssignmentScope):
+			return nil, status.Error(codes.FailedPrecondition, "role with project assignments cannot require organization scope")
 		default:
 			return nil, fmt.Errorf("update role: %w", err)
 		}
@@ -269,7 +291,12 @@ func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.M
 
 	roleID := uuid.MustParse(req.GetId())
 
-	role, err := s.customRoleCore.ModifyCustomRolePermissions(ctx, conv.ModifyCustomRolePermissionsFromPB(req, roleID))
+	modifyPermissions, ok := conv.ModifyCustomRolePermissionsFromPB(req, roleID)
+	if !ok {
+		return nil, errors.New("validated permission changes contain an unknown permission")
+	}
+
+	role, err := s.customRoleCore.ModifyCustomRolePermissions(ctx, modifyPermissions)
 	if err != nil {
 		switch {
 		case errors.Is(err, mdl.ErrNotFound):
@@ -278,6 +305,10 @@ func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.M
 			return nil, status.Error(codes.InvalidArgument, "invalid permission changes")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
+		case errors.Is(err, mdl.ErrManagedRole):
+			return nil, status.Error(codes.FailedPrecondition, "managed role definitions cannot be modified")
+		case errors.Is(err, mdl.ErrInvalidAssignmentScope):
+			return nil, status.Error(codes.FailedPrecondition, "role with project assignments cannot require organization scope")
 		default:
 			return nil, fmt.Errorf("modify role permissions: %w", err)
 		}
@@ -299,6 +330,8 @@ func (s *customRoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRe
 			return nil, status.Errorf(codes.NotFound, "role %q not found", req.GetId())
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot delete role permissions")
+		case errors.Is(err, mdl.ErrManagedRole):
+			return nil, status.Error(codes.FailedPrecondition, "managed role definitions cannot be deleted")
 		default:
 			return nil, fmt.Errorf("delete role: %w", err)
 		}
@@ -323,6 +356,8 @@ func (s *customRoleService) AssignRoleToProject(ctx context.Context, req *pb.Ass
 			return nil, status.Error(codes.AlreadyExists, "user already has role in project")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot grant role permissions")
+		case errors.Is(err, mdl.ErrInvalidAssignmentScope):
+			return nil, status.Error(codes.FailedPrecondition, "role cannot be assigned at project scope")
 		default:
 			return nil, fmt.Errorf("assign role to project: %w", err)
 		}

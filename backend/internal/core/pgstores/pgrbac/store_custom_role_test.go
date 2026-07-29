@@ -501,6 +501,57 @@ func TestStore_CustomRoleByExternalID_error(t *testing.T) {
 	}
 }
 
+func TestStore_LockCustomRole(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := pgrbac.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "lock-custom-role-org")
+	role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "reader"})
+
+	if err := pgdb.NewTransactor(pool).RunTx(ctx, func(ctx context.Context) error {
+		if err := rbacStore.LockCustomRole(ctx, role.ExternalID); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("LockCustomRole() error = %v", err)
+	}
+}
+
+func TestStore_CustomRoleProjectAssignmentState(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+	rbacStore := pgrbac.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "custom-role-project-assignment-state-org")
+	project := seedProject(t, orgStore, org.ID, "project")
+	user := seedUser(t, userStore, "custom-role-project-assignment-state@test.com")
+	seedOrgMembership(t, ctx, pool, user.ID, org.ID)
+	role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "reader"})
+
+	hasAssignments, err := rbacStore.CustomRoleHasProjectAssignments(ctx, role.ExternalID)
+	if err != nil {
+		t.Fatalf("CustomRoleHasProjectAssignments() before assignment error = %v", err)
+	}
+	if want := false; hasAssignments != want {
+		t.Errorf("CustomRoleHasProjectAssignments() before assignment = %t, want %t", hasAssignments, want)
+	}
+
+	seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, role.ExternalID, project.ID)
+
+	hasAssignments, err = rbacStore.CustomRoleHasProjectAssignments(ctx, role.ExternalID)
+	if err != nil {
+		t.Fatalf("CustomRoleHasProjectAssignments() after assignment error = %v", err)
+	}
+	if want := true; hasAssignments != want {
+		t.Errorf("CustomRoleHasProjectAssignments() after assignment = %t, want %t", hasAssignments, want)
+	}
+}
+
 func TestStore_UserProjectCustomRoles(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)

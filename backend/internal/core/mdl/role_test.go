@@ -196,3 +196,53 @@ func TestModifyCustomRolePermissions_Validate_error(t *testing.T) {
 		})
 	}
 }
+
+func TestCustomRole_MinimumAssignmentScope(t *testing.T) {
+	tests := []struct {
+		name string
+		in   CustomRole
+		want AssignmentScope
+	}{
+		{
+			name: "project custom role",
+			in: CustomRole{
+				Kind:        RoleKindCustom,
+				Permissions: []Permission{PermissionCustomRoleAssignProject},
+			},
+			want: AssignmentScopeProject,
+		},
+		{
+			name: "custom role",
+			in: CustomRole{
+				Kind:        RoleKindCustom,
+				Permissions: []Permission{PermissionCustomRoleAssignOrg},
+			},
+			want: AssignmentScopeOrganization,
+		},
+		{
+			name: "organization admin",
+			in: CustomRole{
+				Kind:        RoleKindOrganizationAdmin,
+				Permissions: []Permission{PermissionCustomRoleAssignProject},
+			},
+			want: AssignmentScopeOrganization,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.in.MinimumAssignmentScope(); got != tt.want {
+				t.Errorf("MinimumAssignmentScope() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCustomRole_MinimumAssignmentScope_panicsForUnknownKind(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("MinimumAssignmentScope() did not panic")
+		}
+	}()
+
+	CustomRole{Kind: RoleKind(999)}.MinimumAssignmentScope()
+}

@@ -119,6 +119,112 @@ func (Permission) EnumDescriptor() ([]byte, []int) {
 	return file_permission_proto_rawDescGZIP(), []int{0}
 }
 
+// AssignmentScope is the narrowest scope at which a permission or role is meaningful.
+type AssignmentScope int32
+
+const (
+	AssignmentScope_ASSIGNMENT_SCOPE_UNSPECIFIED  AssignmentScope = 0
+	AssignmentScope_ASSIGNMENT_SCOPE_PROJECT      AssignmentScope = 1
+	AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION AssignmentScope = 2
+	AssignmentScope_ASSIGNMENT_SCOPE_SYSTEM       AssignmentScope = 3
+)
+
+// Enum value maps for AssignmentScope.
+var (
+	AssignmentScope_name = map[int32]string{
+		0: "ASSIGNMENT_SCOPE_UNSPECIFIED",
+		1: "ASSIGNMENT_SCOPE_PROJECT",
+		2: "ASSIGNMENT_SCOPE_ORGANIZATION",
+		3: "ASSIGNMENT_SCOPE_SYSTEM",
+	}
+	AssignmentScope_value = map[string]int32{
+		"ASSIGNMENT_SCOPE_UNSPECIFIED":  0,
+		"ASSIGNMENT_SCOPE_PROJECT":      1,
+		"ASSIGNMENT_SCOPE_ORGANIZATION": 2,
+		"ASSIGNMENT_SCOPE_SYSTEM":       3,
+	}
+)
+
+func (x AssignmentScope) Enum() *AssignmentScope {
+	p := new(AssignmentScope)
+	*p = x
+	return p
+}
+
+func (x AssignmentScope) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssignmentScope) Descriptor() protoreflect.EnumDescriptor {
+	return file_permission_proto_enumTypes[1].Descriptor()
+}
+
+func (AssignmentScope) Type() protoreflect.EnumType {
+	return &file_permission_proto_enumTypes[1]
+}
+
+func (x AssignmentScope) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssignmentScope.Descriptor instead.
+func (AssignmentScope) EnumDescriptor() ([]byte, []int) {
+	return file_permission_proto_rawDescGZIP(), []int{1}
+}
+
+// PermissionDescriptor describes a custom-role-assignable permission.
+type PermissionDescriptor struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Permission             Permission             `protobuf:"varint,1,opt,name=permission,proto3,enum=theapp.v1.Permission" json:"permission,omitempty"`
+	MinimumAssignmentScope AssignmentScope        `protobuf:"varint,2,opt,name=minimum_assignment_scope,json=minimumAssignmentScope,proto3,enum=theapp.v1.AssignmentScope" json:"minimum_assignment_scope,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *PermissionDescriptor) Reset() {
+	*x = PermissionDescriptor{}
+	mi := &file_permission_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PermissionDescriptor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PermissionDescriptor) ProtoMessage() {}
+
+func (x *PermissionDescriptor) ProtoReflect() protoreflect.Message {
+	mi := &file_permission_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PermissionDescriptor.ProtoReflect.Descriptor instead.
+func (*PermissionDescriptor) Descriptor() ([]byte, []int) {
+	return file_permission_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *PermissionDescriptor) GetPermission() Permission {
+	if x != nil {
+		return x.Permission
+	}
+	return Permission_PERMISSION_UNSPECIFIED
+}
+
+func (x *PermissionDescriptor) GetMinimumAssignmentScope() AssignmentScope {
+	if x != nil {
+		return x.MinimumAssignmentScope
+	}
+	return AssignmentScope_ASSIGNMENT_SCOPE_UNSPECIFIED
+}
+
 // Request message for listing custom-role-assignable permissions.
 type ListPermissionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -128,7 +234,7 @@ type ListPermissionsRequest struct {
 
 func (x *ListPermissionsRequest) Reset() {
 	*x = ListPermissionsRequest{}
-	mi := &file_permission_proto_msgTypes[0]
+	mi := &file_permission_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -140,7 +246,7 @@ func (x *ListPermissionsRequest) String() string {
 func (*ListPermissionsRequest) ProtoMessage() {}
 
 func (x *ListPermissionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_permission_proto_msgTypes[0]
+	mi := &file_permission_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -153,21 +259,21 @@ func (x *ListPermissionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPermissionsRequest.ProtoReflect.Descriptor instead.
 func (*ListPermissionsRequest) Descriptor() ([]byte, []int) {
-	return file_permission_proto_rawDescGZIP(), []int{0}
+	return file_permission_proto_rawDescGZIP(), []int{1}
 }
 
 // Response message for listing custom-role-assignable permissions.
 type ListPermissionsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Permissions that may be granted through a custom role.
-	Permissions   []Permission `protobuf:"varint,1,rep,packed,name=permissions,proto3,enum=theapp.v1.Permission" json:"permissions,omitempty"`
+	Permissions   []*PermissionDescriptor `protobuf:"bytes,1,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListPermissionsResponse) Reset() {
 	*x = ListPermissionsResponse{}
-	mi := &file_permission_proto_msgTypes[1]
+	mi := &file_permission_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -179,7 +285,7 @@ func (x *ListPermissionsResponse) String() string {
 func (*ListPermissionsResponse) ProtoMessage() {}
 
 func (x *ListPermissionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_permission_proto_msgTypes[1]
+	mi := &file_permission_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -192,10 +298,10 @@ func (x *ListPermissionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPermissionsResponse.ProtoReflect.Descriptor instead.
 func (*ListPermissionsResponse) Descriptor() ([]byte, []int) {
-	return file_permission_proto_rawDescGZIP(), []int{1}
+	return file_permission_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ListPermissionsResponse) GetPermissions() []Permission {
+func (x *ListPermissionsResponse) GetPermissions() []*PermissionDescriptor {
 	if x != nil {
 		return x.Permissions
 	}
@@ -206,10 +312,15 @@ var File_permission_proto protoreflect.FileDescriptor
 
 const file_permission_proto_rawDesc = "" +
 	"\n" +
-	"\x10permission.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x18\n" +
-	"\x16ListPermissionsRequest\"R\n" +
-	"\x17ListPermissionsResponse\x127\n" +
-	"\vpermissions\x18\x01 \x03(\x0e2\x15.theapp.v1.PermissionR\vpermissions*\xbb\x05\n" +
+	"\x10permission.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xa3\x01\n" +
+	"\x14PermissionDescriptor\x125\n" +
+	"\n" +
+	"permission\x18\x01 \x01(\x0e2\x15.theapp.v1.PermissionR\n" +
+	"permission\x12T\n" +
+	"\x18minimum_assignment_scope\x18\x02 \x01(\x0e2\x1a.theapp.v1.AssignmentScopeR\x16minimumAssignmentScope\"\x18\n" +
+	"\x16ListPermissionsRequest\"\\\n" +
+	"\x17ListPermissionsResponse\x12A\n" +
+	"\vpermissions\x18\x01 \x03(\v2\x1f.theapp.v1.PermissionDescriptorR\vpermissions*\xbb\x05\n" +
 	"\n" +
 	"Permission\x12\x1a\n" +
 	"\x16PERMISSION_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -230,7 +341,12 @@ const file_permission_proto_rawDesc = "" +
 	",PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION\x10\x0e\x123\n" +
 	"/PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS\x10\x0f\x128\n" +
 	"4PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS\x10\x10\x12#\n" +
-	"\x1fPERMISSION_PROJECT_DISCOVER_ALL\x10\x112\x82\x03\n" +
+	"\x1fPERMISSION_PROJECT_DISCOVER_ALL\x10\x11*\x91\x01\n" +
+	"\x0fAssignmentScope\x12 \n" +
+	"\x1cASSIGNMENT_SCOPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18ASSIGNMENT_SCOPE_PROJECT\x10\x01\x12!\n" +
+	"\x1dASSIGNMENT_SCOPE_ORGANIZATION\x10\x02\x12\x1b\n" +
+	"\x17ASSIGNMENT_SCOPE_SYSTEM\x10\x032\x82\x03\n" +
 	"\x11PermissionService\x12\xec\x02\n" +
 	"\x0fListPermissions\x12!.theapp.v1.ListPermissionsRequest\x1a\".theapp.v1.ListPermissionsResponse\"\x91\x02\x92A\xf6\x01J1\n" +
 	"\x03400\x12*\n" +
@@ -267,22 +383,26 @@ func file_permission_proto_rawDescGZIP() []byte {
 	return file_permission_proto_rawDescData
 }
 
-var file_permission_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_permission_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_permission_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_permission_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_permission_proto_goTypes = []any{
 	(Permission)(0),                 // 0: theapp.v1.Permission
-	(*ListPermissionsRequest)(nil),  // 1: theapp.v1.ListPermissionsRequest
-	(*ListPermissionsResponse)(nil), // 2: theapp.v1.ListPermissionsResponse
+	(AssignmentScope)(0),            // 1: theapp.v1.AssignmentScope
+	(*PermissionDescriptor)(nil),    // 2: theapp.v1.PermissionDescriptor
+	(*ListPermissionsRequest)(nil),  // 3: theapp.v1.ListPermissionsRequest
+	(*ListPermissionsResponse)(nil), // 4: theapp.v1.ListPermissionsResponse
 }
 var file_permission_proto_depIdxs = []int32{
-	0, // 0: theapp.v1.ListPermissionsResponse.permissions:type_name -> theapp.v1.Permission
-	1, // 1: theapp.v1.PermissionService.ListPermissions:input_type -> theapp.v1.ListPermissionsRequest
-	2, // 2: theapp.v1.PermissionService.ListPermissions:output_type -> theapp.v1.ListPermissionsResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: theapp.v1.PermissionDescriptor.permission:type_name -> theapp.v1.Permission
+	1, // 1: theapp.v1.PermissionDescriptor.minimum_assignment_scope:type_name -> theapp.v1.AssignmentScope
+	2, // 2: theapp.v1.ListPermissionsResponse.permissions:type_name -> theapp.v1.PermissionDescriptor
+	3, // 3: theapp.v1.PermissionService.ListPermissions:input_type -> theapp.v1.ListPermissionsRequest
+	4, // 4: theapp.v1.PermissionService.ListPermissions:output_type -> theapp.v1.ListPermissionsResponse
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_permission_proto_init() }
@@ -295,8 +415,8 @@ func file_permission_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_permission_proto_rawDesc), len(file_permission_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   2,
+			NumEnums:      2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

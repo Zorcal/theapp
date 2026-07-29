@@ -307,9 +307,11 @@ CREATE TABLE rbac.custom_roles (
     external_id uuid NOT NULL,
     name text NOT NULL,
     org_id integer NOT NULL,
+    managed_key text,
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone,
     etag uuid NOT NULL,
+    CONSTRAINT custom_roles_managed_key_check CHECK (((managed_key IS NULL) OR (managed_key = 'organization_admin'::text))),
     CONSTRAINT custom_roles_name_check CHECK (((name <> ''::text) AND (name = btrim(name))))
 );
 
@@ -870,6 +872,13 @@ CREATE INDEX projects_org_id_name_idx ON org.projects USING btree (org_id, name 
 --
 
 CREATE UNIQUE INDEX custom_roles_org_id_lower_name_key ON rbac.custom_roles USING btree (org_id, lower(name));
+
+
+--
+-- Name: custom_roles_org_id_managed_key_key; Type: INDEX; Schema: rbac; Owner: -
+--
+
+CREATE UNIQUE INDEX custom_roles_org_id_managed_key_key ON rbac.custom_roles USING btree (org_id, managed_key) WHERE (managed_key IS NOT NULL);
 
 
 --

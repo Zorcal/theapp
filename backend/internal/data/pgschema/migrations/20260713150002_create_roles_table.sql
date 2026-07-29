@@ -13,14 +13,23 @@ CREATE TABLE rbac.custom_roles (
     , external_id UUID UNIQUE NOT NULL
     , name TEXT NOT NULL
     , org_id INTEGER NOT NULL REFERENCES org.organizations (id)
+    , managed_key TEXT
     , created_at TIMESTAMPTZ NOT NULL
     , updated_at TIMESTAMPTZ
     , etag UUID UNIQUE NOT NULL
     , CONSTRAINT custom_roles_name_check CHECK (name <> '' AND name = btrim(name))
+    , CONSTRAINT custom_roles_managed_key_check
+        CHECK (managed_key IS NULL OR managed_key = 'organization_admin')
 );
 
 -- Custom role names are unique within an organization, regardless of case.
 CREATE UNIQUE INDEX custom_roles_org_id_lower_name_key ON rbac.custom_roles (org_id, lower(name));
+
+-- Identifies the single application-managed organization role without coupling its identity to
+-- display text. It supports managed-role reconciliation and prevents duplicate admin definitions.
+CREATE UNIQUE INDEX custom_roles_org_id_managed_key_key
+    ON rbac.custom_roles (org_id, managed_key)
+    WHERE managed_key IS NOT NULL;
 
 -- Supplies the referenced key for assignment foreign keys that prove a role belongs to the
 -- assignment organization. The primary key on id alone cannot be a composite FK target.

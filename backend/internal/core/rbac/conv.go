@@ -7,9 +7,21 @@ import (
 )
 
 func customRoleFromPg(r pgrbac.CustomRole) mdl.CustomRole {
+	var kind mdl.RoleKind
+	switch {
+	case r.ManagedKey == nil:
+		kind = mdl.RoleKindCustom
+	case *r.ManagedKey == mdl.ManagedRoleKeyOrganizationAdmin:
+		kind = mdl.RoleKindOrganizationAdmin
+	default:
+		// Managed keys are constrained by the database's closed managed-role registry. Reaching
+		// this branch means the schema and core model no longer agree.
+		panic("unsupported managed role key: " + *r.ManagedKey)
+	}
 	return mdl.CustomRole{
 		ID:          r.ExternalID,
 		Name:        r.Name,
+		Kind:        kind,
 		Permissions: permissionsFromPg(r.PermissionNames),
 		CreatedAt:   r.CreatedAt,
 		UpdatedAt:   r.UpdatedAt,
