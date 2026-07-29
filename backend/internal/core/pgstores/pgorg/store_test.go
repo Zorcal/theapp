@@ -1,4 +1,4 @@
-package pgorg
+package pgorg_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -21,21 +22,21 @@ import (
 func TestStore_CreateOrganization(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 
-	got, err := orgStore.CreateOrganization(ctx, CreateOrganization{Name: "acme", ControlProjectName: "control"})
+	got, err := orgStore.CreateOrganization(ctx, pgorg.CreateOrganization{Name: "acme", ControlProjectName: "control"})
 	if err != nil {
 		t.Fatalf("CreateOrganization() error = %v", err)
 	}
 
-	want := Organization{
+	want := pgorg.Organization{
 		Name:      "acme",
 		CreatedAt: time.Now(),
 	}
 
 	testingx.AssertDiff(
 		t, got, want,
-		cmpopts.IgnoreFields(Organization{}, "ID", "ControlProjectID"),
+		cmpopts.IgnoreFields(pgorg.Organization{}, "ID", "ControlProjectID"),
 		cmpopts.EquateApproxTime(time.Minute),
 	)
 
@@ -48,7 +49,7 @@ func TestStore_CreateOrganization(t *testing.T) {
 
 	control := mustProjectByName(t, orgStore, got.ID, "control")
 
-	wantControl := Project{
+	wantControl := pgorg.Project{
 		OrgID:     got.ID,
 		Name:      "control",
 		IsControl: true,
@@ -57,7 +58,7 @@ func TestStore_CreateOrganization(t *testing.T) {
 
 	testingx.AssertDiff(
 		t, control, wantControl,
-		cmpopts.IgnoreFields(Project{}, "ID", "ETag"),
+		cmpopts.IgnoreFields(pgorg.Project{}, "ID", "ETag"),
 		cmpopts.EquateApproxTime(time.Minute),
 	)
 
@@ -73,11 +74,11 @@ func TestStore_CreateOrganization_error(t *testing.T) {
 	t.Run("duplicate name", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		orgStore := NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		seedOrg(t, orgStore, "acme")
 
-		if _, err := orgStore.CreateOrganization(ctx, CreateOrganization{Name: "acme"}); !errors.Is(err, pgdb.ErrAlreadyExists) {
+		if _, err := orgStore.CreateOrganization(ctx, pgorg.CreateOrganization{Name: "acme"}); !errors.Is(err, pgdb.ErrAlreadyExists) {
 			t.Errorf("CreateOrganization() error = %v, want pgdb.ErrAlreadyExists", err)
 		}
 	})
@@ -86,16 +87,16 @@ func TestStore_CreateOrganization_error(t *testing.T) {
 func TestStore_CreateProject(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 
 	org := seedOrg(t, orgStore, "acme")
 
-	got, err := orgStore.CreateProject(ctx, CreateProject{OrgID: org.ID, Name: "widgets"})
+	got, err := orgStore.CreateProject(ctx, pgorg.CreateProject{OrgID: org.ID, Name: "widgets"})
 	if err != nil {
 		t.Fatalf("CreateProject() error = %v", err)
 	}
 
-	want := Project{
+	want := pgorg.Project{
 		OrgID:     org.ID,
 		Name:      "widgets",
 		CreatedAt: time.Now(),
@@ -103,7 +104,7 @@ func TestStore_CreateProject(t *testing.T) {
 
 	testingx.AssertDiff(
 		t, got, want,
-		cmpopts.IgnoreFields(Project{}, "ID", "ETag"),
+		cmpopts.IgnoreFields(pgorg.Project{}, "ID", "ETag"),
 		cmpopts.EquateApproxTime(time.Minute),
 	)
 
@@ -119,9 +120,9 @@ func TestStore_CreateProject_error(t *testing.T) {
 	t.Run("org not found", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		orgStore := NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
-		if _, err := orgStore.CreateProject(ctx, CreateProject{OrgID: 999999, Name: "widgets"}); !errors.Is(err, sql.ErrNoRows) {
+		if _, err := orgStore.CreateProject(ctx, pgorg.CreateProject{OrgID: 999999, Name: "widgets"}); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("CreateProject() error = %v, want sql.ErrNoRows", err)
 		}
 	})
@@ -129,7 +130,7 @@ func TestStore_CreateProject_error(t *testing.T) {
 	t.Run("duplicate name", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		orgStore := NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 
 		org := seedOrg(t, orgStore, "acme")
 		seedProject(t, orgStore, org.ID, "widgets")
@@ -149,7 +150,7 @@ func TestStore_CreateProject_error(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				if _, err := orgStore.CreateProject(ctx, CreateProject{OrgID: org.ID, Name: tt.dup}); !errors.Is(err, pgdb.ErrAlreadyExists) {
+				if _, err := orgStore.CreateProject(ctx, pgorg.CreateProject{OrgID: org.ID, Name: tt.dup}); !errors.Is(err, pgdb.ErrAlreadyExists) {
 					t.Errorf("CreateProject() error = %v, want pgdb.ErrAlreadyExists", err)
 				}
 			})
@@ -160,7 +161,7 @@ func TestStore_CreateProject_error(t *testing.T) {
 func TestStore_OrganizationByName(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 
 	seeded := seedOrg(t, orgStore, "acme")
 
@@ -175,7 +176,7 @@ func TestStore_OrganizationByName(t *testing.T) {
 func TestStore_OrganizationByName_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 
 	if _, err := orgStore.OrganizationByName(ctx, "acme"); !errors.Is(err, sql.ErrNoRows) {
 		t.Errorf("OrganizationByName() error = %v, want sql.ErrNoRows", err)
@@ -185,7 +186,7 @@ func TestStore_OrganizationByName_error(t *testing.T) {
 func TestStore_ProjectByID(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 
 	org := seedOrg(t, orgStore, "acme")
 	seeded := seedProject(t, orgStore, org.ID, "widgets")
@@ -201,7 +202,7 @@ func TestStore_ProjectByID(t *testing.T) {
 func TestStore_ProjectByID_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 
 	if _, err := orgStore.ProjectByID(ctx, 999999); !errors.Is(err, sql.ErrNoRows) {
 		t.Errorf("ProjectByID() error = %v, want sql.ErrNoRows", err)
@@ -226,7 +227,7 @@ func TestStore_ProjectByName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			pool := pgtest.New(t, ctx)
-			orgStore := NewStore(pool)
+			orgStore := pgorg.NewStore(pool)
 
 			org := seedOrg(t, orgStore, "acme")
 			seeded := seedProject(t, orgStore, org.ID, "widgets")
@@ -244,7 +245,7 @@ func TestStore_ProjectByName(t *testing.T) {
 func TestStore_ProjectByName_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 
 	org := seedOrg(t, orgStore, "acme")
 
@@ -256,7 +257,7 @@ func TestStore_ProjectByName_error(t *testing.T) {
 func TestStore_AccessibleProjects(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 	rbacStore := pgrbac.NewStore(pool)
 	userStore := pguser.NewStore(pool)
 
@@ -300,59 +301,59 @@ func TestStore_AccessibleProjects(t *testing.T) {
 	tests := []struct {
 		name       string
 		userID     uuid.UUID
-		filter     ProjectFilter
+		filter     pgorg.ProjectFilter
 		pageSize   int
 		pageOffset int
-		want       []Project
+		want       []pgorg.Project
 	}{
 		{
 			name:     "project assignment",
 			userID:   projectAssignedUser.ExternalID,
 			pageSize: 10,
-			want:     []Project{projectAssignedProject},
+			want:     []pgorg.Project{projectAssignedProject},
 		},
 		{
 			name:     "whitespace-only name filter",
 			userID:   projectAssignedUser.ExternalID,
-			filter:   ProjectFilter{Name: "   "},
+			filter:   pgorg.ProjectFilter{Name: "   "},
 			pageSize: 10,
-			want:     []Project{projectAssignedProject},
+			want:     []pgorg.Project{projectAssignedProject},
 		},
 		{
 			name:     "organization assignment",
 			userID:   orgAssignedUser.ExternalID,
 			pageSize: 10,
-			want:     []Project{orgAssignedControl, orgAssignedFirstProject, orgAssignedSecondProject},
+			want:     []pgorg.Project{orgAssignedControl, orgAssignedFirstProject, orgAssignedSecondProject},
 		},
 		{
 			name:     "system assignment across organizations",
 			userID:   systemAssignedUser.ExternalID,
-			filter:   ProjectFilter{Name: "first"},
+			filter:   pgorg.ProjectFilter{Name: "first"},
 			pageSize: 10,
-			want:     []Project{projectAssignedProject, orgAssignedFirstProject},
+			want:     []pgorg.Project{projectAssignedProject, orgAssignedFirstProject},
 		},
 		{
 			name:       "pagination",
 			userID:     systemAssignedUser.ExternalID,
-			filter:     ProjectFilter{Name: "first"},
+			filter:     pgorg.ProjectFilter{Name: "first"},
 			pageSize:   1,
 			pageOffset: 1,
-			want:       []Project{orgAssignedFirstProject},
+			want:       []pgorg.Project{orgAssignedFirstProject},
 		},
 		{
 			name:     "name filter",
 			userID:   systemAssignedUser.ExternalID,
-			filter:   ProjectFilter{Name: "PRO"},
+			filter:   pgorg.ProjectFilter{Name: "PRO"},
 			pageSize: 10,
 			// The filter is case-insensitive and both names match, so organization ID determines
 			// their order.
-			want: []Project{systemAssignedProject, systemAssignedWithoutDiscoveryProject},
+			want: []pgorg.Project{systemAssignedProject, systemAssignedWithoutDiscoveryProject},
 		},
 		{
 			name:     "system assignment without global discovery",
 			userID:   systemAssignedWithoutDiscoveryUser.ExternalID,
 			pageSize: 10,
-			want:     []Project{},
+			want:     []pgorg.Project{},
 		},
 		{
 			name:     "empty",
@@ -360,7 +361,7 @@ func TestStore_AccessibleProjects(t *testing.T) {
 			pageSize: 10,
 			// The list query deliberately cannot distinguish a missing user from an existing user
 			// with no assignments; the companion count query performs that validation.
-			want: []Project{},
+			want: []pgorg.Project{},
 		},
 	}
 	for _, tt := range tests {
@@ -378,7 +379,7 @@ func TestStore_AccessibleProjects(t *testing.T) {
 func TestStore_AccessibleProjectCount(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 	rbacStore := pgrbac.NewStore(pool)
 	userStore := pguser.NewStore(pool)
 
@@ -418,7 +419,7 @@ func TestStore_AccessibleProjectCount(t *testing.T) {
 	tests := []struct {
 		name   string
 		userID uuid.UUID
-		filter ProjectFilter
+		filter pgorg.ProjectFilter
 		want   int
 	}{
 		{
@@ -434,7 +435,7 @@ func TestStore_AccessibleProjectCount(t *testing.T) {
 		{
 			name:   "whitespace-only name filter",
 			userID: projectAssignedUser.ExternalID,
-			filter: ProjectFilter{Name: "   "},
+			filter: pgorg.ProjectFilter{Name: "   "},
 			want:   1,
 		},
 		{
@@ -447,7 +448,7 @@ func TestStore_AccessibleProjectCount(t *testing.T) {
 		{
 			name:   "system assignment across organizations",
 			userID: systemAssignedUser.ExternalID,
-			filter: ProjectFilter{Name: "PRO"},
+			filter: pgorg.ProjectFilter{Name: "PRO"},
 			want:   2,
 		},
 		{
@@ -478,10 +479,10 @@ func TestStore_AccessibleProjectCount(t *testing.T) {
 func TestStore_AccessibleProjectCount_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	orgStore := NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
 
 	t.Run("not found", func(t *testing.T) {
-		if _, err := orgStore.AccessibleProjectCount(ctx, uuid.New(), ProjectFilter{}); !errors.Is(err, sql.ErrNoRows) {
+		if _, err := orgStore.AccessibleProjectCount(ctx, uuid.New(), pgorg.ProjectFilter{}); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("AccessibleProjectCount() error = %v, want sql.ErrNoRows", err)
 		}
 	})
@@ -491,7 +492,7 @@ func TestProtectControlProjectTrigger(t *testing.T) {
 	t.Run("delete", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		org := seedOrg(t, NewStore(pool), "acme")
+		org := seedOrg(t, pgorg.NewStore(pool), "acme")
 
 		_, err := pool.Exec(ctx, `DELETE FROM org.projects WHERE id = $1`, org.ControlProjectID)
 		if err == nil {
@@ -504,7 +505,7 @@ func TestProtectControlProjectTrigger(t *testing.T) {
 	t.Run("update is_control on a control project", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		org := seedOrg(t, NewStore(pool), "acme")
+		org := seedOrg(t, pgorg.NewStore(pool), "acme")
 
 		_, err := pool.Exec(ctx, `UPDATE org.projects SET is_control = false WHERE id = $1`, org.ControlProjectID)
 		if err == nil {
@@ -517,7 +518,7 @@ func TestProtectControlProjectTrigger(t *testing.T) {
 	t.Run("update is_control on an ordinary project", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		orgStore := NewStore(pool)
+		orgStore := pgorg.NewStore(pool)
 		org := seedOrg(t, orgStore, "acme")
 
 		project := seedProject(t, orgStore, org.ID, "widgets")
@@ -533,7 +534,7 @@ func TestProtectControlProjectTrigger(t *testing.T) {
 	t.Run("rename a control project", func(t *testing.T) {
 		ctx := context.Background()
 		pool := pgtest.New(t, ctx)
-		org := seedOrg(t, NewStore(pool), "acme")
+		org := seedOrg(t, pgorg.NewStore(pool), "acme")
 
 		if _, err := pool.Exec(ctx, `UPDATE org.projects SET name = 'renamed' WHERE id = $1`, org.ControlProjectID); err != nil {
 			t.Errorf("UPDATE name error = %v, want nil", err)
@@ -541,10 +542,10 @@ func TestProtectControlProjectTrigger(t *testing.T) {
 	})
 }
 
-func seedOrg(t *testing.T, orgStore *Store, name string) Organization {
+func seedOrg(t *testing.T, orgStore *pgorg.Store, name string) pgorg.Organization {
 	t.Helper()
 
-	org, err := orgStore.CreateOrganization(t.Context(), CreateOrganization{Name: name, ControlProjectName: "control"})
+	org, err := orgStore.CreateOrganization(t.Context(), pgorg.CreateOrganization{Name: name, ControlProjectName: "control"})
 	if err != nil {
 		t.Fatalf("seed org %q: %v", name, err)
 	}
@@ -552,10 +553,10 @@ func seedOrg(t *testing.T, orgStore *Store, name string) Organization {
 	return org
 }
 
-func seedProject(t *testing.T, orgStore *Store, orgID int, name string) Project {
+func seedProject(t *testing.T, orgStore *pgorg.Store, orgID int, name string) pgorg.Project {
 	t.Helper()
 
-	project, err := orgStore.CreateProject(t.Context(), CreateProject{OrgID: orgID, Name: name})
+	project, err := orgStore.CreateProject(t.Context(), pgorg.CreateProject{OrgID: orgID, Name: name})
 	if err != nil {
 		t.Fatalf("seed project %q: %v", name, err)
 	}
@@ -635,7 +636,7 @@ func seedSystemRole(t *testing.T, pool *pgxpool.Pool, name, permissionName strin
 	}
 }
 
-func mustProjectByID(t *testing.T, orgStore *Store, projectID int) Project {
+func mustProjectByID(t *testing.T, orgStore *pgorg.Store, projectID int) pgorg.Project {
 	t.Helper()
 
 	project, err := orgStore.ProjectByID(t.Context(), projectID)
@@ -646,7 +647,7 @@ func mustProjectByID(t *testing.T, orgStore *Store, projectID int) Project {
 	return project
 }
 
-func mustProjectByName(t *testing.T, orgStore *Store, orgID int, name string) Project {
+func mustProjectByName(t *testing.T, orgStore *pgorg.Store, orgID int, name string) pgorg.Project {
 	t.Helper()
 
 	project, err := orgStore.ProjectByName(t.Context(), orgID, name)

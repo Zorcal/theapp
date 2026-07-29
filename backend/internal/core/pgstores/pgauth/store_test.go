@@ -1,4 +1,4 @@
-package pgauth
+package pgauth_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
@@ -20,11 +21,11 @@ func TestStore_MagicLinkToken(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	u := seedUser(t, userStore, "alice@test.com")
 
-	cm := CreateMagicLinkToken{
+	cm := pgauth.CreateMagicLinkToken{
 		UserID:    u.ID,
 		TokenHash: "abc123hash",
 		ExpiresAt: time.Now().Add(15 * time.Minute),
@@ -43,10 +44,10 @@ func TestStore_MagicLinkToken(t *testing.T) {
 	}
 
 	createdDiffOpts := cmp.Options{
-		cmpopts.IgnoreFields(MagicLinkToken{}, "ID", "CreatedAt"),
+		cmpopts.IgnoreFields(pgauth.MagicLinkToken{}, "ID", "CreatedAt"),
 		cmpopts.EquateApproxTime(time.Minute),
 	}
-	wantCreated := MagicLinkToken{
+	wantCreated := pgauth.MagicLinkToken{
 		UserID:         u.ID,
 		UserExternalID: u.ExternalID,
 		ExpiresAt:      cm.ExpiresAt,
@@ -74,7 +75,7 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	t.Run("not found", func(t *testing.T) {
 		if _, err := authStore.MagicLinkTokenByHash(ctx, "nonexistent"); !errors.Is(err, sql.ErrNoRows) {
@@ -84,7 +85,7 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 
 	t.Run("expired not returned", func(t *testing.T) {
 		u := seedUser(t, userStore, "expired@test.com")
-		if _, err := authStore.CreateMagicLinkToken(ctx, CreateMagicLinkToken{
+		if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
 			UserID:    u.ID,
 			TokenHash: "expiredhash",
 			ExpiresAt: time.Now().Add(-1 * time.Minute),
@@ -99,7 +100,7 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 
 	t.Run("double consume", func(t *testing.T) {
 		u := seedUser(t, userStore, "double@test.com")
-		tok, err := authStore.CreateMagicLinkToken(ctx, CreateMagicLinkToken{
+		tok, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
 			UserID:    u.ID,
 			TokenHash: "doublehash",
 			ExpiresAt: time.Now().Add(15 * time.Minute),
@@ -118,7 +119,7 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 	})
 
 	t.Run("unknown user", func(t *testing.T) {
-		if _, err := authStore.CreateMagicLinkToken(ctx, CreateMagicLinkToken{
+		if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
 			UserID:    -1,
 			TokenHash: "unknownuserhash",
 			ExpiresAt: time.Now().Add(15 * time.Minute),
@@ -135,7 +136,7 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 
 	t.Run("consume expired", func(t *testing.T) {
 		u := seedUser(t, userStore, "consume-expired-mlt@test.com")
-		tok, err := authStore.CreateMagicLinkToken(ctx, CreateMagicLinkToken{
+		tok, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
 			UserID:    u.ID,
 			TokenHash: "consume-expired-mlthash",
 			ExpiresAt: time.Now().Add(-1 * time.Minute),
@@ -154,11 +155,11 @@ func TestStore_LatestMagicLinkTokenCreatedAt(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	u := seedUser(t, userStore, "latest-two@test.com")
 
-	if _, err := authStore.CreateMagicLinkToken(ctx, CreateMagicLinkToken{
+	if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
 		UserID:    u.ID,
 		TokenHash: "latesttok-first",
 		ExpiresAt: time.Now().Add(15 * time.Minute),
@@ -166,7 +167,7 @@ func TestStore_LatestMagicLinkTokenCreatedAt(t *testing.T) {
 		t.Fatalf("CreateMagicLinkToken(first) error = %v", err)
 	}
 
-	second, err := authStore.CreateMagicLinkToken(ctx, CreateMagicLinkToken{
+	second, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
 		UserID:    u.ID,
 		TokenHash: "latesttok-second",
 		ExpiresAt: time.Now().Add(15 * time.Minute),
@@ -189,7 +190,7 @@ func TestStore_LatestMagicLinkTokenCreatedAt_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	t.Run("no tokens", func(t *testing.T) {
 		u := seedUser(t, userStore, "latest-none@test.com")
@@ -203,7 +204,7 @@ func TestStore_InvalidateUserMagicLinkTokens(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	t.Run("invalidates all active tokens", func(t *testing.T) {
 		u := seedUser(t, userStore, "invalidate-active@test.com")
@@ -211,7 +212,7 @@ func TestStore_InvalidateUserMagicLinkTokens(t *testing.T) {
 		hashes := []string{"invhash-a", "invhash-b"}
 
 		for i, hash := range hashes {
-			if _, err := authStore.CreateMagicLinkToken(ctx, CreateMagicLinkToken{
+			if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
 				UserID:    u.ID,
 				TokenHash: hash,
 				ExpiresAt: time.Now().Add(time.Duration(i+1) * 15 * time.Minute),
@@ -234,7 +235,7 @@ func TestStore_InvalidateUserMagicLinkTokens(t *testing.T) {
 	t.Run("expired tokens are not affected", func(t *testing.T) {
 		u := seedUser(t, userStore, "invalidate-expired@test.com")
 
-		if _, err := authStore.CreateMagicLinkToken(ctx, CreateMagicLinkToken{
+		if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
 			UserID:    u.ID,
 			TokenHash: "expiredinv-hash",
 			ExpiresAt: time.Now().Add(-1 * time.Minute),
@@ -260,11 +261,11 @@ func TestStore_RefreshToken(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	u := seedUser(t, userStore, "bob@test.com")
 
-	cr := CreateRefreshToken{
+	cr := pgauth.CreateRefreshToken{
 		UserID:    u.ID,
 		TokenHash: "refreshhash",
 		ExpiresAt: time.Now().Add(720 * time.Hour),
@@ -283,10 +284,10 @@ func TestStore_RefreshToken(t *testing.T) {
 	}
 
 	createdDiffOpts := cmp.Options{
-		cmpopts.IgnoreFields(RefreshToken{}, "ID", "CreatedAt"),
+		cmpopts.IgnoreFields(pgauth.RefreshToken{}, "ID", "CreatedAt"),
 		cmpopts.EquateApproxTime(time.Minute),
 	}
-	wantCreated := RefreshToken{
+	wantCreated := pgauth.RefreshToken{
 		UserID:         u.ID,
 		UserExternalID: u.ExternalID,
 		ExpiresAt:      cr.ExpiresAt,
@@ -309,10 +310,10 @@ func TestStore_RefreshToken(t *testing.T) {
 func TestStore_RefreshToken_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	t.Run("unknown user", func(t *testing.T) {
-		if _, err := authStore.CreateRefreshToken(ctx, CreateRefreshToken{
+		if _, err := authStore.CreateRefreshToken(ctx, pgauth.CreateRefreshToken{
 			UserID:    -1,
 			TokenHash: "unknownuserrefresh",
 			ExpiresAt: time.Now().Add(720 * time.Hour),
@@ -326,11 +327,11 @@ func TestStore_ConsumeRefreshToken(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	u := seedUser(t, userStore, "consume@test.com")
 
-	cr := CreateRefreshToken{
+	cr := pgauth.CreateRefreshToken{
 		UserID:    u.ID,
 		TokenHash: "consumehash",
 		ExpiresAt: time.Now().Add(720 * time.Hour),
@@ -358,7 +359,7 @@ func TestStore_ConsumeRefreshToken_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	t.Run("not found", func(t *testing.T) {
 		if _, err := authStore.ConsumeRefreshToken(ctx, "nonexistent"); !errors.Is(err, sql.ErrNoRows) {
@@ -368,7 +369,7 @@ func TestStore_ConsumeRefreshToken_error(t *testing.T) {
 
 	t.Run("expired not consumed", func(t *testing.T) {
 		u := seedUser(t, userStore, "consume-exp@test.com")
-		if _, err := authStore.CreateRefreshToken(ctx, CreateRefreshToken{
+		if _, err := authStore.CreateRefreshToken(ctx, pgauth.CreateRefreshToken{
 			UserID:    u.ID,
 			TokenHash: "consume-expiredhash",
 			ExpiresAt: time.Now().Add(-1 * time.Minute),
@@ -383,7 +384,7 @@ func TestStore_ConsumeRefreshToken_error(t *testing.T) {
 
 	t.Run("double consume", func(t *testing.T) {
 		u := seedUser(t, userStore, "consume-double@test.com")
-		if _, err := authStore.CreateRefreshToken(ctx, CreateRefreshToken{
+		if _, err := authStore.CreateRefreshToken(ctx, pgauth.CreateRefreshToken{
 			UserID:    u.ID,
 			TokenHash: "consume-doublehash",
 			ExpiresAt: time.Now().Add(720 * time.Hour),
@@ -405,7 +406,7 @@ func TestStore_LockUser(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	u := seedUser(t, userStore, "lockuser@test.com")
 
@@ -420,7 +421,7 @@ func TestStore_RevokeAllUserRefreshTokens(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
-	authStore := NewStore(pool)
+	authStore := pgauth.NewStore(pool)
 
 	t.Run("revokes all active tokens", func(t *testing.T) {
 		u := seedUser(t, userStore, "revokeall@test.com")
@@ -428,7 +429,7 @@ func TestStore_RevokeAllUserRefreshTokens(t *testing.T) {
 		hashes := []string{"revokeall-a", "revokeall-b"}
 
 		for _, hash := range hashes {
-			if _, err := authStore.CreateRefreshToken(ctx, CreateRefreshToken{
+			if _, err := authStore.CreateRefreshToken(ctx, pgauth.CreateRefreshToken{
 				UserID:    u.ID,
 				TokenHash: hash,
 				ExpiresAt: time.Now().Add(720 * time.Hour),

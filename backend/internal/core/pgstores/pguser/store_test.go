@@ -1,4 +1,4 @@
-package pguser
+package pguser_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/order"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
@@ -20,7 +21,7 @@ import (
 func TestStore_UserByEmail(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	seeded := seedUser(t, store, "alice@test.com", "Alice Smith")
 
@@ -35,7 +36,7 @@ func TestStore_UserByEmail(t *testing.T) {
 func TestStore_UserByEmail_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	t.Run("not found", func(t *testing.T) {
 		_, err := store.UserByEmail(ctx, "nobody@test.com")
@@ -48,7 +49,7 @@ func TestStore_UserByEmail_error(t *testing.T) {
 func TestStore_UserByExternalID(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	seeded := seedUser(t, store, "alice@test.com", "Alice Smith")
 
@@ -63,7 +64,7 @@ func TestStore_UserByExternalID(t *testing.T) {
 func TestStore_UserByExternalID_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	t.Run("not found", func(t *testing.T) {
 		id := uuid.New()
@@ -77,9 +78,9 @@ func TestStore_UserByExternalID_error(t *testing.T) {
 func TestStore_CreateUser(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
-	got, err := store.CreateUser(ctx, CreateUser{
+	got, err := store.CreateUser(ctx, pguser.CreateUser{
 		Email: "alice@test.com",
 		Name:  "Alice Smith",
 	})
@@ -87,7 +88,7 @@ func TestStore_CreateUser(t *testing.T) {
 		t.Fatalf("CreateUser() error = %v", err)
 	}
 
-	want := User{
+	want := pguser.User{
 		Email:     "alice@test.com",
 		Name:      "Alice Smith",
 		CreatedAt: time.Now(),
@@ -95,7 +96,7 @@ func TestStore_CreateUser(t *testing.T) {
 	}
 
 	diffOpts := cmp.Options{
-		cmpopts.IgnoreFields(User{}, "ID", "ExternalID", "ETag"), // Ignore generated fields
+		cmpopts.IgnoreFields(pguser.User{}, "ID", "ExternalID", "ETag"), // Ignore generated fields
 		cmpopts.EquateApproxTime(time.Minute),
 	}
 	testingx.AssertDiff(t, got, want, diffOpts...)
@@ -117,7 +118,7 @@ func TestStore_CreateUser(t *testing.T) {
 func TestStore_MarkEmailVerified(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	t.Run("sets email_verified_at on first call", func(t *testing.T) {
 		seeded := seedUser(t, store, "alice@test.com", "Alice Smith")
@@ -167,12 +168,12 @@ func TestStore_MarkEmailVerified(t *testing.T) {
 func TestStore_CreateUser_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	t.Run("duplicate email returns ErrAlreadyExists", func(t *testing.T) {
 		seedUser(t, store, "alice@test.com", "Alice Smith")
 
-		if _, err := store.CreateUser(ctx, CreateUser{
+		if _, err := store.CreateUser(ctx, pguser.CreateUser{
 			Email: "alice@test.com",
 			Name:  "Alice Duplicate",
 		}); !errors.Is(err, pgdb.ErrAlreadyExists) {
@@ -184,14 +185,14 @@ func TestStore_CreateUser_error(t *testing.T) {
 func TestStore_UserCount(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	seedUser(t, store, "alice@test.com", "Alice Smith")
 	seedUser(t, store, "bob@test.com", "Bob Jones")
 
 	tests := []struct {
 		name   string
-		filter Filter
+		filter pguser.Filter
 		want   int
 	}{
 		{
@@ -200,22 +201,22 @@ func TestStore_UserCount(t *testing.T) {
 		},
 		{
 			name:   "email prefix filter",
-			filter: Filter{Email: " alice "},
+			filter: pguser.Filter{Email: " alice "},
 			want:   1,
 		},
 		{
 			name:   "name prefix filter",
-			filter: Filter{Name: " Bob "},
+			filter: pguser.Filter{Name: " Bob "},
 			want:   1,
 		},
 		{
 			name:   "whitespace-only filter counts all",
-			filter: Filter{Email: " ", Name: " "},
+			filter: pguser.Filter{Email: " ", Name: " "},
 			want:   2,
 		},
 		{
 			name:   "filter with no matches",
-			filter: Filter{Email: "nobody"},
+			filter: pguser.Filter{Email: "nobody"},
 			want:   0,
 		},
 	}
@@ -235,7 +236,7 @@ func TestStore_UserCount(t *testing.T) {
 func TestStore_Users(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	charlie := seedUser(t, store, "charlie@test.com", "Charlie Brown")
 	alice := seedUser(t, store, "alice@test.com", "Alice Smith")
@@ -247,89 +248,89 @@ func TestStore_Users(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		filter     Filter
-		orderBys   []order.By[OrderByField]
+		filter     pguser.Filter
+		orderBys   []order.By[pguser.OrderByField]
 		pageSize   int
 		pageOffset int
-		want       []User
+		want       []pguser.User
 	}{
 		{
 			name:       "no order defaults to insert order",
 			pageSize:   10,
 			pageOffset: 0,
-			want:       []User{charlie, alice, bob},
+			want:       []pguser.User{charlie, alice, bob},
 		},
 		{
 			name:       "order by email asc",
-			orderBys:   []order.By[OrderByField]{order.NewBy(OrderByFieldEmail, order.DirectionAsc)},
+			orderBys:   []order.By[pguser.OrderByField]{order.NewBy(pguser.OrderByFieldEmail, order.DirectionAsc)},
 			pageSize:   10,
 			pageOffset: 0,
-			want:       []User{alice, bob, charlie},
+			want:       []pguser.User{alice, bob, charlie},
 		},
 		{
 			name:       "order by email desc",
-			orderBys:   []order.By[OrderByField]{order.NewBy(OrderByFieldEmail, order.DirectionDesc)},
+			orderBys:   []order.By[pguser.OrderByField]{order.NewBy(pguser.OrderByFieldEmail, order.DirectionDesc)},
 			pageSize:   10,
 			pageOffset: 0,
-			want:       []User{charlie, bob, alice},
+			want:       []pguser.User{charlie, bob, alice},
 		},
 		{
 			name:       "first page",
-			orderBys:   []order.By[OrderByField]{order.NewBy(OrderByFieldEmail, order.DirectionAsc)},
+			orderBys:   []order.By[pguser.OrderByField]{order.NewBy(pguser.OrderByFieldEmail, order.DirectionAsc)},
 			pageSize:   2,
 			pageOffset: 0,
-			want:       []User{alice, bob},
+			want:       []pguser.User{alice, bob},
 		},
 		{
 			name:       "second page",
-			orderBys:   []order.By[OrderByField]{order.NewBy(OrderByFieldEmail, order.DirectionAsc)},
+			orderBys:   []order.By[pguser.OrderByField]{order.NewBy(pguser.OrderByFieldEmail, order.DirectionAsc)},
 			pageSize:   2,
 			pageOffset: 2,
-			want:       []User{charlie},
+			want:       []pguser.User{charlie},
 		},
 		{
 			name:       "offset past end returns empty",
 			pageSize:   10,
 			pageOffset: 10,
-			want:       []User{},
+			want:       []pguser.User{},
 		},
 		{
 			name:       "filter by email prefix",
-			filter:     Filter{Email: " alice "},
+			filter:     pguser.Filter{Email: " alice "},
 			pageSize:   10,
 			pageOffset: 0,
-			want:       []User{alice},
+			want:       []pguser.User{alice},
 		},
 		{
 			name:       "filter by name prefix",
-			filter:     Filter{Name: " Bob "},
+			filter:     pguser.Filter{Name: " Bob "},
 			pageSize:   10,
 			pageOffset: 0,
-			want:       []User{bob},
+			want:       []pguser.User{bob},
 		},
 		{
 			name: "filter by email and name prefix",
-			filter: Filter{
+			filter: pguser.Filter{
 				Email: " c ",
 				Name:  " Charlie ",
 			},
 			pageSize:   10,
 			pageOffset: 0,
-			want:       []User{charlie},
+			want:       []pguser.User{charlie},
 		},
 		{
 			name:       "whitespace-only filter",
-			filter:     Filter{Email: " ", Name: " "},
+			filter:     pguser.Filter{Email: " ", Name: " "},
 			pageSize:   10,
 			pageOffset: 0,
-			want:       []User{charlie, alice, bob},
+			want:       []pguser.User{charlie, alice, bob},
 		},
 		{
 			name:       "filter with no matches returns empty",
-			filter:     Filter{Email: "nobody"},
+			filter:     pguser.Filter{Email: "nobody"},
 			pageSize:   10,
 			pageOffset: 0,
-			want:       []User{},
+			want:       []pguser.User{},
 		},
 	}
 	for _, tt := range tests {
@@ -347,34 +348,34 @@ func TestStore_Users(t *testing.T) {
 func TestStore_UpdateUser(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	diffOpts := cmp.Options{
-		cmpopts.IgnoreFields(User{}, "ID", "ETag"),
+		cmpopts.IgnoreFields(pguser.User{}, "ID", "ETag"),
 		cmpopts.EquateApproxTime(time.Minute),
 	}
 
 	tests := []struct {
 		name string
-		seed CreateUser
-		in   func(seeded User) UpdateUser
-		want func(seeded User) User
+		seed pguser.CreateUser
+		in   func(seeded pguser.User) pguser.UpdateUser
+		want func(seeded pguser.User) pguser.User
 	}{
 		{
 			name: "updates name",
-			seed: CreateUser{
+			seed: pguser.CreateUser{
 				Email: "alice@test.com",
 				Name:  "Alice Smith",
 			},
-			in: func(seeded User) UpdateUser {
-				return UpdateUser{
+			in: func(seeded pguser.User) pguser.UpdateUser {
+				return pguser.UpdateUser{
 					ExternalID: seeded.ExternalID,
 					Name:       "Alice Jones",
-					Fields:     UserUpdateFields{Name: true},
+					Fields:     pguser.UserUpdateFields{Name: true},
 				}
 			},
-			want: func(seeded User) User {
-				return User{
+			want: func(seeded pguser.User) pguser.User {
+				return pguser.User{
 					ExternalID: seeded.ExternalID,
 					Email:      seeded.Email,
 					Name:       "Alice Jones",
@@ -385,19 +386,19 @@ func TestStore_UpdateUser(t *testing.T) {
 		},
 		{
 			name: "name not in fields leaves name unchanged",
-			seed: CreateUser{
+			seed: pguser.CreateUser{
 				Email: "bob@test.com",
 				Name:  "Bob Smith",
 			},
-			in: func(seeded User) UpdateUser {
-				return UpdateUser{
+			in: func(seeded pguser.User) pguser.UpdateUser {
+				return pguser.UpdateUser{
 					ExternalID: seeded.ExternalID,
 					Name:       "ignored",
-					Fields:     UserUpdateFields{Name: false},
+					Fields:     pguser.UserUpdateFields{Name: false},
 				}
 			},
-			want: func(seeded User) User {
-				return User{
+			want: func(seeded pguser.User) pguser.User {
+				return pguser.User{
 					ExternalID: seeded.ExternalID,
 					Email:      seeded.Email,
 					Name:       "Bob Smith",
@@ -431,14 +432,14 @@ func TestStore_UpdateUser(t *testing.T) {
 func TestStore_UpdateUser_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	t.Run("not found", func(t *testing.T) {
 		id := uuid.New()
-		_, err := store.UpdateUser(ctx, UpdateUser{
+		_, err := store.UpdateUser(ctx, pguser.UpdateUser{
 			ExternalID: id,
 			Name:       "Alice Jones",
-			Fields:     UserUpdateFields{Name: true},
+			Fields:     pguser.UserUpdateFields{Name: true},
 		})
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("UpdateUser(%v) error = %v, want sql.ErrNoRows", id, err)
@@ -449,7 +450,7 @@ func TestStore_UpdateUser_error(t *testing.T) {
 func TestStore_GetOrCreateUserByEmail(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
-	store := NewStore(pool)
+	store := pguser.NewStore(pool)
 
 	t.Run("creates user when not found", func(t *testing.T) {
 		got, err := store.GetOrCreateUserByEmail(ctx, "new@test.com")
@@ -458,9 +459,9 @@ func TestStore_GetOrCreateUserByEmail(t *testing.T) {
 		}
 
 		diffOpts := cmp.Options{
-			cmpopts.IgnoreFields(User{}, "ID", "ExternalID", "CreatedAt", "UpdatedAt", "ETag"), // Ignore generated fields
+			cmpopts.IgnoreFields(pguser.User{}, "ID", "ExternalID", "CreatedAt", "UpdatedAt", "ETag"), // Ignore generated fields
 		}
-		want := User{Email: "new@test.com"}
+		want := pguser.User{Email: "new@test.com"}
 		testingx.AssertDiff(t, got, want, diffOpts)
 	})
 
@@ -476,10 +477,10 @@ func TestStore_GetOrCreateUserByEmail(t *testing.T) {
 	})
 }
 
-func seedUser(t *testing.T, s *Store, email, name string) User {
+func seedUser(t *testing.T, s *pguser.Store, email, name string) pguser.User {
 	t.Helper()
 
-	seeded, err := s.CreateUser(t.Context(), CreateUser{
+	seeded, err := s.CreateUser(t.Context(), pguser.CreateUser{
 		Email: email,
 		Name:  name,
 	})

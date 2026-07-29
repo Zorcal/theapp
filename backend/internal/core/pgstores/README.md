@@ -47,6 +47,10 @@ func (s *Store) GetThing(ctx context.Context, id uuid.UUID) (Thing, error) {
 
 ## Testing
 
+- Declare every test file in an external test package named `<package>_test` (for example,
+  `package pguser_test`). Store tests import sibling pgstore packages to seed related data; keeping
+  tests outside the package under test prevents those setup dependencies from creating import
+  cycles.
 - Use `pgtest.New(t, ctx)` to get a fresh, isolated `*pgxpool.Pool` per test. Cleanup is registered automatically — do not close the pool manually.
 - Each pool costs one connection for the lifetime of the test, so minimize how many pools you open. The right structure depends on whether subtests are isolated from each other:
 
@@ -70,6 +74,7 @@ func (s *Store) GetThing(ctx context.Context, id uuid.UUID) (Thing, error) {
   ```
 
   **Separate pools** — when a test's correctness depends on what is (or isn't) in the database, give it its own pool. `TestStore_QueryUsers` is a good example: its table cases assert a specific set of rows, so it cannot share a pool with `TestStore_InsertUser` — inserts from one would corrupt the other's expectations.
+
 - Use a `seedX` helper (e.g. `seedUser`) for any data inserted as test setup — it makes clear what is precondition vs. what is under test. The helper should return the inserted model so tests can use it in assertions without re-querying.
 - DB-generated fields (UUIDs, serials) should be excluded from struct diffs via `cmpopts.IgnoreFields` and asserted non-zero separately.
 - Use `cmpopts.EquateApproxTime(time.Minute)` for timestamp comparisons — set `want` to `time.Now()` and let the margin absorb DB round-trip skew.
