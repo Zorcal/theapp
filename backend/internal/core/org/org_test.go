@@ -400,11 +400,8 @@ func TestCore_AccessibleProjects(t *testing.T) {
 	}
 	filter := mdl.ProjectFilter{Name: "con"}
 	orgStorer := &MockedOrgStorer{
-		AccessibleProjectsFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter, _, _ int) ([]pgorg.Project, error) {
-			return []pgorg.Project{mockedProject}, nil
-		},
-		AccessibleProjectCountFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter) (int, error) {
-			return 1, nil
+		AccessibleProjectsFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter, _, _ int) ([]pgorg.Project, int, error) {
+			return []pgorg.Project{mockedProject}, 1, nil
 		},
 	}
 	core := NewCore(orgStorer, immediateTransactor{})
@@ -445,8 +442,8 @@ func TestCore_AccessibleProjects_error(t *testing.T) {
 		{
 			name: "list store error",
 			orgStorer: &MockedOrgStorer{
-				AccessibleProjectsFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter, _, _ int) ([]pgorg.Project, error) {
-					return nil, dbErr
+				AccessibleProjectsFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter, _, _ int) ([]pgorg.Project, int, error) {
+					return nil, 0, dbErr
 				},
 			},
 			want: dbErr,
@@ -454,26 +451,11 @@ func TestCore_AccessibleProjects_error(t *testing.T) {
 		{
 			name: "user not found",
 			orgStorer: &MockedOrgStorer{
-				AccessibleProjectsFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter, _, _ int) ([]pgorg.Project, error) {
-					return nil, nil
-				},
-				AccessibleProjectCountFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter) (int, error) {
-					return 0, sql.ErrNoRows
+				AccessibleProjectsFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter, _, _ int) ([]pgorg.Project, int, error) {
+					return nil, 0, sql.ErrNoRows
 				},
 			},
 			want: mdl.ErrNotFound,
-		},
-		{
-			name: "count store error",
-			orgStorer: &MockedOrgStorer{
-				AccessibleProjectsFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter, _, _ int) ([]pgorg.Project, error) {
-					return nil, nil
-				},
-				AccessibleProjectCountFunc: func(_ context.Context, _ uuid.UUID, _ pgorg.ProjectFilter) (int, error) {
-					return 0, dbErr
-				},
-			},
-			want: dbErr,
 		},
 	}
 	for _, tt := range tests {

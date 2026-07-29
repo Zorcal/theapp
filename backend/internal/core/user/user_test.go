@@ -63,6 +63,7 @@ func TestCore_integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateUser() error = %v", err)
 	}
+
 	testingx.AssertDiff(t, updated, mdl.User{
 		Email:     "alice@test.com",
 		Name:      "Alice Jones",
@@ -77,6 +78,7 @@ func TestCore_integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserByID(%v) error = %v", usr.ID, err)
 	}
+
 	testingx.AssertDiff(t, got, updated)
 
 	// Users — updated user appears in filtered results

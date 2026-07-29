@@ -24,14 +24,9 @@ func (c *Core) CustomRoles(ctx context.Context, pageSize, pageOffset int) ([]mdl
 		return nil, 0, errors.New("organization context missing")
 	}
 
-	rs, err := c.roleStorer.CustomRoles(ctx, *sess.OrgID, pageSize, pageOffset)
+	rs, count, err := c.roleStorer.CustomRoles(ctx, *sess.OrgID, pageSize, pageOffset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("custom roles: %w", err)
-	}
-
-	count, err := c.roleStorer.CustomRoleCount(ctx, *sess.OrgID)
-	if err != nil {
-		return nil, 0, fmt.Errorf("custom role count: %w", err)
 	}
 
 	return customRolesFromPg(rs), count, nil
@@ -47,17 +42,12 @@ func (c *Core) UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, pag
 		return nil, 0, errors.New("project context missing")
 	}
 
-	roles, err := c.roleStorer.UserProjectCustomRoles(ctx, userID, *sess.ProjectID, pageSize, pageOffset)
-	if err != nil {
-		return nil, 0, fmt.Errorf("user project custom roles: %w", err)
-	}
-
-	count, err := c.roleStorer.UserProjectCustomRoleCount(ctx, userID, *sess.ProjectID)
+	roles, count, err := c.roleStorer.UserProjectCustomRoles(ctx, userID, *sess.ProjectID, pageSize, pageOffset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, mdl.ErrNotFound
 		}
-		return nil, 0, fmt.Errorf("user project custom role count: %w", err)
+		return nil, 0, fmt.Errorf("user project custom roles: %w", err)
 	}
 
 	return customRolesFromPg(roles), count, nil
@@ -73,17 +63,12 @@ func (c *Core) UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, pageSiz
 		return nil, 0, errors.New("organization context missing")
 	}
 
-	roles, err := c.roleStorer.UserOrgCustomRoles(ctx, userID, *sess.OrgID, pageSize, pageOffset)
-	if err != nil {
-		return nil, 0, fmt.Errorf("user organization custom roles: %w", err)
-	}
-
-	count, err := c.roleStorer.UserOrgCustomRoleCount(ctx, userID, *sess.OrgID)
+	roles, count, err := c.roleStorer.UserOrgCustomRoles(ctx, userID, *sess.OrgID, pageSize, pageOffset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, mdl.ErrNotFound
 		}
-		return nil, 0, fmt.Errorf("user organization custom role count: %w", err)
+		return nil, 0, fmt.Errorf("user organization custom roles: %w", err)
 	}
 
 	return customRolesFromPg(roles), count, nil

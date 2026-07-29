@@ -246,11 +246,8 @@ func TestCore_CustomRoles(t *testing.T) {
 		ETag:            uuid.New(),
 	}
 	roleStorer := &MockedRoleStorer{
-		CustomRolesFunc: func(_ context.Context, _, _, _ int) ([]pgrbac.CustomRole, error) {
-			return []pgrbac.CustomRole{mockOutput}, nil
-		},
-		CustomRoleCountFunc: func(_ context.Context, _ int) (int, error) {
-			return 3, nil
+		CustomRolesFunc: func(_ context.Context, _, _, _ int) ([]pgrbac.CustomRole, int, error) {
+			return []pgrbac.CustomRole{mockOutput}, 3, nil
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
@@ -287,20 +284,8 @@ func TestCore_CustomRoles_error(t *testing.T) {
 		{
 			name: "roles store error",
 			roleStorer: &MockedRoleStorer{
-				CustomRolesFunc: func(_ context.Context, _, _, _ int) ([]pgrbac.CustomRole, error) {
-					return nil, dbErr
-				},
-			},
-			want: dbErr,
-		},
-		{
-			name: "role count store error",
-			roleStorer: &MockedRoleStorer{
-				CustomRolesFunc: func(_ context.Context, _, _, _ int) ([]pgrbac.CustomRole, error) {
-					return nil, nil
-				},
-				CustomRoleCountFunc: func(_ context.Context, _ int) (int, error) {
-					return 0, dbErr
+				CustomRolesFunc: func(_ context.Context, _, _, _ int) ([]pgrbac.CustomRole, int, error) {
+					return nil, 0, dbErr
 				},
 			},
 			want: dbErr,
@@ -354,11 +339,8 @@ func TestCore_UserProjectCustomRoles(t *testing.T) {
 		ETag:            uuid.New(),
 	}
 	roleStorer := &MockedRoleStorer{
-		UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
-			return []pgrbac.CustomRole{mockedRole}, nil
-		},
-		UserProjectCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
-			return 1, nil
+		UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, int, error) {
+			return []pgrbac.CustomRole{mockedRole}, 1, nil
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
@@ -389,8 +371,8 @@ func TestCore_UserProjectCustomRoles_error(t *testing.T) {
 		{
 			name: "roles store error",
 			roleStorer: &MockedRoleStorer{
-				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
-					return nil, dbErr
+				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, int, error) {
+					return nil, 0, dbErr
 				},
 			},
 			want: dbErr,
@@ -398,26 +380,11 @@ func TestCore_UserProjectCustomRoles_error(t *testing.T) {
 		{
 			name: "target not found",
 			roleStorer: &MockedRoleStorer{
-				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
-					return nil, nil
-				},
-				UserProjectCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
-					return 0, sql.ErrNoRows
+				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, int, error) {
+					return nil, 0, sql.ErrNoRows
 				},
 			},
 			want: mdl.ErrNotFound,
-		},
-		{
-			name: "count store error",
-			roleStorer: &MockedRoleStorer{
-				UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
-					return nil, nil
-				},
-				UserProjectCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
-					return 0, dbErr
-				},
-			},
-			want: dbErr,
 		},
 	}
 	for _, tt := range tests {
@@ -471,11 +438,8 @@ func TestCore_UserOrgCustomRoles(t *testing.T) {
 		ETag:            uuid.New(),
 	}
 	roleStorer := &MockedRoleStorer{
-		UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
-			return []pgrbac.CustomRole{mockedRole}, nil
-		},
-		UserOrgCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
-			return 1, nil
+		UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, int, error) {
+			return []pgrbac.CustomRole{mockedRole}, 1, nil
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
@@ -506,8 +470,8 @@ func TestCore_UserOrgCustomRoles_error(t *testing.T) {
 		{
 			name: "roles store error",
 			roleStorer: &MockedRoleStorer{
-				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
-					return nil, dbErr
+				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, int, error) {
+					return nil, 0, dbErr
 				},
 			},
 			want: dbErr,
@@ -515,26 +479,11 @@ func TestCore_UserOrgCustomRoles_error(t *testing.T) {
 		{
 			name: "target not found",
 			roleStorer: &MockedRoleStorer{
-				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
-					return nil, nil
-				},
-				UserOrgCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
-					return 0, sql.ErrNoRows
+				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, int, error) {
+					return nil, 0, sql.ErrNoRows
 				},
 			},
 			want: mdl.ErrNotFound,
-		},
-		{
-			name: "count store error",
-			roleStorer: &MockedRoleStorer{
-				UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _, _ int) ([]pgrbac.CustomRole, error) {
-					return nil, nil
-				},
-				UserOrgCustomRoleCountFunc: func(_ context.Context, _ uuid.UUID, _ int) (int, error) {
-					return 0, dbErr
-				},
-			},
-			want: dbErr,
 		},
 	}
 	for _, tt := range tests {

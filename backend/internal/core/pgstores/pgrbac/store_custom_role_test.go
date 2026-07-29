@@ -417,47 +417,48 @@ func TestStore_CustomRoles(t *testing.T) {
 
 	firstOrg := seedOrg(t, orgStore, "first-custom-role-org")
 	secondOrg := seedOrg(t, orgStore, "second-custom-role-org")
-	firstRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: firstOrg.ID, Name: "reader", PermissionNames: []string{"custom-role:read"}})
+	firstRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: firstOrg.ID, Name: "editor"})
+	secondRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: firstOrg.ID, Name: "reader", PermissionNames: []string{"custom-role:read"}})
 	seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: secondOrg.ID, Name: "other org role"})
 
-	gotFirstPage, err := rbacStore.CustomRoles(ctx, firstOrg.ID, 50, 0)
-	if err != nil {
-		t.Fatalf("CustomRoles() error = %v", err)
+	tests := []struct {
+		name       string
+		pageOffset int
+		want       []pgrbac.CustomRole
+		wantCount  int
+	}{
+		{
+			name:       "first page",
+			pageOffset: 0,
+			want:       []pgrbac.CustomRole{firstRole},
+			wantCount:  2,
+		},
+		{
+			name:       "second page",
+			pageOffset: 1,
+			want:       []pgrbac.CustomRole{secondRole},
+			wantCount:  2,
+		},
+		{
+			name:       "page after roles",
+			pageOffset: 2,
+			want:       []pgrbac.CustomRole{},
+			wantCount:  2,
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotCount, err := rbacStore.CustomRoles(ctx, firstOrg.ID, 1, tt.pageOffset)
+			if err != nil {
+				t.Fatalf("CustomRoles() error = %v", err)
+			}
 
-	wantFirstPage := []pgrbac.CustomRole{firstRole}
+			testingx.AssertDiff(t, got, tt.want)
 
-	testingx.AssertDiff(t, gotFirstPage, wantFirstPage)
-
-	gotSecondPage, err := rbacStore.CustomRoles(ctx, firstOrg.ID, 50, 1)
-	if err != nil {
-		t.Fatalf("CustomRoles() second page error = %v", err)
-	}
-
-	wantSecondPage := []pgrbac.CustomRole{}
-
-	testingx.AssertDiff(t, gotSecondPage, wantSecondPage)
-}
-
-func TestStore_CustomRoleCount(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-	rbacStore := pgrbac.NewStore(pool)
-
-	firstOrg := seedOrg(t, orgStore, "first-custom-role-count-org")
-	secondOrg := seedOrg(t, orgStore, "second-custom-role-count-org")
-	seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: firstOrg.ID, Name: "reader"})
-	seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: firstOrg.ID, Name: "editor"})
-	seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: secondOrg.ID, Name: "other org role"})
-
-	got, err := rbacStore.CustomRoleCount(ctx, firstOrg.ID)
-	if err != nil {
-		t.Fatalf("CustomRoleCount() error = %v", err)
-	}
-
-	if want := 2; got != want {
-		t.Errorf("CustomRoleCount() = %d, want %d", got, want)
+			if gotCount != tt.wantCount {
+				t.Errorf("CustomRoles(%d, 1, %d) total count = %d, want %d", firstOrg.ID, tt.pageOffset, gotCount, tt.wantCount)
+			}
+		})
 	}
 }
 
@@ -518,149 +519,61 @@ func TestStore_UserProjectCustomRoles(t *testing.T) {
 	orgRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "organization reader"})
 	seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, otherProjectRole.ExternalID, secondProject.ID)
 	seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, orgRole.ExternalID, org.ID)
+	unassignedUser := seedUser(t, userStore, "unassigned-user-project-custom-roles@test.com")
+	seedOrgMembership(t, ctx, pool, unassignedUser.ID, org.ID)
 
 	tests := []struct {
 		name       string
+		userID     uuid.UUID
 		pageOffset int
 		want       []pgrbac.CustomRole
+		wantCount  int
 	}{
 		{
 			name:       "first page",
+			userID:     user.ExternalID,
 			pageOffset: 0,
 			want:       []pgrbac.CustomRole{firstProjectRole},
+			wantCount:  2,
 		},
 		{
 			name:       "second page",
+			userID:     user.ExternalID,
 			pageOffset: 1,
 			want:       []pgrbac.CustomRole{secondProjectRole},
+			wantCount:  2,
 		},
 		{
 			name:       "page after assignments",
+			userID:     user.ExternalID,
 			pageOffset: 2,
 			want:       []pgrbac.CustomRole{},
+			wantCount:  2,
 		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := rbacStore.UserProjectCustomRoles(ctx, user.ExternalID, project.ID, 1, tt.pageOffset)
-			if err != nil {
-				t.Fatalf("UserProjectCustomRoles(%v, %d, 1, %d) error = %v", user.ExternalID, project.ID, tt.pageOffset, err)
-			}
-
-			testingx.AssertDiff(t, got, tt.want)
-		})
-	}
-}
-
-func TestStore_UserProjectCustomRoles_empty(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-	userStore := pguser.NewStore(pool)
-	rbacStore := pgrbac.NewStore(pool)
-
-	org := seedOrg(t, orgStore, "empty-user-project-custom-roles-org")
-	project := seedProject(t, orgStore, org.ID, "project")
-	unassignedUser := seedUser(t, userStore, "empty-user-project-custom-roles@test.com")
-	nonMember := seedUser(t, userStore, "non-member-project-custom-roles@test.com")
-	seedOrgMembership(t, ctx, pool, unassignedUser.ID, org.ID)
-
-	tests := []struct {
-		name      string
-		userID    uuid.UUID
-		projectID int
-	}{
 		{
 			name:      "no assignments",
 			userID:    unassignedUser.ExternalID,
-			projectID: project.ID,
-		},
-		{
-			name:      "user missing",
-			userID:    uuid.New(),
-			projectID: project.ID,
-		},
-		{
-			name:      "project missing",
-			userID:    unassignedUser.ExternalID,
-			projectID: -1,
-		},
-		{
-			name:      "organization membership missing",
-			userID:    nonMember.ExternalID,
-			projectID: project.ID,
+			want:      []pgrbac.CustomRole{},
+			wantCount: 0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := rbacStore.UserProjectCustomRoles(ctx, tt.userID, tt.projectID, 50, 0)
+			got, gotCount, err := rbacStore.UserProjectCustomRoles(ctx, tt.userID, project.ID, 1, tt.pageOffset)
 			if err != nil {
-				t.Fatalf("UserProjectCustomRoles(%v, %d) error = %v", tt.userID, tt.projectID, err)
+				t.Fatalf("UserProjectCustomRoles(%v, %d, 1, %d) error = %v", tt.userID, project.ID, tt.pageOffset, err)
 			}
 
-			want := []pgrbac.CustomRole{}
+			testingx.AssertDiff(t, got, tt.want)
 
-			testingx.AssertDiff(t, got, want)
-		})
-	}
-}
-
-func TestStore_UserProjectCustomRoleCount(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-	userStore := pguser.NewStore(pool)
-	rbacStore := pgrbac.NewStore(pool)
-
-	org := seedOrg(t, orgStore, "count-user-project-custom-roles-org")
-	project := seedProject(t, orgStore, org.ID, "first project")
-	user := seedUser(t, userStore, "count-user-project-custom-roles@test.com")
-	unassignedUser := seedUser(t, userStore, "count-empty-user-project-custom-roles@test.com")
-	seedOrgMembership(t, ctx, pool, user.ID, org.ID)
-	seedOrgMembership(t, ctx, pool, unassignedUser.ID, org.ID)
-	firstRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "reader"})
-	secondRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "writer"})
-	seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, firstRole.ExternalID, project.ID)
-	seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, secondRole.ExternalID, project.ID)
-
-	// Assignments in another project and at organization scope must not contribute to the count.
-	secondProject := seedProject(t, orgStore, org.ID, "second project")
-	otherProjectRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "other project reader"})
-	orgRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "organization reader"})
-	seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, otherProjectRole.ExternalID, secondProject.ID)
-	seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, orgRole.ExternalID, org.ID)
-
-	tests := []struct {
-		name   string
-		userID uuid.UUID
-		want   int
-	}{
-		{
-			name:   "assigned roles",
-			userID: user.ExternalID,
-			want:   2,
-		},
-		{
-			name:   "no assignments",
-			userID: unassignedUser.ExternalID,
-			want:   0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := rbacStore.UserProjectCustomRoleCount(ctx, tt.userID, project.ID)
-			if err != nil {
-				t.Fatalf("UserProjectCustomRoleCount(%v, %d) error = %v", tt.userID, project.ID, err)
-			}
-
-			if got != tt.want {
-				t.Errorf("UserProjectCustomRoleCount(%v, %d) = %d, want %d", tt.userID, project.ID, got, tt.want)
+			if gotCount != tt.wantCount {
+				t.Errorf("UserProjectCustomRoles(%v, %d, 1, %d) total count = %d, want %d", tt.userID, project.ID, tt.pageOffset, gotCount, tt.wantCount)
 			}
 		})
 	}
 }
 
-func TestStore_UserProjectCustomRoleCount_error(t *testing.T) {
+func TestStore_UserProjectCustomRoles_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	orgStore := pgorg.NewStore(pool)
@@ -696,8 +609,8 @@ func TestStore_UserProjectCustomRoleCount_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := rbacStore.UserProjectCustomRoleCount(ctx, tt.userID, tt.projectID); !errors.Is(err, sql.ErrNoRows) {
-				t.Errorf("UserProjectCustomRoleCount(%v, %d) error = %v, want sql.ErrNoRows", tt.userID, tt.projectID, err)
+			if _, _, err := rbacStore.UserProjectCustomRoles(ctx, tt.userID, tt.projectID, 50, 0); !errors.Is(err, sql.ErrNoRows) {
+				t.Errorf("UserProjectCustomRoles(%v, %d) error = %v, want sql.ErrNoRows", tt.userID, tt.projectID, err)
 			}
 		})
 	}
@@ -726,140 +639,61 @@ func TestStore_UserOrgCustomRoles(t *testing.T) {
 	otherOrgRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: otherOrg.ID, Name: "other organization reader"})
 	seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, projectRole.ExternalID, project.ID)
 	seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, otherOrgRole.ExternalID, otherOrg.ID)
+	unassignedUser := seedUser(t, userStore, "unassigned-user-org-custom-roles@test.com")
+	seedOrgMembership(t, ctx, pool, unassignedUser.ID, org.ID)
 
 	tests := []struct {
 		name       string
+		userID     uuid.UUID
 		pageOffset int
 		want       []pgrbac.CustomRole
+		wantCount  int
 	}{
 		{
 			name:       "first page",
+			userID:     user.ExternalID,
 			pageOffset: 0,
 			want:       []pgrbac.CustomRole{firstOrgRole},
+			wantCount:  2,
 		},
 		{
 			name:       "second page",
+			userID:     user.ExternalID,
 			pageOffset: 1,
 			want:       []pgrbac.CustomRole{secondOrgRole},
+			wantCount:  2,
 		},
 		{
 			name:       "page after assignments",
+			userID:     user.ExternalID,
 			pageOffset: 2,
 			want:       []pgrbac.CustomRole{},
+			wantCount:  2,
+		},
+		{
+			name:      "no assignments",
+			userID:    unassignedUser.ExternalID,
+			want:      []pgrbac.CustomRole{},
+			wantCount: 0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := rbacStore.UserOrgCustomRoles(ctx, user.ExternalID, org.ID, 1, tt.pageOffset)
+			got, gotCount, err := rbacStore.UserOrgCustomRoles(ctx, tt.userID, org.ID, 1, tt.pageOffset)
 			if err != nil {
-				t.Fatalf("UserOrgCustomRoles(%v, %d, 1, %d) error = %v", user.ExternalID, org.ID, tt.pageOffset, err)
+				t.Fatalf("UserOrgCustomRoles(%v, %d, 1, %d) error = %v", tt.userID, org.ID, tt.pageOffset, err)
 			}
 
 			testingx.AssertDiff(t, got, tt.want)
-		})
-	}
-}
 
-func TestStore_UserOrgCustomRoles_empty(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-	userStore := pguser.NewStore(pool)
-	rbacStore := pgrbac.NewStore(pool)
-
-	org := seedOrg(t, orgStore, "empty-user-org-custom-roles-org")
-	unassignedUser := seedUser(t, userStore, "empty-user-org-custom-roles@test.com")
-	nonMember := seedUser(t, userStore, "non-member-org-custom-roles@test.com")
-	seedOrgMembership(t, ctx, pool, unassignedUser.ID, org.ID)
-
-	tests := []struct {
-		name   string
-		userID uuid.UUID
-	}{
-		{
-			name:   "no assignments",
-			userID: unassignedUser.ExternalID,
-		},
-		{
-			name:   "user missing",
-			userID: uuid.New(),
-		},
-		{
-			name:   "organization membership missing",
-			userID: nonMember.ExternalID,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := rbacStore.UserOrgCustomRoles(ctx, tt.userID, org.ID, 50, 0)
-			if err != nil {
-				t.Fatalf("UserOrgCustomRoles(%v, %d) error = %v", tt.userID, org.ID, err)
-			}
-
-			want := []pgrbac.CustomRole{}
-
-			testingx.AssertDiff(t, got, want)
-		})
-	}
-}
-
-func TestStore_UserOrgCustomRoleCount(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-	userStore := pguser.NewStore(pool)
-	rbacStore := pgrbac.NewStore(pool)
-
-	org := seedOrg(t, orgStore, "count-user-org-custom-roles-org")
-	user := seedUser(t, userStore, "count-user-org-custom-roles@test.com")
-	unassignedUser := seedUser(t, userStore, "count-empty-user-org-custom-roles@test.com")
-	seedOrgMembership(t, ctx, pool, user.ID, org.ID)
-	seedOrgMembership(t, ctx, pool, unassignedUser.ID, org.ID)
-	firstRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "reader"})
-	secondRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "writer"})
-	seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, firstRole.ExternalID, org.ID)
-	seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, secondRole.ExternalID, org.ID)
-
-	// Project-scope and other-organization assignments must not contribute to the count.
-	otherOrg := seedOrg(t, orgStore, "other-count-user-org-custom-roles-org")
-	project := seedProject(t, orgStore, org.ID, "project")
-	seedOrgMembership(t, ctx, pool, user.ID, otherOrg.ID)
-	projectRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "project reader"})
-	otherOrgRole := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: otherOrg.ID, Name: "other organization reader"})
-	seedProjectRoleAssignment(t, ctx, rbacStore, user.ExternalID, projectRole.ExternalID, project.ID)
-	seedOrgRoleAssignment(t, ctx, rbacStore, user.ExternalID, otherOrgRole.ExternalID, otherOrg.ID)
-
-	tests := []struct {
-		name   string
-		userID uuid.UUID
-		want   int
-	}{
-		{
-			name:   "assigned roles",
-			userID: user.ExternalID,
-			want:   2,
-		},
-		{
-			name:   "no assignments",
-			userID: unassignedUser.ExternalID,
-			want:   0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := rbacStore.UserOrgCustomRoleCount(ctx, tt.userID, org.ID)
-			if err != nil {
-				t.Fatalf("UserOrgCustomRoleCount(%v, %d) error = %v", tt.userID, org.ID, err)
-			}
-
-			if got != tt.want {
-				t.Errorf("UserOrgCustomRoleCount(%v, %d) = %d, want %d", tt.userID, org.ID, got, tt.want)
+			if gotCount != tt.wantCount {
+				t.Errorf("UserOrgCustomRoles(%v, %d, 1, %d) total count = %d, want %d", tt.userID, org.ID, tt.pageOffset, gotCount, tt.wantCount)
 			}
 		})
 	}
 }
 
-func TestStore_UserOrgCustomRoleCount_error(t *testing.T) {
+func TestStore_UserOrgCustomRoles_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	orgStore := pgorg.NewStore(pool)
@@ -884,8 +718,8 @@ func TestStore_UserOrgCustomRoleCount_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := rbacStore.UserOrgCustomRoleCount(ctx, tt.userID, org.ID); !errors.Is(err, sql.ErrNoRows) {
-				t.Errorf("UserOrgCustomRoleCount(%v, %d) error = %v, want sql.ErrNoRows", tt.userID, org.ID, err)
+			if _, _, err := rbacStore.UserOrgCustomRoles(ctx, tt.userID, org.ID, 50, 0); !errors.Is(err, sql.ErrNoRows) {
+				t.Errorf("UserOrgCustomRoles(%v, %d) error = %v, want sql.ErrNoRows", tt.userID, org.ID, err)
 			}
 		})
 	}

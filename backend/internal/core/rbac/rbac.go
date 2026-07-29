@@ -35,24 +35,16 @@ type RoleStorer interface {
 	// CustomRoleByExternalID returns an organization's role with the given external ID.
 	// Returns [sql.ErrNoRows] if the organization does not own such a role.
 	CustomRoleByExternalID(ctx context.Context, orgID int, roleID uuid.UUID) (pgrbac.CustomRole, error)
-	// CustomRoles returns a page of an organization's custom roles.
-	CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, error)
-	// CustomRoleCount returns the number of custom roles owned by an organization.
-	CustomRoleCount(ctx context.Context, orgID int) (int, error)
-	// UserProjectCustomRoles returns a page of custom roles assigned directly to userID in projectID.
-	// An empty page does not indicate whether the user, project, or organization membership exists.
-	// Callers must use UserProjectCustomRoleCount with this method to validate that context.
-	UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, projectID, pageSize, pageOffset int) ([]pgrbac.CustomRole, error)
-	// UserProjectCustomRoleCount returns the number of custom roles assigned directly to userID in projectID.
+	// CustomRoles returns a page and total count of an organization's custom roles.
+	CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, int, error)
+	// UserProjectCustomRoles returns a page and total count of custom roles assigned directly to
+	// userID in projectID.
 	// Returns [sql.ErrNoRows] if the user, project, or organization membership does not exist.
-	UserProjectCustomRoleCount(ctx context.Context, userID uuid.UUID, projectID int) (int, error)
-	// UserOrgCustomRoles returns a page of custom roles assigned to userID across orgID.
-	// An empty page does not indicate whether the user or organization membership exists.
-	// Callers must use UserOrgCustomRoleCount with this method to validate that context.
-	UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, error)
-	// UserOrgCustomRoleCount returns the number of custom roles assigned to userID across orgID.
+	UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, projectID, pageSize, pageOffset int) ([]pgrbac.CustomRole, int, error)
+	// UserOrgCustomRoles returns a page and total count of custom roles assigned to userID across
+	// orgID.
 	// Returns [sql.ErrNoRows] if the user or organization membership does not exist.
-	UserOrgCustomRoleCount(ctx context.Context, userID uuid.UUID, orgID int) (int, error)
+	UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, orgID, pageSize, pageOffset int) ([]pgrbac.CustomRole, int, error)
 	// OrgPermissionsByProjectID returns projectID's org and the names of the permissions userID
 	// holds there through organization- and system-scope role assignments.
 	// Returns [sql.ErrNoRows] if no such user or project exists.
@@ -85,18 +77,14 @@ type RoleStorer interface {
 	// LockSystemRoleUser acquires a transaction-level lock that serializes system-role assignment
 	// changes for userID.
 	LockSystemRoleUser(ctx context.Context, userID uuid.UUID) error
-	// SystemRoles returns a page of system roles and their permissions.
-	SystemRoles(ctx context.Context, pageSize, pageOffset int) ([]pgrbac.SystemRole, error)
+	// SystemRoles returns a page and total count of system roles and their permissions.
+	SystemRoles(ctx context.Context, pageSize, pageOffset int) ([]pgrbac.SystemRole, int, error)
 	// SystemRoleByName returns the system role named name and its permissions.
 	// Returns [sql.ErrNoRows] if no such system role exists.
 	SystemRoleByName(ctx context.Context, name string) (pgrbac.SystemRole, error)
-	// SystemRoleCount returns the number of system roles.
-	SystemRoleCount(ctx context.Context) (int, error)
-	// UserSystemRolesByExternalID returns a page of system roles assigned to userID.
-	UserSystemRolesByExternalID(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]pgrbac.SystemRole, error)
-	// UserSystemRoleCountByExternalID returns the number of system roles assigned to userID.
+	// UserSystemRolesByExternalID returns a page and total count of system roles assigned to userID.
 	// Returns [sql.ErrNoRows] if no such user exists.
-	UserSystemRoleCountByExternalID(ctx context.Context, userID uuid.UUID) (int, error)
+	UserSystemRolesByExternalID(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]pgrbac.SystemRole, int, error)
 	// SystemPermissions returns the names of the permissions held through system-role assignments.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	SystemPermissions(ctx context.Context, userID uuid.UUID) ([]string, error)

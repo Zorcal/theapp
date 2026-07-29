@@ -15,14 +15,9 @@ import (
 
 // SystemRoles returns a page of system roles, along with the total count.
 func (c *Core) SystemRoles(ctx context.Context, pageSize, pageOffset int) ([]mdl.SystemRole, int, error) {
-	rs, err := c.roleStorer.SystemRoles(ctx, pageSize, pageOffset)
+	rs, count, err := c.roleStorer.SystemRoles(ctx, pageSize, pageOffset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("system roles: %w", err)
-	}
-
-	count, err := c.roleStorer.SystemRoleCount(ctx)
-	if err != nil {
-		return nil, 0, fmt.Errorf("system role count: %w", err)
 	}
 
 	return systemRolesFromPg(rs), count, nil
@@ -31,17 +26,12 @@ func (c *Core) SystemRoles(ctx context.Context, pageSize, pageOffset int) ([]mdl
 // UserSystemRoles returns a page of system roles assigned to userID, along with the total count.
 // Returns [mdl.ErrNotFound] if no user with that ID exists.
 func (c *Core) UserSystemRoles(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]mdl.SystemRole, int, error) {
-	rs, err := c.roleStorer.UserSystemRolesByExternalID(ctx, userID, pageSize, pageOffset)
-	if err != nil {
-		return nil, 0, fmt.Errorf("user system roles: %w", err)
-	}
-
-	count, err := c.roleStorer.UserSystemRoleCountByExternalID(ctx, userID)
+	rs, count, err := c.roleStorer.UserSystemRolesByExternalID(ctx, userID, pageSize, pageOffset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, mdl.ErrNotFound
 		}
-		return nil, 0, fmt.Errorf("user system role count: %w", err)
+		return nil, 0, fmt.Errorf("user system roles: %w", err)
 	}
 
 	return systemRolesFromPg(rs), count, nil

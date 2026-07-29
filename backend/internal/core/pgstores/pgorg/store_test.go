@@ -265,6 +265,7 @@ func TestStore_AccessibleProjects(t *testing.T) {
 	// does not expand within its organization.
 	projectAssignedUser := seedUser(t, userStore, "project-assignment@test.com")
 	projectAssignedOrg := seedOrg(t, orgStore, "project-assignment-org")
+	projectAssignedControl := mustProjectByID(t, orgStore, projectAssignedOrg.ControlProjectID)
 	projectAssignedProject := seedProject(t, orgStore, projectAssignedOrg.ID, "first")
 	seedProject(t, orgStore, projectAssignedOrg.ID, "second")
 	seedOrgMembership(t, pool, projectAssignedUser.ID, projectAssignedOrg.ID)
@@ -298,6 +299,8 @@ func TestStore_AccessibleProjects(t *testing.T) {
 	seedSystemRole(t, pool, "system-role:system-read", "system-role:read")
 	seedSystemRoleAssignment(t, rbacStore, systemAssignedWithoutDiscoveryUser.ExternalID, "system-role:system-read")
 
+	unassignedUser := seedUser(t, userStore, "unassigned@test.com")
+
 	tests := []struct {
 		name       string
 		userID     uuid.UUID
@@ -305,32 +308,51 @@ func TestStore_AccessibleProjects(t *testing.T) {
 		pageSize   int
 		pageOffset int
 		want       []pgorg.Project
+		wantCount  int
 	}{
 		{
-			name:     "project assignment",
-			userID:   projectAssignedUser.ExternalID,
-			pageSize: 10,
-			want:     []pgorg.Project{projectAssignedProject},
+			name:      "no assignments",
+			userID:    unassignedUser.ExternalID,
+			pageSize:  10,
+			want:      []pgorg.Project{},
+			wantCount: 0,
 		},
 		{
-			name:     "whitespace-only name filter",
-			userID:   projectAssignedUser.ExternalID,
-			filter:   pgorg.ProjectFilter{Name: "   "},
-			pageSize: 10,
-			want:     []pgorg.Project{projectAssignedProject},
+			name:      "project assignment",
+			userID:    projectAssignedUser.ExternalID,
+			pageSize:  10,
+			want:      []pgorg.Project{projectAssignedProject},
+			wantCount: 1,
 		},
 		{
-			name:     "organization assignment",
-			userID:   orgAssignedUser.ExternalID,
-			pageSize: 10,
-			want:     []pgorg.Project{orgAssignedControl, orgAssignedFirstProject, orgAssignedSecondProject},
+			name:      "whitespace-only name filter",
+			userID:    projectAssignedUser.ExternalID,
+			filter:    pgorg.ProjectFilter{Name: "   "},
+			pageSize:  10,
+			want:      []pgorg.Project{projectAssignedProject},
+			wantCount: 1,
 		},
 		{
-			name:     "system assignment across organizations",
-			userID:   systemAssignedUser.ExternalID,
-			filter:   pgorg.ProjectFilter{Name: "first"},
-			pageSize: 10,
-			want:     []pgorg.Project{projectAssignedProject, orgAssignedFirstProject},
+			name:      "organization assignment",
+			userID:    orgAssignedUser.ExternalID,
+			pageSize:  10,
+			want:      []pgorg.Project{orgAssignedControl, orgAssignedFirstProject, orgAssignedSecondProject},
+			wantCount: 3,
+		},
+		{
+			name:      "system assignment",
+			userID:    systemAssignedUser.ExternalID,
+			pageSize:  1,
+			want:      []pgorg.Project{projectAssignedControl},
+			wantCount: 11,
+		},
+		{
+			name:      "system assignment across organizations",
+			userID:    systemAssignedUser.ExternalID,
+			filter:    pgorg.ProjectFilter{Name: "first"},
+			pageSize:  10,
+			want:      []pgorg.Project{projectAssignedProject, orgAssignedFirstProject},
+			wantCount: 2,
 		},
 		{
 			name:       "pagination",
@@ -339,6 +361,7 @@ func TestStore_AccessibleProjects(t *testing.T) {
 			pageSize:   1,
 			pageOffset: 1,
 			want:       []pgorg.Project{orgAssignedFirstProject},
+			wantCount:  2,
 		},
 		{
 			name:     "name filter",
@@ -347,143 +370,41 @@ func TestStore_AccessibleProjects(t *testing.T) {
 			pageSize: 10,
 			// The filter is case-insensitive and both names match, so organization ID determines
 			// their order.
-			want: []pgorg.Project{systemAssignedProject, systemAssignedWithoutDiscoveryProject},
+			want:      []pgorg.Project{systemAssignedProject, systemAssignedWithoutDiscoveryProject},
+			wantCount: 2,
 		},
 		{
-			name:     "system assignment without global discovery",
-			userID:   systemAssignedWithoutDiscoveryUser.ExternalID,
-			pageSize: 10,
-			want:     []pgorg.Project{},
-		},
-		{
-			name:     "empty",
-			userID:   uuid.New(),
-			pageSize: 10,
-			// The list query deliberately cannot distinguish a missing user from an existing user
-			// with no assignments; the companion count query performs that validation.
-			want: []pgorg.Project{},
+			name:      "system assignment without global discovery",
+			userID:    systemAssignedWithoutDiscoveryUser.ExternalID,
+			pageSize:  10,
+			want:      []pgorg.Project{},
+			wantCount: 0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := orgStore.AccessibleProjects(ctx, tt.userID, tt.filter, tt.pageSize, tt.pageOffset)
+			got, count, err := orgStore.AccessibleProjects(ctx, tt.userID, tt.filter, tt.pageSize, tt.pageOffset)
 			if err != nil {
 				t.Fatalf("AccessibleProjects(%s, %+v, %d, %d) error = %v", tt.userID, tt.filter, tt.pageSize, tt.pageOffset, err)
 			}
 
 			testingx.AssertDiff(t, got, tt.want)
-		})
-	}
-}
 
-func TestStore_AccessibleProjectCount(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-	rbacStore := pgrbac.NewStore(pool)
-	userStore := pguser.NewStore(pool)
-
-	// Organization-wide access should reach exactly the control project and this ordinary project.
-	org := seedOrg(t, orgStore, "count-org")
-	project := seedProject(t, orgStore, org.ID, "project")
-	role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "count role"})
-
-	// This second organization proves organization assignments stay within their tenant, while
-	// global discovery reaches matching projects across organizations.
-	secondOrg := seedOrg(t, orgStore, "count-second-org")
-	seedProject(t, orgStore, secondOrg.ID, "project")
-
-	// This user proves that existence alone contributes no projects.
-	unassignedUser := seedUser(t, userStore, "count-empty@test.com")
-
-	// Give one user direct access to only the ordinary project.
-	projectAssignedUser := seedUser(t, userStore, "count-project-assigned@test.com")
-	seedOrgMembership(t, pool, projectAssignedUser.ID, org.ID)
-	seedProjectRoleAssignment(t, ctx, rbacStore, projectAssignedUser.ExternalID, role.ExternalID, project.ID)
-
-	// Give one user overlapping direct and organization-wide access to the ordinary project.
-	orgAssignedUser := seedUser(t, userStore, "count-org-assigned@test.com")
-	seedOrgMembership(t, pool, orgAssignedUser.ID, org.ID)
-	seedProjectRoleAssignment(t, ctx, rbacStore, orgAssignedUser.ExternalID, role.ExternalID, project.ID)
-	seedOrgRoleAssignment(t, ctx, rbacStore, orgAssignedUser.ExternalID, role.ExternalID, org.ID)
-
-	// Superadmin carries global project discovery and therefore reaches both organizations.
-	systemAssignedUser := seedUser(t, userStore, "count-system-assigned@test.com")
-	seedSystemRoleAssignment(t, rbacStore, systemAssignedUser.ExternalID, "superadmin")
-
-	// A narrow system role proves that system scope alone does not enable global discovery.
-	systemAssignedWithoutDiscoveryUser := seedUser(t, userStore, "count-system-assigned-without-discovery@test.com")
-	seedSystemRole(t, pool, "system-role:system-read", "system-role:read")
-	seedSystemRoleAssignment(t, rbacStore, systemAssignedWithoutDiscoveryUser.ExternalID, "system-role:system-read")
-
-	tests := []struct {
-		name   string
-		userID uuid.UUID
-		filter pgorg.ProjectFilter
-		want   int
-	}{
-		{
-			name:   "no assignments",
-			userID: unassignedUser.ExternalID,
-			want:   0,
-		},
-		{
-			name:   "project assignment",
-			userID: projectAssignedUser.ExternalID,
-			want:   1,
-		},
-		{
-			name:   "whitespace-only name filter",
-			userID: projectAssignedUser.ExternalID,
-			filter: pgorg.ProjectFilter{Name: "   "},
-			want:   1,
-		},
-		{
-			name:   "organization assignment deduplicates scopes",
-			userID: orgAssignedUser.ExternalID,
-			// The organization assignment reaches the control project and project. The direct
-			// assignment also reaches project, but that overlap must not increase the count beyond two.
-			want: 2,
-		},
-		{
-			name:   "system assignment across organizations",
-			userID: systemAssignedUser.ExternalID,
-			filter: pgorg.ProjectFilter{Name: "PRO"},
-			want:   2,
-		},
-		{
-			name:   "system assignment",
-			userID: systemAssignedUser.ExternalID,
-			want:   4,
-		},
-		{
-			name:   "system assignment without global discovery",
-			userID: systemAssignedWithoutDiscoveryUser.ExternalID,
-			want:   0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := orgStore.AccessibleProjectCount(ctx, tt.userID, tt.filter)
-			if err != nil {
-				t.Fatalf("AccessibleProjectCount(%s, %+v) error = %v", tt.userID, tt.filter, err)
-			}
-
-			if got != tt.want {
-				t.Errorf("AccessibleProjectCount(%s, %+v) = %d, want %d", tt.userID, tt.filter, got, tt.want)
+			if count != tt.wantCount {
+				t.Errorf("AccessibleProjects(%s, %+v, %d, %d) total count = %d, want %d", tt.userID, tt.filter, tt.pageSize, tt.pageOffset, count, tt.wantCount)
 			}
 		})
 	}
 }
 
-func TestStore_AccessibleProjectCount_error(t *testing.T) {
+func TestStore_AccessibleProjects_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	orgStore := pgorg.NewStore(pool)
 
 	t.Run("not found", func(t *testing.T) {
-		if _, err := orgStore.AccessibleProjectCount(ctx, uuid.New(), pgorg.ProjectFilter{}); !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("AccessibleProjectCount() error = %v, want sql.ErrNoRows", err)
+		if _, _, err := orgStore.AccessibleProjects(ctx, uuid.New(), pgorg.ProjectFilter{}, 10, 0); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("AccessibleProjects() error = %v, want sql.ErrNoRows", err)
 		}
 	})
 }

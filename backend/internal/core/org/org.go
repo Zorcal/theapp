@@ -32,15 +32,10 @@ type OrgStorer interface {
 	// ProjectByName returns the project named name owned by orgID.
 	// Returns [sql.ErrNoRows] if no such project exists.
 	ProjectByName(ctx context.Context, orgID int, name string) (pgorg.Project, error)
-	// AccessibleProjects returns the projects reachable through any role assignment held by userID
-	// that match filter, ordered by name and organization ID. An empty result cannot distinguish a
-	// missing user from a user without accessible projects, so callers are expected to use it
-	// together with AccessibleProjectCount.
-	AccessibleProjects(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter, pageSize, pageOffset int) ([]pgorg.Project, error)
-	// AccessibleProjectCount returns the number of projects matching filter that are reachable
-	// through any role assignment held by userID.
+	// AccessibleProjects returns a page and total count of projects reachable through any role
+	// assignment held by userID that match filter, ordered by name and organization ID.
 	// Returns [sql.ErrNoRows] if no such user exists.
-	AccessibleProjectCount(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter) (int, error)
+	AccessibleProjects(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter, pageSize, pageOffset int) ([]pgorg.Project, int, error)
 }
 
 // Transactor runs a function inside a database transaction.
@@ -158,17 +153,12 @@ func (c *Core) AccessibleProjects(ctx context.Context, filter mdl.ProjectFilter,
 
 	pgFilter := projectFilterToPg(filter)
 
-	projects, err := c.orgStorer.AccessibleProjects(ctx, sess.User.UserID, pgFilter, pageSize, pageOffset)
-	if err != nil {
-		return nil, 0, fmt.Errorf("accessible projects: %w", err)
-	}
-
-	count, err := c.orgStorer.AccessibleProjectCount(ctx, sess.User.UserID, pgFilter)
+	projects, count, err := c.orgStorer.AccessibleProjects(ctx, sess.User.UserID, pgFilter, pageSize, pageOffset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, mdl.ErrNotFound
 		}
-		return nil, 0, fmt.Errorf("accessible project count: %w", err)
+		return nil, 0, fmt.Errorf("accessible projects: %w", err)
 	}
 
 	return projectsFromPg(projects), count, nil

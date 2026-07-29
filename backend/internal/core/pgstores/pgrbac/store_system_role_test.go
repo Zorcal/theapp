@@ -57,37 +57,43 @@ func TestStore_SystemRoles(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	rbacStore := pgrbac.NewStore(pool)
 
-	gotFirstPage, err := rbacStore.SystemRoles(ctx, 50, 0)
-	if err != nil {
-		t.Fatalf("SystemRoles() error = %v", err)
+	systemRoles := seededSystemRoles()
+
+	tests := []struct {
+		name       string
+		pageSize   int
+		pageOffset int
+		want       []pgrbac.SystemRole
+		wantCount  int
+	}{
+		{
+			name:       "first page",
+			pageSize:   50,
+			pageOffset: 0,
+			want:       systemRoles,
+			wantCount:  len(systemRoles),
+		},
+		{
+			name:       "second page",
+			pageSize:   50,
+			pageOffset: 1,
+			want:       []pgrbac.SystemRole{},
+			wantCount:  len(systemRoles),
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotCount, err := rbacStore.SystemRoles(ctx, tt.pageSize, tt.pageOffset)
+			if err != nil {
+				t.Fatalf("SystemRoles(%d, %d) error = %v", tt.pageSize, tt.pageOffset, err)
+			}
 
-	wantFirstPage := seededSystemRoles()
+			testingx.AssertDiff(t, got, tt.want)
 
-	testingx.AssertDiff(t, gotFirstPage, wantFirstPage)
-
-	gotSecondPage, err := rbacStore.SystemRoles(ctx, 50, 1)
-	if err != nil {
-		t.Fatalf("SystemRoles() second page error = %v", err)
-	}
-
-	wantSecondPage := []pgrbac.SystemRole{}
-
-	testingx.AssertDiff(t, gotSecondPage, wantSecondPage)
-}
-
-func TestStore_SystemRoleCount(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	rbacStore := pgrbac.NewStore(pool)
-
-	got, err := rbacStore.SystemRoleCount(ctx)
-	if err != nil {
-		t.Fatalf("SystemRoleCount() error = %v", err)
-	}
-
-	if want := len(seededSystemRoles()); got != want {
-		t.Errorf("SystemRoleCount() = %d, want %d", got, want)
+			if gotCount != tt.wantCount {
+				t.Errorf("SystemRoles(%d, %d) total count = %d, want %d", tt.pageSize, tt.pageOffset, gotCount, tt.wantCount)
+			}
+		})
 	}
 }
 
@@ -124,7 +130,7 @@ func TestStore_UserSystemRolesByExternalID(t *testing.T) {
 
 	usr := seedUser(t, userStore, "alice@test.com")
 
-	gotBeforeAssignment, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
+	gotBeforeAssignment, gotCountBeforeAssignment, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
 	if err != nil {
 		t.Fatalf("UserSystemRolesByExternalID() before assignment error = %v", err)
 	}
@@ -133,9 +139,13 @@ func TestStore_UserSystemRolesByExternalID(t *testing.T) {
 
 	testingx.AssertDiff(t, gotBeforeAssignment, wantBeforeAssignment)
 
+	if wantCount := 0; gotCountBeforeAssignment != wantCount {
+		t.Errorf("UserSystemRolesByExternalID(%v, 50, 0) total count = %d, want %d", usr.ExternalID, gotCountBeforeAssignment, wantCount)
+	}
+
 	seedSystemRoleAssignment(t, rbacStore, usr.ExternalID, "superadmin")
 
-	gotAfterAssignment, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
+	gotAfterAssignment, gotCountAfterAssignment, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
 	if err != nil {
 		t.Fatalf("UserSystemRolesByExternalID() error = %v", err)
 	}
@@ -144,25 +154,20 @@ func TestStore_UserSystemRolesByExternalID(t *testing.T) {
 
 	testingx.AssertDiff(t, gotAfterAssignment, wantAfterAssignment)
 
-	gotCount, err := rbacStore.UserSystemRoleCountByExternalID(ctx, usr.ExternalID)
-	if err != nil {
-		t.Fatalf("UserSystemRoleCountByExternalID() error = %v", err)
-	}
-	if wantCount := 1; gotCount != wantCount {
-		t.Errorf("UserSystemRoleCountByExternalID() = %d, want %d", gotCount, wantCount)
+	if wantCount := 1; gotCountAfterAssignment != wantCount {
+		t.Errorf("UserSystemRolesByExternalID(%v, 50, 0) total count = %d, want %d", usr.ExternalID, gotCountAfterAssignment, wantCount)
 	}
 }
 
-func TestStore_UserSystemRoleCountByExternalID_error(t *testing.T) {
-	t.Run("user not found", func(t *testing.T) {
-		ctx := context.Background()
-		pool := pgtest.New(t, ctx)
-		rbacStore := pgrbac.NewStore(pool)
+func TestStore_UserSystemRolesByExternalID_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	rbacStore := pgrbac.NewStore(pool)
+	userID := uuid.New()
 
-		if _, err := rbacStore.UserSystemRoleCountByExternalID(ctx, uuid.New()); !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("UserSystemRoleCountByExternalID() error = %v, want sql.ErrNoRows", err)
-		}
-	})
+	if _, _, err := rbacStore.UserSystemRolesByExternalID(ctx, userID, 50, 0); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("UserSystemRolesByExternalID(%v, 50, 0) error = %v, want sql.ErrNoRows", userID, err)
+	}
 }
 
 func TestStore_SystemPermissions(t *testing.T) {
@@ -292,7 +297,7 @@ func TestStore_UnassignSystemRole(t *testing.T) {
 		t.Fatalf("UnassignSystemRole() error = %v", err)
 	}
 
-	got, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
+	got, count, err := rbacStore.UserSystemRolesByExternalID(ctx, usr.ExternalID, 50, 0)
 	if err != nil {
 		t.Fatalf("UserSystemRolesByExternalID() error = %v", err)
 	}
@@ -300,6 +305,10 @@ func TestStore_UnassignSystemRole(t *testing.T) {
 	want := []pgrbac.SystemRole{}
 
 	testingx.AssertDiff(t, got, want)
+
+	if wantCount := 0; count != wantCount {
+		t.Errorf("UserSystemRolesByExternalID(%v, 50, 0) total count = %d, want %d", usr.ExternalID, count, wantCount)
+	}
 }
 
 func TestStore_FullyPrivilegedUserRemainsAfterSystemRoleUnassign(t *testing.T) {

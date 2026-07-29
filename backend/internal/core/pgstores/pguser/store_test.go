@@ -99,6 +99,7 @@ func TestStore_CreateUser(t *testing.T) {
 		cmpopts.IgnoreFields(pguser.User{}, "ID", "ExternalID", "ETag"), // Ignore generated fields
 		cmpopts.EquateApproxTime(time.Minute),
 	}
+
 	testingx.AssertDiff(t, got, want, diffOpts...)
 
 	if got.ID == 0 {
@@ -302,8 +303,9 @@ func TestStore_Users(t *testing.T) {
 			}
 
 			testingx.AssertDiff(t, got, tt.want, diffOpts...)
+
 			if gotCount != tt.wantCount {
-				t.Errorf("Users() total count = %d, want %d", gotCount, tt.wantCount)
+				t.Errorf("Users(%+v, %+v, %d, %d) total count = %d, want %d", tt.filter, tt.orderBys, tt.pageSize, tt.pageOffset, gotCount, tt.wantCount)
 			}
 		})
 	}
@@ -426,6 +428,7 @@ func TestStore_GetOrCreateUserByEmail(t *testing.T) {
 			cmpopts.IgnoreFields(pguser.User{}, "ID", "ExternalID", "CreatedAt", "UpdatedAt", "ETag"), // Ignore generated fields
 		}
 		want := pguser.User{Email: "new@test.com"}
+
 		testingx.AssertDiff(t, got, want, diffOpts)
 	})
 

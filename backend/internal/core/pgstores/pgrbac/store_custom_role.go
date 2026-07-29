@@ -148,23 +148,31 @@ func (s *Store) DeleteCustomRole(ctx context.Context, orgID int, roleID uuid.UUI
 	return nil
 }
 
-// CustomRoles returns a page of an organization's custom roles and their permissions.
-func (s *Store) CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]CustomRole, error) {
-	q := customRolesQuery(orgID, pageSize, pageOffset)
+// CustomRoles returns a page of an organization's custom roles and their permissions, along with
+// the total count.
+func (s *Store) CustomRoles(ctx context.Context, orgID, pageSize, pageOffset int) ([]CustomRole, int, error) {
+	rolesQ := customRolesQuery(orgID, pageSize, pageOffset)
+	countQ := customRoleCountQuery(orgID)
 
-	var roles []CustomRole
+	var (
+		roles []CustomRole
+		count int
+	)
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.QueueMany(ctx, b, &roles); err != nil {
+		if err := rolesQ.QueueMany(ctx, b, &roles); err != nil {
 			return fmt.Errorf("custom roles: %w", err)
+		}
+		if err := countQ.Queue(ctx, b, &count); err != nil {
+			return fmt.Errorf("custom role count: %w", err)
 		}
 		return nil
 	}
 
 	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return roles, nil
+	return roles, count, nil
 }
 
 // CustomRoleByExternalID returns an organization's custom role with the given external ID.
@@ -185,25 +193,6 @@ func (s *Store) CustomRoleByExternalID(ctx context.Context, orgID int, roleID uu
 	}
 
 	return role, nil
-}
-
-// CustomRoleCount returns the number of custom roles owned by an organization.
-func (s *Store) CustomRoleCount(ctx context.Context, orgID int) (int, error) {
-	q := customRoleCountQuery(orgID)
-
-	var count int
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &count); err != nil {
-			return fmt.Errorf("custom role count: %w", err)
-		}
-		return nil
-	}
-
-	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return 0, err
-	}
-
-	return count, nil
 }
 
 // AssignCustomRoleToProject grants an organization member an organization-owned role in projectID.
@@ -292,84 +281,58 @@ func (s *Store) UnassignCustomRoleFromOrg(ctx context.Context, userID, roleID uu
 	return nil
 }
 
-// UserProjectCustomRoles returns a page of custom roles assigned directly to userID in projectID.
-// An empty page does not indicate whether the user, project, or organization membership exists.
-// Callers must use UserProjectCustomRoleCount with this method to validate that context.
-func (s *Store) UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, projectID, pageSize, pageOffset int) ([]CustomRole, error) {
-	q := userProjectCustomRolesQuery(userID, projectID, pageSize, pageOffset)
+// UserProjectCustomRoles returns a page and total count of custom roles assigned directly to
+// userID in projectID.
+// Returns [sql.ErrNoRows] if the user, project, or organization membership does not exist.
+func (s *Store) UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, projectID, pageSize, pageOffset int) ([]CustomRole, int, error) {
+	rolesQ := userProjectCustomRolesQuery(userID, projectID, pageSize, pageOffset)
+	countQ := userProjectCustomRoleCountQuery(userID, projectID)
 
-	var roles []CustomRole
+	var (
+		roles []CustomRole
+		count int
+	)
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.QueueMany(ctx, b, &roles); err != nil {
+		if err := rolesQ.QueueMany(ctx, b, &roles); err != nil {
 			return fmt.Errorf("user project custom roles: %w", err)
 		}
-		return nil
-	}
-
-	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return nil, err
-	}
-
-	return roles, nil
-}
-
-// UserProjectCustomRoleCount returns the number of custom roles assigned directly to userID in projectID.
-// Returns [sql.ErrNoRows] if the user, project, or organization membership does not exist.
-func (s *Store) UserProjectCustomRoleCount(ctx context.Context, userID uuid.UUID, projectID int) (int, error) {
-	q := userProjectCustomRoleCountQuery(userID, projectID)
-
-	var count int
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &count); err != nil {
+		if err := countQ.Queue(ctx, b, &count); err != nil {
 			return fmt.Errorf("user project custom role count: %w", err)
 		}
 		return nil
 	}
 
 	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 
-	return count, nil
+	return roles, count, nil
 }
 
-// UserOrgCustomRoles returns a page of custom roles assigned to userID across orgID.
-// An empty page does not indicate whether the user or organization membership exists.
-// Callers must use UserOrgCustomRoleCount with this method to validate that context.
-func (s *Store) UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, orgID, pageSize, pageOffset int) ([]CustomRole, error) {
-	q := userOrgCustomRolesQuery(userID, orgID, pageSize, pageOffset)
+// UserOrgCustomRoles returns a page and total count of custom roles assigned to userID across
+// orgID.
+// Returns [sql.ErrNoRows] if the user or organization membership does not exist.
+func (s *Store) UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, orgID, pageSize, pageOffset int) ([]CustomRole, int, error) {
+	rolesQ := userOrgCustomRolesQuery(userID, orgID, pageSize, pageOffset)
+	countQ := userOrgCustomRoleCountQuery(userID, orgID)
 
-	var roles []CustomRole
+	var (
+		roles []CustomRole
+		count int
+	)
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.QueueMany(ctx, b, &roles); err != nil {
+		if err := rolesQ.QueueMany(ctx, b, &roles); err != nil {
 			return fmt.Errorf("user organization custom roles: %w", err)
 		}
-		return nil
-	}
-
-	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return nil, err
-	}
-
-	return roles, nil
-}
-
-// UserOrgCustomRoleCount returns the number of custom roles assigned to userID across orgID.
-// Returns [sql.ErrNoRows] if the user or organization membership does not exist.
-func (s *Store) UserOrgCustomRoleCount(ctx context.Context, userID uuid.UUID, orgID int) (int, error) {
-	q := userOrgCustomRoleCountQuery(userID, orgID)
-
-	var count int
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &count); err != nil {
+		if err := countQ.Queue(ctx, b, &count); err != nil {
 			return fmt.Errorf("user organization custom role count: %w", err)
 		}
 		return nil
 	}
 
 	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 
-	return count, nil
+	return roles, count, nil
 }

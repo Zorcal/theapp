@@ -65,8 +65,8 @@ func TestCore_integration_systemRoleAssignmentLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserSystemRoles() after assignment error = %v", err)
 	}
-	if wantAssignedCount := 1; gotAssignedCount != wantAssignedCount {
-		t.Errorf("UserSystemRoles() after assignment total count = %d, want %d", gotAssignedCount, wantAssignedCount)
+	if wantCount := 1; gotAssignedCount != wantCount {
+		t.Errorf("UserSystemRoles() after assignment total count = %d, want %d", gotAssignedCount, wantCount)
 	}
 
 	wantAssignedRoles := []mdl.SystemRole{seededSystemRole(t, "superadmin")}
@@ -83,8 +83,8 @@ func TestCore_integration_systemRoleAssignmentLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserSystemRoles() after unassignment error = %v", err)
 	}
-	if wantUnassignedCount := 0; gotUnassignedCount != wantUnassignedCount {
-		t.Errorf("UserSystemRoles() after unassignment total count = %d, want %d", gotUnassignedCount, wantUnassignedCount)
+	if wantCount := 0; gotUnassignedCount != wantCount {
+		t.Errorf("UserSystemRoles() after unassignment total count = %d, want %d", gotUnassignedCount, wantCount)
 	}
 
 	wantUnassignedRoles := []mdl.SystemRole{}
@@ -128,8 +128,8 @@ func TestCore_integration_systemRoleChangesRequireSystemScope(t *testing.T) {
 		t.Fatalf("UserSystemRoles() assign target error = %v", err)
 	}
 
-	if wantAssignCount := 0; gotAssignCount != wantAssignCount {
-		t.Errorf("UserSystemRoles() assign target total count = %d, want %d", gotAssignCount, wantAssignCount)
+	if wantCount := 0; gotAssignCount != wantCount {
+		t.Errorf("UserSystemRoles() assign target total count = %d, want %d", gotAssignCount, wantCount)
 	}
 
 	testingx.AssertDiff(t, gotAssignRoles, []mdl.SystemRole{})
@@ -138,8 +138,8 @@ func TestCore_integration_systemRoleChangesRequireSystemScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserSystemRoles() unassign target error = %v", err)
 	}
-	if wantUnassignCount := 1; gotUnassignCount != wantUnassignCount {
-		t.Errorf("UserSystemRoles() unassign target total count = %d, want %d", gotUnassignCount, wantUnassignCount)
+	if wantCount := 1; gotUnassignCount != wantCount {
+		t.Errorf("UserSystemRoles() unassign target total count = %d, want %d", gotUnassignCount, wantCount)
 	}
 
 	wantUnassignRoles := []mdl.SystemRole{seededSystemRole(t, "superadmin")}
@@ -153,13 +153,10 @@ func TestCore_integration_systemRoleChangesRequireSystemScope(t *testing.T) {
 // through the core and PostgreSQL store layers.
 func TestCore_SystemRoles(t *testing.T) {
 	roleStorer := &MockedRoleStorer{
-		SystemRolesFunc: func(_ context.Context, _, _ int) ([]pgrbac.SystemRole, error) {
+		SystemRolesFunc: func(_ context.Context, _, _ int) ([]pgrbac.SystemRole, int, error) {
 			return []pgrbac.SystemRole{
 				{Name: "superadmin", PermissionNames: []string{"user:create", "user:read"}},
-			}, nil
-		},
-		SystemRoleCountFunc: func(_ context.Context) (int, error) {
-			return 7, nil
+			}, 7, nil
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
@@ -189,19 +186,8 @@ func TestCore_SystemRoles_error(t *testing.T) {
 		{
 			name: "system roles store error",
 			roleStorer: &MockedRoleStorer{
-				SystemRolesFunc: func(_ context.Context, _, _ int) ([]pgrbac.SystemRole, error) {
-					return nil, dbErr
-				},
-			},
-		},
-		{
-			name: "system role count store error",
-			roleStorer: &MockedRoleStorer{
-				SystemRolesFunc: func(_ context.Context, _, _ int) ([]pgrbac.SystemRole, error) {
-					return nil, nil
-				},
-				SystemRoleCountFunc: func(_ context.Context) (int, error) {
-					return 0, dbErr
+				SystemRolesFunc: func(_ context.Context, _, _ int) ([]pgrbac.SystemRole, int, error) {
+					return nil, 0, dbErr
 				},
 			},
 		},
@@ -220,13 +206,10 @@ func TestCore_SystemRoles_error(t *testing.T) {
 func TestCore_UserSystemRoles(t *testing.T) {
 	userID := uuid.New()
 	roleStorer := &MockedRoleStorer{
-		UserSystemRolesByExternalIDFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]pgrbac.SystemRole, error) {
+		UserSystemRolesByExternalIDFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]pgrbac.SystemRole, int, error) {
 			return []pgrbac.SystemRole{
 				{Name: "test-role", PermissionNames: []string{"user:read"}},
-			}, nil
-		},
-		UserSystemRoleCountByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (int, error) {
-			return 1, nil
+			}, 1, nil
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
@@ -257,11 +240,8 @@ func TestCore_UserSystemRoles_error(t *testing.T) {
 		{
 			name: "user not found",
 			roleStorer: &MockedRoleStorer{
-				UserSystemRolesByExternalIDFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]pgrbac.SystemRole, error) {
-					return nil, nil
-				},
-				UserSystemRoleCountByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (int, error) {
-					return 0, sql.ErrNoRows
+				UserSystemRolesByExternalIDFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]pgrbac.SystemRole, int, error) {
+					return nil, 0, sql.ErrNoRows
 				},
 			},
 			want: mdl.ErrNotFound,
@@ -269,20 +249,8 @@ func TestCore_UserSystemRoles_error(t *testing.T) {
 		{
 			name: "user roles store error",
 			roleStorer: &MockedRoleStorer{
-				UserSystemRolesByExternalIDFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]pgrbac.SystemRole, error) {
-					return nil, dbErr
-				},
-			},
-			want: dbErr,
-		},
-		{
-			name: "user role count store error",
-			roleStorer: &MockedRoleStorer{
-				UserSystemRolesByExternalIDFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]pgrbac.SystemRole, error) {
-					return nil, nil
-				},
-				UserSystemRoleCountByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (int, error) {
-					return 0, dbErr
+				UserSystemRolesByExternalIDFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]pgrbac.SystemRole, int, error) {
+					return nil, 0, dbErr
 				},
 			},
 			want: dbErr,

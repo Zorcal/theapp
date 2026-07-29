@@ -75,9 +75,9 @@ covered by a primary key or another index.
 
 ## Explicit non-goals
 
-- Do not combine a paginated list and its total count into one query. Their shared access relation
-  will be centralized, but the list and count operations remain separate until that design is
-  considered independently.
+- Do not combine a paginated list and its total count into one SQL query. Keep them as separate
+  typed queries over the shared access relation, queued together in one batch to avoid a second
+  database round trip.
 - Do not add performance tests or benchmarks as part of this work.
 - Do not replace integer permission IDs with permission names as keys.
 - Do not merge system and custom roles, or the three assignment scopes, into generic tables.
@@ -110,8 +110,8 @@ covered by a primary key or another index.
 2. Add the accessible-project relation, including the system-only `project:discover-all` rule.
 3. Refactor permission resolution, privilege checks, and project list/count queries onto the
    canonical relations.
-4. Keep list filtering, stable ordering, pagination, and total counting in their existing
-   operations.
+4. Keep list filtering, stable ordering, pagination, and total counting in separate typed queries,
+   while returning the page and count from one batched store operation.
 
 ### 4. Align later roadmap work
 

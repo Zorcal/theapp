@@ -177,9 +177,10 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 Before phase 19, strengthen assignment tenant keys, add the set-oriented permission-name lookup,
 and centralize the effective system, organization, project, and accessible-project relations.
 Preserve integer permission primary keys, separate assignment scope tables, explicit deletion with
-`NO ACTION` foreign keys, and live authorization state. Paginated list queries and total-count
-queries remain separate, and this work adds no performance testing. The complete sequence and
-future-phase interactions are in docs/rbac-query-restructuring.md.
+`NO ACTION` foreign keys, and live authorization state. Paginated list and total-count queries
+remain separate SQL statements but are queued in one batch to avoid a second database round trip;
+this work adds no performance testing. The complete sequence and future-phase interactions are in
+docs/rbac-query-restructuring.md.
 
 **Checkpoint:** existing observable behavior is unchanged, cross-organization assignment state is
 rejected structurally, and all effective-access consumers use the canonical SQL relations.
