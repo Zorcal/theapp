@@ -1,9 +1,10 @@
 # Permissions and roles — implementation tasks
 
-Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–17
+Breaks down docs/permissions-and-roles.md into ordered, independently-shippable tasks. Phases 1–18
 are complete. They established users/auth, organizations/projects, the RBAC schema, permission
-resolution, the bootstrap CLI, project-scoped enforcement, and the system- and custom-role APIs.
-Phase 18 is current: discovering accessible projects.
+resolution, the bootstrap CLI, project-scoped enforcement, the system- and custom-role APIs, and
+accessible-project discovery. The RBAC query restructuring described in
+docs/rbac-query-restructuring.md is the current work before phase 19.
 
 ## Working process
 
@@ -139,7 +140,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 ## Phase 14 — custom role service: assignment endpoints — done
 
 35. Add project- and org-scope assign/unassign endpoints using `custom-role:assign-project`, `custom-role:unassign-project`, `custom-role:assign-org`, and `custom-role:unassign-org`. Add paginated endpoints that list a target user's project- and organization-scoped assignments separately, authorized by `custom-role:read-project-assignments` and `custom-role:read-org-assignments`. Assignment mutations write only to `project_role_assignments` and `org_role_assignments`; system assignment remains exclusively in `SystemRoleService`. This part is complete. Depends on 18, 22, 32.
-36. Gate project- and org-scoped assignment, unassignment, and permission resolution on current `org_membership`, and require the custom role's owning `org_id` to match the target project/org. Membership removal explicitly deletes every project- and org-scoped assignment before deleting the membership, in one transaction; assignment rows without membership are invalid state repaired through manual database intervention. This part is complete. Depends on 18, 33, 35.
+36. Gate project- and org-scoped assignment, unassignment, and permission resolution on current `org_membership`, and require the custom role's owning `org_id` to match the target project/org. Membership removal explicitly deletes every project- and org-scoped assignment before deleting the membership, in one transaction. This part is complete; the later RBAC query restructuring adds composite foreign keys as a database backstop for the same tenant invariants. Depends on 18, 33, 35.
 
 **Checkpoint:** custom roles can be assigned and unassigned at project or org scope. Privilege-escalation checks and the global recovery invariant are completed in phases 15–16, so these endpoints remain restricted to trusted internal testing until then.
 
@@ -171,6 +172,18 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** the endpoint lists every project the caller has any role in, paginated.
 
+## RBAC query restructuring — current
+
+Before phase 19, strengthen assignment tenant keys, add the set-oriented permission-name lookup,
+and centralize the effective system, organization, project, and accessible-project relations.
+Preserve integer permission primary keys, separate assignment scope tables, explicit deletion with
+`NO ACTION` foreign keys, and live authorization state. Paginated list queries and total-count
+queries remain separate, and this work adds no performance testing. The complete sequence and
+future-phase interactions are in docs/rbac-query-restructuring.md.
+
+**Checkpoint:** existing observable behavior is unchanged, cross-organization assignment state is
+rejected structurally, and all effective-access consumers use the canonical SQL relations.
+
 ## Phase 19 — org creation endpoint
 
 45. Proto schema: `schemas/organization.proto` (create/delete org). Run `make generate`.
@@ -183,7 +196,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 ## Phase 20 — org-scoped user management endpoints
 
 49. Extend `schemas/organization.proto` with a create-or-assign-user RPC: creates a user if none exists with the given email, then assigns them to the calling org; if the user already exists, only the org assignment happens. Add the organization-store membership operation used by this flow and replace direct membership inserts in test seed helpers with it. Anchored on the org's control project — the `x-project-id` metadata must be that project's ID. Run `make generate`. Depends on 45, 46.
-50. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an organization"). Also anchored on the org's control project; the request body additionally carries a project ID filter, resolved through the three-way union (24), not `org_membership`. Add reverse-lookup indexes on `org_membership(org_id)`, `project_role_assignments(project_id)`, and `org_role_assignments(org_id)` for these organization/project-first lookups and the later deletion cleanup. Run `make generate`. Depends on 45, 46.
+50. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an organization"). Also anchored on the org's control project; the request body additionally carries a project ID filter, resolved through the canonical effective-access relation introduced by the RBAC query restructuring, not `org_membership`. Add any organization/project-first indexes still needed for this listing and later deletion cleanup after accounting for the restructuring's final composite keys. Run `make generate`. Depends on 45, 46.
 51. Wire both endpoints behind the appropriate org-scoped permissions. Depends on 49, 50.
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
@@ -203,9 +216,9 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 
 **Checkpoint:** a project can be created end-to-end via the API within an existing org.
 
-## Phase 23 — org/project deletion cascade cleanup
+## Phase 23 — explicit org/project deletion cleanup
 
-57. Explicit cascade cleanup for org/project deletion (assignments and custom roles). Depends on 35, 46, 56.
+57. Explicit, ordered cleanup for org/project deletion (assignments and custom roles) in the same transaction. Foreign keys retain `NO ACTION`; do not use `ON DELETE CASCADE`. Depends on 35, 46, 56.
 
 **Checkpoint:** deleting an org or project leaves no dangling assignment/role/mapping rows.
 
@@ -225,7 +238,7 @@ system roles, but it cannot create, edit, or delete them. Custom roles never ent
 ## Phase 26 — RLS on assignment tables and the cross-user listing function
 
 61. RLS on `project_role_assignments` / `org_role_assignments` / `system_role_assignments`, keyed on `app.user_id`. Depends on 9, 22, 58.
-62. `SECURITY DEFINER` function for "list everyone with a role in project X". Depends on 61.
+62. `SECURITY DEFINER` function for "list everyone with a role in project X". Reuse the canonical project permission relation for the function's internal authorization check rather than duplicating the scope union. Depends on 61.
 
 **Checkpoint:** assignment-table RLS holds, and the one function that legitimately needs to see across users works correctly.
 
