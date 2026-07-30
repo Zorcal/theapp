@@ -5,10 +5,36 @@ DBMATE_SCHEMA_DIR=$(shell pwd)/internal/data/pgschema
 # deliberately together when there's a reason to.
 DBMATE_IMAGE=ghcr.io/amacneil/dbmate:2.33.0
 PG_IMAGE=postgres:17.10
+REPO_PREFIX=github.com/zorcal/theapp/backend/
 
 .PHONY: test
 test:
 	go test -p 4 ./...
+
+.PHONY: test-coverage
+test-coverage:
+	@go test -json -p 4 ./... -cover -count=1 \
+	| jq -r 'select(.Output?) | [.Package, .Output] | @tsv' \
+	| awk -F'\t' -v prefix="$(REPO_PREFIX)" '\
+		/coverage: .*% of statements/ { \
+			package = $$1; \
+			sub("^" prefix, "", package); \
+			coverage = $$2; \
+			sub(/^.*coverage: /, "", coverage); \
+			sub(/% of statements.*$$/, "", coverage); \
+			results[package] = coverage; \
+		} \
+		END { \
+			for (package in results) \
+				print package "\t" results[package] "%"; \
+		} \
+	' \
+	| sort -t $$'\t' -k2,2nr \
+	| { \
+		printf "PACKAGE\tCOVERAGE\n"; \
+		cat; \
+	} \
+	| column -t -s $$'\t'
 
 .PHONY: seed-dev-operator
 seed-dev-operator:
