@@ -258,7 +258,11 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 ## Phase 22 — project creation endpoint
 
 55. Extend `schemas/project.proto` and `ProjectService` with create/delete project RPCs. Run `make generate`.
-56. Project creation gRPC endpoint: wires 19 behind `project:create`, anchored on the org's default project the same way `org:create` anchors on `theapp/control`. Depends on 25, 55.
+56. Project creation gRPC endpoint: wires 19 behind the organization-scoped `project:create`
+    permission, anchored on the org's default project to resolve the target organization. Unlike
+    project-scoped `org:create` on `theapp/control`, `project:create` cannot be granted by a
+    project-scope role assignment because creating a sibling project changes organization-level
+    state. Depends on 25, 55.
 
 **Checkpoint:** a project can be created end-to-end via the API within an existing org.
 

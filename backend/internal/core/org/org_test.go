@@ -16,6 +16,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
+	"github.com/zorcal/theapp/backend/internal/data/pgschema"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
@@ -28,17 +29,22 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 	orgStore := pgorg.NewStore(pool)
 	rbacStore := pgrbac.NewStore(pool)
 	userStore := pguser.NewStore(pool)
-	core := NewCore(orgStore, pgdb.NewTransactor(pool))
+	core := NewCore(orgStore, rbacStore, pgdb.NewTransactor(pool))
 
 	diffOpts := cmp.Options{
 		cmpopts.IgnoreFields(mdl.Organization{}, "ID", "ControlProjectID"),
 		cmpopts.IgnoreFields(mdl.Project{}, "ID", "ETag"),
+		cmpopts.IgnoreFields(pgrbac.CustomRole{}, "ID", "ExternalID", "CreatedAt", "UpdatedAt", "ETag"),
 		cmpopts.EquateApproxTime(time.Minute),
+		cmpopts.SortSlices(func(a, b string) bool { return a < b }),
 	}
 
 	// Create an organization with its default and control projects.
 
-	createdOrg, err := core.CreateOrganization(ctx, mdl.CreateOrganization{Name: "acme", ProjectName: "acme"})
+	creator := seedUser(t, userStore, "organization-creator@test.com", "Organization Creator")
+
+	createCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{User: mdl.AuthUser{UserID: creator.ExternalID}})
+	createdOrg, err := core.CreateOrganization(createCtx, mdl.CreateOrganization{Name: "acme", ProjectName: "acme"})
 	if err != nil {
 		t.Fatalf("CreateOrganization() error = %v", err)
 	}
@@ -56,6 +62,22 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 	if createdOrg.ControlProjectID == 0 {
 		t.Error("CreateOrganization() ControlProjectID = 0, want non-zero")
 	}
+
+	// List the managed role assigned to the organization creator.
+
+	creatorRoles, creatorRoleCount, err := rbacStore.UserOrgCustomRoles(ctx, creator.ExternalID, createdOrg.ID, 50, 0)
+	if err != nil {
+		t.Fatalf("UserOrgCustomRoles() error = %v", err)
+	}
+	if wantCount := 1; creatorRoleCount != wantCount {
+		t.Errorf("UserOrgCustomRoles() total count = %d, want %d", creatorRoleCount, wantCount)
+	}
+
+	testingx.AssertDiff(t, creatorRoles, []pgrbac.CustomRole{{
+		Name:            "Organization Administrator",
+		ManagedKey:      new(mdl.ManagedRoleKeyOrganizationAdmin),
+		PermissionNames: permissionsToPg(mdl.OrganizationAdminPermissions()),
+	}}, diffOpts...)
 
 	// Create another project in the organization.
 
@@ -128,7 +150,64 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 	}
 }
 
+func TestCore_integration_organizationAdminSeedSynchronization(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := pgrbac.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+	core := NewCore(orgStore, rbacStore, pgdb.NewTransactor(pool))
+
+	// Create an organization with its managed administrator role.
+
+	creator := seedUser(t, userStore, "managed-role-sync@test.com", "Managed Role Sync")
+
+	createCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{User: mdl.AuthUser{UserID: creator.ExternalID}})
+	createdOrg, err := core.CreateOrganization(createCtx, mdl.CreateOrganization{
+		Name:        "managed-role-sync",
+		ProjectName: "managed-role-sync",
+	})
+	if err != nil {
+		t.Fatalf("CreateOrganization() error = %v", err)
+	}
+
+	roles, _, err := rbacStore.UserOrgCustomRoles(ctx, creator.ExternalID, createdOrg.ID, 50, 0)
+	if err != nil {
+		t.Fatalf("UserOrgCustomRoles() error = %v", err)
+	}
+	if wantCount := 1; len(roles) != wantCount {
+		t.Fatalf("UserOrgCustomRoles() count = %d, want %d", len(roles), wantCount)
+	}
+
+	// Replace its canonical permissions with a stale permission set.
+
+	staleRole := mustUpdateCustomRole(t, rbacStore, pgrbac.UpdateCustomRole{
+		OrgID:           createdOrg.ID,
+		ExternalID:      roles[0].ExternalID,
+		Fields:          pgrbac.CustomRoleUpdateFields{PermissionNames: true},
+		PermissionNames: []string{"custom-role:read", "org:create"},
+	})
+
+	// Reapply seed data and verify that it restores the canonical permission set.
+
+	if err := pgschema.Seed(ctx, pool); err != nil {
+		t.Fatalf("Seed() synchronization error = %v", err)
+	}
+
+	gotSynchronizedRole, err := rbacStore.CustomRoleByExternalID(ctx, createdOrg.ID, staleRole.ExternalID)
+	if err != nil {
+		t.Fatalf("CustomRoleByExternalID() error = %v", err)
+	}
+
+	wantSynchronizedRole := permissionsToPg(mdl.OrganizationAdminPermissions())
+
+	testingx.AssertDiff(t, gotSynchronizedRole.PermissionNames, wantSynchronizedRole, cmp.Options{
+		cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+	})
+}
+
 func TestCore_CreateOrganization(t *testing.T) {
+	creatorID := uuid.New()
 	orgStorer := &MockedOrgStorer{
 		CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
 			return pgorg.Organization{ID: 1, Name: co.Name}, nil
@@ -136,10 +215,24 @@ func TestCore_CreateOrganization(t *testing.T) {
 		CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
 			return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
 		},
+		AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+			return nil
+		},
 	}
-	core := NewCore(orgStorer, immediateTransactor{})
+	roleBootstrapper := &MockedRoleBootstrapperStore{
+		CreateOrganizationAdminRoleFunc: func(_ context.Context, _ int, _ []string) (pgrbac.CustomRole, error) {
+			return pgrbac.CustomRole{ExternalID: uuid.New()}, nil
+		},
+		AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+			return nil
+		},
+	}
+	core := NewCore(orgStorer, roleBootstrapper, immediateTransactor{})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+		User: mdl.AuthUser{UserID: creatorID},
+	})
 
-	got, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{Name: "acme", ProjectName: "acme"})
+	got, err := core.CreateOrganization(ctx, mdl.CreateOrganization{Name: "acme", ProjectName: "acme"})
 	if err != nil {
 		t.Fatalf("CreateOrganization() error = %v", err)
 	}
@@ -149,7 +242,7 @@ func TestCore_CreateOrganization(t *testing.T) {
 	testingx.AssertDiff(t, got, want)
 }
 
-func TestCore_CreateOrganization_error(t *testing.T) {
+func TestCore_BootstrapOrganization_error(t *testing.T) {
 	dbErr := errors.New("db error")
 
 	tests := []struct {
@@ -200,13 +293,242 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.orgStorer, immediateTransactor{})
+			core := NewCore(tt.orgStorer, nil, immediateTransactor{})
 
-			if _, err := core.CreateOrganization(t.Context(), tt.in); !errors.Is(err, tt.want) {
-				t.Errorf("CreateOrganization(%+v) error = %v, want %v", tt.in, err, tt.want)
+			if _, err := core.BootstrapOrganization(t.Context(), tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("BootstrapOrganization(%+v) error = %v, want %v", tt.in, err, tt.want)
 			}
 		})
 	}
+}
+
+func TestCore_CreateOrganization_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name                  string
+		orgStorer             *MockedOrgStorer
+		roleBootstrapperStore *MockedRoleBootstrapperStore
+		want                  error
+	}{
+		{
+			name: "default project organization not found",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, _ pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{}, sql.ErrNoRows
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{},
+			// A newly created organization cannot legitimately disappear within the transaction.
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "creator not found",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return sql.ErrNoRows
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{},
+			// A vanished authenticated creator is an internal consistency failure.
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "creator already a member",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return pgdb.ErrAlreadyExists
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{},
+			// A fresh organization cannot already contain its creator membership.
+			want: pgdb.ErrAlreadyExists,
+		},
+		{
+			name: "add creator as member store error",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return dbErr
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{},
+			want:                  dbErr,
+		},
+		{
+			name: "administrator role dependency not found",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return nil
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{
+				CreateOrganizationAdminRoleFunc: func(_ context.Context, _ int, _ []string) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			// The new organization and canonical permissions must exist at this point.
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "administrator role already exists",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return nil
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{
+				CreateOrganizationAdminRoleFunc: func(_ context.Context, _ int, _ []string) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, pgdb.ErrAlreadyExists
+				},
+			},
+			// A fresh organization cannot already contain its managed role.
+			want: pgdb.ErrAlreadyExists,
+		},
+		{
+			name: "create administrator role store error",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return nil
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{
+				CreateOrganizationAdminRoleFunc: func(_ context.Context, _ int, _ []string) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "administrator assignment dependency not found",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return nil
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{
+				CreateOrganizationAdminRoleFunc: func(_ context.Context, _ int, _ []string) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{ExternalID: uuid.New()}, nil
+				},
+				AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+					return sql.ErrNoRows
+				},
+			},
+			// Every assignment dependency was created earlier in the transaction.
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "administrator assignment already exists",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return nil
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{
+				CreateOrganizationAdminRoleFunc: func(_ context.Context, _ int, _ []string) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{ExternalID: uuid.New()}, nil
+				},
+				AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+					return pgdb.ErrAlreadyExists
+				},
+			},
+			// A newly created managed role cannot already be assigned to its creator.
+			want: pgdb.ErrAlreadyExists,
+		},
+		{
+			name: "assign administrator role store error",
+			orgStorer: &MockedOrgStorer{
+				CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+					return pgorg.Organization{ID: 1, Name: co.Name}, nil
+				},
+				CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+					return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+				},
+				AddOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
+					return nil
+				},
+			},
+			roleBootstrapperStore: &MockedRoleBootstrapperStore{
+				CreateOrganizationAdminRoleFunc: func(_ context.Context, _ int, _ []string) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{ExternalID: uuid.New()}, nil
+				},
+				AssignCustomRoleToOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error {
+					return dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
+				User: mdl.AuthUser{UserID: uuid.New()},
+			})
+			core := NewCore(tt.orgStorer, tt.roleBootstrapperStore, immediateTransactor{})
+
+			if _, err := core.CreateOrganization(ctx, mdl.CreateOrganization{Name: "acme", ProjectName: "acme"}); !errors.Is(err, tt.want) {
+				t.Errorf("CreateOrganization() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+
+	t.Run("missing auth data", func(t *testing.T) {
+		core := NewCore(&MockedOrgStorer{}, &MockedRoleBootstrapperStore{}, immediateTransactor{})
+
+		if _, err := core.CreateOrganization(t.Context(), mdl.CreateOrganization{Name: "acme", ProjectName: "acme"}); err == nil {
+			t.Error("CreateOrganization() error = nil, want error")
+		}
+	})
 }
 
 func TestCore_CreateProject(t *testing.T) {
@@ -215,7 +537,7 @@ func TestCore_CreateProject(t *testing.T) {
 			return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
 		},
 	}
-	core := NewCore(orgStorer, immediateTransactor{})
+	core := NewCore(orgStorer, nil, immediateTransactor{})
 
 	got, err := core.CreateProject(t.Context(), mdl.CreateProject{OrgID: 7, Name: "widgets"})
 	if err != nil {
@@ -275,7 +597,7 @@ func TestCore_CreateProject_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.orgStorer, immediateTransactor{})
+			core := NewCore(tt.orgStorer, nil, immediateTransactor{})
 
 			if _, err := core.CreateProject(t.Context(), tt.in); !errors.Is(err, tt.want) {
 				t.Errorf("CreateProject(%+v) error = %v, want %v", tt.in, err, tt.want)
@@ -290,7 +612,7 @@ func TestCore_OrganizationByName(t *testing.T) {
 			return pgorg.Organization{ID: 1, Name: name}, nil
 		},
 	}
-	core := NewCore(orgStorer, immediateTransactor{})
+	core := NewCore(orgStorer, nil, immediateTransactor{})
 
 	got, err := core.OrganizationByName(t.Context(), "acme")
 	if err != nil {
@@ -327,7 +649,7 @@ func TestCore_OrganizationByName_error(t *testing.T) {
 				OrganizationByNameFunc: func(_ context.Context, _ string) (pgorg.Organization, error) {
 					return pgorg.Organization{}, tt.mockErr
 				},
-			}, immediateTransactor{})
+			}, nil, immediateTransactor{})
 
 			if _, err := core.OrganizationByName(t.Context(), "acme"); !errors.Is(err, tt.want) {
 				t.Errorf("OrganizationByName() error = %v, want %v", err, tt.want)
@@ -342,7 +664,7 @@ func TestCore_ProjectByName(t *testing.T) {
 			return pgorg.Project{ID: 1, OrgID: orgID, Name: name}, nil
 		},
 	}
-	core := NewCore(orgStorer, immediateTransactor{})
+	core := NewCore(orgStorer, nil, immediateTransactor{})
 
 	got, err := core.ProjectByName(t.Context(), 7, "control")
 	if err != nil {
@@ -379,7 +701,7 @@ func TestCore_ProjectByName_error(t *testing.T) {
 				ProjectByNameFunc: func(_ context.Context, _ int, _ string) (pgorg.Project, error) {
 					return pgorg.Project{}, tt.mockErr
 				},
-			}, immediateTransactor{})
+			}, nil, immediateTransactor{})
 
 			if _, err := core.ProjectByName(t.Context(), 7, "control"); !errors.Is(err, tt.want) {
 				t.Errorf("ProjectByName() error = %v, want %v", err, tt.want)
@@ -404,7 +726,7 @@ func TestCore_AccessibleProjects(t *testing.T) {
 			return []pgorg.Project{mockedProject}, 1, nil
 		},
 	}
-	core := NewCore(orgStorer, immediateTransactor{})
+	core := NewCore(orgStorer, nil, immediateTransactor{})
 	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}})
 
 	got, totalSize, err := core.AccessibleProjects(ctx, filter, 10, 0)
@@ -460,7 +782,7 @@ func TestCore_AccessibleProjects_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.orgStorer, immediateTransactor{})
+			core := NewCore(tt.orgStorer, nil, immediateTransactor{})
 			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}})
 
 			if _, _, err := core.AccessibleProjects(ctx, mdl.ProjectFilter{}, 10, 0); !errors.Is(err, tt.want) {
@@ -470,7 +792,7 @@ func TestCore_AccessibleProjects_error(t *testing.T) {
 	}
 
 	t.Run("auth session missing", func(t *testing.T) {
-		core := NewCore(&MockedOrgStorer{}, immediateTransactor{})
+		core := NewCore(&MockedOrgStorer{}, nil, immediateTransactor{})
 
 		if _, _, err := core.AccessibleProjects(t.Context(), mdl.ProjectFilter{}, 10, 0); err == nil {
 			t.Error("AccessibleProjects() error = nil, want error")
@@ -501,4 +823,15 @@ func seedSystemRoleAssignment(t *testing.T, rbacStore *pgrbac.Store, userID uuid
 	if err := rbacStore.AssignSystemRole(t.Context(), userID, roleName); err != nil {
 		t.Fatalf("seed system role assignment (user %s, role %q): %v", userID, roleName, err)
 	}
+}
+
+func mustUpdateCustomRole(t *testing.T, rbacStore *pgrbac.Store, update pgrbac.UpdateCustomRole) pgrbac.CustomRole {
+	t.Helper()
+
+	role, err := rbacStore.UpdateCustomRole(t.Context(), update)
+	if err != nil {
+		t.Fatalf("seed custom role permissions: %v", err)
+	}
+
+	return role
 }

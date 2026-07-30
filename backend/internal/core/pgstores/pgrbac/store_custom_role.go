@@ -15,7 +15,7 @@ import (
 func (s *Store) CreateCustomRole(ctx context.Context, cr CreateCustomRole) (CustomRole, error) {
 	var role CustomRole
 
-	q := createCustomRoleQuery(cr)
+	q := createCustomRoleQuery(cr, nil)
 
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &role); err != nil {
@@ -25,6 +25,32 @@ func (s *Store) CreateCustomRole(ctx context.Context, cr CreateCustomRole) (Cust
 	}
 
 	if err := pgdb.RunBatchTx(ctx, s.pool, doInBatch); err != nil {
+		return CustomRole{}, err
+	}
+
+	return role, nil
+}
+
+// CreateOrganizationAdminRole creates an organization's canonical managed administrator role.
+// Returns [sql.ErrNoRows] if the organization or any permission does not exist.
+// Returns [pgdb.ErrAlreadyExists] if the organization already has a managed administrator role.
+func (s *Store) CreateOrganizationAdminRole(ctx context.Context, orgID int, permissionNames []string) (CustomRole, error) {
+	cr := CreateCustomRole{
+		OrgID:           orgID,
+		Name:            "Organization Administrator",
+		PermissionNames: permissionNames,
+	}
+	q := createCustomRoleQuery(cr, new("organization_admin"))
+
+	var role CustomRole
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &role); err != nil {
+			return fmt.Errorf("create organization administrator role: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
 		return CustomRole{}, err
 	}
 

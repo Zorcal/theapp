@@ -142,6 +142,8 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 	// after the test ends — at which point t.Context() is already canceled.
 	pool := pgtest.New(t, context.Background())
 
+	pgdbTransactor := pgdb.NewTransactor(pool)
+
 	pgUserStore := pguser.NewStore(pool)
 	pgAuthStore := pgauth.NewStore(pool)
 	pgOrgStore := pgorg.NewStore(pool)
@@ -161,10 +163,10 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 		RefreshTokenTTL:    720 * time.Hour,
 	}
 
-	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdb.NewTransactor(pool), authCoreCfg)
+	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdbTransactor, authCoreCfg)
 	userCore := user.NewCore(pgUserStore)
-	rbacCore := rbac.NewCore(pgRBACStore, pgdb.NewTransactor(pool))
-	orgCore := org.NewCore(pgOrgStore, pgdb.NewTransactor(pool))
+	rbacCore := rbac.NewCore(pgRBACStore, pgdbTransactor)
+	orgCore := org.NewCore(pgOrgStore, pgRBACStore, pgdbTransactor)
 
 	dbosCtx := dbostest.New(t, context.Background(), pool)
 

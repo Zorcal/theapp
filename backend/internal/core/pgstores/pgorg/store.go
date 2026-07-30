@@ -65,6 +65,27 @@ func (s *Store) CreateProject(ctx context.Context, cp CreateProject) (Project, e
 	return project, nil
 }
 
+// AddOrganizationMember adds a user to an organization.
+// Returns [sql.ErrNoRows] if the user or organization does not exist.
+// Returns [pgdb.ErrAlreadyExists] if the user is already an organization member.
+func (s *Store) AddOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error {
+	q := addOrganizationMemberQuery(userID, orgID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		var orgIDSink int
+		if err := q.Queue(ctx, b, &orgIDSink); err != nil {
+			return fmt.Errorf("add organization member: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // OrganizationByName returns the organization with the given name.
 // Returns [sql.ErrNoRows] if no such organization exists.
 func (s *Store) OrganizationByName(ctx context.Context, name string) (Organization, error) {

@@ -139,6 +139,82 @@ func TestStore_CreateCustomRole_error(t *testing.T) {
 	}
 }
 
+func TestStore_CreateOrganizationAdminRole(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := pgrbac.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "organization-admin-role-org")
+
+	got, err := rbacStore.CreateOrganizationAdminRole(ctx, org.ID, []string{
+		"project:create",
+		"custom-role:read",
+		"custom-role:read",
+	})
+	if err != nil {
+		t.Fatalf("CreateOrganizationAdminRole() error = %v", err)
+	}
+
+	want := pgrbac.CustomRole{
+		Name:            "Organization Administrator",
+		ManagedKey:      new("organization_admin"),
+		PermissionNames: []string{"custom-role:read", "project:create"},
+		CreatedAt:       time.Now(),
+	}
+
+	testingx.AssertDiff(t, got, want, cmp.Options{
+		cmpopts.IgnoreFields(pgrbac.CustomRole{}, "ID", "ExternalID", "ETag"),
+		cmpopts.EquateApproxTime(time.Minute),
+	})
+
+	if got.ID == 0 {
+		t.Error("CreateOrganizationAdminRole() ID = 0, want non-zero")
+	}
+	if got.ExternalID == uuid.Nil {
+		t.Error("CreateOrganizationAdminRole() ExternalID = zero UUID, want non-zero")
+	}
+	if got.ETag == uuid.Nil {
+		t.Error("CreateOrganizationAdminRole() ETag = zero UUID, want non-zero")
+	}
+}
+
+func TestStore_CreateOrganizationAdminRole_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	rbacStore := pgrbac.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "organization-admin-role-error-org")
+
+	tests := []struct {
+		name            string
+		orgID           int
+		permissionNames []string
+		want            error
+	}{
+		{
+			name:            "unknown organization",
+			orgID:           999999,
+			permissionNames: []string{"custom-role:read"},
+			want:            sql.ErrNoRows,
+		},
+		{
+			name:            "unknown permission",
+			orgID:           org.ID,
+			permissionNames: []string{"permission:unknown"},
+			want:            sql.ErrNoRows,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := rbacStore.CreateOrganizationAdminRole(ctx, tt.orgID, tt.permissionNames); !errors.Is(err, tt.want) {
+				t.Errorf("CreateOrganizationAdminRole() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestStore_UpdateCustomRole(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)

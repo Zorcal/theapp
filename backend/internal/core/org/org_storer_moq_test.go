@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 )
 
 // Ensure, that MockedOrgStorer does implement OrgStorer.
@@ -23,6 +24,9 @@ var _ OrgStorer = &MockedOrgStorer{}
 //		mockedOrgStorer := &MockedOrgStorer{
 //			AccessibleProjectsFunc: func(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter, pageSize int, pageOffset int) ([]pgorg.Project, int, error) {
 //				panic("mock out the AccessibleProjects method")
+//			},
+//			AddOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) error {
+//				panic("mock out the AddOrganizationMember method")
 //			},
 //			CreateOrganizationFunc: func(ctx context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
 //				panic("mock out the CreateOrganization method")
@@ -45,6 +49,9 @@ var _ OrgStorer = &MockedOrgStorer{}
 type MockedOrgStorer struct {
 	// AccessibleProjectsFunc mocks the AccessibleProjects method.
 	AccessibleProjectsFunc func(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter, pageSize int, pageOffset int) ([]pgorg.Project, int, error)
+
+	// AddOrganizationMemberFunc mocks the AddOrganizationMember method.
+	AddOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) error
 
 	// CreateOrganizationFunc mocks the CreateOrganization method.
 	CreateOrganizationFunc func(ctx context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error)
@@ -72,6 +79,15 @@ type MockedOrgStorer struct {
 			PageSize int
 			// PageOffset is the pageOffset argument value.
 			PageOffset int
+		}
+		// AddOrganizationMember holds details about calls to the AddOrganizationMember method.
+		AddOrganizationMember []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
 		}
 		// CreateOrganization holds details about calls to the CreateOrganization method.
 		CreateOrganization []struct {
@@ -104,11 +120,12 @@ type MockedOrgStorer struct {
 			Name string
 		}
 	}
-	lockAccessibleProjects sync.RWMutex
-	lockCreateOrganization sync.RWMutex
-	lockCreateProject      sync.RWMutex
-	lockOrganizationByName sync.RWMutex
-	lockProjectByName      sync.RWMutex
+	lockAccessibleProjects    sync.RWMutex
+	lockAddOrganizationMember sync.RWMutex
+	lockCreateOrganization    sync.RWMutex
+	lockCreateProject         sync.RWMutex
+	lockOrganizationByName    sync.RWMutex
+	lockProjectByName         sync.RWMutex
 }
 
 // AccessibleProjects calls AccessibleProjectsFunc.
@@ -156,6 +173,46 @@ func (mock *MockedOrgStorer) AccessibleProjectsCalls() []struct {
 	mock.lockAccessibleProjects.RLock()
 	calls = mock.calls.AccessibleProjects
 	mock.lockAccessibleProjects.RUnlock()
+	return calls
+}
+
+// AddOrganizationMember calls AddOrganizationMemberFunc.
+func (mock *MockedOrgStorer) AddOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error {
+	if mock.AddOrganizationMemberFunc == nil {
+		panic("MockedOrgStorer.AddOrganizationMemberFunc: method is nil but OrgStorer.AddOrganizationMember was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		OrgID:  orgID,
+	}
+	mock.lockAddOrganizationMember.Lock()
+	mock.calls.AddOrganizationMember = append(mock.calls.AddOrganizationMember, callInfo)
+	mock.lockAddOrganizationMember.Unlock()
+	return mock.AddOrganizationMemberFunc(ctx, userID, orgID)
+}
+
+// AddOrganizationMemberCalls gets all the calls that were made to AddOrganizationMember.
+// Check the length with:
+//
+//	len(mockedOrgStorer.AddOrganizationMemberCalls())
+func (mock *MockedOrgStorer) AddOrganizationMemberCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}
+	mock.lockAddOrganizationMember.RLock()
+	calls = mock.calls.AddOrganizationMember
+	mock.lockAddOrganizationMember.RUnlock()
 	return calls
 }
 
@@ -304,5 +361,145 @@ func (mock *MockedOrgStorer) ProjectByNameCalls() []struct {
 	mock.lockProjectByName.RLock()
 	calls = mock.calls.ProjectByName
 	mock.lockProjectByName.RUnlock()
+	return calls
+}
+
+// Ensure, that MockedRoleBootstrapperStore does implement RoleBootstrapperStore.
+// If this is not the case, regenerate this file with moq.
+var _ RoleBootstrapperStore = &MockedRoleBootstrapperStore{}
+
+// MockedRoleBootstrapperStore is a mock implementation of RoleBootstrapperStore.
+//
+//	func TestSomethingThatUsesRoleBootstrapperStore(t *testing.T) {
+//
+//		// make and configure a mocked RoleBootstrapperStore
+//		mockedRoleBootstrapperStore := &MockedRoleBootstrapperStore{
+//			AssignCustomRoleToOrgFunc: func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error {
+//				panic("mock out the AssignCustomRoleToOrg method")
+//			},
+//			CreateOrganizationAdminRoleFunc: func(ctx context.Context, orgID int, permissionNames []string) (pgrbac.CustomRole, error) {
+//				panic("mock out the CreateOrganizationAdminRole method")
+//			},
+//		}
+//
+//		// use mockedRoleBootstrapperStore in code that requires RoleBootstrapperStore
+//		// and then make assertions.
+//
+//	}
+type MockedRoleBootstrapperStore struct {
+	// AssignCustomRoleToOrgFunc mocks the AssignCustomRoleToOrg method.
+	AssignCustomRoleToOrgFunc func(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error
+
+	// CreateOrganizationAdminRoleFunc mocks the CreateOrganizationAdminRole method.
+	CreateOrganizationAdminRoleFunc func(ctx context.Context, orgID int, permissionNames []string) (pgrbac.CustomRole, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// AssignCustomRoleToOrg holds details about calls to the AssignCustomRoleToOrg method.
+		AssignCustomRoleToOrg []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// RoleID is the roleID argument value.
+			RoleID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
+		}
+		// CreateOrganizationAdminRole holds details about calls to the CreateOrganizationAdminRole method.
+		CreateOrganizationAdminRole []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// OrgID is the orgID argument value.
+			OrgID int
+			// PermissionNames is the permissionNames argument value.
+			PermissionNames []string
+		}
+	}
+	lockAssignCustomRoleToOrg       sync.RWMutex
+	lockCreateOrganizationAdminRole sync.RWMutex
+}
+
+// AssignCustomRoleToOrg calls AssignCustomRoleToOrgFunc.
+func (mock *MockedRoleBootstrapperStore) AssignCustomRoleToOrg(ctx context.Context, userID uuid.UUID, roleID uuid.UUID, orgID int) error {
+	if mock.AssignCustomRoleToOrgFunc == nil {
+		panic("MockedRoleBootstrapperStore.AssignCustomRoleToOrgFunc: method is nil but RoleBootstrapperStore.AssignCustomRoleToOrg was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		RoleID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		RoleID: roleID,
+		OrgID:  orgID,
+	}
+	mock.lockAssignCustomRoleToOrg.Lock()
+	mock.calls.AssignCustomRoleToOrg = append(mock.calls.AssignCustomRoleToOrg, callInfo)
+	mock.lockAssignCustomRoleToOrg.Unlock()
+	return mock.AssignCustomRoleToOrgFunc(ctx, userID, roleID, orgID)
+}
+
+// AssignCustomRoleToOrgCalls gets all the calls that were made to AssignCustomRoleToOrg.
+// Check the length with:
+//
+//	len(mockedRoleBootstrapperStore.AssignCustomRoleToOrgCalls())
+func (mock *MockedRoleBootstrapperStore) AssignCustomRoleToOrgCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	RoleID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		RoleID uuid.UUID
+		OrgID  int
+	}
+	mock.lockAssignCustomRoleToOrg.RLock()
+	calls = mock.calls.AssignCustomRoleToOrg
+	mock.lockAssignCustomRoleToOrg.RUnlock()
+	return calls
+}
+
+// CreateOrganizationAdminRole calls CreateOrganizationAdminRoleFunc.
+func (mock *MockedRoleBootstrapperStore) CreateOrganizationAdminRole(ctx context.Context, orgID int, permissionNames []string) (pgrbac.CustomRole, error) {
+	if mock.CreateOrganizationAdminRoleFunc == nil {
+		panic("MockedRoleBootstrapperStore.CreateOrganizationAdminRoleFunc: method is nil but RoleBootstrapperStore.CreateOrganizationAdminRole was just called")
+	}
+	callInfo := struct {
+		Ctx             context.Context
+		OrgID           int
+		PermissionNames []string
+	}{
+		Ctx:             ctx,
+		OrgID:           orgID,
+		PermissionNames: permissionNames,
+	}
+	mock.lockCreateOrganizationAdminRole.Lock()
+	mock.calls.CreateOrganizationAdminRole = append(mock.calls.CreateOrganizationAdminRole, callInfo)
+	mock.lockCreateOrganizationAdminRole.Unlock()
+	return mock.CreateOrganizationAdminRoleFunc(ctx, orgID, permissionNames)
+}
+
+// CreateOrganizationAdminRoleCalls gets all the calls that were made to CreateOrganizationAdminRole.
+// Check the length with:
+//
+//	len(mockedRoleBootstrapperStore.CreateOrganizationAdminRoleCalls())
+func (mock *MockedRoleBootstrapperStore) CreateOrganizationAdminRoleCalls() []struct {
+	Ctx             context.Context
+	OrgID           int
+	PermissionNames []string
+} {
+	var calls []struct {
+		Ctx             context.Context
+		OrgID           int
+		PermissionNames []string
+	}
+	mock.lockCreateOrganizationAdminRole.RLock()
+	calls = mock.calls.CreateOrganizationAdminRole
+	mock.lockCreateOrganizationAdminRole.RUnlock()
 	return calls
 }

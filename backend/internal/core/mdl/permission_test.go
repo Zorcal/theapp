@@ -62,7 +62,7 @@ func TestPermissionAssignmentScope(t *testing.T) {
 		},
 		{
 			name: "organization",
-			in:   PermissionCustomRoleAssignOrg,
+			in:   PermissionProjectCreate,
 			want: AssignmentScopeOrganization,
 		},
 		{

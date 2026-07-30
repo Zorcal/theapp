@@ -10,10 +10,11 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
-func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
+func createCustomRoleQuery(cr CreateCustomRole, managedKey *string) pgdb.TypedQuery[CustomRole] {
 	params := pgx.NamedArgs{
 		"org_id":           cr.OrgID,
 		"name":             cr.Name,
+		"managed_key":      managedKey,
 		"permission_names": cr.PermissionNames,
 	}
 
@@ -26,12 +27,12 @@ func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
 				FROM rbac.resolve_permissions(@permission_names::text[])
 			),
 			new_role AS (
-				INSERT INTO rbac.custom_roles (external_id, org_id, name, created_at, etag)
-				SELECT gen_random_uuid(), o.id, @name, NOW(), gen_random_uuid()
-				FROM org.organizations AS o
+				INSERT INTO rbac.custom_roles (external_id, org_id, name, managed_key, created_at, etag)
+				SELECT gen_random_uuid(), organization.id, @name, @managed_key, NOW(), gen_random_uuid()
+				FROM org.organizations AS organization
 				CROSS JOIN resolved_permissions
-				WHERE o.id = @org_id
-				RETURNING id, external_id, org_id, name, created_at, updated_at, etag
+				WHERE organization.id = @org_id
+				RETURNING id, external_id, name, managed_key, created_at, updated_at, etag
 			),
 			inserted_permissions AS (
 				INSERT INTO rbac.custom_role_permissions (role_id, permission_id)
@@ -45,7 +46,7 @@ func createCustomRoleQuery(cr CreateCustomRole) pgdb.TypedQuery[CustomRole] {
 			new_role.id,
 			new_role.external_id,
 			new_role.name,
-			NULL::text AS managed_key,
+			new_role.managed_key,
 			resolved_permissions.permission_names,
 			new_role.created_at,
 			new_role.updated_at,

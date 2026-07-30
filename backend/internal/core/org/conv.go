@@ -3,6 +3,7 @@ package org
 import (
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
+	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
 // defaultControlProjectName is the initial name given to a new organization's control project.
@@ -56,4 +57,8 @@ func projectsFromPg(projects []pgorg.Project) []mdl.Project {
 
 func projectFilterToPg(filter mdl.ProjectFilter) pgorg.ProjectFilter {
 	return pgorg.ProjectFilter{Name: filter.Name}
+}
+
+func permissionsToPg(permissions []mdl.Permission) []string {
+	return slicesx.Map(permissions, func(permission mdl.Permission) string { return string(permission) })
 }

@@ -57,7 +57,7 @@ func ensureOrganization(ctx context.Context, orgCore *org.Core, name, defaultPro
 			return mdl.Organization{}, fmt.Errorf("look up organization %q: %w", name, err)
 		}
 
-		o, err = orgCore.CreateOrganization(ctx, mdl.CreateOrganization{Name: name, ProjectName: defaultProjectName})
+		o, err = orgCore.BootstrapOrganization(ctx, mdl.CreateOrganization{Name: name, ProjectName: defaultProjectName})
 		if err != nil {
 			return mdl.Organization{}, fmt.Errorf("create organization %q: %w", name, err)
 		}

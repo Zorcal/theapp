@@ -11,10 +11,11 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
-//go:generate moq -rm -fmt goimports -out org_storer_moq_test.go . OrgStorer:MockedOrgStorer
+//go:generate moq -rm -fmt goimports -out org_storer_moq_test.go . OrgStorer:MockedOrgStorer RoleBootstrapperStore:MockedRoleBootstrapperStore
 
 // OrgStorer defines the database operations the Core requires.
 type OrgStorer interface {
@@ -26,6 +27,10 @@ type OrgStorer interface {
 	// Returns [sql.ErrNoRows] if no organization with that ID exists.
 	// Returns [pgdb.ErrAlreadyExists] if a project with the same name already exists in the organization.
 	CreateProject(ctx context.Context, cp pgorg.CreateProject) (pgorg.Project, error)
+	// AddOrganizationMember adds a user to an organization.
+	// Returns [sql.ErrNoRows] if the user or organization does not exist.
+	// Returns [pgdb.ErrAlreadyExists] if the user is already an organization member.
+	AddOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error
 	// OrganizationByName returns the organization with the given name.
 	// Returns [sql.ErrNoRows] if no such organization exists.
 	OrganizationByName(ctx context.Context, name string) (pgorg.Organization, error)
@@ -38,6 +43,15 @@ type OrgStorer interface {
 	AccessibleProjects(ctx context.Context, userID uuid.UUID, filter pgorg.ProjectFilter, pageSize, pageOffset int) ([]pgorg.Project, int, error)
 }
 
+// RoleBootstrapperStore defines the managed-role persistence operations required during
+// organization creation.
+type RoleBootstrapperStore interface {
+	// CreateOrganizationAdminRole creates an organization's canonical managed administrator role.
+	CreateOrganizationAdminRole(ctx context.Context, orgID int, permissionNames []string) (pgrbac.CustomRole, error)
+	// AssignCustomRoleToOrg assigns an organization-owned role to an organization member.
+	AssignCustomRoleToOrg(ctx context.Context, userID, roleID uuid.UUID, orgID int) error
+}
+
 // Transactor runs a function inside a database transaction.
 type Transactor interface {
 	RunTx(ctx context.Context, fn func(ctx context.Context) error) error
@@ -45,21 +59,42 @@ type Transactor interface {
 
 // Core holds the business logic for the organization and project domain.
 type Core struct {
-	orgStorer  OrgStorer
-	transactor Transactor
+	orgStorer             OrgStorer
+	roleBootstrapperStore RoleBootstrapperStore
+	transactor            Transactor
 }
 
-// NewCore constructs a Core backed by the provided OrgStorer and Transactor.
-func NewCore(os OrgStorer, tr Transactor) *Core {
-	return &Core{orgStorer: os, transactor: tr}
+// NewCore constructs a Core backed by the provided stores and Transactor.
+func NewCore(os OrgStorer, rb RoleBootstrapperStore, tr Transactor) *Core {
+	return &Core{orgStorer: os, roleBootstrapperStore: rb, transactor: tr}
 }
 
 // CreateOrganization creates a new organization, along with a default project named
-// co.ProjectName and a control project, and returns the created organization.
+// co.ProjectName and a control project. It also adds the authenticated user as a member,
+// creates the managed organization administrator role, assigns it to that user, and returns
+// the created organization.
 // Returns [mdl.ErrAlreadyExists] if an organization with the same name already exists.
 // Returns [mdl.ErrControlProjectNameConflict] if co.ProjectName collides with the org's control project.
 // Returns [mdl.ErrValidation] if co is invalid.
 func (c *Core) CreateOrganization(ctx context.Context, co mdl.CreateOrganization) (mdl.Organization, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return mdl.Organization{}, errors.New("auth session missing")
+	}
+
+	return c.createOrganization(ctx, co, &sess.User.UserID)
+}
+
+// BootstrapOrganization creates an organization without creator membership or managed role state.
+// It is reserved for establishing the system organization before its bootstrap user exists.
+func (c *Core) BootstrapOrganization(ctx context.Context, co mdl.CreateOrganization) (mdl.Organization, error) {
+	return c.createOrganization(ctx, co, nil)
+}
+
+// createOrganization creates the organization, control project, and default project in one
+// transaction. When creatorID is provided, the same transaction also adds the creator as an
+// organization member and assigns the canonical managed organization-administrator role.
+func (c *Core) createOrganization(ctx context.Context, co mdl.CreateOrganization, creatorID *uuid.UUID) (mdl.Organization, error) {
 	if err := co.Validate(); err != nil {
 		return mdl.Organization{}, fmt.Errorf("validate: %w", err)
 	}
@@ -77,9 +112,30 @@ func (c *Core) CreateOrganization(ctx context.Context, co mdl.CreateOrganization
 
 		if _, err := c.orgStorer.CreateProject(ctx, pgorg.CreateProject{OrgID: pgOrg.ID, Name: co.ProjectName}); err != nil {
 			if errors.Is(err, pgdb.ErrAlreadyExists) {
-				return mdl.ErrControlProjectNameConflict
+				return fmt.Errorf("create default project: %w", mdl.ErrControlProjectNameConflict)
 			}
+			// A missing organization here means the transaction lost the row it just created.
 			return fmt.Errorf("create default project: %w", err)
+		}
+
+		if creatorID == nil {
+			return nil
+		}
+
+		if err := c.orgStorer.AddOrganizationMember(ctx, *creatorID, pgOrg.ID); err != nil {
+			// The creator and organization were resolved before this internal bootstrap step.
+			return fmt.Errorf("add organization creator as member: %w", err)
+		}
+
+		adminRole, err := c.roleBootstrapperStore.CreateOrganizationAdminRole(ctx, pgOrg.ID, permissionsToPg(mdl.OrganizationAdminPermissions()))
+		if err != nil {
+			// Missing permissions or conflicting managed state indicate inconsistent system data.
+			return fmt.Errorf("create organization administrator role: %w", err)
+		}
+
+		if err := c.roleBootstrapperStore.AssignCustomRoleToOrg(ctx, *creatorID, adminRole.ExternalID, pgOrg.ID); err != nil {
+			// Every assignment dependency was created earlier in this transaction.
+			return fmt.Errorf("assign organization administrator role: %w", err)
 		}
 
 		return nil

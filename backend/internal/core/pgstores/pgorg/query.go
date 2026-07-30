@@ -105,6 +105,28 @@ func createProjectQuery(cp CreateProject) pgdb.TypedQuery[Project] {
 	}
 }
 
+func addOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID}
+	const sql = `
+		INSERT INTO org.org_membership (org_id, user_id)
+		SELECT organization.id, usr.id
+		FROM org.organizations AS organization
+		CROSS JOIN useraccess.users AS usr
+		WHERE organization.id = @org_id
+			AND usr.external_id = @user_id
+		RETURNING org_id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func accessibleProjectsQuery(userID uuid.UUID, filter ProjectFilter, pageSize, pageOffset int) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{
 		"user_id":     userID,

@@ -306,9 +306,10 @@ assignments at both organization and project scope. It therefore holds `custom-r
 `custom-role:unassign-org`, `custom-role:read-project-assignments`,
 `custom-role:assign-project`, and `custom-role:unassign-project`. It also holds the ordinary
 `project:create` permission. Project creation anchors on the organization's default project the
-same way organization creation anchors on `theapp/control`: the metadata project resolves the
-organization, and the organization-scoped assignment grants authority through the canonical
-project permission relation.
+same way organization creation anchors on `theapp/control`, but `project:create` has organization
+minimum scope because creating a sibling project changes organization-level state. The metadata
+project resolves the organization, and only an organization- or system-scoped assignment can grant
+the permission; a project-scoped custom-role assignment cannot.
 
 The canonical organization-admin permission set is defined once for new organization creation.
 After permission seeding, an idempotent add-only reconciliation grants any missing canonical

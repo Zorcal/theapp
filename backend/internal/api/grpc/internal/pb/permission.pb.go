@@ -46,6 +46,8 @@ const (
 	Permission_PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS      Permission = 15
 	Permission_PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS Permission = 16
 	Permission_PERMISSION_PROJECT_DISCOVER_ALL                      Permission = 17
+	Permission_PERMISSION_ORGANIZATION_CREATE                       Permission = 18
+	Permission_PERMISSION_PROJECT_CREATE                            Permission = 19
 )
 
 // Enum value maps for Permission.
@@ -69,6 +71,8 @@ var (
 		15: "PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS",
 		16: "PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS",
 		17: "PERMISSION_PROJECT_DISCOVER_ALL",
+		18: "PERMISSION_ORGANIZATION_CREATE",
+		19: "PERMISSION_PROJECT_CREATE",
 	}
 	Permission_value = map[string]int32{
 		"PERMISSION_UNSPECIFIED":                               0,
@@ -89,6 +93,8 @@ var (
 		"PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS":      15,
 		"PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS": 16,
 		"PERMISSION_PROJECT_DISCOVER_ALL":                      17,
+		"PERMISSION_ORGANIZATION_CREATE":                       18,
+		"PERMISSION_PROJECT_CREATE":                            19,
 	}
 )
 
@@ -320,7 +326,7 @@ const file_permission_proto_rawDesc = "" +
 	"\x18minimum_assignment_scope\x18\x02 \x01(\x0e2\x1a.theapp.v1.AssignmentScopeR\x16minimumAssignmentScope\"\x18\n" +
 	"\x16ListPermissionsRequest\"\\\n" +
 	"\x17ListPermissionsResponse\x12A\n" +
-	"\vpermissions\x18\x01 \x03(\v2\x1f.theapp.v1.PermissionDescriptorR\vpermissions*\xbb\x05\n" +
+	"\vpermissions\x18\x01 \x03(\v2\x1f.theapp.v1.PermissionDescriptorR\vpermissions*\xfe\x05\n" +
 	"\n" +
 	"Permission\x12\x1a\n" +
 	"\x16PERMISSION_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -341,7 +347,9 @@ const file_permission_proto_rawDesc = "" +
 	",PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION\x10\x0e\x123\n" +
 	"/PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS\x10\x0f\x128\n" +
 	"4PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS\x10\x10\x12#\n" +
-	"\x1fPERMISSION_PROJECT_DISCOVER_ALL\x10\x11*\x91\x01\n" +
+	"\x1fPERMISSION_PROJECT_DISCOVER_ALL\x10\x11\x12\"\n" +
+	"\x1ePERMISSION_ORGANIZATION_CREATE\x10\x12\x12\x1d\n" +
+	"\x19PERMISSION_PROJECT_CREATE\x10\x13*\x91\x01\n" +
 	"\x0fAssignmentScope\x12 \n" +
 	"\x1cASSIGNMENT_SCOPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18ASSIGNMENT_SCOPE_PROJECT\x10\x01\x12!\n" +

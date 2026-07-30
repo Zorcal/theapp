@@ -37,8 +37,8 @@ const (
 	PermissionUserUpdate Permission = "user:update"
 )
 
-// All system role service permissions. System role permissions are system-wide rather than
-// project- or org-scoped — they can only be granted through a system-scope role assignment.
+// All system role service permissions are system-wide, can only be granted through a system-scope
+// role assignment, and have endpoints anchored on the theapp organization's control project.
 const (
 	PermissionSystemRoleRead     Permission = "system-role:read"
 	PermissionSystemRoleAssign   Permission = "system-role:assign"
@@ -47,6 +47,19 @@ const (
 
 // PermissionProjectDiscoverAll allows a system-scoped role to make every project discoverable.
 const PermissionProjectDiscoverAll Permission = "project:discover-all"
+
+// Organization and project lifecycle permissions.
+const (
+	// PermissionOrgCreate is project-scoped and anchored on the theapp organization's control
+	// project. This restricts organization creation to callers explicitly authorized through that
+	// permanent system project.
+	PermissionOrgCreate Permission = "org:create"
+
+	// PermissionProjectCreate is organization-scoped and anchored on the target organization's
+	// default project for request-context resolution. Creating a sibling project changes
+	// organization-level state, so a project-scope role assignment cannot grant it.
+	PermissionProjectCreate Permission = "project:create"
+)
 
 // All custom role service permissions. They authorize role management only within the organization
 // resolved from the request's project context.
@@ -73,6 +86,8 @@ func AllPermissions() []Permission {
 		PermissionSystemRoleAssign,
 		PermissionSystemRoleUnassign,
 		PermissionProjectDiscoverAll,
+		PermissionOrgCreate,
+		PermissionProjectCreate,
 		PermissionCustomRoleCreate,
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
@@ -113,6 +128,26 @@ func PermissionsAssignableToCustomRoles() []Permission {
 		PermissionCustomRoleUnassignOrg,
 		PermissionCustomRoleReadProjectAssignments,
 		PermissionCustomRoleReadOrgAssignments,
+		PermissionOrgCreate,
+		PermissionProjectCreate,
+	}
+}
+
+// OrganizationAdminPermissions returns the canonical permissions held by every managed
+// organization administrator role.
+func OrganizationAdminPermissions() []Permission {
+	return []Permission{
+		PermissionProjectCreate,
+		PermissionCustomRoleCreate,
+		PermissionCustomRoleRead,
+		PermissionCustomRoleUpdate,
+		PermissionCustomRoleDelete,
+		PermissionCustomRoleAssignProject,
+		PermissionCustomRoleUnassignProject,
+		PermissionCustomRoleAssignOrg,
+		PermissionCustomRoleUnassignOrg,
+		PermissionCustomRoleReadProjectAssignments,
+		PermissionCustomRoleReadOrgAssignments,
 	}
 }
 
@@ -128,11 +163,13 @@ func PermissionAssignmentScope(permission Permission) AssignmentScope {
 		PermissionCustomRoleDelete,
 		PermissionCustomRoleAssignOrg,
 		PermissionCustomRoleUnassignOrg,
-		PermissionCustomRoleReadOrgAssignments:
+		PermissionCustomRoleReadOrgAssignments,
+		PermissionProjectCreate:
 		return AssignmentScopeOrganization
 	case PermissionCustomRoleAssignProject,
 		PermissionCustomRoleUnassignProject,
-		PermissionCustomRoleReadProjectAssignments:
+		PermissionCustomRoleReadProjectAssignments,
+		PermissionOrgCreate:
 		return AssignmentScopeProject
 	default:
 		// Permissions are defined by the backend's closed permission registry. Reaching this
