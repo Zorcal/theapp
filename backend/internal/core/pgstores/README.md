@@ -48,6 +48,19 @@ func (s *Store) GetThing(ctx context.Context, id uuid.UUID) (Thing, error) {
 - The `Expect` field determines which queue method to use: `ExpectOne` → `.Queue()`, `ExpectMany` → `.QueueMany()`. A mismatch panics at runtime.
 - Use `pgx.NamedArgs` for query parameters — `@param_name` placeholders in SQL, collected into a `pgx.NamedArgs` map. Never use positional `$1`, `$2`, etc. Declare the `params` variable before the SQL string.
 
+## Locking
+
+Prefer transaction-level advisory locks when application operations must be serialized. Advisory
+locks express the application invariant directly without adding row-lock conflicts to otherwise
+independent reads, updates, or foreign-key inserts. Namespace every advisory lock so unrelated
+features cannot contend, acquire it inside the transaction it protects, and use a consistent
+ordering when an operation needs more than one lock.
+
+Any other locking mechanism must be justified in a nearby comment. The justification must explain
+which invariant requires the lock, why an advisory lock is insufficient, why the selected lock mode
+is the least restrictive correct mode, and how it interacts with foreign keys and concurrent
+queries.
+
 ## Testing
 
 - Declare every test file in an external test package named `<package>_test` (for example,
