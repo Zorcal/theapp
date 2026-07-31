@@ -148,7 +148,7 @@ func (s *authService) GetAuthContext(ctx context.Context, req *pb.GetAuthContext
 	authCtx, err := s.authCore.AuthContext(ctx)
 	if err != nil {
 		if errors.Is(err, mdl.ErrNotFound) {
-			return nil, status.Error(codes.NotFound, "auth context not found")
+			return nil, status.Error(codes.NotFound, "user or project not found")
 		}
 		return nil, fmt.Errorf("get auth context: %w", err)
 	}

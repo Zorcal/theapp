@@ -85,6 +85,27 @@ Wire up `pgdb.NewTransactor(pool)` at the composition root (`main.go`). `*pgdb.T
 
 Nesting is safe: if `RunTx` is called with a context that already carries a transaction, it reuses it and leaves commit/rollback to the outer caller.
 
+## Error handling
+
+Exported core methods translate store errors into caller-facing `mdl` errors. Unexported helpers
+return wrapped SQL errors unchanged, using a private contextual error only when callers must
+distinguish otherwise identical failures.
+
+Wrap errors with `fmt.Errorf` when the added context makes the log line meaningfully easier to debug — when without it a
+reader couldn't tell where in the call stack the error came from or what was being attempted.
+
+Translate a known SQL error when it represents an expected result of caller input. Leave it wrapped
+when an earlier stage of the same transaction already established and protected the relevant state;
+the error then indicates an internal failure. Checks performed outside the current transaction do
+not provide that guarantee.
+
+Document caller-facing `mdl` errors on exported core methods and matching consumer interfaces. Only
+those documented errors should be treated as expected by consumers of the core.
+
+Document every known SQL error that deliberately remains internal with a nearby comment explaining
+why it must not be remapped. Cover the case in a test, expect the original SQL error, and repeat the
+explanation immediately before the expectation.
+
 ## Testing
 
 Each core package uses two complementary layers of tests:

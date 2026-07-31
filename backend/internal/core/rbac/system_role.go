@@ -11,6 +11,7 @@ import (
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
+	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
 // SystemRoles returns a page of system roles, along with the total count.
@@ -39,7 +40,7 @@ func (c *Core) UserSystemRoles(ctx context.Context, userID uuid.UUID, pageSize, 
 
 // AssignSystemRole grants targetUserID the system role named roleName at system scope.
 // The actor is read from the auth session in ctx.
-// Returns [mdl.ErrNotFound] if the target user or system role does not exist.
+// Returns [mdl.ErrNotFound] if the actor, target user, or system role does not exist.
 // Returns [mdl.ErrPermissionDenied] if the actor's system-scope permissions are not a superset of the role's.
 // Returns [mdl.ErrAlreadyExists] if the target user already has the system role.
 func (c *Core) AssignSystemRole(ctx context.Context, targetUserID uuid.UUID, roleName string) error {
@@ -54,11 +55,21 @@ func (c *Core) AssignSystemRole(ctx context.Context, targetUserID uuid.UUID, rol
 		}
 
 		if _, err := c.authorizeSystemRoleChange(ctx, sess.User.UserID, roleName); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("authorize system role change: %w", mdl.ErrNotFound)
+			}
 			return fmt.Errorf("authorize system role change: %w", err)
 		}
 
 		if err := c.roleStorer.AssignSystemRole(ctx, targetUserID, roleName); err != nil {
-			return fmt.Errorf("assign system role: %w", handleAssignmentError(err))
+			switch {
+			case errors.Is(err, sql.ErrNoRows):
+				return fmt.Errorf("assign system role: %w", mdl.ErrNotFound)
+			case errors.Is(err, pgdb.ErrAlreadyExists):
+				return fmt.Errorf("assign system role: %w", mdl.ErrAlreadyExists)
+			default:
+				return fmt.Errorf("assign system role: %w", err)
+			}
 		}
 
 		return nil
@@ -71,7 +82,7 @@ func (c *Core) AssignSystemRole(ctx context.Context, targetUserID uuid.UUID, rol
 
 // UnassignSystemRole revokes the system role named roleName from targetUserID.
 // The actor is read from the auth session in ctx.
-// Returns [mdl.ErrNotFound] if the target user, role, or assignment does not exist.
+// Returns [mdl.ErrNotFound] if the actor, target user, role, or assignment does not exist.
 // Returns [mdl.ErrPermissionDenied] if the actor's system-scope permissions are not a superset of the role's.
 // Returns [mdl.ErrLastFullyPrivilegedSystemAdmin] if the change would leave no fully privileged
 // system administrator.
@@ -92,15 +103,24 @@ func (c *Core) UnassignSystemRole(ctx context.Context, targetUserID uuid.UUID, r
 
 		role, err := c.authorizeSystemRoleChange(ctx, sess.User.UserID, roleName)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("authorize system role change: %w", mdl.ErrNotFound)
+			}
 			return fmt.Errorf("authorize system role change: %w", err)
 		}
 
 		if err := c.ensureFullyPrivilegedSystemUserRemains(ctx, targetUserID, role.Name); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("ensure fully privileged system user remains: %w", mdl.ErrNotFound)
+			}
 			return fmt.Errorf("ensure fully privileged system user remains: %w", err)
 		}
 
 		if err := c.roleStorer.UnassignSystemRole(ctx, targetUserID, roleName); err != nil {
-			return fmt.Errorf("unassign system role: %w", handleAssignmentError(err))
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("unassign system role: %w", mdl.ErrNotFound)
+			}
+			return fmt.Errorf("unassign system role: %w", err)
 		}
 
 		return nil
@@ -120,7 +140,14 @@ func (c *Core) BootstrapAssignSystemRole(ctx context.Context, userID uuid.UUID, 
 		}
 
 		if err := c.roleStorer.AssignSystemRole(ctx, userID, roleName); err != nil {
-			return fmt.Errorf("assign system role: %w", handleAssignmentError(err))
+			switch {
+			case errors.Is(err, sql.ErrNoRows):
+				return fmt.Errorf("assign system role: %w", mdl.ErrNotFound)
+			case errors.Is(err, pgdb.ErrAlreadyExists):
+				return fmt.Errorf("assign system role: %w", mdl.ErrAlreadyExists)
+			default:
+				return fmt.Errorf("assign system role: %w", err)
+			}
 		}
 
 		return nil
@@ -139,9 +166,6 @@ func (c *Core) authorizeSystemRoleChange(ctx context.Context, actorUserID uuid.U
 	// between this check and the target's update.
 	role, err := c.roleStorer.SystemRoleByName(ctx, roleName)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return pgrbac.SystemRole{}, mdl.ErrNotFound
-		}
 		return pgrbac.SystemRole{}, fmt.Errorf("system role: %w", err)
 	}
 
@@ -165,9 +189,6 @@ func (c *Core) authorizeSystemRoleChange(ctx context.Context, actorUserID uuid.U
 func (c *Core) ensureFullyPrivilegedSystemUserRemains(ctx context.Context, targetUserID uuid.UUID, roleName string) error {
 	remain, err := c.roleStorer.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, targetUserID, roleName)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return mdl.ErrNotFound
-		}
 		return fmt.Errorf("fully privileged system user after unassign: %w", err)
 	}
 

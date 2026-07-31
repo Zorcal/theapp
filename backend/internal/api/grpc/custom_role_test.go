@@ -368,16 +368,6 @@ func TestRoleService_CreateRole_error(t *testing.T) {
 			want: status.New(codes.InvalidArgument, "invalid role"),
 		},
 		{
-			name: "organization or permission not found",
-			customRoleCore: &MockedCustomRoleCore{
-				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
-					return mdl.CustomRole{}, mdl.ErrNotFound
-				},
-			},
-			in:   &pb.CreateRoleRequest{Role: &pb.Role{Name: "role manager"}},
-			want: status.New(codes.NotFound, "organization or permission not found"),
-		},
-		{
 			name: "permission denied",
 			customRoleCore: &MockedCustomRoleCore{
 				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
@@ -386,6 +376,16 @@ func TestRoleService_CreateRole_error(t *testing.T) {
 			},
 			in:   &pb.CreateRoleRequest{Role: &pb.Role{Name: "role manager"}},
 			want: status.New(codes.PermissionDenied, "caller cannot add role permissions"),
+		},
+		{
+			name: "caller or project not found",
+			customRoleCore: &MockedCustomRoleCore{
+				CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.CreateRoleRequest{Role: &pb.Role{Name: "role manager"}},
+			want: status.New(codes.NotFound, "caller or project not found"),
 		},
 		{
 			name: "core error",

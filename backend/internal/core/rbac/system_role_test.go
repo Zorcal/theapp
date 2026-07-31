@@ -381,6 +381,19 @@ func TestCore_AssignSystemRole_error(t *testing.T) {
 			want: mdl.ErrAlreadyExists,
 		},
 		{
+			name: "actor not found",
+			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
+					return pgrbac.SystemRole{}, nil
+				},
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+					return nil, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
 			name: "actor permissions store error",
 			roleStorer: &MockedRoleStorer{
 				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
@@ -557,6 +570,20 @@ func TestCore_UnassignSystemRole_error(t *testing.T) {
 				},
 			},
 			want: mdl.ErrPermissionDenied,
+		},
+		{
+			name: "actor not found",
+			roleStorer: &MockedRoleStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				LockSystemRoleUserFunc:       func(_ context.Context, _ uuid.UUID) error { return nil },
+				SystemRoleByNameFunc: func(_ context.Context, _ string) (pgrbac.SystemRole, error) {
+					return pgrbac.SystemRole{}, nil
+				},
+				SystemPermissionsFunc: func(_ context.Context, _ uuid.UUID) ([]string, error) {
+					return nil, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
 		},
 		{
 			name: "actor permissions store error",

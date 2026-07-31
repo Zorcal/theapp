@@ -575,6 +575,45 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 		}
 	})
 
+	t.Run("mark email verified", func(t *testing.T) {
+		rawToken, tokenHash := mustGenerateToken(t)
+
+		authStorerMock := &MockedAuthStorer{
+			MagicLinkTokenByHashFunc: func(_ context.Context, hash string) (pgauth.MagicLinkToken, error) {
+				if hash != tokenHash {
+					return pgauth.MagicLinkToken{}, sql.ErrNoRows
+				}
+				return pgauth.MagicLinkToken{
+					ID:             1,
+					UserID:         1,
+					UserExternalID: uuid.New(),
+					ExpiresAt:      time.Now().Add(15 * time.Minute),
+				}, nil
+			},
+			ConsumeMagicLinkTokenFunc: func(_ context.Context, _ int) error {
+				return nil
+			},
+		}
+		userStorerMock := &MockedUserStorer{
+			MarkEmailVerifiedFunc: func(_ context.Context, _ uuid.UUID) error {
+				return sql.ErrNoRows
+			},
+		}
+		core := NewCore(
+			authStorerMock,
+			userStorerMock,
+			&MockedPermissionStorer{},
+			immediateTransactor{},
+			testConfig(),
+		)
+
+		// The persisted token still references the user through a foreign key, so sql.ErrNoRows
+		// must remain an internal error.
+		if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: rawToken}); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("VerifyMagicLink() error = %v, want wrapping %v", err, sql.ErrNoRows)
+		}
+	})
+
 	t.Run("refresh token creation", func(t *testing.T) {
 		rawToken, tokenHash := mustGenerateToken(t)
 		createErr := errors.New("db error")

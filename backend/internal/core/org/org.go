@@ -15,6 +15,10 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
+// errOrgCreatorNotFound distinguishes a missing authenticated creator from other sql.ErrNoRows
+// failures so CreateOrganization can map it at the exported core boundary.
+var errOrgCreatorNotFound = errors.New("organization creator not found")
+
 //go:generate moq -rm -fmt goimports -out org_storer_moq_test.go . OrgStorer:MockedOrgStorer RoleBootstrapperStore:MockedRoleBootstrapperStore
 
 // OrgStorer defines the database operations the Core requires.
@@ -75,6 +79,7 @@ func NewCore(os OrgStorer, rb RoleBootstrapperStore, tr Transactor) *Core {
 // the created organization.
 // Returns [mdl.ErrAlreadyExists] if an organization with the same name already exists.
 // Returns [mdl.ErrControlProjectNameConflict] if co.ProjectName collides with the org's control project.
+// Returns [mdl.ErrNotFound] if the authenticated creator no longer exists.
 // Returns [mdl.ErrValidation] if co is invalid.
 func (c *Core) CreateOrganization(ctx context.Context, co mdl.CreateOrganization) (mdl.Organization, error) {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
@@ -82,7 +87,15 @@ func (c *Core) CreateOrganization(ctx context.Context, co mdl.CreateOrganization
 		return mdl.Organization{}, errors.New("auth session missing")
 	}
 
-	return c.createOrganization(ctx, co, &sess.User.UserID)
+	organization, err := c.createOrganization(ctx, co, &sess.User.UserID)
+	if err != nil {
+		if errors.Is(err, errOrgCreatorNotFound) {
+			return mdl.Organization{}, fmt.Errorf("create organization: %w", mdl.ErrNotFound)
+		}
+		return mdl.Organization{}, fmt.Errorf("create organization: %w", err)
+	}
+
+	return organization, nil
 }
 
 // BootstrapOrganization creates an organization without creator membership or managed role state.
@@ -114,7 +127,8 @@ func (c *Core) createOrganization(ctx context.Context, co mdl.CreateOrganization
 			if errors.Is(err, pgdb.ErrAlreadyExists) {
 				return fmt.Errorf("create default project: %w", mdl.ErrControlProjectNameConflict)
 			}
-			// A missing organization here means the transaction lost the row it just created.
+			// The organization was created earlier in this transaction, so sql.ErrNoRows is an
+			// impossible state that must remain an internal error.
 			return fmt.Errorf("create default project: %w", err)
 		}
 
@@ -123,18 +137,26 @@ func (c *Core) createOrganization(ctx context.Context, co mdl.CreateOrganization
 		}
 
 		if err := c.orgStorer.AddOrganizationMember(ctx, *creatorID, pgOrg.ID); err != nil {
-			// The creator and organization were resolved before this internal bootstrap step.
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: %w", errOrgCreatorNotFound, err)
+			}
+			// pgdb.ErrAlreadyExists is impossible because a new organization cannot already
+			// contain its creator membership, so it must remain an internal error.
 			return fmt.Errorf("add organization creator as member: %w", err)
 		}
 
 		adminRole, err := c.roleBootstrapperStore.CreateOrganizationAdminRole(ctx, pgOrg.ID, permissionsToPg(mdl.OrganizationAdminPermissions()))
 		if err != nil {
-			// Missing permissions or conflicting managed state indicate inconsistent system data.
+			// sql.ErrNoRows is impossible because the organization and canonical permissions were
+			// established earlier. pgdb.ErrAlreadyExists is impossible because a new organization
+			// cannot already contain its managed role. Both must remain internal errors.
 			return fmt.Errorf("create organization administrator role: %w", err)
 		}
 
 		if err := c.roleBootstrapperStore.AssignCustomRoleToOrg(ctx, *creatorID, adminRole.ExternalID, pgOrg.ID); err != nil {
-			// Every assignment dependency was created earlier in this transaction.
+			// sql.ErrNoRows is impossible because the assignment dependencies were established
+			// earlier. pgdb.ErrAlreadyExists is impossible because a new role cannot already be
+			// assigned to its creator. Both must remain internal errors.
 			return fmt.Errorf("assign organization administrator role: %w", err)
 		}
 

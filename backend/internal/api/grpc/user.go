@@ -31,6 +31,7 @@ type UserCore interface {
 	// UserByID returns the user with the given ID.
 	// Returns [mdl.ErrNotFound] if no user with that ID exists.
 	UserByID(ctx context.Context, id uuid.UUID) (mdl.User, error)
+	// Users returns a page of users matching filter, ordered by orderBys, and the total count.
 	Users(ctx context.Context, filter mdl.UserFilter, orderBys []order.By[mdl.UserOrderByField], pageSize, pageOffset int) (usrs []mdl.User, totalCount int, err error)
 	// CreateUser creates a new user and returns the created user.
 	// Returns [mdl.ErrAlreadyExists] if a user with the same email already exists.

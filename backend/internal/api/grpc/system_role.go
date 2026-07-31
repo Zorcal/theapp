@@ -27,17 +27,18 @@ type systemRoleService struct {
 //go:generate moq -rm -fmt goimports -out system_role_core_moq_test.go . SystemRoleCore:MockedSystemRoleCore SystemRoleOrganizationCore:MockedSystemRoleOrganizationCore
 
 type SystemRoleCore interface {
+	// SystemRoles returns a page of system roles and the total count.
 	SystemRoles(ctx context.Context, pageSize, pageOffset int) ([]mdl.SystemRole, int, error)
 	// UserSystemRoles returns a page of system roles assigned to userID.
 	// Returns [mdl.ErrNotFound] if no user with that ID exists.
 	UserSystemRoles(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]mdl.SystemRole, int, error)
 	// AssignSystemRole grants userID the system role named roleName.
-	// Returns [mdl.ErrNotFound] if the user or system role does not exist.
+	// Returns [mdl.ErrNotFound] if the actor, user, or system role does not exist.
 	// Returns [mdl.ErrPermissionDenied] if the actor may not assign the role.
 	// Returns [mdl.ErrAlreadyExists] if the user already has the role.
 	AssignSystemRole(ctx context.Context, userID uuid.UUID, roleName string) error
 	// UnassignSystemRole revokes the system role named roleName from userID.
-	// Returns [mdl.ErrNotFound] if the user, system role, or assignment does not exist.
+	// Returns [mdl.ErrNotFound] if the actor, user, system role, or assignment does not exist.
 	// Returns [mdl.ErrPermissionDenied] if the actor may not unassign the role.
 	// Returns [mdl.ErrLastFullyPrivilegedSystemAdmin] if the change would leave no fully privileged
 	// system administrator.

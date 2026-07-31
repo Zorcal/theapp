@@ -158,6 +158,69 @@ func TestStore_CreateProject_error(t *testing.T) {
 	})
 }
 
+func TestStore_AddOrganizationMember(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "membership-org")
+	user := seedUser(t, userStore, "membership-user@test.com")
+
+	if err := orgStore.AddOrganizationMember(ctx, user.ExternalID, org.ID); err != nil {
+		t.Fatalf("AddOrganizationMember() error = %v", err)
+	}
+
+	if exists := checkOrgMembership(t, pool, user.ID, org.ID); !exists {
+		t.Error("AddOrganizationMember() organization membership does not exist")
+	}
+}
+
+func TestStore_AddOrganizationMember_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	notFoundOrg := seedOrg(t, orgStore, "membership-not-found-org")
+	notFoundUser := seedUser(t, userStore, "membership-not-found-user@test.com")
+	existingOrg := seedOrg(t, orgStore, "membership-already-exists-org")
+	existingUser := seedUser(t, userStore, "membership-already-exists-user@test.com")
+	seedOrgMembership(t, pool, existingUser.ID, existingOrg.ID)
+
+	t.Run("not found", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			userID uuid.UUID
+			orgID  int
+		}{
+			{
+				name:   "user",
+				userID: uuid.New(),
+				orgID:  notFoundOrg.ID,
+			},
+			{
+				name:   "organization",
+				userID: notFoundUser.ExternalID,
+				orgID:  999999,
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if err := orgStore.AddOrganizationMember(ctx, tt.userID, tt.orgID); !errors.Is(err, sql.ErrNoRows) {
+					t.Errorf("AddOrganizationMember() error = %v, want sql.ErrNoRows", err)
+				}
+			})
+		}
+	})
+
+	t.Run("already exists", func(t *testing.T) {
+		if err := orgStore.AddOrganizationMember(ctx, existingUser.ExternalID, existingOrg.ID); !errors.Is(err, pgdb.ErrAlreadyExists) {
+			t.Errorf("AddOrganizationMember() error = %v, want pgdb.ErrAlreadyExists", err)
+		}
+	})
+}
+
 func TestStore_OrganizationByName(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
@@ -630,6 +693,22 @@ func mustProjectByID(t *testing.T, orgStore *pgorg.Store, projectID int) pgorg.P
 	}
 
 	return project
+}
+
+func checkOrgMembership(t *testing.T, pool *pgxpool.Pool, userID, orgID int) bool {
+	t.Helper()
+
+	var exists bool
+	if err := pool.QueryRow(
+		t.Context(),
+		"SELECT EXISTS (SELECT FROM org.org_membership WHERE user_id = $1 AND org_id = $2)",
+		userID,
+		orgID,
+	).Scan(&exists); err != nil {
+		t.Fatalf("check organization membership (user %d, org %d): %v", userID, orgID, err)
+	}
+
+	return exists
 }
 
 func mustProjectByName(t *testing.T, orgStore *pgorg.Store, orgID int, name string) pgorg.Project {

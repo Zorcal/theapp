@@ -556,7 +556,7 @@ func TestAuthService_GetAuthContext_error(t *testing.T) {
 				t.Helper()
 				return authCtxForTestUser(t, t.Context())
 			},
-			want: status.New(codes.NotFound, "auth context not found"),
+			want: status.New(codes.NotFound, "user or project not found"),
 		},
 		{
 			name: "core error",

@@ -30,7 +30,8 @@ type CustomRoleCore interface {
 	// CustomRoles returns a page of custom roles owned by the caller's organization.
 	CustomRoles(ctx context.Context, pageSize, pageOffset int) ([]mdl.CustomRole, int, error)
 	// CustomRoleByID returns a custom role owned by the caller's organization.
-	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
+	// Returns [mdl.ErrNotFound] if the caller or selected project no longer exists, or the role
+	// does not exist or is owned by another organization.
 	CustomRoleByID(ctx context.Context, customRoleID uuid.UUID) (mdl.CustomRole, error)
 	// UserProjectCustomRoles returns a page of custom roles assigned directly to userID in the caller's project.
 	// Returns [mdl.ErrNotFound] if the user, project, or organization membership does not exist.
@@ -39,12 +40,14 @@ type CustomRoleCore interface {
 	// Returns [mdl.ErrNotFound] if the user or organization membership does not exist.
 	UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]mdl.CustomRole, int, error)
 	// CreateCustomRole creates a custom role in the caller's organization.
+	// Returns [mdl.ErrNotFound] if the caller or selected project no longer exists.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to the role.
 	CreateCustomRole(ctx context.Context, cr mdl.CreateCustomRole) (mdl.CustomRole, error)
 	// UpdateCustomRole updates a custom role in the caller's organization.
-	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
+	// Returns [mdl.ErrNotFound] if the caller or selected project no longer exists, or the role
+	// does not exist or is owned by another organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
@@ -53,7 +56,8 @@ type CustomRoleCore interface {
 	// assignments require organization scope.
 	UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (mdl.CustomRole, error)
 	// ModifyCustomRolePermissions atomically changes permissions on a custom role.
-	// Returns [mdl.ErrNotFound] if the role does not exist or is owned by another organization.
+	// Returns [mdl.ErrNotFound] if the caller or selected project no longer exists, or the role
+	// does not exist or is owned by another organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
 	// Returns [mdl.ErrManagedRole] if the role is application-managed.
@@ -66,16 +70,24 @@ type CustomRoleCore interface {
 	// Returns [mdl.ErrManagedRole] if the role is application-managed.
 	DeleteCustomRole(ctx context.Context, customRoleID uuid.UUID) error
 	// AssignCustomRoleToProject assigns a custom role to a user in the caller's project.
+	// Returns [mdl.ErrNotFound] if the caller, user, role, project, or organization membership does
+	// not exist.
+	// Returns [mdl.ErrAlreadyExists] if the user already has the role in the project.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	// Returns [mdl.ErrInvalidAssignmentScope] if the role contains an organization-scoped permission.
 	AssignCustomRoleToProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromProject unassigns a custom role from a user in the caller's project.
+	// Returns [mdl.ErrNotFound] if the caller, selected project, or assignment does not exist.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	UnassignCustomRoleFromProject(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// AssignCustomRoleToOrg assigns a custom role to a user across the caller's organization.
+	// Returns [mdl.ErrNotFound] if the caller, selected project, user, role, organization, or
+	// membership does not exist.
+	// Returns [mdl.ErrAlreadyExists] if the user already has the role in the organization.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
 	// UnassignCustomRoleFromOrg unassigns a custom role from a user across the caller's organization.
+	// Returns [mdl.ErrNotFound] if the caller, selected project, or assignment does not exist.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission in the role.
 	UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, roleID uuid.UUID) error
 }
@@ -99,10 +111,10 @@ func (s *customRoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRe
 			return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "role.name", Description: "a role with this name already exists"},
 			})
-		case errors.Is(err, mdl.ErrNotFound):
-			return nil, status.Error(codes.NotFound, "organization or permission not found")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot add role permissions")
+		case errors.Is(err, mdl.ErrNotFound):
+			return nil, status.Error(codes.NotFound, "caller or project not found")
 		default:
 			return nil, fmt.Errorf("create role: %w", err)
 		}

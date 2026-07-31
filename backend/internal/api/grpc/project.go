@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"google.golang.org/grpc/codes"
@@ -53,6 +54,9 @@ func (s *projectService) ListProjects(ctx context.Context, req *pb.ListProjectsR
 
 	projects, totalCount, err := s.projectCore.AccessibleProjects(ctx, filter, pageSize, pageToken.Offset)
 	if err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "user not found")
+		}
 		return nil, fmt.Errorf("list accessible projects: %w", err)
 	}
 

@@ -214,6 +214,16 @@ func TestProjectService_ListProjects_error(t *testing.T) {
 			want: status.New(codes.InvalidArgument, "page_token filter mismatch"),
 		},
 		{
+			name: "authenticated user not found",
+			projectCore: &MockedProjectCore{
+				AccessibleProjectsFunc: func(_ context.Context, _ mdl.ProjectFilter, _, _ int) ([]mdl.Project, int, error) {
+					return nil, 0, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.ListProjectsRequest{},
+			want: status.New(codes.NotFound, "user not found"),
+		},
+		{
 			name: "core error",
 			projectCore: &MockedProjectCore{
 				AccessibleProjectsFunc: func(_ context.Context, _ mdl.ProjectFilter, _, _ int) ([]mdl.Project, int, error) {

@@ -746,7 +746,7 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 			want: mdl.ErrValidation,
 		},
 		{
-			name: "organization not found",
+			name: "role dependency not found",
 			in:   mdl.CreateCustomRole{Name: "project manager"},
 			roleStorer: &MockedRoleStorer{
 				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
@@ -756,7 +756,9 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
 			},
-			want: mdl.ErrNotFound,
+			// sql.ErrNoRows can mean an application-known permission is missing from the registry,
+			// so it cannot safely be remapped to mdl.ErrNotFound.
+			want: sql.ErrNoRows,
 		},
 		{
 			name: "store error",
@@ -1119,6 +1121,77 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 				},
 			},
 			want: dbErr,
+		},
+		{
+			name: "permission update role disappears",
+			in: mdl.UpdateCustomRole{
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleUnassignProject},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:unassign-project"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, sql.ErrNoRows
+				},
+			},
+			// The role is locked, and every application-known permission must exist in the
+			// registry, so sql.ErrNoRows must remain an internal error.
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "permission update role already exists",
+			in: mdl.UpdateCustomRole{
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleUnassignProject},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:unassign-project"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, pgdb.ErrAlreadyExists
+				},
+			},
+			want: mdl.ErrAlreadyExists,
+		},
+		{
+			name: "permission update constraint violated",
+			in: mdl.UpdateCustomRole{
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleUnassignProject},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:unassign-project"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				UpdateCustomRoleFunc: func(_ context.Context, _ pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, pgdb.ErrCheckConstraintViolated
+				},
+			},
+			want: mdl.ErrValidation,
 		},
 		{
 			name: "role not found",
@@ -1514,7 +1587,9 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
 			},
-			want: mdl.ErrNotFound,
+			// The role is locked, and every application-known permission must exist in the
+			// registry, so sql.ErrNoRows must remain an internal error.
+			want: sql.ErrNoRows,
 		},
 		{
 			name: "store",
@@ -1714,7 +1789,9 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 					return sql.ErrNoRows
 				},
 			},
-			want: mdl.ErrNotFound,
+			// The organization-owned role was resolved and locked earlier in the transaction, so
+			// sql.ErrNoRows must remain an internal error.
+			want: sql.ErrNoRows,
 		},
 		{
 			name: "store error",

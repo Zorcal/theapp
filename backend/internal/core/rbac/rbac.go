@@ -3,14 +3,10 @@ package rbac
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/google/uuid"
 
-	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
-	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
 //go:generate moq -rm -fmt goimports -out role_storer_moq_test.go . RoleStorer:MockedRoleStorer
@@ -120,16 +116,4 @@ type Core struct {
 // NewCore constructs a Core backed by the provided role store and transactor.
 func NewCore(rs RoleStorer, tr Transactor) *Core {
 	return &Core{roleStorer: rs, transactor: tr}
-}
-
-// SystemRoles returns a page of system roles and their permissions, along with the total count.
-func handleAssignmentError(err error) error {
-	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		return mdl.ErrNotFound
-	case errors.Is(err, pgdb.ErrAlreadyExists):
-		return mdl.ErrAlreadyExists
-	default:
-		return err
-	}
 }

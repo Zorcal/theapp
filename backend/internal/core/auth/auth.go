@@ -219,6 +219,8 @@ func (c *Core) VerifyMagicLink(ctx context.Context, vml mdl.VerifyMagicLink) (md
 		}
 
 		if err := c.userStorer.MarkEmailVerified(ctx, tok.UserExternalID); err != nil {
+			// The persisted token still references the user through a foreign key, so
+			// sql.ErrNoRows is an impossible state that must remain an internal error.
 			return fmt.Errorf("mark email verified: %w", err)
 		}
 

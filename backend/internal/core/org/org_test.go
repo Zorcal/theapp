@@ -322,7 +322,8 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 				},
 			},
 			roleBootstrapperStore: &MockedRoleBootstrapperStore{},
-			// A newly created organization cannot legitimately disappear within the transaction.
+			// A newly created organization cannot disappear within the transaction, so
+			// sql.ErrNoRows must remain an internal error.
 			want: sql.ErrNoRows,
 		},
 		{
@@ -339,8 +340,7 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 				},
 			},
 			roleBootstrapperStore: &MockedRoleBootstrapperStore{},
-			// A vanished authenticated creator is an internal consistency failure.
-			want: sql.ErrNoRows,
+			want:                  mdl.ErrNotFound,
 		},
 		{
 			name: "creator already a member",
@@ -356,7 +356,8 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 				},
 			},
 			roleBootstrapperStore: &MockedRoleBootstrapperStore{},
-			// A fresh organization cannot already contain its creator membership.
+			// A fresh organization cannot already contain its creator membership, so
+			// pgdb.ErrAlreadyExists must remain an internal error.
 			want: pgdb.ErrAlreadyExists,
 		},
 		{
@@ -393,7 +394,8 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 					return pgrbac.CustomRole{}, sql.ErrNoRows
 				},
 			},
-			// The new organization and canonical permissions must exist at this point.
+			// The new organization and canonical permissions must exist at this point, so
+			// sql.ErrNoRows must remain an internal error.
 			want: sql.ErrNoRows,
 		},
 		{
@@ -414,7 +416,8 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 					return pgrbac.CustomRole{}, pgdb.ErrAlreadyExists
 				},
 			},
-			// A fresh organization cannot already contain its managed role.
+			// A fresh organization cannot already contain its managed role, so
+			// pgdb.ErrAlreadyExists must remain an internal error.
 			want: pgdb.ErrAlreadyExists,
 		},
 		{
@@ -458,7 +461,8 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 					return sql.ErrNoRows
 				},
 			},
-			// Every assignment dependency was created earlier in the transaction.
+			// The organization, creator membership, and managed role were established earlier in
+			// the transaction, so sql.ErrNoRows must remain an internal error.
 			want: sql.ErrNoRows,
 		},
 		{
@@ -482,7 +486,8 @@ func TestCore_CreateOrganization_error(t *testing.T) {
 					return pgdb.ErrAlreadyExists
 				},
 			},
-			// A newly created managed role cannot already be assigned to its creator.
+			// A newly created managed role cannot already be assigned to its creator, so
+			// pgdb.ErrAlreadyExists must remain an internal error.
 			want: pgdb.ErrAlreadyExists,
 		},
 		{
