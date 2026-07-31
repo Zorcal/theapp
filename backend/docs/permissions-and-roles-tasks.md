@@ -239,11 +239,9 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
     `make generate`. Depends on 45, 46.
 51. Add the organization-scoped user-management permissions, include them in newly created
     organization-admin roles, and wire both endpoints behind them. After permission seeding, run an
-    idempotent, add-only reconciliation that grants the new permissions to every role identified by
-    `managed_key = 'organization_admin'`. Test multiple organizations and a second reconciliation
-    run. Permission removal remains an explicit migration or administrative cleanup so mixed
-    application versions cannot remove one another's grants during a rolling deployment. Depends
-    on 49, 50.
+    idempotent reconciliation that synchronizes every role identified by
+    `managed_key = 'organization_admin'` with the canonical permission set. Test multiple
+    organizations and a second reconciliation run. Depends on 49, 50.
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
 

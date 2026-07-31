@@ -311,12 +311,11 @@ minimum scope because creating a sibling project changes organization-level stat
 project resolves the organization, and only an organization- or system-scoped assignment can grant
 the permission; a project-scoped custom-role assignment cannot.
 
-The canonical organization-admin permission set is defined once for new organization creation.
-After permission seeding, an idempotent add-only reconciliation grants any missing canonical
-permissions to every `organization_admin` managed role, so capabilities introduced after launch
-reach existing organizations as well as new ones. Reconciliation never removes grants: permission
-removal uses an explicit migration or administrative cleanup so different application versions
-cannot remove one another's permissions during a rolling deployment.
+The canonical organization-admin permission set is used for new organization creation and seed
+reconciliation. After permission seeding, an idempotent synchronization adds missing permissions
+and removes noncanonical permissions from every `organization_admin` managed role. Capabilities
+introduced after launch therefore reach existing organizations, while removed capabilities no
+longer remain granted by managed roles.
 
 ## Managing users within an organization
 
