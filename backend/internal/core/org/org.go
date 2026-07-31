@@ -35,6 +35,8 @@ type OrgStorer interface {
 	// Returns [sql.ErrNoRows] if the user or organization does not exist.
 	// Returns [pgdb.ErrAlreadyExists] if the user is already an organization member.
 	AddOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error
+	// IsOrganizationMember reports whether userID is a member of orgID.
+	IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
 	// OrganizationByName returns the organization with the given name.
 	// Returns [sql.ErrNoRows] if no such organization exists.
 	OrganizationByName(ctx context.Context, name string) (pgorg.Organization, error)
@@ -204,6 +206,16 @@ func (c *Core) OrganizationByName(ctx context.Context, name string) (mdl.Organiz
 	}
 
 	return organizationFromPg(pgOrg), nil
+}
+
+// IsOrganizationMember reports whether userID is a member of orgID.
+func (c *Core) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
+	member, err := c.orgStorer.IsOrganizationMember(ctx, userID, orgID)
+	if err != nil {
+		return false, fmt.Errorf("organization member: %w", err)
+	}
+
+	return member, nil
 }
 
 // ProjectByName returns the project named name owned by orgID.

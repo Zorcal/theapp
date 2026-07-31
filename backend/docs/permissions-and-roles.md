@@ -179,7 +179,12 @@ data, and it only ever concerns the caller rather than an arbitrary user ID.
 
 Permissions are part of the `SystemRole` resource rather than exposed through a per-role list endpoint. The administrative UI needs a role and its grants together when displaying or selecting it; embedding them avoids a follow-up request for every row. System roles and permission sets are small seed data, so independently paginating one role's permissions would add API and client complexity without a practical payload benefit. A user's assignment list also returns `SystemRole` resources, so it has the same complete shape.
 
-Every system-role RPC is anchored on the `theapp` organization's control project. Its permission namespace is distinct from custom-role management: reads require `system-role:read`, assignment requires `system-role:assign`, and unassignment requires `system-role:unassign`. A future custom-role permission must not satisfy one of these checks merely because both APIs deal with roles.
+Every system-role RPC is anchored on the `theapp` organization's control project and requires the
+caller to be a member of `theapp`. System-scoped authority therefore does not bypass the internal
+staff boundary represented by that membership. Its permission namespace is distinct from
+custom-role management: reads require `system-role:read`, assignment requires
+`system-role:assign`, and unassignment requires `system-role:unassign`. A future custom-role
+permission must not satisfy one of these checks merely because both APIs deal with roles.
 
 The project anchor determines whether the caller may reach the endpoint, but it does not justify a system-wide grant by itself. Before assigning or unassigning, the core resolves the actor's permissions again from system scope only and applies the superset rule described below in the same transaction as the write. Transaction-level advisory locks serialize assignment changes for the actor and target, so the actor's authority cannot change between the check and the write. Project- and org-scoped permissions—including ones resolved through `theapp/control`—cannot be laundered into authority over `system_role_assignments`.
 

@@ -116,7 +116,7 @@ Permissions and system roles are rows inserted by `seed.sql`, not something any 
 
 ## Phase 12 — system role service - done
 
-26. Finalize `schemas/system_role.proto` and its generated gRPC/gateway/OpenAPI artifacts: list system roles with their permissions, assign/unassign a system role, and list a user's system-role assignments. `SystemRole.permissions` is embedded so list and assignment responses carry the complete role definition without a per-role follow-up request. Every method is anchored on `theapp`'s control project. This part is complete.
+26. Finalize `schemas/system_role.proto` and its generated gRPC/gateway/OpenAPI artifacts: list system roles with their permissions, assign/unassign a system role, and list a user's system-role assignments. `SystemRole.permissions` is embedded so list and assignment responses carry the complete role definition without a per-role follow-up request. Every method is anchored on `theapp`'s control project and requires `theapp` membership. This part is complete.
 27. Seed `system-role:read`, `system-role:assign`, and `system-role:unassign`; add their `mdl.Permission` constants and register every `SystemRoleService` method in `permissionRegistry`. List operations require `system-role:read`, assign requires `system-role:assign`, and unassign requires `system-role:unassign`. This part is already complete. Depends on 7, 15, 26.
 28. Add paginated store/core read operations for system roles (including their permissions) and a user's system-role assignments; add `UnassignSystemRole` alongside the existing `AssignSystemRole`. This part is complete. Depends on 9, 13, 26.
 29. Enforce the system-scope superset rule inside the same transaction as assign and unassign: the actor's authority must be resolved only from its own `system_role_assignments`, never from project- or org-scoped grants. The ordinary core operations read the actor's ID from the authenticated session in context, acquire transaction-level advisory locks for the actor and target in UUID order, resolve the actor's system permissions, and return `mdl.ErrPermissionDenied` when the actor lacks any permission carried by the target role. A missing auth session is treated as a programming error because the transport must authenticate these operations before calling the core. The bootstrap CLI uses a separately named unchecked operation so it can establish the first system administrator. This part is complete. Depends on 12, 28.
@@ -126,7 +126,7 @@ The service is deliberately separate from custom-role management. It can read an
 system roles, but it cannot create, edit, or delete them. Custom roles never enter
 `system_role_assignments`, structurally enforced by that table's foreign key to `system_roles`.
 
-**Checkpoint:** an authorized system administrator can list and assign/unassign seeded system roles through the API; all calls require `theapp/control`, grants and revokes enforce the system-only superset rule, and the last system-role-management holder cannot be removed.
+**Checkpoint:** an authorized system administrator can list and assign/unassign seeded system roles through the API; all calls require `theapp/control` and `theapp` membership, grants and revokes enforce the system-only superset rule, and the last system-role-management holder cannot be removed.
 
 ## Phase 13 — custom role service: CRUD and ownership — done
 
@@ -184,7 +184,7 @@ remain separate SQL statements but are queued in one batch to avoid a second dat
 **Checkpoint:** existing observable behavior is unchanged, cross-organization assignment state is
 rejected structurally, and all effective-access consumers use the canonical SQL relations.
 
-## Phase 19 — org creation endpoint
+## Phase 19 — org creation endpoint — done
 
 45. Proto schema: add organization creation to `schemas/organization.proto`. Organization deletion
     remains part of phase 23. Run `make generate`.

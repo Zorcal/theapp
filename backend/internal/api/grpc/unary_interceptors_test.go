@@ -670,3 +670,149 @@ func TestPermissionUnaryInterceptor_error(t *testing.T) {
 		}
 	})
 }
+
+func TestSystemControlProjectUnaryInterceptor(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		core     OrganizationCore
+		authSess mdl.AuthSession
+	}{
+		{
+			name:     "unprotected method",
+			method:   "/theapp.v1.ProjectService/ListProjects",
+			core:     nil,
+			authSess: mdl.AuthSession{},
+		},
+		{
+			name:   "authorized",
+			method: "/theapp.v1.SystemRoleService/ListSystemRoles",
+			core: &MockedOrganizationCore{
+				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
+					return mdl.Organization{ID: 1, ControlProjectID: 2}, nil
+				},
+				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
+					return true, nil
+				},
+			},
+			authSess: mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(2),
+				OrgID:     new(1),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), tt.authSess)
+			interceptor := systemControlProjectUnaryInterceptor(tt.core)
+			handler := func(_ context.Context, _ any) (any, error) { return "handled", nil }
+
+			got, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: tt.method}, handler)
+			if err != nil {
+				t.Fatalf("systemControlProjectUnaryInterceptor(%q) error = %v", tt.method, err)
+			}
+			if want := "handled"; got != want {
+				t.Errorf("systemControlProjectUnaryInterceptor(%q) = %v, want %v", tt.method, got, want)
+			}
+		})
+	}
+}
+
+func TestSystemControlProjectUnaryInterceptor_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name     string
+		method   string
+		core     OrganizationCore
+		authSess mdl.AuthSession
+		want     error
+	}{
+		{
+			name:     "missing scope",
+			method:   "/theapp.v1.SystemRoleService/ListSystemRoles",
+			core:     &MockedOrganizationCore{},
+			authSess: mdl.AuthSession{},
+			want:     errors.New("auth session project or organization missing"),
+		},
+		{
+			name:   "organization lookup error",
+			method: "/theapp.v1.SystemRoleService/ListSystemRoles",
+			core: &MockedOrganizationCore{
+				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
+					return mdl.Organization{}, dbErr
+				},
+			},
+			authSess: mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(2),
+				OrgID:     new(1),
+			},
+			want: dbErr,
+		},
+		{
+			name:   "wrong project",
+			method: "/theapp.v1.SystemRoleService/ListSystemRoles",
+			core: &MockedOrganizationCore{
+				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
+					return mdl.Organization{ID: 1, ControlProjectID: 3}, nil
+				},
+			},
+			authSess: mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(2),
+				OrgID:     new(1),
+			},
+			want: status.Error(codes.PermissionDenied, codes.PermissionDenied.String()),
+		},
+		{
+			name:   "membership lookup error",
+			method: "/theapp.v1.OrgService/CreateOrganization",
+			core: &MockedOrganizationCore{
+				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
+					return mdl.Organization{ID: 1, ControlProjectID: 2}, nil
+				},
+				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
+					return false, dbErr
+				},
+			},
+			authSess: mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(2),
+				OrgID:     new(1),
+			},
+			want: dbErr,
+		},
+		{
+			name:   "not a member",
+			method: "/theapp.v1.OrgService/CreateOrganization",
+			core: &MockedOrganizationCore{
+				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
+					return mdl.Organization{ID: 1, ControlProjectID: 2}, nil
+				},
+				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
+					return false, nil
+				},
+			},
+			authSess: mdl.AuthSession{
+				User:      mdl.AuthUser{UserID: uuid.New()},
+				ProjectID: new(2),
+				OrgID:     new(1),
+			},
+			want: status.Error(codes.PermissionDenied, codes.PermissionDenied.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), tt.authSess)
+			interceptor := systemControlProjectUnaryInterceptor(tt.core)
+			handler := func(_ context.Context, _ any) (any, error) { return "handled", nil }
+
+			_, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: tt.method}, handler)
+			if !errors.Is(err, tt.want) && status.Code(err) != status.Code(tt.want) {
+				t.Errorf("systemControlProjectUnaryInterceptor(%q) error = %v, want %v", tt.method, err, tt.want)
+			}
+		})
+	}
+}

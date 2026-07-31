@@ -37,7 +37,8 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 // SystemRoleService lists seeded system roles and manages their user
 // assignments. System-role definitions cannot be created, updated, or deleted
 // through the API. Every call is anchored on the "theapp" organization's
-// control project: x-project-id must be that project's ID.
+// control project and requires membership in that organization: x-project-id
+// must be that project's ID.
 service SystemRoleService {
   // Lists the system roles available to assign.
   rpc ListSystemRoles(ListSystemRolesRequest) returns (ListSystemRolesResponse) {

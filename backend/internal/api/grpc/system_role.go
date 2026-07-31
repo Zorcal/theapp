@@ -20,11 +20,10 @@ import (
 type systemRoleService struct {
 	pb.UnimplementedSystemRoleServiceServer
 
-	systemRoleCore             SystemRoleCore
-	systemRoleOrganizationCore SystemRoleOrganizationCore
+	systemRoleCore SystemRoleCore
 }
 
-//go:generate moq -rm -fmt goimports -out system_role_core_moq_test.go . SystemRoleCore:MockedSystemRoleCore SystemRoleOrganizationCore:MockedSystemRoleOrganizationCore
+//go:generate moq -rm -fmt goimports -out system_role_core_moq_test.go . SystemRoleCore:MockedSystemRoleCore
 
 type SystemRoleCore interface {
 	// SystemRoles returns a page of system roles and the total count.
@@ -45,19 +44,9 @@ type SystemRoleCore interface {
 	UnassignSystemRole(ctx context.Context, userID uuid.UUID, roleName string) error
 }
 
-type SystemRoleOrganizationCore interface {
-	// OrganizationByName returns the organization with the given name.
-	// Returns [mdl.ErrNotFound] if no organization with that name exists.
-	OrganizationByName(ctx context.Context, name string) (mdl.Organization, error)
-}
-
 func (s *systemRoleService) ListSystemRoles(ctx context.Context, req *pb.ListSystemRolesRequest) (*pb.ListSystemRolesResponse, error) {
 	if err := validate.ListSystemRoles(req); err != nil {
 		return nil, fmt.Errorf("validate list system roles request: %w", err)
-	}
-
-	if err := s.authorizeProject(ctx); err != nil {
-		return nil, fmt.Errorf("authorize project: %w", err)
 	}
 
 	pageSize := int(req.GetPageSize())
@@ -96,10 +85,6 @@ func (s *systemRoleService) AssignSystemRole(ctx context.Context, req *pb.Assign
 		return nil, fmt.Errorf("validate assign system role request: %w", err)
 	}
 
-	if err := s.authorizeProject(ctx); err != nil {
-		return nil, fmt.Errorf("authorize project: %w", err)
-	}
-
 	userID := uuid.MustParse(req.GetUserId())
 
 	if err := s.systemRoleCore.AssignSystemRole(ctx, userID, req.GetRoleName()); err != nil {
@@ -123,10 +108,6 @@ func (s *systemRoleService) UnassignSystemRole(ctx context.Context, req *pb.Unas
 		return nil, fmt.Errorf("validate unassign system role request: %w", err)
 	}
 
-	if err := s.authorizeProject(ctx); err != nil {
-		return nil, fmt.Errorf("authorize project: %w", err)
-	}
-
 	userID := uuid.MustParse(req.GetUserId())
 
 	if err := s.systemRoleCore.UnassignSystemRole(ctx, userID, req.GetRoleName()); err != nil {
@@ -148,10 +129,6 @@ func (s *systemRoleService) UnassignSystemRole(ctx context.Context, req *pb.Unas
 func (s *systemRoleService) ListSystemRoleAssignments(ctx context.Context, req *pb.ListSystemRoleAssignmentsRequest) (*pb.ListSystemRoleAssignmentsResponse, error) {
 	if err := validate.ListSystemRoleAssignments(req); err != nil {
 		return nil, fmt.Errorf("validate list system role assignments request: %w", err)
-	}
-
-	if err := s.authorizeProject(ctx); err != nil {
-		return nil, fmt.Errorf("authorize project: %w", err)
 	}
 
 	userID := uuid.MustParse(req.GetUserId())
@@ -188,22 +165,4 @@ func (s *systemRoleService) ListSystemRoleAssignments(ctx context.Context, req *
 		TotalSize:     mustconv.Int32(totalCount),
 		NextPageToken: nextPageToken,
 	}, nil
-}
-
-func (s *systemRoleService) authorizeProject(ctx context.Context) error {
-	sess, ok := mdl.AuthSessionFromContext(ctx)
-	if !ok || sess.ProjectID == nil || sess.OrgID == nil {
-		return errors.New("auth session project or organization missing")
-	}
-
-	org, err := s.systemRoleOrganizationCore.OrganizationByName(ctx, mdl.SystemOrgName)
-	if err != nil {
-		return fmt.Errorf("fetch system organization: %w", err)
-	}
-
-	if sess.MustOrgID() != org.ID || sess.MustProjectID() != org.ControlProjectID {
-		return status.Error(codes.PermissionDenied, codes.PermissionDenied.String())
-	}
-
-	return nil
 }

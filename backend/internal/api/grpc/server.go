@@ -18,14 +18,14 @@ import (
 
 // ServerConfig contains all the mandatory systems required by the GRPC server.
 type ServerConfig struct {
-	Log                        *slog.Logger
-	UserCore                   UserCore
-	AuthCore                   AuthCore
-	SystemRoleCore             SystemRoleCore
-	SystemRoleOrganizationCore SystemRoleOrganizationCore
-	CustomRoleCore             CustomRoleCore
-	ProjectCore                ProjectCore
-	WorkflowAuthCore           WorkflowAuthCore
+	Log              *slog.Logger
+	UserCore         UserCore
+	AuthCore         AuthCore
+	SystemRoleCore   SystemRoleCore
+	CustomRoleCore   CustomRoleCore
+	ProjectCore      ProjectCore
+	OrganizationCore OrganizationCore
+	WorkflowAuthCore WorkflowAuthCore
 	// JWTKey is the HMAC secret used to validate access tokens.
 	JWTKey      []byte
 	JWTIssuer   string
@@ -70,6 +70,17 @@ var organizationScopedPermissions = set.Set[mdl.Permission]{
 	mdl.PermissionCustomRoleUnassignOrg:        {},
 }
 
+// systemControlProjectMethods lists methods that must be called through the system
+// organization's control project.
+var systemControlProjectMethods = set.Set[string]{
+	"/theapp.v1.OrgService/CreateOrganization": {},
+
+	"/theapp.v1.SystemRoleService/ListSystemRoles":           {},
+	"/theapp.v1.SystemRoleService/AssignSystemRole":          {},
+	"/theapp.v1.SystemRoleService/UnassignSystemRole":        {},
+	"/theapp.v1.SystemRoleService/ListSystemRoleAssignments": {},
+}
+
 // permissionRegistry maps every protected (non-public, see publicMethods) gRPC method to the
 // permissions required to call it. All listed permissions must be held — this is a conjunction
 // (AND), never a disjunction. A method with no entry here is denied rather than let through
@@ -80,6 +91,8 @@ var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.AuthService/GetAuthContext":    {},
 
 	"/theapp.v1.ProjectService/ListProjects": {},
+
+	"/theapp.v1.OrgService/CreateOrganization": {mdl.PermissionOrgCreate},
 
 	"/theapp.v1.UserService/GetUser":    {mdl.PermissionUserRead},
 	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},
@@ -127,6 +140,7 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			recoveryUnaryInterceptor(),
 			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
 			permissionUnaryInterceptor(),
+			systemControlProjectUnaryInterceptor(cfg.OrganizationCore),
 			idempotencyUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
@@ -135,6 +149,7 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			recoveryStreamInterceptor(),
 			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
 			permissionStreamInterceptor(),
+			systemControlProjectStreamInterceptor(cfg.OrganizationCore),
 		),
 	)
 
@@ -148,8 +163,7 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	})
 
 	pb.RegisterSystemRoleServiceServer(srv, &systemRoleService{
-		systemRoleCore:             cfg.SystemRoleCore,
-		systemRoleOrganizationCore: cfg.SystemRoleOrganizationCore,
+		systemRoleCore: cfg.SystemRoleCore,
 	})
 
 	pb.RegisterRoleServiceServer(srv, &customRoleService{
@@ -160,6 +174,10 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 
 	pb.RegisterProjectServiceServer(srv, &projectService{
 		projectCore: cfg.ProjectCore,
+	})
+
+	pb.RegisterOrgServiceServer(srv, &organizationService{
+		organizationCore: cfg.OrganizationCore,
 	})
 
 	if cfg.Reflection {

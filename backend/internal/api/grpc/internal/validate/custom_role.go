@@ -111,6 +111,7 @@ func UpdateRole(req *pb.UpdateRoleRequest) error {
 	updatableFields := []string{"name", "permissions"}
 
 	var violations []*errdetails.BadRequest_FieldViolation
+
 	for _, path := range maskPaths {
 		if !slices.Contains(updatableFields, path) {
 			violations = append(violations, &errdetails.BadRequest_FieldViolation{
@@ -155,6 +156,7 @@ func ModifyRolePermissions(req *pb.ModifyRolePermissionsRequest) error {
 	}
 
 	var violations []*errdetails.BadRequest_FieldViolation
+
 	for i, permName := range req.GetAddPermissions() {
 		if slices.Contains(req.GetRemovePermissions(), permName) {
 			violations = append(violations, &errdetails.BadRequest_FieldViolation{
@@ -226,6 +228,7 @@ func UnassignRoleFromOrganization(req *pb.UnassignRoleFromOrganizationRequest) e
 
 func roleAssignment(roleID, userID string) error {
 	var violations []*errdetails.BadRequest_FieldViolation
+
 	if _, err := uuid.Parse(roleID); err != nil {
 		violations = append(violations, &errdetails.BadRequest_FieldViolation{
 			Field: "role_id", Description: "must be a valid UUID",
@@ -258,6 +261,7 @@ func permissionViolations(perms []pb.Permission, field string) []*errdetails.Bad
 	systemOnlyPerms := mdl.SystemOnlyPermissions()
 
 	var violations []*errdetails.BadRequest_FieldViolation
+
 	for i, perm := range perms {
 		mdlPerm, ok := conv.PermissionFromPB(perm)
 		switch {

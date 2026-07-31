@@ -221,6 +221,62 @@ func TestStore_AddOrganizationMember_error(t *testing.T) {
 	})
 }
 
+func TestStore_IsOrganizationMember(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "organization-member-check")
+	member := seedUser(t, userStore, "organization-member-check@test.com")
+	nonmember := seedUser(t, userStore, "organization-nonmember-check@test.com")
+	seedOrgMembership(t, pool, member.ID, org.ID)
+
+	tests := []struct {
+		name   string
+		userID uuid.UUID
+		orgID  int
+		want   bool
+	}{
+		{
+			name:   "member",
+			userID: member.ExternalID,
+			orgID:  org.ID,
+			want:   true,
+		},
+		{
+			name:   "nonmember",
+			userID: nonmember.ExternalID,
+			orgID:  org.ID,
+			want:   false,
+		},
+		{
+			name:   "unknown user",
+			userID: uuid.New(),
+			orgID:  org.ID,
+			want:   false,
+		},
+		{
+			name:   "unknown organization",
+			userID: member.ExternalID,
+			orgID:  org.ID + 999,
+			want:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := orgStore.IsOrganizationMember(ctx, tt.userID, tt.orgID)
+			if err != nil {
+				t.Fatalf("IsOrganizationMember(%s, %d) error = %v", tt.userID, tt.orgID, err)
+			}
+
+			if got != tt.want {
+				t.Errorf("IsOrganizationMember(%s, %d) = %t, want %t", tt.userID, tt.orgID, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestStore_OrganizationByName(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)

@@ -50,12 +50,13 @@ const testProjectID = 1
 
 // ServerTest is a test harness for the gRPC server using mock cores. Use NewServerTest to construct one.
 type ServerTest struct {
-	userServiceClient       pb.UserServiceClient
-	authServiceClient       pb.AuthServiceClient
-	systemRoleServiceClient pb.SystemRoleServiceClient
-	customRoleServiceClient pb.RoleServiceClient
-	permissionServiceClient pb.PermissionServiceClient
-	projectServiceClient    pb.ProjectServiceClient
+	userServiceClient         pb.UserServiceClient
+	authServiceClient         pb.AuthServiceClient
+	systemRoleServiceClient   pb.SystemRoleServiceClient
+	customRoleServiceClient   pb.RoleServiceClient
+	permissionServiceClient   pb.PermissionServiceClient
+	projectServiceClient      pb.ProjectServiceClient
+	organizationServiceClient pb.OrgServiceClient
 }
 
 // NewServerTest starts a gRPC server with the given config over an in-memory transport and returns
@@ -69,10 +70,10 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 	cfg.JWTIssuer = testJWTIssuer
 	cfg.JWTAudience = testJWTAudience
 
+	orgID := 1
 	if cfg.AuthCore == nil {
 		cfg.AuthCore = &MockedAuthCore{
 			AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
-				orgID := 1
 				return mdl.AuthSession{
 					User: mdl.AuthUser{
 						UserID:      userID,
@@ -83,7 +84,6 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 				}, nil
 			},
 			OrganizationAuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
-				orgID := 1
 				return mdl.AuthSession{
 					User: mdl.AuthUser{
 						UserID:      userID,
@@ -95,40 +95,34 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 			},
 		}
 	}
-	if cfg.SystemRoleOrganizationCore == nil {
-		cfg.SystemRoleOrganizationCore = &MockedSystemRoleOrganizationCore{
-			OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-				return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-			},
-		}
-	}
-
 	conn := newBufconnClientConn(t, cfg)
 
 	return ServerTest{
-		userServiceClient:       pb.NewUserServiceClient(conn),
-		authServiceClient:       pb.NewAuthServiceClient(conn),
-		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
-		customRoleServiceClient: pb.NewRoleServiceClient(conn),
-		permissionServiceClient: pb.NewPermissionServiceClient(conn),
-		projectServiceClient:    pb.NewProjectServiceClient(conn),
+		userServiceClient:         pb.NewUserServiceClient(conn),
+		authServiceClient:         pb.NewAuthServiceClient(conn),
+		systemRoleServiceClient:   pb.NewSystemRoleServiceClient(conn),
+		customRoleServiceClient:   pb.NewRoleServiceClient(conn),
+		permissionServiceClient:   pb.NewPermissionServiceClient(conn),
+		projectServiceClient:      pb.NewProjectServiceClient(conn),
+		organizationServiceClient: pb.NewOrgServiceClient(conn),
 	}
 }
 
 // ServerIntegrationTest is a test harness for the gRPC server using real cores backed by a real
 // PostgreSQL database. Use NewServerIntegrationTest to construct one.
 type ServerIntegrationTest struct {
-	userServiceClient       pb.UserServiceClient
-	authServiceClient       pb.AuthServiceClient
-	systemRoleServiceClient pb.SystemRoleServiceClient
-	customRoleServiceClient pb.RoleServiceClient
-	permissionServiceClient pb.PermissionServiceClient
-	projectServiceClient    pb.ProjectServiceClient
-	emailSender             *testingx.CaptureEmailSender
-	userStore               *pguser.Store
-	orgStore                *pgorg.Store
-	rbacStore               *pgrbac.Store
-	pool                    *pgxpool.Pool
+	userServiceClient         pb.UserServiceClient
+	authServiceClient         pb.AuthServiceClient
+	systemRoleServiceClient   pb.SystemRoleServiceClient
+	customRoleServiceClient   pb.RoleServiceClient
+	permissionServiceClient   pb.PermissionServiceClient
+	projectServiceClient      pb.ProjectServiceClient
+	organizationServiceClient pb.OrgServiceClient
+	emailSender               *testingx.CaptureEmailSender
+	userStore                 *pguser.Store
+	orgStore                  *pgorg.Store
+	rbacStore                 *pgrbac.Store
+	pool                      *pgxpool.Pool
 }
 
 // NewServerIntegrationTest starts a gRPC server over an in-memory transport wired to real cores
@@ -175,31 +169,32 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 	dbostest.Launch(t, dbosCtx)
 
 	conn := newBufconnClientConn(t, ServerConfig{
-		Log:                        log,
-		UserCore:                   userCore,
-		AuthCore:                   authCore,
-		SystemRoleCore:             rbacCore,
-		SystemRoleOrganizationCore: orgCore,
-		CustomRoleCore:             rbacCore,
-		ProjectCore:                orgCore,
-		WorkflowAuthCore:           workflowAuthCore,
-		JWTKey:                     testJWTKey,
-		JWTIssuer:                  testJWTIssuer,
-		JWTAudience:                testJWTAudience,
+		Log:              log,
+		UserCore:         userCore,
+		AuthCore:         authCore,
+		SystemRoleCore:   rbacCore,
+		CustomRoleCore:   rbacCore,
+		ProjectCore:      orgCore,
+		OrganizationCore: orgCore,
+		WorkflowAuthCore: workflowAuthCore,
+		JWTKey:           testJWTKey,
+		JWTIssuer:        testJWTIssuer,
+		JWTAudience:      testJWTAudience,
 	})
 
 	return ServerIntegrationTest{
-		userServiceClient:       pb.NewUserServiceClient(conn),
-		authServiceClient:       pb.NewAuthServiceClient(conn),
-		systemRoleServiceClient: pb.NewSystemRoleServiceClient(conn),
-		customRoleServiceClient: pb.NewRoleServiceClient(conn),
-		permissionServiceClient: pb.NewPermissionServiceClient(conn),
-		projectServiceClient:    pb.NewProjectServiceClient(conn),
-		emailSender:             emailSender,
-		userStore:               pgUserStore,
-		orgStore:                pgOrgStore,
-		rbacStore:               pgRBACStore,
-		pool:                    pool,
+		userServiceClient:         pb.NewUserServiceClient(conn),
+		authServiceClient:         pb.NewAuthServiceClient(conn),
+		systemRoleServiceClient:   pb.NewSystemRoleServiceClient(conn),
+		customRoleServiceClient:   pb.NewRoleServiceClient(conn),
+		permissionServiceClient:   pb.NewPermissionServiceClient(conn),
+		projectServiceClient:      pb.NewProjectServiceClient(conn),
+		organizationServiceClient: pb.NewOrgServiceClient(conn),
+		emailSender:               emailSender,
+		userStore:                 pgUserStore,
+		orgStore:                  pgOrgStore,
+		rbacStore:                 pgRBACStore,
+		pool:                      pool,
 	}
 }
 
@@ -229,15 +224,6 @@ func authCtxForUserAtProject(t *testing.T, ctx context.Context, userID uuid.UUID
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 		},
 	}, testJWTKey)
-}
-
-func seedOrgMembership(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID, orgID int) {
-	t.Helper()
-
-	// TODO: Replace this direct insert when the organization store exposes membership creation.
-	if _, err := pool.Exec(ctx, "INSERT INTO org.org_membership (user_id, org_id) VALUES ($1, $2)", userID, orgID); err != nil {
-		t.Fatalf("seed organization membership (user %d, organization %d): %v", userID, orgID, err)
-	}
 }
 
 // authCtxWithToken returns ctx with the given JWT as a Bearer token in the gRPC outgoing metadata.
@@ -312,4 +298,46 @@ func newBufconnClientConn(t *testing.T, cfg ServerConfig) *grpc.ClientConn {
 	})
 
 	return conn
+}
+
+func seedOrgMembership(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID, orgID int) {
+	t.Helper()
+
+	// TODO: Replace this direct insert when the organization store exposes membership creation.
+	if _, err := pool.Exec(ctx, "INSERT INTO org.org_membership (user_id, org_id) VALUES ($1, $2)", userID, orgID); err != nil {
+		t.Fatalf("seed organization membership (user %d, organization %d): %v", userID, orgID, err)
+	}
+}
+
+func seedOrganization(t *testing.T, ctx context.Context, orgStore *pgorg.Store, name, controlProjectName string) pgorg.Organization {
+	t.Helper()
+
+	organization, err := orgStore.CreateOrganization(ctx, pgorg.CreateOrganization{
+		Name:               name,
+		ControlProjectName: controlProjectName,
+	})
+	if err != nil {
+		t.Fatalf("seed organization %q: %v", name, err)
+	}
+
+	return organization
+}
+
+func seedUser(t *testing.T, ctx context.Context, userStore *pguser.Store, email, name string) pguser.User {
+	t.Helper()
+
+	user, err := userStore.CreateUser(ctx, pguser.CreateUser{Email: email, Name: name})
+	if err != nil {
+		t.Fatalf("seed user %q: %v", email, err)
+	}
+
+	return user
+}
+
+func seedSystemRoleAssignment(t *testing.T, ctx context.Context, rbacStore *pgrbac.Store, userID uuid.UUID, roleName string) {
+	t.Helper()
+
+	if err := rbacStore.AssignSystemRole(ctx, userID, roleName); err != nil {
+		t.Fatalf("seed system role %q assignment for user %s: %v", roleName, userID, err)
+	}
 }

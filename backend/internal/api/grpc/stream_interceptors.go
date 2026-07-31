@@ -89,6 +89,23 @@ func permissionStreamInterceptor() grpc.StreamServerInterceptor {
 	}
 }
 
+// systemControlProjectStreamInterceptor is the streaming counterpart of
+// systemControlProjectUnaryInterceptor. Must run after authStreamInterceptor and
+// permissionStreamInterceptor.
+func systemControlProjectStreamInterceptor(core OrganizationCore) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if !systemControlProjectMethods.Contains(info.FullMethod) {
+			return handler(srv, ss)
+		}
+
+		if err := requireSystemControlProject(ss.Context(), core); err != nil {
+			return err
+		}
+
+		return handler(srv, ss)
+	}
+}
+
 // loggingStreamInterceptor logs the method and duration at stream boundaries, and each individual message at DEBUG level.
 // Sensitive pb types implement slog.LogValuer to ensure credentials are redacted, not logged in plaintext.
 func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {

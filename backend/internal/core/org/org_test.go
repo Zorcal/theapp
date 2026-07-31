@@ -663,6 +663,37 @@ func TestCore_OrganizationByName_error(t *testing.T) {
 	}
 }
 
+func TestCore_IsOrganizationMember(t *testing.T) {
+	orgStorer := &MockedOrgStorer{
+		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
+			return true, nil
+		},
+	}
+	core := NewCore(orgStorer, nil, immediateTransactor{})
+
+	member, err := core.IsOrganizationMember(t.Context(), uuid.New(), 1)
+	if err != nil {
+		t.Fatalf("IsOrganizationMember() error = %v", err)
+	}
+	if !member {
+		t.Error("IsOrganizationMember() = false, want true")
+	}
+}
+
+func TestCore_IsOrganizationMember_error(t *testing.T) {
+	dbErr := errors.New("db error")
+	orgStorer := &MockedOrgStorer{
+		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
+			return false, dbErr
+		},
+	}
+	core := NewCore(orgStorer, nil, immediateTransactor{})
+
+	if _, err := core.IsOrganizationMember(t.Context(), uuid.New(), 1); !errors.Is(err, dbErr) {
+		t.Errorf("IsOrganizationMember() error = %v, want %v", err, dbErr)
+	}
+}
+
 func TestCore_ProjectByName(t *testing.T) {
 	orgStorer := &MockedOrgStorer{
 		ProjectByNameFunc: func(_ context.Context, orgID int, name string) (pgorg.Project, error) {

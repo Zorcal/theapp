@@ -32,7 +32,8 @@ const (
 // SystemRoleService lists seeded system roles and manages their user
 // assignments. System-role definitions cannot be created, updated, or deleted
 // through the API. Every call is anchored on the "theapp" organization's
-// control project: x-project-id must be that project's ID.
+// control project and requires membership in that organization: x-project-id
+// must be that project's ID.
 type SystemRoleServiceClient interface {
 	// Lists the system roles available to assign.
 	ListSystemRoles(ctx context.Context, in *ListSystemRolesRequest, opts ...grpc.CallOption) (*ListSystemRolesResponse, error)
@@ -99,7 +100,8 @@ func (c *systemRoleServiceClient) ListSystemRoleAssignments(ctx context.Context,
 // SystemRoleService lists seeded system roles and manages their user
 // assignments. System-role definitions cannot be created, updated, or deleted
 // through the API. Every call is anchored on the "theapp" organization's
-// control project: x-project-id must be that project's ID.
+// control project and requires membership in that organization: x-project-id
+// must be that project's ID.
 type SystemRoleServiceServer interface {
 	// Lists the system roles available to assign.
 	ListSystemRoles(context.Context, *ListSystemRolesRequest) (*ListSystemRolesResponse, error)

@@ -35,6 +35,7 @@ func CreateUser(req *pb.CreateUserRequest) error {
 	}
 
 	var violations []*errdetails.BadRequest_FieldViolation
+
 	if req.GetUser().GetEmail() == "" {
 		violations = append(violations, &errdetails.BadRequest_FieldViolation{
 			Field: "user.email", Description: "required",
@@ -77,6 +78,7 @@ func UpdateUser(req *pb.UpdateUserRequest) error {
 	}
 
 	var violations []*errdetails.BadRequest_FieldViolation
+
 	for _, path := range maskPaths {
 		if path != "name" {
 			violations = append(violations, &errdetails.BadRequest_FieldViolation{

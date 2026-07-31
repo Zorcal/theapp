@@ -201,6 +201,53 @@ func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
+// systemControlProjectUnaryInterceptor requires declared methods to use the system organization's
+// control project and requires the caller to belong to that organization. Must run after
+// authUnaryInterceptor and permissionUnaryInterceptor.
+func systemControlProjectUnaryInterceptor(core OrganizationCore) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if !systemControlProjectMethods.Contains(info.FullMethod) {
+			return handler(ctx, req)
+		}
+
+		if err := requireSystemControlProject(ctx, core); err != nil {
+			return nil, err
+		}
+
+		return handler(ctx, req)
+	}
+}
+
+func requireSystemControlProject(ctx context.Context, core OrganizationCore) error {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok || sess.ProjectID == nil || sess.OrgID == nil {
+		return errors.New("auth session project or organization missing")
+	}
+
+	// This deliberately performs two additional database queries and round trips instead of
+	// adding organization metadata and membership to every auth session. These protected methods
+	// are called relatively infrequently, while enriching auth sessions would add work to the hot
+	// path for every authenticated request.
+
+	systemOrg, err := core.OrganizationByName(ctx, mdl.SystemOrgName)
+	if err != nil {
+		return fmt.Errorf("fetch system organization: %w", err)
+	}
+	if sess.MustOrgID() != systemOrg.ID || sess.MustProjectID() != systemOrg.ControlProjectID {
+		return fmt.Errorf("require system control project: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
+	}
+
+	member, err := core.IsOrganizationMember(ctx, sess.User.UserID, systemOrg.ID)
+	if err != nil {
+		return fmt.Errorf("check system organization membership: %w", err)
+	}
+	if !member {
+		return fmt.Errorf("require system organization membership: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
+	}
+
+	return nil
+}
+
 // projectMetadataKey is the gRPC request-metadata key carrying the project the caller is currently
 // operating in.
 const projectMetadataKey = "x-project-id"

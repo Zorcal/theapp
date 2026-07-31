@@ -303,18 +303,18 @@ func run(ctx context.Context, cfg Config) error {
 	defer log.InfoContext(ctx, "gRPC server stopped")
 
 	srv := grpc.NewServer(grpc.ServerConfig{
-		Log:                        log,
-		UserCore:                   userCore,
-		AuthCore:                   authCore,
-		SystemRoleCore:             rbacCore,
-		SystemRoleOrganizationCore: orgCore,
-		CustomRoleCore:             rbacCore,
-		ProjectCore:                orgCore,
-		WorkflowAuthCore:           authWorkflowCore,
-		JWTKey:                     []byte(cfg.Auth.JWTSecret),
-		JWTIssuer:                  cfg.Auth.JWTIssuer,
-		JWTAudience:                cfg.Auth.JWTAudience,
-		Reflection:                 cfg.IsLocalEnvironment(),
+		Log:              log,
+		UserCore:         userCore,
+		AuthCore:         authCore,
+		SystemRoleCore:   rbacCore,
+		CustomRoleCore:   rbacCore,
+		ProjectCore:      orgCore,
+		OrganizationCore: orgCore,
+		WorkflowAuthCore: authWorkflowCore,
+		JWTKey:           []byte(cfg.Auth.JWTSecret),
+		JWTIssuer:        cfg.Auth.JWTIssuer,
+		JWTAudience:      cfg.Auth.JWTAudience,
+		Reflection:       cfg.IsLocalEnvironment(),
 	})
 
 	// Setup HTTP gateway server.

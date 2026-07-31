@@ -34,6 +34,9 @@ var _ OrgStorer = &MockedOrgStorer{}
 //			CreateProjectFunc: func(ctx context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
 //				panic("mock out the CreateProject method")
 //			},
+//			IsOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
+//				panic("mock out the IsOrganizationMember method")
+//			},
 //			OrganizationByNameFunc: func(ctx context.Context, name string) (pgorg.Organization, error) {
 //				panic("mock out the OrganizationByName method")
 //			},
@@ -58,6 +61,9 @@ type MockedOrgStorer struct {
 
 	// CreateProjectFunc mocks the CreateProject method.
 	CreateProjectFunc func(ctx context.Context, cp pgorg.CreateProject) (pgorg.Project, error)
+
+	// IsOrganizationMemberFunc mocks the IsOrganizationMember method.
+	IsOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
 
 	// OrganizationByNameFunc mocks the OrganizationByName method.
 	OrganizationByNameFunc func(ctx context.Context, name string) (pgorg.Organization, error)
@@ -103,6 +109,15 @@ type MockedOrgStorer struct {
 			// Cp is the cp argument value.
 			Cp pgorg.CreateProject
 		}
+		// IsOrganizationMember holds details about calls to the IsOrganizationMember method.
+		IsOrganizationMember []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
+		}
 		// OrganizationByName holds details about calls to the OrganizationByName method.
 		OrganizationByName []struct {
 			// Ctx is the ctx argument value.
@@ -124,6 +139,7 @@ type MockedOrgStorer struct {
 	lockAddOrganizationMember sync.RWMutex
 	lockCreateOrganization    sync.RWMutex
 	lockCreateProject         sync.RWMutex
+	lockIsOrganizationMember  sync.RWMutex
 	lockOrganizationByName    sync.RWMutex
 	lockProjectByName         sync.RWMutex
 }
@@ -285,6 +301,46 @@ func (mock *MockedOrgStorer) CreateProjectCalls() []struct {
 	mock.lockCreateProject.RLock()
 	calls = mock.calls.CreateProject
 	mock.lockCreateProject.RUnlock()
+	return calls
+}
+
+// IsOrganizationMember calls IsOrganizationMemberFunc.
+func (mock *MockedOrgStorer) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
+	if mock.IsOrganizationMemberFunc == nil {
+		panic("MockedOrgStorer.IsOrganizationMemberFunc: method is nil but OrgStorer.IsOrganizationMember was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		OrgID:  orgID,
+	}
+	mock.lockIsOrganizationMember.Lock()
+	mock.calls.IsOrganizationMember = append(mock.calls.IsOrganizationMember, callInfo)
+	mock.lockIsOrganizationMember.Unlock()
+	return mock.IsOrganizationMemberFunc(ctx, userID, orgID)
+}
+
+// IsOrganizationMemberCalls gets all the calls that were made to IsOrganizationMember.
+// Check the length with:
+//
+//	len(mockedOrgStorer.IsOrganizationMemberCalls())
+func (mock *MockedOrgStorer) IsOrganizationMemberCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}
+	mock.lockIsOrganizationMember.RLock()
+	calls = mock.calls.IsOrganizationMember
+	mock.lockIsOrganizationMember.RUnlock()
 	return calls
 }
 

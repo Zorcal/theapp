@@ -45,6 +45,7 @@ the corresponding `.proto` operation annotation and regenerate the OpenAPI artif
 Use `ServerTest` for unit tests: the server runs with mocked cores, so tests exercise only the gRPC handler layer. Because inputs and outputs are fully controlled, this is the right place for exhaustive negative-case coverage — invalid arguments, permission errors, not-found responses, and other error paths.
 
 Use `ServerIntegrationTest` for integration tests that must cross layer boundaries. It wires real cores against a real Postgres database and is slower, so keep integration tests focused on the golden path at a high level rather than exhaustive edge cases.
+Exercise and observe the behavior under test only through generated gRPC clients. Direct store or SQL access is allowed only inside seed helpers that prepare prerequisite state; do not use it to perform the action under test or verify its result.
 
 ### File conventions
 

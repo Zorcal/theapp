@@ -25,10 +25,9 @@ func NewStore(pool *pgxpool.Pool) *Store {
 // organization.
 // Returns [pgdb.ErrAlreadyExists] if an organization with the same name already exists.
 func (s *Store) CreateOrganization(ctx context.Context, co CreateOrganization) (Organization, error) {
-	var org Organization
-
 	q := createOrganizationQuery(co)
 
+	var org Organization
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &org); err != nil {
 			return fmt.Errorf("create organization: %w", err)
@@ -47,10 +46,9 @@ func (s *Store) CreateOrganization(ctx context.Context, co CreateOrganization) (
 // Returns [sql.ErrNoRows] if no organization with that ID exists.
 // Returns [pgdb.ErrAlreadyExists] if a project with the same name already exists in the organization.
 func (s *Store) CreateProject(ctx context.Context, cp CreateProject) (Project, error) {
-	var project Project
-
 	q := createProjectQuery(cp)
 
+	var project Project
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &project); err != nil {
 			return fmt.Errorf("create project: %w", err)
@@ -86,13 +84,31 @@ func (s *Store) AddOrganizationMember(ctx context.Context, userID uuid.UUID, org
 	return nil
 }
 
+// IsOrganizationMember reports whether userID is a member of orgID.
+func (s *Store) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
+	q := organizationMemberQuery(userID, orgID)
+
+	var member bool
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &member); err != nil {
+			return fmt.Errorf("check organization membership: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return member, nil
+}
+
 // OrganizationByName returns the organization with the given name.
 // Returns [sql.ErrNoRows] if no such organization exists.
 func (s *Store) OrganizationByName(ctx context.Context, name string) (Organization, error) {
-	var org Organization
-
 	q := organizationByNameQuery(name)
 
+	var org Organization
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &org); err != nil {
 			return fmt.Errorf("organization by name: %w", err)
@@ -110,10 +126,9 @@ func (s *Store) OrganizationByName(ctx context.Context, name string) (Organizati
 // ProjectByID returns the project with the given ID.
 // Returns [sql.ErrNoRows] if no such project exists.
 func (s *Store) ProjectByID(ctx context.Context, id int) (Project, error) {
-	var project Project
-
 	q := projectByIDQuery(id)
 
+	var project Project
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &project); err != nil {
 			return fmt.Errorf("project by id: %w", err)
@@ -131,10 +146,9 @@ func (s *Store) ProjectByID(ctx context.Context, id int) (Project, error) {
 // ProjectByName returns the project named name owned by orgID.
 // Returns [sql.ErrNoRows] if no such project exists.
 func (s *Store) ProjectByName(ctx context.Context, orgID int, name string) (Project, error) {
-	var project Project
-
 	q := projectByNameQuery(orgID, name)
 
+	var project Project
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := q.Queue(ctx, b, &project); err != nil {
 			return fmt.Errorf("project by name: %w", err)

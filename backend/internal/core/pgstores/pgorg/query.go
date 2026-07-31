@@ -127,6 +127,24 @@ func addOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[int
 	}
 }
 
+func organizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID}
+	const sql = `
+		SELECT EXISTS (
+			SELECT
+			FROM org.org_membership AS membership
+			JOIN useraccess.users AS usr ON usr.id = membership.user_id
+			WHERE membership.org_id = @org_id AND usr.external_id = @user_id
+		)`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowTo[bool],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func accessibleProjectsQuery(userID uuid.UUID, filter ProjectFilter, pageSize, pageOffset int) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{
 		"user_id":     userID,
