@@ -60,9 +60,11 @@ type ServerTest struct {
 }
 
 // NewServerTest starts a gRPC server with the given config over an in-memory transport and returns
-// a harness with pre-wired clients. The JWT config is always overridden with test credentials. AuthCore
-// defaults to a mock granting every permission, so tests exercising unrelated RPCs don't each need to
-// stub out permission resolution; tests targeting permission enforcement itself set AuthCore explicitly.
+// a harness with pre-wired clients. The JWT config is always overridden with test credentials. When
+// AuthCore is nil, it defaults to a mock returning an auth session with every permission. Project-scoped
+// requests also receive project metadata suitable for system and organization control-project checks;
+// requests without project metadata receive a session with a nil Project. Tests targeting authentication
+// or permission enforcement set AuthCore explicitly.
 func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 	t.Helper()
 
@@ -70,18 +72,26 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 	cfg.JWTIssuer = testJWTIssuer
 	cfg.JWTAudience = testJWTAudience
 
-	orgID := 1
 	if cfg.AuthCore == nil {
 		cfg.AuthCore = &MockedAuthCore{
 			AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
-				return mdl.AuthSession{
+				sess := mdl.AuthSession{
 					User: mdl.AuthUser{
 						UserID:      userID,
 						Permissions: mdl.AllPermissions(),
 					},
-					ProjectID: projectID,
-					OrgID:     &orgID,
-				}, nil
+				}
+				if projectID != nil {
+					sess.Project = &mdl.AuthProject{
+						ID:          *projectID,
+						OrgID:       1,
+						OrgName:     mdl.SystemOrgName,
+						IsControl:   true,
+						IsOrgMember: true,
+					}
+				}
+
+				return sess, nil
 			},
 			OrganizationAuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
 				return mdl.AuthSession{
@@ -89,8 +99,13 @@ func NewServerTest(t *testing.T, cfg ServerConfig) ServerTest {
 						UserID:      userID,
 						Permissions: mdl.AllPermissions(),
 					},
-					ProjectID: &projectID,
-					OrgID:     &orgID,
+					Project: &mdl.AuthProject{
+						ID:          projectID,
+						OrgID:       1,
+						OrgName:     mdl.SystemOrgName,
+						IsControl:   true,
+						IsOrgMember: true,
+					},
 				}, nil
 			},
 		}

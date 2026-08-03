@@ -281,121 +281,6 @@ func TestStore_EnsureOrganizationMember_error(t *testing.T) {
 	})
 }
 
-func TestStore_IsOrganizationMember(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-	userStore := pguser.NewStore(pool)
-
-	org := seedOrg(t, orgStore, "organization-member-check")
-	member := seedUser(t, userStore, "organization-member-check@test.com")
-	nonmember := seedUser(t, userStore, "organization-nonmember-check@test.com")
-	seedOrgMembership(t, pool, member.ID, org.ID)
-
-	tests := []struct {
-		name   string
-		userID uuid.UUID
-		orgID  int
-		want   bool
-	}{
-		{
-			name:   "member",
-			userID: member.ExternalID,
-			orgID:  org.ID,
-			want:   true,
-		},
-		{
-			name:   "nonmember",
-			userID: nonmember.ExternalID,
-			orgID:  org.ID,
-			want:   false,
-		},
-		{
-			name:   "unknown user",
-			userID: uuid.New(),
-			orgID:  org.ID,
-			want:   false,
-		},
-		{
-			name:   "unknown organization",
-			userID: member.ExternalID,
-			orgID:  org.ID + 999,
-			want:   false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := orgStore.IsOrganizationMember(ctx, tt.userID, tt.orgID)
-			if err != nil {
-				t.Fatalf("IsOrganizationMember(%s, %d) error = %v", tt.userID, tt.orgID, err)
-			}
-
-			if got != tt.want {
-				t.Errorf("IsOrganizationMember(%s, %d) = %t, want %t", tt.userID, tt.orgID, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStore_IsOrganizationControlProject(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-
-	org := seedOrg(t, orgStore, "organization-control-project-check")
-	ordinaryProject := seedProject(t, orgStore, org.ID, "ordinary")
-	otherOrg := seedOrg(t, orgStore, "other-organization-control-project-check")
-
-	tests := []struct {
-		name      string
-		orgID     int
-		projectID int
-		want      bool
-	}{
-		{
-			name:      "control project",
-			orgID:     org.ID,
-			projectID: org.ControlProjectID,
-			want:      true,
-		},
-		{
-			name:      "ordinary project",
-			orgID:     org.ID,
-			projectID: ordinaryProject.ID,
-			want:      false,
-		},
-		{
-			name:      "different organization",
-			orgID:     org.ID,
-			projectID: otherOrg.ControlProjectID,
-			want:      false,
-		},
-		{
-			name:      "unknown organization",
-			orgID:     org.ID + 999,
-			projectID: org.ControlProjectID,
-			want:      false,
-		},
-		{
-			name:      "unknown project",
-			orgID:     org.ID,
-			projectID: org.ControlProjectID + 999,
-			want:      false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := orgStore.IsOrganizationControlProject(ctx, tt.orgID, tt.projectID)
-			if err != nil {
-				t.Fatalf("IsOrganizationControlProject(%d, %d) error = %v", tt.orgID, tt.projectID, err)
-			}
-			if got != tt.want {
-				t.Errorf("IsOrganizationControlProject(%d, %d) = %t, want %t", tt.orgID, tt.projectID, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestStore_OrganizationByName(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
@@ -418,32 +303,6 @@ func TestStore_OrganizationByName_error(t *testing.T) {
 
 	if _, err := orgStore.OrganizationByName(ctx, "acme"); !errors.Is(err, sql.ErrNoRows) {
 		t.Errorf("OrganizationByName() error = %v, want sql.ErrNoRows", err)
-	}
-}
-
-func TestStore_ProjectByID(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-
-	org := seedOrg(t, orgStore, "acme")
-	seeded := seedProject(t, orgStore, org.ID, "widgets")
-
-	got, err := orgStore.ProjectByID(ctx, seeded.ID)
-	if err != nil {
-		t.Fatalf("ProjectByID() error = %v", err)
-	}
-
-	testingx.AssertDiff(t, got, seeded)
-}
-
-func TestStore_ProjectByID_error(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	orgStore := pgorg.NewStore(pool)
-
-	if _, err := orgStore.ProjectByID(ctx, 999999); !errors.Is(err, sql.ErrNoRows) {
-		t.Errorf("ProjectByID() error = %v, want sql.ErrNoRows", err)
 	}
 }
 
@@ -502,7 +361,7 @@ func TestStore_AccessibleProjects(t *testing.T) {
 	// Project-scoped access reaches only the assigned project, not its siblings.
 	projectAssignedUser := seedUser(t, userStore, "project-assignment@test.com")
 	projectAssignedOrg := seedOrg(t, orgStore, "project-assignment-org")
-	projectAssignedControl := mustProjectByID(t, orgStore, projectAssignedOrg.ControlProjectID)
+	projectAssignedControl := mustProjectByName(t, orgStore, projectAssignedOrg.ID, "control")
 	projectAssignedProject := seedProject(t, orgStore, projectAssignedOrg.ID, "shared-zulu")
 	seedProject(t, orgStore, projectAssignedOrg.ID, "second")
 	seedOrgMembership(t, pool, projectAssignedUser.ID, projectAssignedOrg.ID)
@@ -513,7 +372,7 @@ func TestStore_AccessibleProjects(t *testing.T) {
 	// and deduplicates projects also reached through a direct assignment.
 	orgAssignedUser := seedUser(t, userStore, "org-assignment@test.com")
 	orgAssignedOrg := seedOrg(t, orgStore, "org-assignment-first")
-	orgAssignedControl := mustProjectByID(t, orgStore, orgAssignedOrg.ControlProjectID)
+	orgAssignedControl := mustProjectByName(t, orgStore, orgAssignedOrg.ID, "control")
 	orgAssignedSharedProject := seedProject(t, orgStore, orgAssignedOrg.ID, "shared-alpha")
 	orgAssignedSecondProject := seedProject(t, orgStore, orgAssignedOrg.ID, "second")
 	orgAssignedProject2 := seedProject(t, orgStore, orgAssignedOrg.ID, "project-2")
@@ -857,17 +716,6 @@ func seedSystemRole(t *testing.T, pool *pgxpool.Pool, name, permissionName strin
 		WHERE role.name = $1`, name, permissionName); err != nil {
 		t.Fatalf("seed system role %q permission %q: %v", name, permissionName, err)
 	}
-}
-
-func mustProjectByID(t *testing.T, orgStore *pgorg.Store, projectID int) pgorg.Project {
-	t.Helper()
-
-	project, err := orgStore.ProjectByID(t.Context(), projectID)
-	if err != nil {
-		t.Fatalf("ProjectByID(%d) error = %v", projectID, err)
-	}
-
-	return project
 }
 
 func checkOrgMembership(t *testing.T, pool *pgxpool.Pool, userID, orgID int) bool {

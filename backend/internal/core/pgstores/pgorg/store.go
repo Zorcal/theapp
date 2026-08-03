@@ -104,44 +104,6 @@ func (s *Store) EnsureOrganizationMember(ctx context.Context, userID uuid.UUID, 
 	return nil
 }
 
-// IsOrganizationMember reports whether userID is a member of orgID.
-func (s *Store) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
-	q := isOrganizationMemberQuery(userID, orgID)
-
-	var isMember bool
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &isMember); err != nil {
-			return fmt.Errorf("check organization membership: %w", err)
-		}
-		return nil
-	}
-
-	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return false, err
-	}
-
-	return isMember, nil
-}
-
-// IsOrganizationControlProject reports whether projectID is orgID's control project.
-func (s *Store) IsOrganizationControlProject(ctx context.Context, orgID, projectID int) (bool, error) {
-	q := isOrganizationControlProjectQuery(orgID, projectID)
-
-	var isControlProject bool
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &isControlProject); err != nil {
-			return fmt.Errorf("check organization control project: %w", err)
-		}
-		return nil
-	}
-
-	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return false, err
-	}
-
-	return isControlProject, nil
-}
-
 // OrganizationByName returns the organization with the given name.
 // Returns [sql.ErrNoRows] if no such organization exists.
 func (s *Store) OrganizationByName(ctx context.Context, name string) (Organization, error) {
@@ -160,26 +122,6 @@ func (s *Store) OrganizationByName(ctx context.Context, name string) (Organizati
 	}
 
 	return org, nil
-}
-
-// ProjectByID returns the project with the given ID.
-// Returns [sql.ErrNoRows] if no such project exists.
-func (s *Store) ProjectByID(ctx context.Context, id int) (Project, error) {
-	q := projectByIDQuery(id)
-
-	var project Project
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &project); err != nil {
-			return fmt.Errorf("project by id: %w", err)
-		}
-		return nil
-	}
-
-	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		return Project{}, err
-	}
-
-	return project, nil
 }
 
 // ProjectByName returns the project named name owned by orgID.

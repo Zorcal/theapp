@@ -161,18 +161,10 @@ func TestSystemRoleService_ListSystemRoles(t *testing.T) {
 			}, 3, nil
 		},
 	}
-	orgCore := &MockedOrganizationCore{
-		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-			return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-		},
-		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-			return true, nil
-		},
-	}
+
 	srvTest := NewServerTest(t, ServerConfig{
-		Log:              testingx.NewLogger(t),
-		SystemRoleCore:   systemRoleCore,
-		OrganizationCore: orgCore,
+		Log:            testingx.NewLogger(t),
+		SystemRoleCore: systemRoleCore,
 	})
 
 	got, err := srvTest.systemRoleServiceClient.ListSystemRoles(
@@ -197,41 +189,25 @@ func TestSystemRoleService_ListSystemRoles(t *testing.T) {
 		TotalSize:     3,
 		NextPageToken: nextPageToken,
 	}
+
 	testingx.AssertDiff(t, got, want, defaultDiffOpts())
 }
 
 func TestSystemRoleService_ListSystemRoles_error(t *testing.T) {
 	tests := []struct {
 		name           string
-		orgCore        OrganizationCore
 		systemRoleCore SystemRoleCore
 		in             *pb.ListSystemRolesRequest
 		want           *status.Status
 	}{
 		{
-			name: "validated request",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
+			name:           "validated request",
 			systemRoleCore: &MockedSystemRoleCore{},
 			in:             &pb.ListSystemRolesRequest{PageToken: "not-a-token"},
 			want:           status.New(codes.InvalidArgument, "invalid page_token"),
 		},
 		{
 			name: "core error",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				SystemRolesFunc: func(_ context.Context, _, _ int) ([]mdl.SystemRole, int, error) {
 					return nil, 0, errors.New("boom")
@@ -244,9 +220,8 @@ func TestSystemRoleService_ListSystemRoles_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
-				Log:              testingx.NewLogger(t),
-				SystemRoleCore:   tt.systemRoleCore,
-				OrganizationCore: tt.orgCore,
+				Log:            testingx.NewLogger(t),
+				SystemRoleCore: tt.systemRoleCore,
 			})
 
 			_, err := srvTest.systemRoleServiceClient.ListSystemRoles(authCtxForTestUser(t, t.Context()), tt.in)
@@ -268,18 +243,10 @@ func TestSystemRoleService_AssignSystemRole(t *testing.T) {
 	systemRoleCore := &MockedSystemRoleCore{
 		AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error { return nil },
 	}
-	orgCore := &MockedOrganizationCore{
-		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-			return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-		},
-		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-			return true, nil
-		},
-	}
+
 	srvTest := NewServerTest(t, ServerConfig{
-		Log:              testingx.NewLogger(t),
-		SystemRoleCore:   systemRoleCore,
-		OrganizationCore: orgCore,
+		Log:            testingx.NewLogger(t),
+		SystemRoleCore: systemRoleCore,
 	})
 
 	got, err := srvTest.systemRoleServiceClient.AssignSystemRole(
@@ -296,21 +263,12 @@ func TestSystemRoleService_AssignSystemRole(t *testing.T) {
 func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 	tests := []struct {
 		name           string
-		orgCore        OrganizationCore
 		systemRoleCore SystemRoleCore
 		in             *pb.AssignSystemRoleRequest
 		want           *status.Status
 	}{
 		{
-			name: "validated request",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
+			name:           "validated request",
 			systemRoleCore: &MockedSystemRoleCore{},
 			in:             &pb.AssignSystemRoleRequest{UserId: "not-a-uuid", RoleName: "whatever"},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
@@ -319,14 +277,6 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "not found",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return mdl.ErrNotFound
@@ -337,14 +287,6 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "permission denied",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return mdl.ErrPermissionDenied
@@ -355,14 +297,6 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "already assigned",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return mdl.ErrAlreadyExists
@@ -373,14 +307,6 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "core error",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return errors.New("boom")
@@ -393,9 +319,8 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
-				Log:              testingx.NewLogger(t),
-				SystemRoleCore:   tt.systemRoleCore,
-				OrganizationCore: tt.orgCore,
+				Log:            testingx.NewLogger(t),
+				SystemRoleCore: tt.systemRoleCore,
 			})
 
 			_, err := srvTest.systemRoleServiceClient.AssignSystemRole(authCtxForTestUser(t, t.Context()), tt.in)
@@ -417,18 +342,10 @@ func TestSystemRoleService_UnassignSystemRole(t *testing.T) {
 	systemRoleCore := &MockedSystemRoleCore{
 		UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error { return nil },
 	}
-	orgCore := &MockedOrganizationCore{
-		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-			return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-		},
-		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-			return true, nil
-		},
-	}
+
 	srvTest := NewServerTest(t, ServerConfig{
-		Log:              testingx.NewLogger(t),
-		SystemRoleCore:   systemRoleCore,
-		OrganizationCore: orgCore,
+		Log:            testingx.NewLogger(t),
+		SystemRoleCore: systemRoleCore,
 	})
 
 	got, err := srvTest.systemRoleServiceClient.UnassignSystemRole(
@@ -445,21 +362,12 @@ func TestSystemRoleService_UnassignSystemRole(t *testing.T) {
 func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 	tests := []struct {
 		name           string
-		orgCore        OrganizationCore
 		systemRoleCore SystemRoleCore
 		in             *pb.UnassignSystemRoleRequest
 		want           *status.Status
 	}{
 		{
-			name: "validated request",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
+			name:           "validated request",
 			systemRoleCore: &MockedSystemRoleCore{},
 			in:             &pb.UnassignSystemRoleRequest{UserId: "not-a-uuid", RoleName: "whatever"},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
@@ -468,14 +376,6 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "not found",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return mdl.ErrNotFound
@@ -486,14 +386,6 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "permission denied",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return mdl.ErrPermissionDenied
@@ -504,14 +396,6 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "last fully privileged system administrator",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return mdl.ErrLastFullyPrivilegedSystemAdmin
@@ -522,14 +406,6 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "core error",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
 					return errors.New("boom")
@@ -542,9 +418,8 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
-				Log:              testingx.NewLogger(t),
-				SystemRoleCore:   tt.systemRoleCore,
-				OrganizationCore: tt.orgCore,
+				Log:            testingx.NewLogger(t),
+				SystemRoleCore: tt.systemRoleCore,
 			})
 
 			_, err := srvTest.systemRoleServiceClient.UnassignSystemRole(
@@ -573,18 +448,10 @@ func TestSystemRoleService_ListSystemRoleAssignments(t *testing.T) {
 			}, 1, nil
 		},
 	}
-	orgCore := &MockedOrganizationCore{
-		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-			return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-		},
-		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-			return true, nil
-		},
-	}
+
 	srvTest := NewServerTest(t, ServerConfig{
-		Log:              testingx.NewLogger(t),
-		SystemRoleCore:   systemRoleCore,
-		OrganizationCore: orgCore,
+		Log:            testingx.NewLogger(t),
+		SystemRoleCore: systemRoleCore,
 	})
 
 	got, err := srvTest.systemRoleServiceClient.ListSystemRoleAssignments(
@@ -607,21 +474,12 @@ func TestSystemRoleService_ListSystemRoleAssignments(t *testing.T) {
 func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 	tests := []struct {
 		name           string
-		orgCore        OrganizationCore
 		systemRoleCore SystemRoleCore
 		in             *pb.ListSystemRoleAssignmentsRequest
 		want           *status.Status
 	}{
 		{
-			name: "validated request",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
+			name:           "validated request",
 			systemRoleCore: &MockedSystemRoleCore{},
 			in:             &pb.ListSystemRoleAssignmentsRequest{UserId: "not-a-uuid"},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
@@ -630,14 +488,6 @@ func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 		},
 		{
 			name: "user not found",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				UserSystemRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.SystemRole, int, error) {
 					return nil, 0, mdl.ErrNotFound
@@ -648,14 +498,6 @@ func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 		},
 		{
 			name: "core error",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
 			systemRoleCore: &MockedSystemRoleCore{
 				UserSystemRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.SystemRole, int, error) {
 					return nil, 0, errors.New("boom")
@@ -668,9 +510,8 @@ func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
-				Log:              testingx.NewLogger(t),
-				SystemRoleCore:   tt.systemRoleCore,
-				OrganizationCore: tt.orgCore,
+				Log:            testingx.NewLogger(t),
+				SystemRoleCore: tt.systemRoleCore,
 			})
 
 			_, err := srvTest.systemRoleServiceClient.ListSystemRoleAssignments(authCtxForTestUser(t, t.Context()), tt.in)

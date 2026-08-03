@@ -20,11 +20,11 @@ func (c *Core) CustomRoles(ctx context.Context, pageSize, pageOffset int) ([]mdl
 	if !ok {
 		return nil, 0, errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return nil, 0, errors.New("organization context missing")
+	if sess.Project == nil {
+		return nil, 0, errors.New("project context missing")
 	}
 
-	rs, count, err := c.roleStorer.CustomRoles(ctx, *sess.OrgID, pageSize, pageOffset)
+	rs, count, err := c.roleStorer.CustomRoles(ctx, sess.Project.OrgID, pageSize, pageOffset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("custom roles: %w", err)
 	}
@@ -39,11 +39,11 @@ func (c *Core) UserProjectCustomRoles(ctx context.Context, userID uuid.UUID, pag
 	if !ok {
 		return nil, 0, errors.New("auth session missing")
 	}
-	if sess.ProjectID == nil {
+	if sess.Project == nil {
 		return nil, 0, errors.New("project context missing")
 	}
 
-	roles, count, err := c.roleStorer.UserProjectCustomRoles(ctx, userID, *sess.ProjectID, pageSize, pageOffset)
+	roles, count, err := c.roleStorer.UserProjectCustomRoles(ctx, userID, sess.Project.ID, pageSize, pageOffset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, mdl.ErrNotFound
@@ -61,11 +61,11 @@ func (c *Core) UserOrgCustomRoles(ctx context.Context, userID uuid.UUID, pageSiz
 	if !ok {
 		return nil, 0, errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return nil, 0, errors.New("organization context missing")
+	if sess.Project == nil {
+		return nil, 0, errors.New("project context missing")
 	}
 
-	roles, count, err := c.roleStorer.UserOrgCustomRoles(ctx, userID, *sess.OrgID, pageSize, pageOffset)
+	roles, count, err := c.roleStorer.UserOrgCustomRoles(ctx, userID, sess.Project.OrgID, pageSize, pageOffset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, 0, mdl.ErrNotFound
@@ -83,11 +83,11 @@ func (c *Core) CustomRoleByID(ctx context.Context, roleID uuid.UUID) (mdl.Custom
 	if !ok {
 		return mdl.CustomRole{}, errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return mdl.CustomRole{}, errors.New("organization context missing")
+	if sess.Project == nil {
+		return mdl.CustomRole{}, errors.New("project context missing")
 	}
 
-	role, err := c.roleStorer.CustomRoleByExternalID(ctx, *sess.OrgID, roleID)
+	role, err := c.roleStorer.CustomRoleByExternalID(ctx, sess.Project.OrgID, roleID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.CustomRole{}, mdl.ErrNotFound
@@ -108,20 +108,17 @@ func (c *Core) CreateCustomRole(ctx context.Context, cr mdl.CreateCustomRole) (m
 	if !ok {
 		return mdl.CustomRole{}, errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return mdl.CustomRole{}, errors.New("organization context missing")
+	if sess.Project == nil {
+		return mdl.CustomRole{}, errors.New("project context missing")
 	}
 
 	if err := cr.Validate(); err != nil {
 		return mdl.CustomRole{}, fmt.Errorf("validate: %w", err)
 	}
-	if sess.ProjectID == nil {
-		return mdl.CustomRole{}, errors.New("project context missing")
-	}
 
 	var role pgrbac.CustomRole
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-		userOrgPerms, err := c.roleStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, *sess.ProjectID)
+		userOrgPerms, err := c.roleStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, sess.Project.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("get actor organization permissions: %w", mdl.ErrNotFound)
@@ -169,8 +166,8 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 	if !ok {
 		return mdl.CustomRole{}, errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return mdl.CustomRole{}, errors.New("organization context missing")
+	if sess.Project == nil {
+		return mdl.CustomRole{}, errors.New("project context missing")
 	}
 
 	if err := ur.Validate(); err != nil {
@@ -178,13 +175,9 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 	}
 
 	if ur.Fields.Permissions {
-		if sess.ProjectID == nil {
-			return mdl.CustomRole{}, errors.New("project context missing")
-		}
-
 		var role pgrbac.CustomRole
 		if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-			userOrgPerms, currentRole, err := c.customRolePermChangeContext(ctx, sess.User.UserID, *sess.ProjectID, ur.ID)
+			userOrgPerms, currentRole, err := c.customRolePermChangeContext(ctx, sess.User.UserID, sess.Project.ID, ur.ID)
 			if err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					return fmt.Errorf("get permission change context: %w", mdl.ErrNotFound)
@@ -227,7 +220,7 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 		return customRoleFromPg(role), nil
 	}
 
-	role, err := c.roleStorer.UpdateCustomRole(ctx, updateCustomRoleToPg(ur, *sess.OrgID))
+	role, err := c.roleStorer.UpdateCustomRole(ctx, updateCustomRoleToPg(ur, sess.Project.OrgID))
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -257,20 +250,17 @@ func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCu
 	if !ok {
 		return mdl.CustomRole{}, errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return mdl.CustomRole{}, errors.New("organization context missing")
+	if sess.Project == nil {
+		return mdl.CustomRole{}, errors.New("project context missing")
 	}
 
 	if err := mrp.Validate(); err != nil {
 		return mdl.CustomRole{}, fmt.Errorf("validate: %w", err)
 	}
-	if sess.ProjectID == nil {
-		return mdl.CustomRole{}, errors.New("project context missing")
-	}
 
 	var role pgrbac.CustomRole
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-		userOrgPerms, currentRole, err := c.customRolePermChangeContext(ctx, sess.User.UserID, *sess.ProjectID, mrp.ID)
+		userOrgPerms, currentRole, err := c.customRolePermChangeContext(ctx, sess.User.UserID, sess.Project.ID, mrp.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("get permission change context: %w", mdl.ErrNotFound)
@@ -318,12 +308,12 @@ func (c *Core) DeleteCustomRole(ctx context.Context, roleID uuid.UUID) error {
 	if !ok {
 		return errors.New("auth session missing")
 	}
-	if sess.ProjectID == nil {
+	if sess.Project == nil {
 		return errors.New("project context missing")
 	}
 
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-		userOrgPerms, role, err := c.customRolePermChangeContext(ctx, sess.User.UserID, *sess.ProjectID, roleID)
+		userOrgPerms, role, err := c.customRolePermChangeContext(ctx, sess.User.UserID, sess.Project.ID, roleID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("get permission change context: %w", mdl.ErrNotFound)
@@ -363,12 +353,12 @@ func (c *Core) AssignCustomRoleToProject(ctx context.Context, targetUserID, role
 	if !ok {
 		return errors.New("auth session missing")
 	}
-	if sess.ProjectID == nil {
+	if sess.Project == nil {
 		return errors.New("project context missing")
 	}
 
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-		userProjectPerms, err := c.roleStorer.ProjectPermissions(ctx, sess.User.UserID, *sess.ProjectID)
+		userProjectPerms, err := c.roleStorer.ProjectPermissions(ctx, sess.User.UserID, sess.Project.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return mdl.ErrNotFound
@@ -394,7 +384,7 @@ func (c *Core) AssignCustomRoleToProject(ctx context.Context, targetUserID, role
 			return mdl.ErrPermissionDenied
 		}
 
-		if err := c.roleStorer.AssignCustomRoleToProject(ctx, targetUserID, roleID, *sess.ProjectID); err != nil {
+		if err := c.roleStorer.AssignCustomRoleToProject(ctx, targetUserID, roleID, sess.Project.ID); err != nil {
 			switch {
 			case errors.Is(err, sql.ErrNoRows):
 				return fmt.Errorf("assign custom role to project: %w", mdl.ErrNotFound)
@@ -422,12 +412,12 @@ func (c *Core) UnassignCustomRoleFromProject(ctx context.Context, targetUserID, 
 	if !ok {
 		return errors.New("auth session missing")
 	}
-	if sess.ProjectID == nil {
+	if sess.Project == nil {
 		return errors.New("project context missing")
 	}
 
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-		userProjectPerms, err := c.roleStorer.ProjectPermissions(ctx, sess.User.UserID, *sess.ProjectID)
+		userProjectPerms, err := c.roleStorer.ProjectPermissions(ctx, sess.User.UserID, sess.Project.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return mdl.ErrNotFound
@@ -447,7 +437,7 @@ func (c *Core) UnassignCustomRoleFromProject(ctx context.Context, targetUserID, 
 			return mdl.ErrPermissionDenied
 		}
 
-		if err := c.roleStorer.UnassignCustomRoleFromProject(ctx, targetUserID, roleID, *sess.ProjectID); err != nil {
+		if err := c.roleStorer.UnassignCustomRoleFromProject(ctx, targetUserID, roleID, sess.Project.ID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("unassign custom role from project: %w", mdl.ErrNotFound)
 			}
@@ -472,12 +462,12 @@ func (c *Core) AssignCustomRoleToOrg(ctx context.Context, targetUserID, roleID u
 	if !ok {
 		return errors.New("auth session missing")
 	}
-	if sess.ProjectID == nil {
+	if sess.Project == nil {
 		return errors.New("project context missing")
 	}
 
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-		userOrgPerms, err := c.roleStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, *sess.ProjectID)
+		userOrgPerms, err := c.roleStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, sess.Project.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return mdl.ErrNotFound
@@ -525,12 +515,12 @@ func (c *Core) UnassignCustomRoleFromOrg(ctx context.Context, targetUserID, role
 	if !ok {
 		return errors.New("auth session missing")
 	}
-	if sess.ProjectID == nil {
+	if sess.Project == nil {
 		return errors.New("project context missing")
 	}
 
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
-		userOrgPerms, err := c.roleStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, *sess.ProjectID)
+		userOrgPerms, err := c.roleStorer.OrgPermissionsByProjectID(ctx, sess.User.UserID, sess.Project.ID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return mdl.ErrNotFound

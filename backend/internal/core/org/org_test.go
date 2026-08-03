@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
@@ -82,10 +83,7 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 
 	// Create an organization user and repeat the operation without duplicating the user or membership.
 
-	orgCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
-		User:  mdl.AuthUser{UserID: creator.ExternalID},
-		OrgID: new(createdOrg.ID),
-	})
+	orgCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{User: mdl.AuthUser{UserID: creator.ExternalID}, Project: &mdl.AuthProject{OrgID: createdOrg.ID}})
 
 	createdOrgUser, err := core.CreateOrganizationUser(orgCtx, mdl.CreateOrganizationUser{
 		Email: "organization-user@test.com",
@@ -96,12 +94,8 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 
 	testingx.AssertDiff(t, createdOrgUser, mdl.User{Email: "organization-user@test.com"}, diffOpts...)
 
-	isMember, err := orgStore.IsOrganizationMember(ctx, createdOrgUser.ID, createdOrg.ID)
-	if err != nil {
-		t.Fatalf("IsOrganizationMember() error = %v", err)
-	}
-	if !isMember {
-		t.Error("IsOrganizationMember() = false, want true")
+	if !checkOrgMembership(t, pool, createdOrgUser.ID, createdOrg.ID) {
+		t.Error("organization membership = false, want true")
 	}
 
 	// Creating the user with the organization again is a no-op.
@@ -698,70 +692,6 @@ func TestCore_OrganizationByName_error(t *testing.T) {
 	}
 }
 
-func TestCore_IsOrganizationMember(t *testing.T) {
-	orgStorer := &MockedOrgStorer{
-		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-			return true, nil
-		},
-	}
-	core := NewCore(orgStorer, nil, nil, immediateTransactor{})
-
-	isMember, err := core.IsOrganizationMember(t.Context(), uuid.New(), 1)
-	if err != nil {
-		t.Fatalf("IsOrganizationMember() error = %v", err)
-	}
-	if !isMember {
-		t.Error("IsOrganizationMember() = false, want true")
-	}
-}
-
-func TestCore_IsOrganizationMember_error(t *testing.T) {
-	dbErr := errors.New("db error")
-	orgStorer := &MockedOrgStorer{
-		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-			return false, dbErr
-		},
-	}
-	core := NewCore(orgStorer, nil, nil, immediateTransactor{})
-
-	if _, err := core.IsOrganizationMember(t.Context(), uuid.New(), 1); !errors.Is(err, dbErr) {
-		t.Errorf("IsOrganizationMember() error = %v, want %v", err, dbErr)
-	}
-}
-
-func TestCore_IsOrganizationControlProject(t *testing.T) {
-	orgStorer := &MockedOrgStorer{
-		IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
-			return true, nil
-		},
-	}
-	core := NewCore(orgStorer, nil, nil, immediateTransactor{})
-
-	isControlProject, err := core.IsOrganizationControlProject(t.Context(), 1, 2)
-	if err != nil {
-		t.Fatalf("IsOrganizationControlProject() error = %v, want nil", err)
-	}
-
-	if !isControlProject {
-		t.Error("IsOrganizationControlProject() = false, want true")
-	}
-}
-
-func TestCore_IsOrganizationControlProject_error(t *testing.T) {
-	dbErr := errors.New("db error")
-
-	orgStorer := &MockedOrgStorer{
-		IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
-			return false, dbErr
-		},
-	}
-	core := NewCore(orgStorer, nil, nil, immediateTransactor{})
-
-	if _, err := core.IsOrganizationControlProject(t.Context(), 1, 2); !errors.Is(err, dbErr) {
-		t.Errorf("IsOrganizationControlProject() error = %v, want %v", err, dbErr)
-	}
-}
-
 func TestCore_CreateOrganizationUser(t *testing.T) {
 	now := time.Now()
 	userID := uuid.New()
@@ -785,7 +715,7 @@ func TestCore_CreateOrganizationUser(t *testing.T) {
 		},
 	}
 	core := NewCore(orgStorer, orgUserStore, nil, immediateTransactor{})
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(1)})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 1}})
 
 	got, err := core.CreateOrganizationUser(ctx, mdl.CreateOrganizationUser{Email: want.Email})
 	if err != nil {
@@ -860,7 +790,7 @@ func TestCore_CreateOrganizationUser_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.orgStorer, tt.orgUserStore, nil, immediateTransactor{})
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(1)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 1}})
 
 			if _, err := core.CreateOrganizationUser(ctx, tt.in); !errors.Is(err, tt.want) {
 				t.Errorf("CreateOrganizationUser() error = %v, want %v", err, tt.want)
@@ -1053,4 +983,25 @@ func mustUpdateCustomRole(t *testing.T, rbacStore *pgrbac.Store, update pgrbac.U
 	}
 
 	return role
+}
+
+func checkOrgMembership(t *testing.T, pool *pgxpool.Pool, userID uuid.UUID, orgID int) bool {
+	t.Helper()
+
+	var isMember bool
+	if err := pool.QueryRow(
+		t.Context(),
+		`SELECT EXISTS (
+			SELECT
+			FROM org.org_membership AS membership
+			JOIN useraccess.users AS usr ON usr.id = membership.user_id
+			WHERE usr.external_id = $1 AND membership.org_id = $2
+		)`,
+		userID,
+		orgID,
+	).Scan(&isMember); err != nil {
+		t.Fatalf("check organization membership: %v", err)
+	}
+
+	return isMember
 }

@@ -147,8 +147,8 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			recoveryUnaryInterceptor(),
 			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
 			permissionUnaryInterceptor(),
-			systemControlProjectUnaryInterceptor(cfg.OrganizationCore),
-			organizationControlProjectUnaryInterceptor(cfg.OrganizationCore),
+			systemControlProjectUnaryInterceptor(),
+			organizationControlProjectUnaryInterceptor(),
 			idempotencyUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
@@ -157,8 +157,8 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			recoveryStreamInterceptor(),
 			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
 			permissionStreamInterceptor(),
-			systemControlProjectStreamInterceptor(cfg.OrganizationCore),
-			organizationControlProjectStreamInterceptor(cfg.OrganizationCore),
+			systemControlProjectStreamInterceptor(),
+			organizationControlProjectStreamInterceptor(),
 		),
 	)
 

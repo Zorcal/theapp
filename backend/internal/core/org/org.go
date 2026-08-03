@@ -39,10 +39,6 @@ type OrgStorer interface {
 	// EnsureOrganizationMember adds a user to an organization when the membership does not exist.
 	// Returns [sql.ErrNoRows] if the user or organization does not exist.
 	EnsureOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error
-	// IsOrganizationMember reports whether userID is a member of orgID.
-	IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
-	// IsOrganizationControlProject reports whether projectID is orgID's control project.
-	IsOrganizationControlProject(ctx context.Context, orgID, projectID int) (bool, error)
 	// OrganizationByName returns the organization with the given name.
 	// Returns [sql.ErrNoRows] if no such organization exists.
 	OrganizationByName(ctx context.Context, name string) (pgorg.Organization, error)
@@ -222,26 +218,6 @@ func (c *Core) OrganizationByName(ctx context.Context, name string) (mdl.Organiz
 	return organizationFromPg(pgOrg), nil
 }
 
-// IsOrganizationMember reports whether userID is a member of orgID.
-func (c *Core) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
-	isMember, err := c.orgStorer.IsOrganizationMember(ctx, userID, orgID)
-	if err != nil {
-		return false, fmt.Errorf("organization member: %w", err)
-	}
-
-	return isMember, nil
-}
-
-// IsOrganizationControlProject reports whether projectID is orgID's control project.
-func (c *Core) IsOrganizationControlProject(ctx context.Context, orgID, projectID int) (bool, error) {
-	isControlProject, err := c.orgStorer.IsOrganizationControlProject(ctx, orgID, projectID)
-	if err != nil {
-		return false, fmt.Errorf("organization control project: %w", err)
-	}
-
-	return isControlProject, nil
-}
-
 // CreateOrganizationUser returns the system user with cou.Email, creating it when necessary, and
 // adds the user to the authenticated organization. Existing organization membership is unchanged.
 // Returns [mdl.ErrValidation] if cou is invalid.
@@ -254,8 +230,8 @@ func (c *Core) CreateOrganizationUser(ctx context.Context, cou mdl.CreateOrganiz
 	if !ok {
 		return mdl.User{}, errors.New("auth session missing")
 	}
-	if sess.OrgID == nil {
-		return mdl.User{}, errors.New("organization context missing")
+	if sess.Project == nil {
+		return mdl.User{}, errors.New("project context missing")
 	}
 
 	var pgUser pguser.User
@@ -266,7 +242,7 @@ func (c *Core) CreateOrganizationUser(ctx context.Context, cou mdl.CreateOrganiz
 			return fmt.Errorf("get or create organization user: %w", err)
 		}
 
-		if err := c.orgStorer.EnsureOrganizationMember(ctx, pgUser.ExternalID, sess.MustOrgID()); err != nil {
+		if err := c.orgStorer.EnsureOrganizationMember(ctx, pgUser.ExternalID, sess.Project.OrgID); err != nil {
 			// The user was established earlier in this transaction and the organization was resolved
 			// before it, so sql.ErrNoRows is an impossible state that must remain an internal error.
 			return fmt.Errorf("add organization user as member: %w", err)

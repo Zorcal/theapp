@@ -7,7 +7,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
@@ -27,15 +26,6 @@ var _ OrganizationCore = &MockedOrganizationCore{}
 //			CreateOrganizationUserFunc: func(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error) {
 //				panic("mock out the CreateOrganizationUser method")
 //			},
-//			IsOrganizationControlProjectFunc: func(ctx context.Context, orgID int, projectID int) (bool, error) {
-//				panic("mock out the IsOrganizationControlProject method")
-//			},
-//			IsOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
-//				panic("mock out the IsOrganizationMember method")
-//			},
-//			OrganizationByNameFunc: func(ctx context.Context, name string) (mdl.Organization, error) {
-//				panic("mock out the OrganizationByName method")
-//			},
 //		}
 //
 //		// use mockedOrganizationCore in code that requires OrganizationCore
@@ -48,15 +38,6 @@ type MockedOrganizationCore struct {
 
 	// CreateOrganizationUserFunc mocks the CreateOrganizationUser method.
 	CreateOrganizationUserFunc func(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error)
-
-	// IsOrganizationControlProjectFunc mocks the IsOrganizationControlProject method.
-	IsOrganizationControlProjectFunc func(ctx context.Context, orgID int, projectID int) (bool, error)
-
-	// IsOrganizationMemberFunc mocks the IsOrganizationMember method.
-	IsOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
-
-	// OrganizationByNameFunc mocks the OrganizationByName method.
-	OrganizationByNameFunc func(ctx context.Context, name string) (mdl.Organization, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -74,37 +55,9 @@ type MockedOrganizationCore struct {
 			// User is the user argument value.
 			User mdl.CreateOrganizationUser
 		}
-		// IsOrganizationControlProject holds details about calls to the IsOrganizationControlProject method.
-		IsOrganizationControlProject []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// OrgID is the orgID argument value.
-			OrgID int
-			// ProjectID is the projectID argument value.
-			ProjectID int
-		}
-		// IsOrganizationMember holds details about calls to the IsOrganizationMember method.
-		IsOrganizationMember []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// UserID is the userID argument value.
-			UserID uuid.UUID
-			// OrgID is the orgID argument value.
-			OrgID int
-		}
-		// OrganizationByName holds details about calls to the OrganizationByName method.
-		OrganizationByName []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Name is the name argument value.
-			Name string
-		}
 	}
-	lockCreateOrganization           sync.RWMutex
-	lockCreateOrganizationUser       sync.RWMutex
-	lockIsOrganizationControlProject sync.RWMutex
-	lockIsOrganizationMember         sync.RWMutex
-	lockOrganizationByName           sync.RWMutex
+	lockCreateOrganization     sync.RWMutex
+	lockCreateOrganizationUser sync.RWMutex
 }
 
 // CreateOrganization calls CreateOrganizationFunc.
@@ -176,121 +129,5 @@ func (mock *MockedOrganizationCore) CreateOrganizationUserCalls() []struct {
 	mock.lockCreateOrganizationUser.RLock()
 	calls = mock.calls.CreateOrganizationUser
 	mock.lockCreateOrganizationUser.RUnlock()
-	return calls
-}
-
-// IsOrganizationControlProject calls IsOrganizationControlProjectFunc.
-func (mock *MockedOrganizationCore) IsOrganizationControlProject(ctx context.Context, orgID int, projectID int) (bool, error) {
-	if mock.IsOrganizationControlProjectFunc == nil {
-		panic("MockedOrganizationCore.IsOrganizationControlProjectFunc: method is nil but OrganizationCore.IsOrganizationControlProject was just called")
-	}
-	callInfo := struct {
-		Ctx       context.Context
-		OrgID     int
-		ProjectID int
-	}{
-		Ctx:       ctx,
-		OrgID:     orgID,
-		ProjectID: projectID,
-	}
-	mock.lockIsOrganizationControlProject.Lock()
-	mock.calls.IsOrganizationControlProject = append(mock.calls.IsOrganizationControlProject, callInfo)
-	mock.lockIsOrganizationControlProject.Unlock()
-	return mock.IsOrganizationControlProjectFunc(ctx, orgID, projectID)
-}
-
-// IsOrganizationControlProjectCalls gets all the calls that were made to IsOrganizationControlProject.
-// Check the length with:
-//
-//	len(mockedOrganizationCore.IsOrganizationControlProjectCalls())
-func (mock *MockedOrganizationCore) IsOrganizationControlProjectCalls() []struct {
-	Ctx       context.Context
-	OrgID     int
-	ProjectID int
-} {
-	var calls []struct {
-		Ctx       context.Context
-		OrgID     int
-		ProjectID int
-	}
-	mock.lockIsOrganizationControlProject.RLock()
-	calls = mock.calls.IsOrganizationControlProject
-	mock.lockIsOrganizationControlProject.RUnlock()
-	return calls
-}
-
-// IsOrganizationMember calls IsOrganizationMemberFunc.
-func (mock *MockedOrganizationCore) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
-	if mock.IsOrganizationMemberFunc == nil {
-		panic("MockedOrganizationCore.IsOrganizationMemberFunc: method is nil but OrganizationCore.IsOrganizationMember was just called")
-	}
-	callInfo := struct {
-		Ctx    context.Context
-		UserID uuid.UUID
-		OrgID  int
-	}{
-		Ctx:    ctx,
-		UserID: userID,
-		OrgID:  orgID,
-	}
-	mock.lockIsOrganizationMember.Lock()
-	mock.calls.IsOrganizationMember = append(mock.calls.IsOrganizationMember, callInfo)
-	mock.lockIsOrganizationMember.Unlock()
-	return mock.IsOrganizationMemberFunc(ctx, userID, orgID)
-}
-
-// IsOrganizationMemberCalls gets all the calls that were made to IsOrganizationMember.
-// Check the length with:
-//
-//	len(mockedOrganizationCore.IsOrganizationMemberCalls())
-func (mock *MockedOrganizationCore) IsOrganizationMemberCalls() []struct {
-	Ctx    context.Context
-	UserID uuid.UUID
-	OrgID  int
-} {
-	var calls []struct {
-		Ctx    context.Context
-		UserID uuid.UUID
-		OrgID  int
-	}
-	mock.lockIsOrganizationMember.RLock()
-	calls = mock.calls.IsOrganizationMember
-	mock.lockIsOrganizationMember.RUnlock()
-	return calls
-}
-
-// OrganizationByName calls OrganizationByNameFunc.
-func (mock *MockedOrganizationCore) OrganizationByName(ctx context.Context, name string) (mdl.Organization, error) {
-	if mock.OrganizationByNameFunc == nil {
-		panic("MockedOrganizationCore.OrganizationByNameFunc: method is nil but OrganizationCore.OrganizationByName was just called")
-	}
-	callInfo := struct {
-		Ctx  context.Context
-		Name string
-	}{
-		Ctx:  ctx,
-		Name: name,
-	}
-	mock.lockOrganizationByName.Lock()
-	mock.calls.OrganizationByName = append(mock.calls.OrganizationByName, callInfo)
-	mock.lockOrganizationByName.Unlock()
-	return mock.OrganizationByNameFunc(ctx, name)
-}
-
-// OrganizationByNameCalls gets all the calls that were made to OrganizationByName.
-// Check the length with:
-//
-//	len(mockedOrganizationCore.OrganizationByNameCalls())
-func (mock *MockedOrganizationCore) OrganizationByNameCalls() []struct {
-	Ctx  context.Context
-	Name string
-} {
-	var calls []struct {
-		Ctx  context.Context
-		Name string
-	}
-	mock.lockOrganizationByName.RLock()
-	calls = mock.calls.OrganizationByName
-	mock.lockOrganizationByName.RUnlock()
 	return calls
 }

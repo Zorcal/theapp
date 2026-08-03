@@ -9,13 +9,119 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
 	"github.com/zorcal/theapp/backend/internal/testingx"
 )
+
+func TestStore_AuthSessionData(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	authStore := pgauth.NewStore(pool)
+	orgStore := pgorg.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	org := seedOrganization(t, orgStore, "auth-session-org")
+	project := seedProject(t, orgStore, org.ID, "ordinary-project")
+
+	member := seedUser(t, userStore, "auth-session-member@test.com")
+	seedOrgMembership(t, orgStore, member.ExternalID, org.ID)
+	nonmember := seedUser(t, userStore, "auth-session-nonmember@test.com")
+
+	tests := []struct {
+		name      string
+		userID    uuid.UUID
+		projectID *int
+		want      pgauth.AuthSessionData
+	}{
+		{
+			name:      "system scope",
+			userID:    member.ExternalID,
+			projectID: nil,
+			want: pgauth.AuthSessionData{
+				UserExternalID: member.ExternalID,
+				Email:          member.Email,
+			},
+		},
+		{
+			name:      "control project member",
+			userID:    member.ExternalID,
+			projectID: new(org.ControlProjectID),
+			want: pgauth.AuthSessionData{
+				UserExternalID:   member.ExternalID,
+				Email:            member.Email,
+				ProjectID:        new(org.ControlProjectID),
+				OrgID:            new(org.ID),
+				OrgName:          new(org.Name),
+				IsControlProject: new(true),
+				IsOrgMember:      new(true),
+			},
+		},
+		{
+			name:      "ordinary project nonmember",
+			userID:    nonmember.ExternalID,
+			projectID: new(project.ID),
+			want: pgauth.AuthSessionData{
+				UserExternalID:   nonmember.ExternalID,
+				Email:            nonmember.Email,
+				ProjectID:        new(project.ID),
+				OrgID:            new(org.ID),
+				OrgName:          new(org.Name),
+				IsControlProject: new(false),
+				IsOrgMember:      new(false),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := authStore.AuthSessionData(ctx, tt.userID, tt.projectID)
+			if err != nil {
+				t.Fatalf("AuthSessionData() error = %v", err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want)
+		})
+	}
+}
+
+func TestStore_AuthSessionData_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	authStore := pgauth.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+
+	user := seedUser(t, userStore, "auth-session-error@test.com")
+
+	t.Run("not found", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			userID    uuid.UUID
+			projectID *int
+		}{
+			{
+				name:   "user",
+				userID: uuid.New(),
+			},
+			{
+				name:      "project",
+				userID:    user.ExternalID,
+				projectID: new(-1),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if _, err := authStore.AuthSessionData(ctx, tt.userID, tt.projectID); !errors.Is(err, sql.ErrNoRows) {
+					t.Errorf("AuthSessionData() error = %v, want sql.ErrNoRows", err)
+				}
+			})
+		}
+	})
+}
 
 func TestStore_MagicLinkToken(t *testing.T) {
 	ctx := context.Background()
@@ -467,4 +573,37 @@ func seedUser(t *testing.T, s *pguser.Store, email string) pguser.User {
 		t.Fatalf("seed user %q: %v", email, err)
 	}
 	return u
+}
+
+func seedOrganization(t *testing.T, s *pgorg.Store, name string) pgorg.Organization {
+	t.Helper()
+
+	org, err := s.CreateOrganization(t.Context(), pgorg.CreateOrganization{
+		Name:               name,
+		ControlProjectName: "control",
+	})
+	if err != nil {
+		t.Fatalf("seed organization %q: %v", name, err)
+	}
+
+	return org
+}
+
+func seedProject(t *testing.T, s *pgorg.Store, orgID int, name string) pgorg.Project {
+	t.Helper()
+
+	project, err := s.CreateProject(t.Context(), pgorg.CreateProject{OrgID: orgID, Name: name})
+	if err != nil {
+		t.Fatalf("seed project %q: %v", name, err)
+	}
+
+	return project
+}
+
+func seedOrgMembership(t *testing.T, s *pgorg.Store, userID uuid.UUID, orgID int) {
+	t.Helper()
+
+	if err := s.AddOrganizationMember(t.Context(), userID, orgID); err != nil {
+		t.Fatalf("seed organization membership: %v", err)
+	}
 }

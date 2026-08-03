@@ -18,9 +18,9 @@ Organization membership and org-scoped role assignment are separate concepts, an
 
 ## AuthSession
 
-At request time, after validating the access token, the request is resolved into an `mdl.AuthSession` struct that is threaded through the call stack. `ProjectID` and `OrgID` are pointers, nil together for a request with no project context (see below) — in that case `User.Permissions` is resolved from system-scope role assignments only. When `ProjectID` is non-nil, `OrgID` is always resolved alongside it (the organization `ProjectID` belongs to), and `User.Permissions` is resolved from project-, org-, and system-scope role assignments for that project. There's a single core method for this resolution, taking a `*int` project ID: non-nil triggers the project-scoped path (org lookup plus the three-way union); nil resolves system-scope permissions only and leaves `ProjectID`/`OrgID` unset.
+At request time, after validating the access token, the request is resolved into an `mdl.AuthSession` struct that is threaded through the call stack. `AuthSession.Project` is nil for a request with no project context (see below) — in that case `User.Permissions` is resolved from system-scope role assignments only. Otherwise, the project contains its ID, organization ID and name, control-project marker, and whether the caller belongs to the organization. `User.Permissions` is resolved from project-, org-, and system-scope role assignments for that project.
 
-A `ProjectID` that doesn't match any real project is rejected outright — the same `mdl.ErrNotFound` used for an unresolvable caller identity — rather than silently resolving a session with a meaningless `OrgID`. This matters because `OrgID` being non-nil is meant to mean "resolved," not merely "a lookup was attempted"; treating a nonexistent project as a resolvable session would hand back an `OrgID` pointing at nothing. A caller with a real project ID but no role assignment relevant to it is a different case entirely, and not an error at all: the session resolves normally, with an empty (or system-scope-only) permission set, which the permission-checking interceptor rejects on its own — the same way it rejects any other caller missing a required permission.
+A specialized auth-store query resolves the caller and all project metadata together. Permissions remain a separate query because permission resolution has a distinct purpose and is reused elsewhere. A project ID that doesn't match any real project is rejected outright — the same `mdl.ErrNotFound` used for an unresolvable caller identity. A caller with a real project ID but no relevant role assignment is a different case and not an error: the session resolves normally with an empty (or system-scope-only) permission set, which permission-checking code rejects on its own.
 
 `AuthUser.Permissions` is resolved from the database on each request rather than cached in the token itself — otherwise a revoked role would stay effective until the token expired, which for a normal access token TTL is far too long a window.
 
@@ -28,9 +28,16 @@ If per-request DB resolution ever becomes a bottleneck, the fix is a short-lived
 
 ```
 AuthSession {
-    User      AuthUser
-    ProjectID *int  // nil for a request with no project context
-    OrgID     *int  // the organization ProjectID belongs to; nil exactly when ProjectID is nil
+	User    AuthUser
+	Project *AuthProject  // nil for a request with no project context
+}
+
+AuthProject {
+	ID        int
+	OrgID     int
+	OrgName   string
+	IsControl bool
+	IsOrgMember bool
 }
 
 AuthUser {

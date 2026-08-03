@@ -107,9 +107,7 @@ func TestCore_integration(t *testing.T) {
 	}
 
 	// AuthSession — resolves the permissions granted through a system-scope role assignment.
-	if err := rbacStore.AssignSystemRole(ctx, aliceUser.ExternalID, "superadmin"); err != nil {
-		t.Fatalf("AssignSystemRole() error = %v", err)
-	}
+	seedSystemRoleAssignment(t, ctx, rbacStore, aliceUser.ExternalID, "superadmin")
 
 	sess, err := core.AuthSession(ctx, aliceUser.ExternalID, nil)
 	if err != nil {
@@ -473,37 +471,40 @@ func TestCore_VerifyMagicLink_error(t *testing.T) {
 	})
 
 	tests := []struct {
-		name    string
-		mockErr error
-		wantErr error
+		name       string
+		authStorer *MockedAuthStorer
+		want       error
 	}{
 		{
-			name:    "token not found",
-			mockErr: sql.ErrNoRows,
-			wantErr: mdl.ErrTokenInvalid,
+			name: "token not found",
+			authStorer: &MockedAuthStorer{
+				MagicLinkTokenByHashFunc: func(_ context.Context, _ string) (pgauth.MagicLinkToken, error) {
+					return pgauth.MagicLinkToken{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrTokenInvalid,
 		},
 		{
-			name:    "lookup error",
-			mockErr: dbErr,
-			wantErr: dbErr,
+			name: "lookup",
+			authStorer: &MockedAuthStorer{
+				MagicLinkTokenByHashFunc: func(_ context.Context, _ string) (pgauth.MagicLinkToken, error) {
+					return pgauth.MagicLinkToken{}, dbErr
+				},
+			},
+			want: dbErr,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			authStorerMock := &MockedAuthStorer{
-				MagicLinkTokenByHashFunc: func(_ context.Context, _ string) (pgauth.MagicLinkToken, error) {
-					return pgauth.MagicLinkToken{}, tt.mockErr
-				},
-			}
 			core := NewCore(
-				authStorerMock,
+				tt.authStorer,
 				&MockedUserStorer{},
 				&MockedPermissionStorer{},
 				immediateTransactor{},
 				testConfig(),
 			)
-			if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
-				t.Errorf("VerifyMagicLink() error = %v, want %v", err, tt.wantErr)
+			if _, err := core.VerifyMagicLink(ctx, mdl.VerifyMagicLink{Token: "anytoken"}); !errors.Is(err, tt.want) {
+				t.Errorf("VerifyMagicLink() error = %v, want %v", err, tt.want)
 			}
 		})
 	}
@@ -715,37 +716,40 @@ func TestCore_RefreshAccessToken_error(t *testing.T) {
 	})
 
 	tests := []struct {
-		name    string
-		mockErr error
-		wantErr error
+		name       string
+		authStorer *MockedAuthStorer
+		want       error
 	}{
 		{
-			name:    "token not found",
-			mockErr: sql.ErrNoRows,
-			wantErr: mdl.ErrTokenInvalid,
+			name: "token not found",
+			authStorer: &MockedAuthStorer{
+				ConsumeRefreshTokenFunc: func(_ context.Context, _ string) (pgauth.RefreshToken, error) {
+					return pgauth.RefreshToken{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrTokenInvalid,
 		},
 		{
-			name:    "consume error",
-			mockErr: dbErr,
-			wantErr: dbErr,
+			name: "consume",
+			authStorer: &MockedAuthStorer{
+				ConsumeRefreshTokenFunc: func(_ context.Context, _ string) (pgauth.RefreshToken, error) {
+					return pgauth.RefreshToken{}, dbErr
+				},
+			},
+			want: dbErr,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			authStorerMock := &MockedAuthStorer{
-				ConsumeRefreshTokenFunc: func(_ context.Context, _ string) (pgauth.RefreshToken, error) {
-					return pgauth.RefreshToken{}, tt.mockErr
-				},
-			}
 			core := NewCore(
-				authStorerMock,
+				tt.authStorer,
 				&MockedUserStorer{},
 				&MockedPermissionStorer{},
 				immediateTransactor{},
 				testConfig(),
 			)
-			if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
-				t.Errorf("RefreshAccessToken() error = %v, want %v", err, tt.wantErr)
+			if _, err := core.RefreshAccessToken(ctx, mdl.RefreshToken{Token: "anytoken"}); !errors.Is(err, tt.want) {
+				t.Errorf("RefreshAccessToken() error = %v, want %v", err, tt.want)
 			}
 		})
 	}
@@ -831,37 +835,40 @@ func TestCore_RevokeRefreshToken_error(t *testing.T) {
 	})
 
 	tests := []struct {
-		name    string
-		mockErr error
-		wantErr error
+		name       string
+		authStorer *MockedAuthStorer
+		want       error
 	}{
 		{
-			name:    "token not found or already revoked",
-			mockErr: sql.ErrNoRows,
-			wantErr: mdl.ErrTokenInvalid,
+			name: "token not found or already revoked",
+			authStorer: &MockedAuthStorer{
+				ConsumeRefreshTokenFunc: func(_ context.Context, _ string) (pgauth.RefreshToken, error) {
+					return pgauth.RefreshToken{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrTokenInvalid,
 		},
 		{
-			name:    "store error",
-			mockErr: dbErr,
-			wantErr: dbErr,
+			name: "store",
+			authStorer: &MockedAuthStorer{
+				ConsumeRefreshTokenFunc: func(_ context.Context, _ string) (pgauth.RefreshToken, error) {
+					return pgauth.RefreshToken{}, dbErr
+				},
+			},
+			want: dbErr,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			authStorerMock := &MockedAuthStorer{
-				ConsumeRefreshTokenFunc: func(_ context.Context, _ string) (pgauth.RefreshToken, error) {
-					return pgauth.RefreshToken{}, tt.mockErr
-				},
-			}
 			core := NewCore(
-				authStorerMock,
+				tt.authStorer,
 				&MockedUserStorer{},
 				&MockedPermissionStorer{},
 				immediateTransactor{},
 				testConfig(),
 			)
-			if err := core.RevokeRefreshToken(ctx, mdl.RefreshToken{Token: "anytoken"}); !errors.Is(err, tt.wantErr) {
-				t.Errorf("RevokeRefreshToken() error = %v, want %v", err, tt.wantErr)
+			if err := core.RevokeRefreshToken(ctx, mdl.RefreshToken{Token: "anytoken"}); !errors.Is(err, tt.want) {
+				t.Errorf("RevokeRefreshToken() error = %v, want %v", err, tt.want)
 			}
 		})
 	}
@@ -869,23 +876,14 @@ func TestCore_RevokeRefreshToken_error(t *testing.T) {
 
 func TestCore_RevokeAllUserRefreshTokens(t *testing.T) {
 	ctx := context.Background()
-	userID := uuid.New()
-
-	var gotUserID uuid.UUID
 	authStorerMock := &MockedAuthStorer{
-		RevokeAllUserRefreshTokensFunc: func(_ context.Context, id uuid.UUID) error {
-			gotUserID = id
-			return nil
-		},
+		RevokeAllUserRefreshTokensFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
 	}
 
 	core := NewCore(authStorerMock, &MockedUserStorer{}, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
 
-	if err := core.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
+	if err := core.RevokeAllUserRefreshTokens(ctx, uuid.New()); err != nil {
 		t.Fatalf("RevokeAllUserRefreshTokens() error = %v", err)
-	}
-	if got, want := gotUserID, userID; got != want {
-		t.Errorf("RevokeAllUserRefreshTokens() userID = %v, want %v", got, want)
 	}
 }
 
@@ -907,12 +905,12 @@ func TestCore_RevokeAllUserRefreshTokens_error(t *testing.T) {
 }
 
 func TestCore_AuthSession(t *testing.T) {
-	id := uuid.New()
+	userID := uuid.New()
 
 	t.Run("system scope", func(t *testing.T) {
-		userStorer := &MockedUserStorer{
-			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-				return pguser.User{ExternalID: id, Email: "alice@test.com"}, nil
+		authStorer := &MockedAuthStorer{
+			AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+				return pgauth.AuthSessionData{UserExternalID: userID, Email: "alice@test.com"}, nil
 			},
 		}
 		permissionStorer := &MockedPermissionStorer{
@@ -920,16 +918,16 @@ func TestCore_AuthSession(t *testing.T) {
 				return []string{"user:create", "user:read"}, nil
 			},
 		}
-		core := NewCore(&MockedAuthStorer{}, userStorer, permissionStorer, immediateTransactor{}, testConfig())
+		core := NewCore(authStorer, &MockedUserStorer{}, permissionStorer, immediateTransactor{}, testConfig())
 
-		got, err := core.AuthSession(t.Context(), id, nil)
+		got, err := core.AuthSession(t.Context(), userID, nil)
 		if err != nil {
 			t.Fatalf("AuthSession() error = %v", err)
 		}
 
 		want := mdl.AuthSession{
 			User: mdl.AuthUser{
-				UserID:      id,
+				UserID:      userID,
 				Email:       "alice@test.com",
 				Permissions: []mdl.Permission{mdl.PermissionUserCreate, mdl.PermissionUserRead},
 			},
@@ -939,9 +937,17 @@ func TestCore_AuthSession(t *testing.T) {
 	})
 
 	t.Run("project scope", func(t *testing.T) {
-		userStorer := &MockedUserStorer{
-			UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-				return pguser.User{ExternalID: id, Email: "alice@test.com"}, nil
+		authStorer := &MockedAuthStorer{
+			AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+				return pgauth.AuthSessionData{
+					UserExternalID:   userID,
+					Email:            "alice@test.com",
+					ProjectID:        new(42),
+					OrgID:            new(5),
+					OrgName:          new("acme"),
+					IsControlProject: new(true),
+					IsOrgMember:      new(true),
+				}, nil
 			},
 		}
 		permissionStorer := &MockedPermissionStorer{
@@ -952,23 +958,26 @@ func TestCore_AuthSession(t *testing.T) {
 				}, nil
 			},
 		}
-		core := NewCore(&MockedAuthStorer{}, userStorer, permissionStorer, immediateTransactor{}, testConfig())
+		core := NewCore(authStorer, &MockedUserStorer{}, permissionStorer, immediateTransactor{}, testConfig())
 
-		projectID := 42
-		got, err := core.AuthSession(t.Context(), id, &projectID)
+		got, err := core.AuthSession(t.Context(), userID, new(42))
 		if err != nil {
 			t.Fatalf("AuthSession() error = %v", err)
 		}
 
-		orgID := 5
 		want := mdl.AuthSession{
 			User: mdl.AuthUser{
-				UserID:      id,
+				UserID:      userID,
 				Email:       "alice@test.com",
 				Permissions: []mdl.Permission{mdl.PermissionUserCreate, mdl.PermissionUserRead},
 			},
-			ProjectID: &projectID,
-			OrgID:     &orgID,
+			Project: &mdl.AuthProject{
+				ID:          42,
+				OrgID:       5,
+				OrgName:     "acme",
+				IsControl:   true,
+				IsOrgMember: true,
+			},
 		}
 
 		testingx.AssertDiff(t, got, want)
@@ -976,41 +985,30 @@ func TestCore_AuthSession(t *testing.T) {
 }
 
 func TestCore_AuthSession_error(t *testing.T) {
-	projectID := 42
 	dbErr := errors.New("db error")
 
 	tests := []struct {
 		name             string
-		userStorer       *MockedUserStorer
+		authStorer       *MockedAuthStorer
 		permissionStorer *MockedPermissionStorer
 		projectID        *int
 		want             error
 	}{
 		{
-			name: "user not found",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, sql.ErrNoRows
+			name: "session data not found",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{}, sql.ErrNoRows
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{},
 			want:             mdl.ErrNotFound,
 		},
 		{
-			name: "user store error",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, dbErr
-				},
-			},
-			permissionStorer: &MockedPermissionStorer{},
-			want:             dbErr,
-		},
-		{
-			name: "user not found, system scope",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, nil
+			name: "system permissions not found",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{UserExternalID: uuid.New()}, nil
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{
@@ -1021,10 +1019,17 @@ func TestCore_AuthSession_error(t *testing.T) {
 			want: mdl.ErrNotFound,
 		},
 		{
-			name: "user or project not found, project scope",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, nil
+			name: "project permissions not found",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{
+						UserExternalID:   uuid.New(),
+						ProjectID:        new(42),
+						OrgID:            new(5),
+						OrgName:          new("acme"),
+						IsControlProject: new(false),
+						IsOrgMember:      new(true),
+					}, nil
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{
@@ -1032,14 +1037,24 @@ func TestCore_AuthSession_error(t *testing.T) {
 					return pgrbac.ProjectPermissions{}, sql.ErrNoRows
 				},
 			},
-			projectID: &projectID,
+			projectID: new(42),
 			want:      mdl.ErrNotFound,
 		},
 		{
-			name: "store error, system scope",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, nil
+			name: "session data store",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{}, dbErr
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{},
+			want:             dbErr,
+		},
+		{
+			name: "system permissions store",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{UserExternalID: uuid.New()}, nil
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{
@@ -1050,10 +1065,17 @@ func TestCore_AuthSession_error(t *testing.T) {
 			want: dbErr,
 		},
 		{
-			name: "store error, project scope",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, nil
+			name: "project permissions store",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{
+						UserExternalID:   uuid.New(),
+						ProjectID:        new(42),
+						OrgID:            new(5),
+						OrgName:          new("acme"),
+						IsControlProject: new(false),
+						IsOrgMember:      new(true),
+					}, nil
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{
@@ -1061,13 +1083,13 @@ func TestCore_AuthSession_error(t *testing.T) {
 					return pgrbac.ProjectPermissions{}, dbErr
 				},
 			},
-			projectID: &projectID,
+			projectID: new(42),
 			want:      dbErr,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(&MockedAuthStorer{}, tt.userStorer, tt.permissionStorer, immediateTransactor{}, testConfig())
+			core := NewCore(tt.authStorer, &MockedUserStorer{}, tt.permissionStorer, immediateTransactor{}, testConfig())
 
 			if _, err := core.AuthSession(t.Context(), uuid.New(), tt.projectID); !errors.Is(err, tt.want) {
 				t.Errorf("AuthSession() error = %v, want %v", err, tt.want)
@@ -1078,24 +1100,30 @@ func TestCore_AuthSession_error(t *testing.T) {
 
 func TestCore_OrganizationAuthSession(t *testing.T) {
 	userID := uuid.New()
-	projectID := 42
-	orgID := 5
+	authStorer := &MockedAuthStorer{
+		AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+			return pgauth.AuthSessionData{
+				UserExternalID:   userID,
+				Email:            "alice@test.com",
+				ProjectID:        new(42),
+				OrgID:            new(5),
+				OrgName:          new("acme"),
+				IsControlProject: new(true),
+				IsOrgMember:      new(true),
+			}, nil
+		},
+	}
 	permissionStorer := &MockedPermissionStorer{
 		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
 			return pgrbac.OrgPermissions{
-				OrgID:           orgID,
+				OrgID:           5,
 				PermissionNames: []string{"custom-role:assign-org", "custom-role:read-org-assignments"},
 			}, nil
 		},
 	}
-	userStorer := &MockedUserStorer{
-		UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-			return pguser.User{ExternalID: userID, Email: "alice@test.com"}, nil
-		},
-	}
-	core := NewCore(&MockedAuthStorer{}, userStorer, permissionStorer, immediateTransactor{}, testConfig())
+	core := NewCore(authStorer, &MockedUserStorer{}, permissionStorer, immediateTransactor{}, testConfig())
 
-	got, err := core.OrganizationAuthSession(t.Context(), userID, projectID)
+	got, err := core.OrganizationAuthSession(t.Context(), userID, 42)
 	if err != nil {
 		t.Fatalf("OrganizationAuthSession() error = %v", err)
 	}
@@ -1109,8 +1137,13 @@ func TestCore_OrganizationAuthSession(t *testing.T) {
 				mdl.PermissionCustomRoleReadOrgAssignments,
 			},
 		},
-		ProjectID: &projectID,
-		OrgID:     &orgID,
+		Project: &mdl.AuthProject{
+			ID:          42,
+			OrgID:       5,
+			OrgName:     "acme",
+			IsControl:   true,
+			IsOrgMember: true,
+		},
 	}
 
 	testingx.AssertDiff(t, got, want)
@@ -1121,35 +1154,32 @@ func TestCore_OrganizationAuthSession_error(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		userStorer       *MockedUserStorer
+		authStorer       *MockedAuthStorer
 		permissionStorer *MockedPermissionStorer
 		want             error
 	}{
 		{
-			name: "user not found",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, sql.ErrNoRows
+			name: "session data not found",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{}, sql.ErrNoRows
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{},
 			want:             mdl.ErrNotFound,
 		},
 		{
-			name: "user store error",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, dbErr
-				},
-			},
-			permissionStorer: &MockedPermissionStorer{},
-			want:             dbErr,
-		},
-		{
-			name: "user or project not found",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, nil
+			name: "organization permissions not found",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{
+						UserExternalID:   uuid.New(),
+						ProjectID:        new(42),
+						OrgID:            new(5),
+						OrgName:          new("acme"),
+						IsControlProject: new(false),
+						IsOrgMember:      new(true),
+					}, nil
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{
@@ -1160,10 +1190,27 @@ func TestCore_OrganizationAuthSession_error(t *testing.T) {
 			want: mdl.ErrNotFound,
 		},
 		{
-			name: "resolve organization permissions",
-			userStorer: &MockedUserStorer{
-				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
-					return pguser.User{}, nil
+			name: "session data store",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{}, dbErr
+				},
+			},
+			permissionStorer: &MockedPermissionStorer{},
+			want:             dbErr,
+		},
+		{
+			name: "organization permissions store",
+			authStorer: &MockedAuthStorer{
+				AuthSessionDataFunc: func(_ context.Context, _ uuid.UUID, _ *int) (pgauth.AuthSessionData, error) {
+					return pgauth.AuthSessionData{
+						UserExternalID:   uuid.New(),
+						ProjectID:        new(42),
+						OrgID:            new(5),
+						OrgName:          new("acme"),
+						IsControlProject: new(false),
+						IsOrgMember:      new(true),
+					}, nil
 				},
 			},
 			permissionStorer: &MockedPermissionStorer{
@@ -1176,7 +1223,7 @@ func TestCore_OrganizationAuthSession_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(&MockedAuthStorer{}, tt.userStorer, tt.permissionStorer, immediateTransactor{}, testConfig())
+			core := NewCore(tt.authStorer, &MockedUserStorer{}, tt.permissionStorer, immediateTransactor{}, testConfig())
 
 			if _, err := core.OrganizationAuthSession(t.Context(), uuid.New(), 42); !errors.Is(err, tt.want) {
 				t.Errorf("OrganizationAuthSession() error = %v, want %v", err, tt.want)
@@ -1187,8 +1234,6 @@ func TestCore_OrganizationAuthSession_error(t *testing.T) {
 
 func TestCore_AuthContext(t *testing.T) {
 	userID := uuid.New()
-	projectID := 42
-	orgID := 5
 	mockedOutput := pgrbac.PermissionsByScope{
 		ProjectPermissionNames: []string{"custom-role:read", "custom-role:update"},
 		OrgPermissionNames:     []string{"custom-role:read"},
@@ -1206,8 +1251,7 @@ func TestCore_AuthContext(t *testing.T) {
 			Email:       "alice@test.com",
 			Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
 		},
-		ProjectID: &projectID,
-		OrgID:     &orgID,
+		Project: &mdl.AuthProject{ID: 42, OrgID: 5},
 	})
 
 	got, err := core.AuthContext(ctx)
@@ -1229,10 +1273,9 @@ func TestCore_AuthContext(t *testing.T) {
 func TestCore_AuthContext_error(t *testing.T) {
 	dbErr := errors.New("db error")
 	userID := uuid.New()
-	projectID := 42
 	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: userID},
-		ProjectID: &projectID,
+		User:    mdl.AuthUser{UserID: userID},
+		Project: &mdl.AuthProject{ID: 42},
 	})
 
 	tests := []struct {
@@ -1409,6 +1452,14 @@ func mustGenerateToken(t *testing.T) (raw, hash string) {
 		t.Fatalf("generateToken() error = %v", err)
 	}
 	return raw, hash
+}
+
+func seedSystemRoleAssignment(t *testing.T, ctx context.Context, s *pgrbac.Store, userID uuid.UUID, roleName string) {
+	t.Helper()
+
+	if err := s.AssignSystemRole(ctx, userID, roleName); err != nil {
+		t.Fatalf("seed system role assignment: %v", err)
+	}
 }
 
 // failingRefreshTokenStorer wraps a real Store but always returns err from CreateRefreshToken.

@@ -38,11 +38,7 @@ func TestCore_integration_customRoleLifecycle(t *testing.T) {
 	project := seedProject(t, ctx, orgStore, org.ID, "custom-role-integration-project")
 	actor := seedUser(t, ctx, userStore, "custom-role-actor@test.com", "Custom Role Actor")
 	seedSystemRoleAssignment(t, ctx, pool, actor.ID, "superadmin")
-	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: actor.ExternalID},
-		ProjectID: &project.ID,
-		OrgID:     &org.ID,
-	})
+	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{User: mdl.AuthUser{UserID: actor.ExternalID}, Project: &mdl.AuthProject{ID: project.ID, OrgID: org.ID}})
 
 	// Create roles with organization-scoped permissions.
 
@@ -153,11 +149,7 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 	seedOrgMembership(t, ctx, pool, user.ID, org.ID)
 	role := seedCustomRole(t, ctx, roleStore, org.ID, "role reader", []mdl.Permission{mdl.PermissionCustomRoleReadProjectAssignments})
 
-	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: actor.ExternalID},
-		ProjectID: &firstProject.ID,
-		OrgID:     &org.ID,
-	})
+	roleCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{User: mdl.AuthUser{UserID: actor.ExternalID}, Project: &mdl.AuthProject{ID: firstProject.ID, OrgID: org.ID}})
 
 	assertProjectPermNames := func(projectID int, want []string) {
 		t.Helper()
@@ -236,7 +228,7 @@ func TestCore_integration_customRoleAssignmentLifecycle(t *testing.T) {
 }
 
 func TestCore_CustomRoles(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 42}})
 	mockOutput := pgrbac.CustomRole{
 		ID:              1,
 		ExternalID:      uuid.New(),
@@ -295,7 +287,7 @@ func TestCore_CustomRoles_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 42}})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if _, _, err := core.CustomRoles(ctx, 25, 0); !errors.Is(err, tt.want) {
@@ -314,7 +306,7 @@ func TestCore_CustomRoles_error(t *testing.T) {
 				ctx:  context.Background(),
 			},
 			{
-				name: "organization context missing",
+				name: "project context missing",
 				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
 			},
 		}
@@ -346,7 +338,7 @@ func TestCore_UserProjectCustomRoles(t *testing.T) {
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{ID: 42}})
 
 	got, count, err := core.UserProjectCustomRoles(ctx, uuid.New(), 25, 0)
 	if err != nil {
@@ -392,7 +384,7 @@ func TestCore_UserProjectCustomRoles_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.roleStorer, immediateTransactor{})
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{ProjectID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{ID: 42}})
 
 			if _, _, err := core.UserProjectCustomRoles(ctx, uuid.New(), 25, 0); !errors.Is(err, tt.want) {
 				t.Errorf("UserProjectCustomRoles() error = %v, want %v", err, tt.want)
@@ -411,10 +403,7 @@ func TestCore_UserProjectCustomRoles_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}),
 			},
 		}
 		for _, tt := range tests {
@@ -445,7 +434,7 @@ func TestCore_UserOrgCustomRoles(t *testing.T) {
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 42}})
 
 	got, count, err := core.UserOrgCustomRoles(ctx, uuid.New(), 25, 0)
 	if err != nil {
@@ -491,7 +480,7 @@ func TestCore_UserOrgCustomRoles_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.roleStorer, immediateTransactor{})
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 42}})
 
 			if _, _, err := core.UserOrgCustomRoles(ctx, uuid.New(), 25, 0); !errors.Is(err, tt.want) {
 				t.Errorf("UserOrgCustomRoles() error = %v, want %v", err, tt.want)
@@ -509,7 +498,7 @@ func TestCore_UserOrgCustomRoles_error(t *testing.T) {
 				ctx:  context.Background(),
 			},
 			{
-				name: "organization context missing",
+				name: "project context missing",
 				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
 			},
 		}
@@ -526,7 +515,7 @@ func TestCore_UserOrgCustomRoles_error(t *testing.T) {
 }
 
 func TestCore_CustomRoleByID(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 42}})
 	mockOutput := pgrbac.CustomRole{
 		ID:              1,
 		ExternalID:      uuid.New(),
@@ -586,7 +575,7 @@ func TestCore_CustomRoleByID_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(42)})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 42}})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if _, err := core.CustomRoleByID(ctx, uuid.New()); !errors.Is(err, tt.want) {
@@ -605,7 +594,7 @@ func TestCore_CustomRoleByID_error(t *testing.T) {
 				ctx:  context.Background(),
 			},
 			{
-				name: "organization context missing",
+				name: "project context missing",
 				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
 			},
 		}
@@ -622,11 +611,7 @@ func TestCore_CustomRoleByID_error(t *testing.T) {
 }
 
 func TestCore_CreateCustomRole(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: uuid.New()},
-		ProjectID: new(7),
-		OrgID:     new(42),
-	})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 	mockOutput := pgrbac.CustomRole{
 		ID:              1,
 		ExternalID:      uuid.New(),
@@ -776,11 +761,7 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-				User:      mdl.AuthUser{UserID: uuid.New()},
-				ProjectID: new(7),
-				OrgID:     new(42),
-			})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if _, err := core.CreateCustomRole(ctx, tt.in); !errors.Is(err, tt.want) {
@@ -799,15 +780,8 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 				ctx:  context.Background(),
 			},
 			{
-				name: "organization context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
-			},
-			{
 				name: "project context missing",
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
 			},
 		}
 		for _, tt := range tests {
@@ -823,11 +797,7 @@ func TestCore_CreateCustomRole_error(t *testing.T) {
 }
 
 func TestCore_UpdateCustomRole(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: uuid.New()},
-		ProjectID: new(7),
-		OrgID:     new(42),
-	})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 
 	tests := []struct {
 		name       string
@@ -1236,11 +1206,7 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-				User:      mdl.AuthUser{UserID: uuid.New()},
-				ProjectID: new(7),
-				OrgID:     new(42),
-			})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if _, err := core.UpdateCustomRole(ctx, tt.in); !errors.Is(err, tt.want) {
@@ -1260,16 +1226,8 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 				ctx:  context.Background(),
 			},
 			{
-				name: "organization context missing",
+				name: "project context missing",
 				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
-			},
-			{
-				name: "project context missing for permission update",
-				in:   mdl.UpdateCustomRole{Fields: mdl.CustomRoleUpdateFields{Permissions: true}},
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
 			},
 		}
 		for _, tt := range tests {
@@ -1285,11 +1243,7 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 }
 
 func TestCore_ModifyCustomRolePermissions(t *testing.T) {
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: uuid.New()},
-		ProjectID: new(7),
-		OrgID:     new(42),
-	})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 
 	tests := []struct {
 		name       string
@@ -1611,11 +1565,7 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-				User:      mdl.AuthUser{UserID: uuid.New()},
-				ProjectID: new(7),
-				OrgID:     new(42),
-			})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if _, err := core.ModifyCustomRolePermissions(ctx, tt.in); !errors.Is(err, tt.want) {
@@ -1634,15 +1584,8 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 				ctx:  context.Background(),
 			},
 			{
-				name: "organization context missing",
-				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
-			},
-			{
 				name: "project context missing",
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{}),
 			},
 		}
 		for _, tt := range tests {
@@ -1671,11 +1614,7 @@ func TestCore_DeleteCustomRole(t *testing.T) {
 		},
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: uuid.New()},
-		ProjectID: new(7),
-		OrgID:     new(42),
-	})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 
 	if err := core.DeleteCustomRole(ctx, uuid.New()); err != nil {
 		t.Fatalf("DeleteCustomRole() error = %v", err)
@@ -1812,11 +1751,7 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-				User:      mdl.AuthUser{UserID: uuid.New()},
-				ProjectID: new(7),
-				OrgID:     new(42),
-			})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if err := core.DeleteCustomRole(ctx, uuid.New()); !errors.Is(err, tt.want) {
@@ -1836,10 +1771,7 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}),
 			},
 		}
 		for _, tt := range tests {
@@ -1856,10 +1788,7 @@ func TestCore_DeleteCustomRole_error(t *testing.T) {
 
 func TestCore_AssignCustomRoleToProject(t *testing.T) {
 	actorID := uuid.New()
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: actorID},
-		ProjectID: new(42),
-	})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: actorID}, Project: &mdl.AuthProject{ID: 42}})
 	mockedRole := pgrbac.CustomRole{PermissionNames: []string{"custom-role:read-project-assignments"}}
 	roleStorer := &MockedRoleStorer{
 		ProjectPermissionsFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.ProjectPermissions, error) {
@@ -2018,10 +1947,7 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-				User:      mdl.AuthUser{UserID: uuid.New()},
-				ProjectID: new(42),
-			})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 42}})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if err := core.AssignCustomRoleToProject(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
@@ -2041,10 +1967,7 @@ func TestCore_AssignCustomRoleToProject_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}),
 			},
 		}
 		for _, tt := range tests {
@@ -2070,10 +1993,7 @@ func TestCore_UnassignCustomRoleFromProject(t *testing.T) {
 		UnassignCustomRoleFromProjectFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error { return nil },
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: uuid.New()},
-		ProjectID: new(42),
-	})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 42}})
 
 	if err := core.UnassignCustomRoleFromProject(ctx, uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("UnassignCustomRoleFromProject() error = %v", err)
@@ -2179,10 +2099,7 @@ func TestCore_UnassignCustomRoleFromProject_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.roleStorer, immediateTransactor{})
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-				User:      mdl.AuthUser{UserID: uuid.New()},
-				ProjectID: new(42),
-			})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 42}})
 
 			if err := core.UnassignCustomRoleFromProject(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
 				t.Errorf("UnassignCustomRoleFromProject() error = %v, want %v", err, tt.want)
@@ -2201,10 +2118,7 @@ func TestCore_UnassignCustomRoleFromProject_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}),
 			},
 		}
 		for _, tt := range tests {
@@ -2221,11 +2135,7 @@ func TestCore_UnassignCustomRoleFromProject_error(t *testing.T) {
 
 func TestCore_AssignCustomRoleToOrg(t *testing.T) {
 	actorID := uuid.New()
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: actorID},
-		ProjectID: new(7),
-		OrgID:     new(42),
-	})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: actorID}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 	mockedRole := pgrbac.CustomRole{PermissionNames: []string{"custom-role:read"}}
 	roleStorer := &MockedRoleStorer{
 		OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
@@ -2361,11 +2271,7 @@ func TestCore_AssignCustomRoleToOrg_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-				User:      mdl.AuthUser{UserID: uuid.New()},
-				ProjectID: new(7),
-				OrgID:     new(42),
-			})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 			core := NewCore(tt.roleStorer, immediateTransactor{})
 
 			if err := core.AssignCustomRoleToOrg(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
@@ -2385,10 +2291,7 @@ func TestCore_AssignCustomRoleToOrg_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}),
 			},
 		}
 		for _, tt := range tests {
@@ -2414,11 +2317,7 @@ func TestCore_UnassignCustomRoleFromOrg(t *testing.T) {
 		UnassignCustomRoleFromOrgFunc: func(_ context.Context, _, _ uuid.UUID, _ int) error { return nil },
 	}
 	core := NewCore(roleStorer, immediateTransactor{})
-	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-		User:      mdl.AuthUser{UserID: uuid.New()},
-		ProjectID: new(7),
-		OrgID:     new(42),
-	})
+	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 
 	if err := core.UnassignCustomRoleFromOrg(ctx, uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("UnassignCustomRoleFromOrg() error = %v", err)
@@ -2524,11 +2423,7 @@ func TestCore_UnassignCustomRoleFromOrg_error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			core := NewCore(tt.roleStorer, immediateTransactor{})
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-				User:      mdl.AuthUser{UserID: uuid.New()},
-				ProjectID: new(7),
-				OrgID:     new(42),
-			})
+			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}, Project: &mdl.AuthProject{ID: 7, OrgID: 42}})
 
 			if err := core.UnassignCustomRoleFromOrg(ctx, uuid.New(), uuid.New()); !errors.Is(err, tt.want) {
 				t.Errorf("UnassignCustomRoleFromOrg() error = %v, want %v", err, tt.want)
@@ -2547,10 +2442,7 @@ func TestCore_UnassignCustomRoleFromOrg_error(t *testing.T) {
 			},
 			{
 				name: "project context missing",
-				ctx: mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{
-					User:  mdl.AuthUser{UserID: uuid.New()},
-					OrgID: new(42),
-				}),
+				ctx:  mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}),
 			},
 		}
 		for _, tt := range tests {

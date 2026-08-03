@@ -41,38 +41,32 @@ type AuthUser struct {
 	Permissions []Permission
 }
 
+// AuthProject identifies the project selected for an authenticated request and its organization.
+type AuthProject struct {
+	ID      int
+	OrgID   int
+	OrgName string
+	// IsControl reports whether this is the organization's structurally designated control
+	// project. Control-project identity does not depend on the project's name.
+	IsControl bool
+	// IsOrgMember reports whether the authenticated user belongs to the project's organization. It
+	// can be false because resolving a session for an existing project does not itself require
+	// organization membership.
+	IsOrgMember bool
+}
+
+// IsSystemControlProject reports whether ap is the system organization's control project.
+func (ap AuthProject) IsSystemControlProject() bool {
+	return ap.OrgName == SystemOrgName && ap.IsControl
+}
+
 // AuthSession is resolved once per request and threaded through the call stack, pairing the
 // caller's identity with the project it's currently operating in, if any.
 type AuthSession struct {
 	User AuthUser
-	// ProjectID is the project the caller is currently operating in. Nil for a request with no
-	// project context, in which case User.Permissions is resolved from system-scope role
-	// assignments only.
-	ProjectID *int
-	// OrgID is the organization ProjectID belongs to. Nil exactly when ProjectID is nil.
-	OrgID *int
-}
-
-// MustProjectID returns the project ID.
-//
-// It panics if the session has no project context. Use this only when the
-// caller has already established that the request is project-scoped.
-func (as AuthSession) MustProjectID() int {
-	if as.ProjectID == nil {
-		panic("MustProjectID called on an AuthSession without project context")
-	}
-	return *as.ProjectID
-}
-
-// MustOrgID returns the organization ID.
-//
-// It panics if the session has no project context. Use this only when the
-// caller has already established that the request is project-scoped.
-func (as AuthSession) MustOrgID() int {
-	if as.OrgID == nil {
-		panic("MustOrgID called on an AuthSession without project context")
-	}
-	return *as.OrgID
+	// Project is nil for a request without project context, in which case User.Permissions is
+	// resolved from system-scope role assignments only.
+	Project *AuthProject
 }
 
 type contextKeyAuthSession struct{}

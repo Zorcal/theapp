@@ -22,6 +22,9 @@ var _ AuthStorer = &MockedAuthStorer{}
 //
 //		// make and configure a mocked AuthStorer
 //		mockedAuthStorer := &MockedAuthStorer{
+//			AuthSessionDataFunc: func(ctx context.Context, userID uuid.UUID, projectID *int) (pgauth.AuthSessionData, error) {
+//				panic("mock out the AuthSessionData method")
+//			},
 //			ConsumeMagicLinkTokenFunc: func(ctx context.Context, id int) error {
 //				panic("mock out the ConsumeMagicLinkToken method")
 //			},
@@ -56,6 +59,9 @@ var _ AuthStorer = &MockedAuthStorer{}
 //
 //	}
 type MockedAuthStorer struct {
+	// AuthSessionDataFunc mocks the AuthSessionData method.
+	AuthSessionDataFunc func(ctx context.Context, userID uuid.UUID, projectID *int) (pgauth.AuthSessionData, error)
+
 	// ConsumeMagicLinkTokenFunc mocks the ConsumeMagicLinkToken method.
 	ConsumeMagicLinkTokenFunc func(ctx context.Context, id int) error
 
@@ -85,6 +91,15 @@ type MockedAuthStorer struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AuthSessionData holds details about calls to the AuthSessionData method.
+		AuthSessionData []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// ProjectID is the projectID argument value.
+			ProjectID *int
+		}
 		// ConsumeMagicLinkToken holds details about calls to the ConsumeMagicLinkToken method.
 		ConsumeMagicLinkToken []struct {
 			// Ctx is the ctx argument value.
@@ -149,6 +164,7 @@ type MockedAuthStorer struct {
 			UserExternalID uuid.UUID
 		}
 	}
+	lockAuthSessionData               sync.RWMutex
 	lockConsumeMagicLinkToken         sync.RWMutex
 	lockConsumeRefreshToken           sync.RWMutex
 	lockCreateMagicLinkToken          sync.RWMutex
@@ -158,6 +174,46 @@ type MockedAuthStorer struct {
 	lockLockUser                      sync.RWMutex
 	lockMagicLinkTokenByHash          sync.RWMutex
 	lockRevokeAllUserRefreshTokens    sync.RWMutex
+}
+
+// AuthSessionData calls AuthSessionDataFunc.
+func (mock *MockedAuthStorer) AuthSessionData(ctx context.Context, userID uuid.UUID, projectID *int) (pgauth.AuthSessionData, error) {
+	if mock.AuthSessionDataFunc == nil {
+		panic("MockedAuthStorer.AuthSessionDataFunc: method is nil but AuthStorer.AuthSessionData was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID *int
+	}{
+		Ctx:       ctx,
+		UserID:    userID,
+		ProjectID: projectID,
+	}
+	mock.lockAuthSessionData.Lock()
+	mock.calls.AuthSessionData = append(mock.calls.AuthSessionData, callInfo)
+	mock.lockAuthSessionData.Unlock()
+	return mock.AuthSessionDataFunc(ctx, userID, projectID)
+}
+
+// AuthSessionDataCalls gets all the calls that were made to AuthSessionData.
+// Check the length with:
+//
+//	len(mockedAuthStorer.AuthSessionDataCalls())
+func (mock *MockedAuthStorer) AuthSessionDataCalls() []struct {
+	Ctx       context.Context
+	UserID    uuid.UUID
+	ProjectID *int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		UserID    uuid.UUID
+		ProjectID *int
+	}
+	mock.lockAuthSessionData.RLock()
+	calls = mock.calls.AuthSessionData
+	mock.lockAuthSessionData.RUnlock()
+	return calls
 }
 
 // ConsumeMagicLinkToken calls ConsumeMagicLinkTokenFunc.

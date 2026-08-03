@@ -38,12 +38,6 @@ var _ OrgStorer = &MockedOrgStorer{}
 //			EnsureOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) error {
 //				panic("mock out the EnsureOrganizationMember method")
 //			},
-//			IsOrganizationControlProjectFunc: func(ctx context.Context, orgID int, projectID int) (bool, error) {
-//				panic("mock out the IsOrganizationControlProject method")
-//			},
-//			IsOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
-//				panic("mock out the IsOrganizationMember method")
-//			},
 //			OrganizationByNameFunc: func(ctx context.Context, name string) (pgorg.Organization, error) {
 //				panic("mock out the OrganizationByName method")
 //			},
@@ -71,12 +65,6 @@ type MockedOrgStorer struct {
 
 	// EnsureOrganizationMemberFunc mocks the EnsureOrganizationMember method.
 	EnsureOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) error
-
-	// IsOrganizationControlProjectFunc mocks the IsOrganizationControlProject method.
-	IsOrganizationControlProjectFunc func(ctx context.Context, orgID int, projectID int) (bool, error)
-
-	// IsOrganizationMemberFunc mocks the IsOrganizationMember method.
-	IsOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
 
 	// OrganizationByNameFunc mocks the OrganizationByName method.
 	OrganizationByNameFunc func(ctx context.Context, name string) (pgorg.Organization, error)
@@ -131,24 +119,6 @@ type MockedOrgStorer struct {
 			// OrgID is the orgID argument value.
 			OrgID int
 		}
-		// IsOrganizationControlProject holds details about calls to the IsOrganizationControlProject method.
-		IsOrganizationControlProject []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// OrgID is the orgID argument value.
-			OrgID int
-			// ProjectID is the projectID argument value.
-			ProjectID int
-		}
-		// IsOrganizationMember holds details about calls to the IsOrganizationMember method.
-		IsOrganizationMember []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// UserID is the userID argument value.
-			UserID uuid.UUID
-			// OrgID is the orgID argument value.
-			OrgID int
-		}
 		// OrganizationByName holds details about calls to the OrganizationByName method.
 		OrganizationByName []struct {
 			// Ctx is the ctx argument value.
@@ -166,15 +136,13 @@ type MockedOrgStorer struct {
 			Name string
 		}
 	}
-	lockAccessibleProjects           sync.RWMutex
-	lockAddOrganizationMember        sync.RWMutex
-	lockCreateOrganization           sync.RWMutex
-	lockCreateProject                sync.RWMutex
-	lockEnsureOrganizationMember     sync.RWMutex
-	lockIsOrganizationControlProject sync.RWMutex
-	lockIsOrganizationMember         sync.RWMutex
-	lockOrganizationByName           sync.RWMutex
-	lockProjectByName                sync.RWMutex
+	lockAccessibleProjects       sync.RWMutex
+	lockAddOrganizationMember    sync.RWMutex
+	lockCreateOrganization       sync.RWMutex
+	lockCreateProject            sync.RWMutex
+	lockEnsureOrganizationMember sync.RWMutex
+	lockOrganizationByName       sync.RWMutex
+	lockProjectByName            sync.RWMutex
 }
 
 // AccessibleProjects calls AccessibleProjectsFunc.
@@ -374,86 +342,6 @@ func (mock *MockedOrgStorer) EnsureOrganizationMemberCalls() []struct {
 	mock.lockEnsureOrganizationMember.RLock()
 	calls = mock.calls.EnsureOrganizationMember
 	mock.lockEnsureOrganizationMember.RUnlock()
-	return calls
-}
-
-// IsOrganizationControlProject calls IsOrganizationControlProjectFunc.
-func (mock *MockedOrgStorer) IsOrganizationControlProject(ctx context.Context, orgID int, projectID int) (bool, error) {
-	if mock.IsOrganizationControlProjectFunc == nil {
-		panic("MockedOrgStorer.IsOrganizationControlProjectFunc: method is nil but OrgStorer.IsOrganizationControlProject was just called")
-	}
-	callInfo := struct {
-		Ctx       context.Context
-		OrgID     int
-		ProjectID int
-	}{
-		Ctx:       ctx,
-		OrgID:     orgID,
-		ProjectID: projectID,
-	}
-	mock.lockIsOrganizationControlProject.Lock()
-	mock.calls.IsOrganizationControlProject = append(mock.calls.IsOrganizationControlProject, callInfo)
-	mock.lockIsOrganizationControlProject.Unlock()
-	return mock.IsOrganizationControlProjectFunc(ctx, orgID, projectID)
-}
-
-// IsOrganizationControlProjectCalls gets all the calls that were made to IsOrganizationControlProject.
-// Check the length with:
-//
-//	len(mockedOrgStorer.IsOrganizationControlProjectCalls())
-func (mock *MockedOrgStorer) IsOrganizationControlProjectCalls() []struct {
-	Ctx       context.Context
-	OrgID     int
-	ProjectID int
-} {
-	var calls []struct {
-		Ctx       context.Context
-		OrgID     int
-		ProjectID int
-	}
-	mock.lockIsOrganizationControlProject.RLock()
-	calls = mock.calls.IsOrganizationControlProject
-	mock.lockIsOrganizationControlProject.RUnlock()
-	return calls
-}
-
-// IsOrganizationMember calls IsOrganizationMemberFunc.
-func (mock *MockedOrgStorer) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
-	if mock.IsOrganizationMemberFunc == nil {
-		panic("MockedOrgStorer.IsOrganizationMemberFunc: method is nil but OrgStorer.IsOrganizationMember was just called")
-	}
-	callInfo := struct {
-		Ctx    context.Context
-		UserID uuid.UUID
-		OrgID  int
-	}{
-		Ctx:    ctx,
-		UserID: userID,
-		OrgID:  orgID,
-	}
-	mock.lockIsOrganizationMember.Lock()
-	mock.calls.IsOrganizationMember = append(mock.calls.IsOrganizationMember, callInfo)
-	mock.lockIsOrganizationMember.Unlock()
-	return mock.IsOrganizationMemberFunc(ctx, userID, orgID)
-}
-
-// IsOrganizationMemberCalls gets all the calls that were made to IsOrganizationMember.
-// Check the length with:
-//
-//	len(mockedOrgStorer.IsOrganizationMemberCalls())
-func (mock *MockedOrgStorer) IsOrganizationMemberCalls() []struct {
-	Ctx    context.Context
-	UserID uuid.UUID
-	OrgID  int
-} {
-	var calls []struct {
-		Ctx    context.Context
-		UserID uuid.UUID
-		OrgID  int
-	}
-	mock.lockIsOrganizationMember.RLock()
-	calls = mock.calls.IsOrganizationMember
-	mock.lockIsOrganizationMember.RUnlock()
 	return calls
 }
 

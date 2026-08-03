@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -31,13 +30,6 @@ type OrganizationCore interface {
 	// Returns [mdl.ErrNotFound] if the authenticated creator no longer exists.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	CreateOrganization(ctx context.Context, organization mdl.CreateOrganization) (mdl.Organization, error)
-	// OrganizationByName returns the organization with the given name.
-	// Returns [mdl.ErrNotFound] if no organization with that name exists.
-	OrganizationByName(ctx context.Context, name string) (mdl.Organization, error)
-	// IsOrganizationMember reports whether userID is a member of orgID.
-	IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
-	// IsOrganizationControlProject reports whether projectID is orgID's control project.
-	IsOrganizationControlProject(ctx context.Context, orgID, projectID int) (bool, error)
 	// CreateOrganizationUser returns the system user with the given email, creating it when needed,
 	// and adds that user to the authenticated organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.

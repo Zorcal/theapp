@@ -76,25 +76,15 @@ func TestOrganizationService_Integration(t *testing.T) {
 
 func TestOrganizationService_CreateOrganization(t *testing.T) {
 	now := time.Now()
-	systemOrg := mdl.Organization{
-		ID:               1,
-		ControlProjectID: 1,
-	}
-	createdOrg := mdl.Organization{
+	mockedOrg := mdl.Organization{
 		ID:               2,
 		Name:             "acme",
 		ControlProjectID: 3,
 		CreatedAt:        now,
 	}
 	orgCore := &MockedOrganizationCore{
-		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-			return systemOrg, nil
-		},
-		IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-			return true, nil
-		},
 		CreateOrganizationFunc: func(_ context.Context, _ mdl.CreateOrganization) (mdl.Organization, error) {
-			return createdOrg, nil
+			return mockedOrg, nil
 		},
 	}
 	srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: orgCore})
@@ -108,10 +98,10 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 	}
 
 	want := &pb.Organization{
-		Id:               mustconv.Int32(createdOrg.ID),
-		Name:             createdOrg.Name,
-		ControlProjectId: mustconv.Int32(createdOrg.ControlProjectID),
-		CreateTime:       timestamppb.New(createdOrg.CreatedAt),
+		Id:               mustconv.Int32(mockedOrg.ID),
+		Name:             mockedOrg.Name,
+		ControlProjectId: mustconv.Int32(mockedOrg.ControlProjectID),
+		CreateTime:       timestamppb.New(mockedOrg.CreatedAt),
 		UpdateTime:       nil,
 	}
 
@@ -126,40 +116,14 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 		want    *status.Status
 	}{
 		{
-			name: "validated request",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
-			},
-			in:   &pb.CreateOrganizationRequest{},
-			want: status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
-		},
-		{
-			name: "system organization membership",
-			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return false, nil
-				},
-			},
-			in:   &pb.CreateOrganizationRequest{Organization: &pb.Organization{Name: "acme"}, ProjectName: "widgets"},
-			want: status.New(codes.PermissionDenied, codes.PermissionDenied.String()),
+			name:    "validated request",
+			orgCore: &MockedOrganizationCore{},
+			in:      &pb.CreateOrganizationRequest{},
+			want:    status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
 		},
 		{
 			name: "already exists",
 			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
 				CreateOrganizationFunc: func(_ context.Context, _ mdl.CreateOrganization) (mdl.Organization, error) {
 					return mdl.Organization{}, mdl.ErrAlreadyExists
 				},
@@ -170,12 +134,6 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 		{
 			name: "control project name conflict",
 			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
 				CreateOrganizationFunc: func(_ context.Context, _ mdl.CreateOrganization) (mdl.Organization, error) {
 					return mdl.Organization{}, mdl.ErrControlProjectNameConflict
 				},
@@ -186,12 +144,6 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 		{
 			name: "internal",
 			orgCore: &MockedOrganizationCore{
-				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
-					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
-				},
-				IsOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) (bool, error) {
-					return true, nil
-				},
 				CreateOrganizationFunc: func(_ context.Context, _ mdl.CreateOrganization) (mdl.Organization, error) {
 					return mdl.Organization{}, errors.New("boom")
 				},
@@ -234,9 +186,6 @@ func TestOrganizationService_CreateOrganizationUser(t *testing.T) {
 		ETag:      uuid.NewString(),
 	}
 	orgCore := &MockedOrganizationCore{
-		IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
-			return true, nil
-		},
 		CreateOrganizationUserFunc: func(_ context.Context, _ mdl.CreateOrganizationUser) (mdl.User, error) {
 			return mockedUser, nil
 		},
@@ -269,13 +218,9 @@ func TestOrganizationService_CreateOrganizationUser_error(t *testing.T) {
 		want    *status.Status
 	}{
 		{
-			name: "validated request",
-			orgCore: &MockedOrganizationCore{
-				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
-					return true, nil
-				},
-			},
-			in: &pb.CreateOrganizationUserRequest{},
+			name:    "validated request",
+			orgCore: &MockedOrganizationCore{},
+			in:      &pb.CreateOrganizationUserRequest{},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "email", Description: "required"},
 			})),
@@ -283,9 +228,6 @@ func TestOrganizationService_CreateOrganizationUser_error(t *testing.T) {
 		{
 			name: "core",
 			orgCore: &MockedOrganizationCore{
-				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
-					return true, nil
-				},
 				CreateOrganizationUserFunc: func(_ context.Context, _ mdl.CreateOrganizationUser) (mdl.User, error) {
 					return mdl.User{}, errors.New("boom")
 				},

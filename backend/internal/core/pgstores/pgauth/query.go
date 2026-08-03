@@ -10,6 +10,38 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
+func authSessionDataQuery(userID uuid.UUID, projectID *int) pgdb.TypedQuery[AuthSessionData] {
+	params := pgx.NamedArgs{
+		"user_id":    userID,
+		"project_id": projectID,
+	}
+	const sql = `
+		SELECT u.external_id AS user_external_id,
+		       u.email,
+		       p.id AS project_id,
+		       o.id AS org_id,
+		       o.name AS org_name,
+		       p.is_control AS is_control_project,
+		       CASE WHEN p.id IS NULL THEN NULL ELSE EXISTS (
+		           SELECT 1
+		           FROM org.org_membership AS om
+		           WHERE om.user_id = u.id
+		             AND om.org_id = o.id
+		       ) END AS is_org_member
+		FROM useraccess.users AS u
+		LEFT JOIN org.projects AS p ON p.id = @project_id
+		LEFT JOIN org.organizations AS o ON o.id = p.org_id
+		WHERE u.external_id = @user_id
+		  AND (@project_id::BIGINT IS NULL OR p.id IS NOT NULL)`
+
+	return pgdb.TypedQuery[AuthSessionData]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[AuthSessionData],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func createMagicLinkTokenQuery(cm CreateMagicLinkToken) pgdb.TypedQuery[MagicLinkToken] {
 	params := pgx.NamedArgs{
 		"user_id":    cm.UserID,

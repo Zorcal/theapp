@@ -11,7 +11,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
-// Store provides auth token database access.
+// Store provides authentication database access.
 type Store struct {
 	pool *pgxpool.Pool
 }
@@ -19,6 +19,26 @@ type Store struct {
 // NewStore constructs a Store backed by pool.
 func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
+}
+
+// AuthSessionData returns user identity and optional project and organization metadata.
+// Returns [sql.ErrNoRows] if the user or requested project does not exist.
+func (s *Store) AuthSessionData(ctx context.Context, userID uuid.UUID, projectID *int) (AuthSessionData, error) {
+	var data AuthSessionData
+
+	q := authSessionDataQuery(userID, projectID)
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &data); err != nil {
+			return fmt.Errorf("auth session data: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return AuthSessionData{}, err
+	}
+
+	return data, nil
 }
 
 // LatestMagicLinkTokenCreatedAt returns the created_at of the most recently issued magic-link token for a user.

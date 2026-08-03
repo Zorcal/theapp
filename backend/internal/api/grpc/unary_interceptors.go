@@ -204,13 +204,13 @@ func permissionUnaryInterceptor() grpc.UnaryServerInterceptor {
 // systemControlProjectUnaryInterceptor requires declared methods to use the system organization's
 // control project and requires the caller to belong to that organization. Must run after
 // authUnaryInterceptor and permissionUnaryInterceptor.
-func systemControlProjectUnaryInterceptor(core OrganizationCore) grpc.UnaryServerInterceptor {
+func systemControlProjectUnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if !systemControlProjectMethods.Contains(info.FullMethod) {
 			return handler(ctx, req)
 		}
 
-		if err := requireSystemControlProject(ctx, core); err != nil {
+		if err := requireSystemControlProject(ctx); err != nil {
 			return nil, fmt.Errorf("require system control project: %w", err)
 		}
 
@@ -218,30 +218,17 @@ func systemControlProjectUnaryInterceptor(core OrganizationCore) grpc.UnaryServe
 	}
 }
 
-func requireSystemControlProject(ctx context.Context, core OrganizationCore) error {
+func requireSystemControlProject(ctx context.Context) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
-	if !ok || sess.ProjectID == nil || sess.OrgID == nil {
-		return errors.New("auth session project or organization missing")
+	if !ok || sess.Project == nil {
+		return errors.New("auth session project data missing")
 	}
 
-	// This deliberately performs two additional database queries and round trips instead of
-	// adding organization metadata and membership to every auth session. These protected methods
-	// are called relatively infrequently, while enriching auth sessions would add work to the hot
-	// path for every authenticated request.
-
-	systemOrg, err := core.OrganizationByName(ctx, mdl.SystemOrgName)
-	if err != nil {
-		return fmt.Errorf("fetch system organization: %w", err)
-	}
-	if sess.MustOrgID() != systemOrg.ID || sess.MustProjectID() != systemOrg.ControlProjectID {
+	if !sess.Project.IsSystemControlProject() {
 		return fmt.Errorf("require system control project: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
 	}
 
-	isMember, err := core.IsOrganizationMember(ctx, sess.User.UserID, systemOrg.ID)
-	if err != nil {
-		return fmt.Errorf("check system organization membership: %w", err)
-	}
-	if !isMember {
+	if !sess.Project.IsOrgMember {
 		return fmt.Errorf("require system organization membership: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
 	}
 
@@ -250,13 +237,13 @@ func requireSystemControlProject(ctx context.Context, core OrganizationCore) err
 
 // organizationControlProjectUnaryInterceptor requires declared methods to use the selected
 // organization's control project. Must run after authUnaryInterceptor and permissionUnaryInterceptor.
-func organizationControlProjectUnaryInterceptor(core OrganizationCore) grpc.UnaryServerInterceptor {
+func organizationControlProjectUnaryInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if !orgControlProjectMethods.Contains(info.FullMethod) {
 			return handler(ctx, req)
 		}
 
-		if err := requireOrganizationControlProject(ctx, core); err != nil {
+		if err := requireOrganizationControlProject(ctx); err != nil {
 			return nil, fmt.Errorf("require organization control project: %w", err)
 		}
 
@@ -264,19 +251,13 @@ func organizationControlProjectUnaryInterceptor(core OrganizationCore) grpc.Unar
 	}
 }
 
-func requireOrganizationControlProject(ctx context.Context, core OrganizationCore) error {
+func requireOrganizationControlProject(ctx context.Context) error {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
-	if !ok || sess.ProjectID == nil || sess.OrgID == nil {
-		return errors.New("auth session project or organization missing")
+	if !ok || sess.Project == nil {
+		return errors.New("auth session project data missing")
 	}
 
-	// Resolve this only for infrequent organization-administration methods. Adding control-project
-	// metadata to every auth session would put the same database work on the authenticated hot path.
-	isControlProject, err := core.IsOrganizationControlProject(ctx, sess.MustOrgID(), sess.MustProjectID())
-	if err != nil {
-		return fmt.Errorf("check organization control project: %w", err)
-	}
-	if !isControlProject {
+	if !sess.Project.IsControl {
 		return fmt.Errorf("require organization control project: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
 	}
 

@@ -70,21 +70,6 @@ func projectByNameQuery(orgID int, name string) pgdb.TypedQuery[Project] {
 	}
 }
 
-func projectByIDQuery(id int) pgdb.TypedQuery[Project] {
-	params := pgx.NamedArgs{"id": id}
-	const sql = `
-		SELECT id, org_id, name, is_control, created_at, updated_at, etag
-		FROM org.projects
-		WHERE id = @id`
-
-	return pgdb.TypedQuery[Project]{
-		SQL:    sql,
-		Args:   params,
-		Scan:   pgx.RowToStructByName[Project],
-		Expect: pgdb.ExpectOne,
-	}
-}
-
 func createProjectQuery(cp CreateProject) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{"org_id": cp.OrgID, "name": cp.Name}
 
@@ -151,41 +136,6 @@ func ensureOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[
 			var id int
 			return id, row.Scan(&id)
 		},
-		Expect: pgdb.ExpectOne,
-	}
-}
-
-func isOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[bool] {
-	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID}
-	const sql = `
-		SELECT EXISTS (
-			SELECT
-			FROM org.org_membership AS membership
-			JOIN useraccess.users AS usr ON usr.id = membership.user_id
-			WHERE membership.org_id = @org_id AND usr.external_id = @user_id
-		)`
-
-	return pgdb.TypedQuery[bool]{
-		SQL:    sql,
-		Args:   params,
-		Scan:   pgx.RowTo[bool],
-		Expect: pgdb.ExpectOne,
-	}
-}
-
-func isOrganizationControlProjectQuery(orgID, projectID int) pgdb.TypedQuery[bool] {
-	params := pgx.NamedArgs{"org_id": orgID, "project_id": projectID}
-	const sql = `
-		SELECT EXISTS (
-			SELECT
-			FROM org.projects
-			WHERE id = @project_id AND org_id = @org_id AND is_control
-		)`
-
-	return pgdb.TypedQuery[bool]{
-		SQL:    sql,
-		Args:   params,
-		Scan:   pgx.RowTo[bool],
 		Expect: pgdb.ExpectOne,
 	}
 }

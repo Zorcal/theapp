@@ -32,6 +32,9 @@ type Transactor interface {
 
 // AuthStorer defines the auth-token database operations required by Core.
 type AuthStorer interface {
+	// AuthSessionData returns user identity and optional project and organization metadata.
+	// Returns [sql.ErrNoRows] if the user or requested project does not exist.
+	AuthSessionData(ctx context.Context, userID uuid.UUID, projectID *int) (pgauth.AuthSessionData, error)
 	// LatestMagicLinkTokenCreatedAt returns the created_at of the most recently issued token for a user.
 	// Returns [sql.ErrNoRows] if the user has never been issued a token.
 	LatestMagicLinkTokenCreatedAt(ctx context.Context, userID int) (time.Time, error)
@@ -66,9 +69,6 @@ type UserStorer interface {
 	// MarkEmailVerified marks the email as verified for the user with the given external ID.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	MarkEmailVerified(ctx context.Context, externalID uuid.UUID) error
-	// UserByExternalID returns the user with the given external ID.
-	// Returns [sql.ErrNoRows] if no such user exists.
-	UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error)
 }
 
 //go:generate moq -rm -fmt goimports -out permission_storer_moq_test.go . PermissionStorer:MockedPermissionStorer
@@ -302,24 +302,23 @@ func (c *Core) RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uu
 
 // AuthSession resolves userID's identity and its permissions. When projectID is non-nil, the
 // permissions are resolved from project-, org-, and system-scope role assignments for that
-// project, and the returned session's ProjectID and OrgID are both set; when projectID is nil,
-// the permissions are resolved from system-scope role assignments only, and ProjectID/OrgID are
-// both left nil.
+// project, and the returned session includes its project and organization metadata. When projectID
+// is nil, permissions are resolved from system-scope role assignments only and Project is nil.
 // Returns [mdl.ErrNotFound] if no user with that ID exists, or if projectID is non-nil and does
 // not match any project.
 // A user with no role assignment relevant to projectID is not an error: the session resolves with
 // an empty (or system-scope-only) permission set, which permission-checking code rejects on its own.
 func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
-	user, err := c.userStorer.UserByExternalID(ctx, userID)
+	data, err := c.authStorer.AuthSessionData(ctx, userID, projectID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.AuthSession{}, mdl.ErrNotFound
 		}
-		return mdl.AuthSession{}, fmt.Errorf("user by external id: %w", err)
+		return mdl.AuthSession{}, fmt.Errorf("auth session data: %w", err)
 	}
 
 	if projectID == nil {
-		perms, err := c.permissionStorer.SystemPermissions(ctx, user.ExternalID)
+		perms, err := c.permissionStorer.SystemPermissions(ctx, data.UserExternalID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return mdl.AuthSession{}, mdl.ErrNotFound
@@ -327,16 +326,10 @@ func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int
 			return mdl.AuthSession{}, fmt.Errorf("system permissions: %w", err)
 		}
 
-		return mdl.AuthSession{
-			User: mdl.AuthUser{
-				UserID:      user.ExternalID,
-				Email:       user.Email,
-				Permissions: permissionsFromPg(perms),
-			},
-		}, nil
+		return authSessionFromPg(data, perms), nil
 	}
 
-	perms, err := c.permissionStorer.ProjectPermissions(ctx, user.ExternalID, *projectID)
+	perms, err := c.permissionStorer.ProjectPermissions(ctx, data.UserExternalID, *projectID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.AuthSession{}, mdl.ErrNotFound
@@ -344,30 +337,22 @@ func (c *Core) AuthSession(ctx context.Context, userID uuid.UUID, projectID *int
 		return mdl.AuthSession{}, fmt.Errorf("project permissions: %w", err)
 	}
 
-	return mdl.AuthSession{
-		User: mdl.AuthUser{
-			UserID:      user.ExternalID,
-			Email:       user.Email,
-			Permissions: permissionsFromPg(perms.PermissionNames),
-		},
-		ProjectID: projectID,
-		OrgID:     &perms.OrgID,
-	}, nil
+	return authSessionFromPg(data, perms.PermissionNames), nil
 }
 
 // OrganizationAuthSession resolves userID's permissions for projectID's organization from
 // organization- and system-scope role assignments.
 // Returns [mdl.ErrNotFound] if no user or project with those IDs exists.
 func (c *Core) OrganizationAuthSession(ctx context.Context, userID uuid.UUID, projectID int) (mdl.AuthSession, error) {
-	user, err := c.userStorer.UserByExternalID(ctx, userID)
+	data, err := c.authStorer.AuthSessionData(ctx, userID, &projectID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.AuthSession{}, mdl.ErrNotFound
 		}
-		return mdl.AuthSession{}, fmt.Errorf("user by external id: %w", err)
+		return mdl.AuthSession{}, fmt.Errorf("auth session data: %w", err)
 	}
 
-	orgPerms, err := c.permissionStorer.OrgPermissionsByProjectID(ctx, user.ExternalID, projectID)
+	orgPerms, err := c.permissionStorer.OrgPermissionsByProjectID(ctx, data.UserExternalID, projectID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.AuthSession{}, mdl.ErrNotFound
@@ -375,15 +360,7 @@ func (c *Core) OrganizationAuthSession(ctx context.Context, userID uuid.UUID, pr
 		return mdl.AuthSession{}, fmt.Errorf("organization permissions by project id: %w", err)
 	}
 
-	return mdl.AuthSession{
-		User: mdl.AuthUser{
-			UserID:      user.ExternalID,
-			Email:       user.Email,
-			Permissions: permissionsFromPg(orgPerms.PermissionNames),
-		},
-		ProjectID: &projectID,
-		OrgID:     &orgPerms.OrgID,
-	}, nil
+	return authSessionFromPg(data, orgPerms.PermissionNames), nil
 }
 
 // AuthContext returns authorization context for the authenticated caller and selected project.
@@ -393,11 +370,11 @@ func (c *Core) AuthContext(ctx context.Context) (mdl.AuthContext, error) {
 	if !ok {
 		return mdl.AuthContext{}, errors.New("auth session missing")
 	}
-	if sess.ProjectID == nil {
+	if sess.Project == nil {
 		return mdl.AuthContext{}, errors.New("project context missing")
 	}
 
-	perms, err := c.permissionStorer.PermissionsByScope(ctx, sess.User.UserID, *sess.ProjectID)
+	perms, err := c.permissionStorer.PermissionsByScope(ctx, sess.User.UserID, sess.Project.ID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return mdl.AuthContext{}, mdl.ErrNotFound

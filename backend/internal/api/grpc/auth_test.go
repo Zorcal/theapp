@@ -477,8 +477,7 @@ func TestAuthService_GetAuthContext(t *testing.T) {
 					UserID:      userID,
 					Permissions: mockedOutput.ProjectPermissions,
 				},
-				ProjectID: projectID,
-				OrgID:     new(1),
+				Project: &mdl.AuthProject{ID: *projectID, OrgID: 1},
 			}, nil
 		},
 		AuthContextFunc: func(_ context.Context) (mdl.AuthContext, error) {
@@ -543,9 +542,8 @@ func TestAuthService_GetAuthContext_error(t *testing.T) {
 			authCore: &MockedAuthCore{
 				AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
 					return mdl.AuthSession{
-						User:      mdl.AuthUser{UserID: userID},
-						ProjectID: projectID,
-						OrgID:     new(1),
+						User:    mdl.AuthUser{UserID: userID},
+						Project: &mdl.AuthProject{ID: *projectID, OrgID: 1},
 					}, nil
 				},
 				AuthContextFunc: func(_ context.Context) (mdl.AuthContext, error) {
@@ -563,9 +561,8 @@ func TestAuthService_GetAuthContext_error(t *testing.T) {
 			authCore: &MockedAuthCore{
 				AuthSessionFunc: func(_ context.Context, userID uuid.UUID, projectID *int) (mdl.AuthSession, error) {
 					return mdl.AuthSession{
-						User:      mdl.AuthUser{UserID: userID},
-						ProjectID: projectID,
-						OrgID:     new(1),
+						User:    mdl.AuthUser{UserID: userID},
+						Project: &mdl.AuthProject{ID: *projectID, OrgID: 1},
 					}, nil
 				},
 				AuthContextFunc: func(_ context.Context) (mdl.AuthContext, error) {

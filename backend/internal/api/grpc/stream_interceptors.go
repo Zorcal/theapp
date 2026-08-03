@@ -92,13 +92,13 @@ func permissionStreamInterceptor() grpc.StreamServerInterceptor {
 // systemControlProjectStreamInterceptor is the streaming counterpart of
 // systemControlProjectUnaryInterceptor. Must run after authStreamInterceptor and
 // permissionStreamInterceptor.
-func systemControlProjectStreamInterceptor(core OrganizationCore) grpc.StreamServerInterceptor {
+func systemControlProjectStreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if !systemControlProjectMethods.Contains(info.FullMethod) {
 			return handler(srv, ss)
 		}
 
-		if err := requireSystemControlProject(ss.Context(), core); err != nil {
+		if err := requireSystemControlProject(ss.Context()); err != nil {
 			return fmt.Errorf("require system control project: %w", err)
 		}
 
@@ -109,13 +109,13 @@ func systemControlProjectStreamInterceptor(core OrganizationCore) grpc.StreamSer
 // organizationControlProjectStreamInterceptor is the streaming counterpart of
 // organizationControlProjectUnaryInterceptor. Must run after authStreamInterceptor and
 // permissionStreamInterceptor.
-func organizationControlProjectStreamInterceptor(core OrganizationCore) grpc.StreamServerInterceptor {
+func organizationControlProjectStreamInterceptor() grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if !orgControlProjectMethods.Contains(info.FullMethod) {
 			return handler(srv, ss)
 		}
 
-		if err := requireOrganizationControlProject(ss.Context(), core); err != nil {
+		if err := requireOrganizationControlProject(ss.Context()); err != nil {
 			return fmt.Errorf("require organization control project: %w", err)
 		}
 

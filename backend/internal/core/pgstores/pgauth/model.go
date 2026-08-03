@@ -1,4 +1,4 @@
-// Package pgauth provides auth token db access functionality.
+// Package pgauth provides authentication database access.
 package pgauth
 
 import (
@@ -37,4 +37,16 @@ type CreateRefreshToken struct {
 	UserID    int
 	TokenHash string
 	ExpiresAt time.Time
+}
+
+// AuthSessionData contains the persisted identity and optional project metadata needed to build
+// an authentication session. Project fields are nil when no project was requested.
+type AuthSessionData struct {
+	UserExternalID   uuid.UUID `db:"user_external_id"`
+	Email            string    `db:"email"`
+	ProjectID        *int      `db:"project_id"`
+	OrgID            *int      `db:"org_id"`
+	OrgName          *string   `db:"org_name"`
+	IsControlProject *bool     `db:"is_control_project"`
+	IsOrgMember      *bool     `db:"is_org_member"`
 }
