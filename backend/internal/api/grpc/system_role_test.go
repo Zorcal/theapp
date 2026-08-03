@@ -69,7 +69,7 @@ func TestSystemRoleService_Integration(t *testing.T) {
 	if err := srv.rbacStore.AssignSystemRole(ctx, actor.ExternalID, "superadmin"); err != nil {
 		t.Fatalf("AssignSystemRole() actor error = %v", err)
 	}
-	seedOrgMembership(t, ctx, srv.pool, actor.ID, theapp.ID)
+	seedOrgMembership(t, ctx, srv.orgStore, actor.ExternalID, theapp.ID)
 
 	// Authenticate the actor through theapp's control project.
 

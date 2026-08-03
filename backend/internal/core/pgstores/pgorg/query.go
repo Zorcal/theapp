@@ -127,7 +127,35 @@ func addOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[int
 	}
 }
 
-func organizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[bool] {
+func ensureOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID}
+	const sql = `
+		WITH
+			target AS (
+				SELECT organization.id AS org_id, usr.id AS user_id
+				FROM org.organizations AS organization
+				CROSS JOIN useraccess.users AS usr
+				WHERE organization.id = @org_id AND usr.external_id = @user_id
+			),
+			inserted AS (
+				INSERT INTO org.org_membership (org_id, user_id)
+				SELECT org_id, user_id FROM target
+				ON CONFLICT DO NOTHING
+			)
+		SELECT org_id FROM target`
+
+	return pgdb.TypedQuery[int]{
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (int, error) {
+			var id int
+			return id, row.Scan(&id)
+		},
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func isOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[bool] {
 	params := pgx.NamedArgs{"user_id": userID, "org_id": orgID}
 	const sql = `
 		SELECT EXISTS (
@@ -135,6 +163,23 @@ func organizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[bool] 
 			FROM org.org_membership AS membership
 			JOIN useraccess.users AS usr ON usr.id = membership.user_id
 			WHERE membership.org_id = @org_id AND usr.external_id = @user_id
+		)`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowTo[bool],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+func isOrganizationControlProjectQuery(orgID, projectID int) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{"org_id": orgID, "project_id": projectID}
+	const sql = `
+		SELECT EXISTS (
+			SELECT
+			FROM org.projects
+			WHERE id = @project_id AND org_id = @org_id AND is_control
 		)`
 
 	return pgdb.TypedQuery[bool]{

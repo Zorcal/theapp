@@ -6,6 +6,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
 func CreateOrganization(req *pb.CreateOrganizationRequest) error {
@@ -45,5 +46,20 @@ func CreateOrganization(req *pb.CreateOrganizationRequest) error {
 		return invalidArgument(violations...)
 	}
 
+	return nil
+}
+
+func CreateOrganizationUser(req *pb.CreateOrganizationUserRequest) error {
+	if req == nil {
+		return requiredRequest("email")
+	}
+	if req.GetEmail() == "" {
+		return requiredRequest("email")
+	}
+	if !mdl.IsValidEmail(req.GetEmail()) {
+		return invalidArgument(&errdetails.BadRequest_FieldViolation{
+			Field: "email", Description: "must be a valid email address",
+		})
+	}
 	return nil
 }

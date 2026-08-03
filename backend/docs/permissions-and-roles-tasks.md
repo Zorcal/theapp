@@ -230,6 +230,7 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
     operation from phase 19 and replace direct membership inserts in test seed helpers with it.
     Anchor the endpoint on the organization's control project — the `x-project-id` metadata must be
     that project's ID. Run `make generate`. Depends on 45, 46, 48.
+    **This task is complete.**
 50. Extend `schemas/organization.proto` with an org-scoped list-users RPC, separate from
     `UserService.ListUsers` (see permissions-and-roles.md, "Managing users within an
     organization"). Also anchor it on the organization's control project; the request body

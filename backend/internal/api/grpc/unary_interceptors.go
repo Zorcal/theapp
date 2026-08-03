@@ -211,7 +211,7 @@ func systemControlProjectUnaryInterceptor(core OrganizationCore) grpc.UnaryServe
 		}
 
 		if err := requireSystemControlProject(ctx, core); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("require system control project: %w", err)
 		}
 
 		return handler(ctx, req)
@@ -243,6 +243,41 @@ func requireSystemControlProject(ctx context.Context, core OrganizationCore) err
 	}
 	if !member {
 		return fmt.Errorf("require system organization membership: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
+	}
+
+	return nil
+}
+
+// organizationControlProjectUnaryInterceptor requires declared methods to use the selected
+// organization's control project. Must run after authUnaryInterceptor and permissionUnaryInterceptor.
+func organizationControlProjectUnaryInterceptor(core OrganizationCore) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if !organizationControlProjectMethods.Contains(info.FullMethod) {
+			return handler(ctx, req)
+		}
+
+		if err := requireOrganizationControlProject(ctx, core); err != nil {
+			return nil, fmt.Errorf("require organization control project: %w", err)
+		}
+
+		return handler(ctx, req)
+	}
+}
+
+func requireOrganizationControlProject(ctx context.Context, core OrganizationCore) error {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok || sess.ProjectID == nil || sess.OrgID == nil {
+		return errors.New("auth session project or organization missing")
+	}
+
+	// Resolve this only for infrequent organization-administration methods. Adding control-project
+	// metadata to every auth session would put the same database work on the authenticated hot path.
+	controlProject, err := core.IsOrganizationControlProject(ctx, sess.MustOrgID(), sess.MustProjectID())
+	if err != nil {
+		return fmt.Errorf("check organization control project: %w", err)
+	}
+	if !controlProject {
+		return fmt.Errorf("require organization control project: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
 	}
 
 	return nil

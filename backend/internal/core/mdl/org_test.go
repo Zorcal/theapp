@@ -51,6 +51,35 @@ func TestCreateOrganization_Validate_error(t *testing.T) {
 	}
 }
 
+func TestCreateOrganizationUser_Validate(t *testing.T) {
+	if err := (CreateOrganizationUser{Email: "alice@test.com"}).Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestCreateOrganizationUser_Validate_error(t *testing.T) {
+	tests := []struct {
+		name string
+		in   CreateOrganizationUser
+	}{
+		{
+			name: "empty email",
+			in:   CreateOrganizationUser{},
+		},
+		{
+			name: "invalid email",
+			in:   CreateOrganizationUser{Email: "alice"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.in.Validate(); !errors.Is(err, ErrValidation) {
+				t.Errorf("Validate() error = %v, want ErrValidation", err)
+			}
+		})
+	}
+}
+
 func TestCreateProject_Validate(t *testing.T) {
 	tests := []struct {
 		name string

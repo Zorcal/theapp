@@ -18,6 +18,7 @@ var permissionToPB = map[mdl.Permission]pb.Permission{
 	mdl.PermissionProjectDiscoverAll:               pb.Permission_PERMISSION_PROJECT_DISCOVER_ALL,
 	mdl.PermissionOrgCreate:                        pb.Permission_PERMISSION_ORGANIZATION_CREATE,
 	mdl.PermissionProjectCreate:                    pb.Permission_PERMISSION_PROJECT_CREATE,
+	mdl.PermissionOrgUserCreate:                    pb.Permission_PERMISSION_ORGANIZATION_USER_CREATE,
 	mdl.PermissionCustomRoleCreate:                 pb.Permission_PERMISSION_CUSTOM_ROLE_CREATE,
 	mdl.PermissionCustomRoleRead:                   pb.Permission_PERMISSION_CUSTOM_ROLE_READ,
 	mdl.PermissionCustomRoleUpdate:                 pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE,

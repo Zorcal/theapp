@@ -59,6 +59,10 @@ const (
 	// default project for request-context resolution. Creating a sibling project changes
 	// organization-level state, so a project-scope role assignment cannot grant it.
 	PermissionProjectCreate Permission = "project:create"
+
+	// PermissionOrgUserCreate authorizes creating a system user when needed and adding
+	// that user to the organization resolved from the request's control project.
+	PermissionOrgUserCreate Permission = "org:user-create"
 )
 
 // All custom role service permissions. They authorize role management only within the organization
@@ -88,6 +92,7 @@ func AllPermissions() []Permission {
 		PermissionProjectDiscoverAll,
 		PermissionOrgCreate,
 		PermissionProjectCreate,
+		PermissionOrgUserCreate,
 		PermissionCustomRoleCreate,
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
@@ -130,6 +135,7 @@ func PermissionsAssignableToCustomRoles() []Permission {
 		PermissionCustomRoleReadOrgAssignments,
 		PermissionOrgCreate,
 		PermissionProjectCreate,
+		PermissionOrgUserCreate,
 	}
 }
 
@@ -138,6 +144,7 @@ func PermissionsAssignableToCustomRoles() []Permission {
 func OrganizationAdminPermissions() []Permission {
 	return []Permission{
 		PermissionProjectCreate,
+		PermissionOrgUserCreate,
 		PermissionCustomRoleCreate,
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
@@ -164,7 +171,8 @@ func PermissionAssignmentScope(permission Permission) AssignmentScope {
 		PermissionCustomRoleAssignOrg,
 		PermissionCustomRoleUnassignOrg,
 		PermissionCustomRoleReadOrgAssignments,
-		PermissionProjectCreate:
+		PermissionProjectCreate,
+		PermissionOrgUserCreate:
 		return AssignmentScopeOrganization
 	case PermissionCustomRoleAssignProject,
 		PermissionCustomRoleUnassignProject,

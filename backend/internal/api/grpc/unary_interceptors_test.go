@@ -816,3 +816,94 @@ func TestSystemControlProjectUnaryInterceptor_error(t *testing.T) {
 		})
 	}
 }
+
+func TestOrganizationControlProjectUnaryInterceptor(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		core     OrganizationCore
+		authSess mdl.AuthSession
+	}{
+		{
+			name:   "unprotected method",
+			method: "/theapp.v1.ProjectService/ListProjects",
+		},
+		{
+			name:   "control project",
+			method: "/theapp.v1.OrgService/CreateOrganizationUser",
+			core: &MockedOrganizationCore{
+				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
+					return true, nil
+				},
+			},
+			authSess: mdl.AuthSession{
+				ProjectID: new(2),
+				OrgID:     new(1),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), tt.authSess)
+			interceptor := organizationControlProjectUnaryInterceptor(tt.core)
+			handler := func(_ context.Context, _ any) (any, error) { return "handled", nil }
+
+			got, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: tt.method}, handler)
+			if err != nil {
+				t.Fatalf("organizationControlProjectUnaryInterceptor() error = %v, want nil", err)
+			}
+			if want := "handled"; got != want {
+				t.Errorf("organizationControlProjectUnaryInterceptor() = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestOrganizationControlProjectUnaryInterceptor_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name     string
+		core     OrganizationCore
+		authSess mdl.AuthSession
+		want     error
+	}{
+		{
+			name: "missing scope",
+			core: &MockedOrganizationCore{},
+			want: errors.New("auth session project or organization missing"),
+		},
+		{
+			name: "lookup",
+			core: &MockedOrganizationCore{
+				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
+					return false, dbErr
+				},
+			},
+			authSess: mdl.AuthSession{ProjectID: new(2), OrgID: new(1)},
+			want:     dbErr,
+		},
+		{
+			name: "ordinary project",
+			core: &MockedOrganizationCore{
+				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
+					return false, nil
+				},
+			},
+			authSess: mdl.AuthSession{ProjectID: new(2), OrgID: new(1)},
+			want:     status.Error(codes.PermissionDenied, codes.PermissionDenied.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), tt.authSess)
+			interceptor := organizationControlProjectUnaryInterceptor(tt.core)
+			handler := func(_ context.Context, _ any) (any, error) { return "handled", nil }
+
+			_, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.OrgService/CreateOrganizationUser"}, handler)
+			if !errors.Is(err, tt.want) && status.Code(err) != status.Code(tt.want) {
+				t.Errorf("organizationControlProjectUnaryInterceptor() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}

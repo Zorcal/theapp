@@ -68,7 +68,7 @@ func TestRoleService_Integration(t *testing.T) {
 		t.Fatalf("CreateUser() target error = %v", err)
 	}
 
-	seedOrgMembership(t, ctx, srv.pool, target.ID, org.ID)
+	seedOrgMembership(t, ctx, srv.orgStore, target.ExternalID, org.ID)
 
 	// Authenticate the actor through the owning organization's control project.
 

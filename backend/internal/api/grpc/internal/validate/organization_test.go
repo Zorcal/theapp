@@ -18,6 +18,33 @@ func TestCreateOrganization(t *testing.T) {
 	}
 }
 
+func TestCreateOrganizationUser(t *testing.T) {
+	if err := CreateOrganizationUser(&pb.CreateOrganizationUserRequest{Email: "member@test.com"}); err != nil {
+		t.Errorf("CreateOrganizationUser() error = %v, want nil", err)
+	}
+}
+
+func TestCreateOrganizationUser_error(t *testing.T) {
+	tests := []validationTest[*pb.CreateOrganizationUserRequest]{
+		{
+			name: "missing request",
+			in:   nil,
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "email", description: "required"}),
+		},
+		{
+			name: "missing email",
+			in:   &pb.CreateOrganizationUserRequest{},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "email", description: "required"}),
+		},
+		{
+			name: "invalid email",
+			in:   &pb.CreateOrganizationUserRequest{Email: "not-an-email"},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "email", description: "must be a valid email address"}),
+		},
+	}
+	runValidationErrorTests(t, "CreateOrganizationUser", CreateOrganizationUser, tests)
+}
+
 func TestCreateOrganization_error(t *testing.T) {
 	tests := []validationTest[*pb.CreateOrganizationRequest]{
 		{

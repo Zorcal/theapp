@@ -36,6 +36,28 @@ type OrganizationCore interface {
 	OrganizationByName(ctx context.Context, name string) (mdl.Organization, error)
 	// IsOrganizationMember reports whether userID is a member of orgID.
 	IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
+	// IsOrganizationControlProject reports whether projectID is orgID's control project.
+	IsOrganizationControlProject(ctx context.Context, orgID, projectID int) (bool, error)
+	// CreateOrganizationUser returns the system user with the given email, creating it when needed,
+	// and adds that user to the authenticated organization.
+	// Returns [mdl.ErrValidation] if the input is invalid.
+	CreateOrganizationUser(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error)
+}
+
+func (s *organizationService) CreateOrganizationUser(ctx context.Context, req *pb.CreateOrganizationUserRequest) (*pb.User, error) {
+	if err := validate.CreateOrganizationUser(req); err != nil {
+		return nil, fmt.Errorf("validate create organization user request: %w", err)
+	}
+
+	user, err := s.organizationCore.CreateOrganizationUser(ctx, conv.CreateOrganizationUserFromPB(req))
+	if err != nil {
+		if errors.Is(err, mdl.ErrValidation) {
+			return nil, status.Error(codes.InvalidArgument, "invalid organization user")
+		}
+		return nil, fmt.Errorf("create organization user: %w", err)
+	}
+
+	return conv.UserToPB(user), nil
 }
 
 func (s *organizationService) CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) (*pb.Organization, error) {

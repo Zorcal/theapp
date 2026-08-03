@@ -92,6 +92,71 @@
           "OrgService"
         ]
       }
+    },
+    "/v1/organizations/users": {
+      "post": {
+        "summary": "Creates a system user when needed and adds that user to the organization selected through\nits control project.",
+        "operationId": "OrgService_CreateOrganizationUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1User"
+            }
+          },
+          "400": {
+            "description": "Invalid email or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization-user creation access is missing or the selected project is not the organization's control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for creating or assigning an organization user.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateOrganizationUserRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the organization control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      }
     }
   },
   "definitions": {
@@ -147,6 +212,19 @@
         "projectName"
       ]
     },
+    "v1CreateOrganizationUserRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address identifying the system user."
+        }
+      },
+      "description": "Request message for creating or assigning an organization user.",
+      "required": [
+        "email"
+      ]
+    },
     "v1Organization": {
       "type": "object",
       "properties": {
@@ -180,6 +258,48 @@
         }
       },
       "description": "Organization represents a tenant."
+    },
+    "v1User": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user. Output only.",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user was created. Output only.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user was last updated. Output only.",
+          "readOnly": true
+        },
+        "emailVerifiedTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user's email address was verified. Null until the user\ncompletes their first magic-link sign-in. Output only.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the user (first and last name)."
+        },
+        "etag": {
+          "type": "string",
+          "description": "The ETag for the current version of the user. Helps to prevent\nsimultaneous updates of a user from overwriting each other (\"mid-air\ncollisions\").\n\nIf this is provided on update, it must match the server's ETag.",
+          "readOnly": true
+        }
+      },
+      "description": "User represents a user in the system."
     }
   },
   "securityDefinitions": {

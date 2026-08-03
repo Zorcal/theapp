@@ -24,6 +24,12 @@ var _ OrganizationCore = &MockedOrganizationCore{}
 //			CreateOrganizationFunc: func(ctx context.Context, organization mdl.CreateOrganization) (mdl.Organization, error) {
 //				panic("mock out the CreateOrganization method")
 //			},
+//			CreateOrganizationUserFunc: func(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error) {
+//				panic("mock out the CreateOrganizationUser method")
+//			},
+//			IsOrganizationControlProjectFunc: func(ctx context.Context, orgID int, projectID int) (bool, error) {
+//				panic("mock out the IsOrganizationControlProject method")
+//			},
 //			IsOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
 //				panic("mock out the IsOrganizationMember method")
 //			},
@@ -40,6 +46,12 @@ type MockedOrganizationCore struct {
 	// CreateOrganizationFunc mocks the CreateOrganization method.
 	CreateOrganizationFunc func(ctx context.Context, organization mdl.CreateOrganization) (mdl.Organization, error)
 
+	// CreateOrganizationUserFunc mocks the CreateOrganizationUser method.
+	CreateOrganizationUserFunc func(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error)
+
+	// IsOrganizationControlProjectFunc mocks the IsOrganizationControlProject method.
+	IsOrganizationControlProjectFunc func(ctx context.Context, orgID int, projectID int) (bool, error)
+
 	// IsOrganizationMemberFunc mocks the IsOrganizationMember method.
 	IsOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
 
@@ -54,6 +66,22 @@ type MockedOrganizationCore struct {
 			Ctx context.Context
 			// Organization is the organization argument value.
 			Organization mdl.CreateOrganization
+		}
+		// CreateOrganizationUser holds details about calls to the CreateOrganizationUser method.
+		CreateOrganizationUser []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// User is the user argument value.
+			User mdl.CreateOrganizationUser
+		}
+		// IsOrganizationControlProject holds details about calls to the IsOrganizationControlProject method.
+		IsOrganizationControlProject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// OrgID is the orgID argument value.
+			OrgID int
+			// ProjectID is the projectID argument value.
+			ProjectID int
 		}
 		// IsOrganizationMember holds details about calls to the IsOrganizationMember method.
 		IsOrganizationMember []struct {
@@ -72,9 +100,11 @@ type MockedOrganizationCore struct {
 			Name string
 		}
 	}
-	lockCreateOrganization   sync.RWMutex
-	lockIsOrganizationMember sync.RWMutex
-	lockOrganizationByName   sync.RWMutex
+	lockCreateOrganization           sync.RWMutex
+	lockCreateOrganizationUser       sync.RWMutex
+	lockIsOrganizationControlProject sync.RWMutex
+	lockIsOrganizationMember         sync.RWMutex
+	lockOrganizationByName           sync.RWMutex
 }
 
 // CreateOrganization calls CreateOrganizationFunc.
@@ -110,6 +140,82 @@ func (mock *MockedOrganizationCore) CreateOrganizationCalls() []struct {
 	mock.lockCreateOrganization.RLock()
 	calls = mock.calls.CreateOrganization
 	mock.lockCreateOrganization.RUnlock()
+	return calls
+}
+
+// CreateOrganizationUser calls CreateOrganizationUserFunc.
+func (mock *MockedOrganizationCore) CreateOrganizationUser(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error) {
+	if mock.CreateOrganizationUserFunc == nil {
+		panic("MockedOrganizationCore.CreateOrganizationUserFunc: method is nil but OrganizationCore.CreateOrganizationUser was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		User mdl.CreateOrganizationUser
+	}{
+		Ctx:  ctx,
+		User: user,
+	}
+	mock.lockCreateOrganizationUser.Lock()
+	mock.calls.CreateOrganizationUser = append(mock.calls.CreateOrganizationUser, callInfo)
+	mock.lockCreateOrganizationUser.Unlock()
+	return mock.CreateOrganizationUserFunc(ctx, user)
+}
+
+// CreateOrganizationUserCalls gets all the calls that were made to CreateOrganizationUser.
+// Check the length with:
+//
+//	len(mockedOrganizationCore.CreateOrganizationUserCalls())
+func (mock *MockedOrganizationCore) CreateOrganizationUserCalls() []struct {
+	Ctx  context.Context
+	User mdl.CreateOrganizationUser
+} {
+	var calls []struct {
+		Ctx  context.Context
+		User mdl.CreateOrganizationUser
+	}
+	mock.lockCreateOrganizationUser.RLock()
+	calls = mock.calls.CreateOrganizationUser
+	mock.lockCreateOrganizationUser.RUnlock()
+	return calls
+}
+
+// IsOrganizationControlProject calls IsOrganizationControlProjectFunc.
+func (mock *MockedOrganizationCore) IsOrganizationControlProject(ctx context.Context, orgID int, projectID int) (bool, error) {
+	if mock.IsOrganizationControlProjectFunc == nil {
+		panic("MockedOrganizationCore.IsOrganizationControlProjectFunc: method is nil but OrganizationCore.IsOrganizationControlProject was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		OrgID     int
+		ProjectID int
+	}{
+		Ctx:       ctx,
+		OrgID:     orgID,
+		ProjectID: projectID,
+	}
+	mock.lockIsOrganizationControlProject.Lock()
+	mock.calls.IsOrganizationControlProject = append(mock.calls.IsOrganizationControlProject, callInfo)
+	mock.lockIsOrganizationControlProject.Unlock()
+	return mock.IsOrganizationControlProjectFunc(ctx, orgID, projectID)
+}
+
+// IsOrganizationControlProjectCalls gets all the calls that were made to IsOrganizationControlProject.
+// Check the length with:
+//
+//	len(mockedOrganizationCore.IsOrganizationControlProjectCalls())
+func (mock *MockedOrganizationCore) IsOrganizationControlProjectCalls() []struct {
+	Ctx       context.Context
+	OrgID     int
+	ProjectID int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		OrgID     int
+		ProjectID int
+	}
+	mock.lockIsOrganizationControlProject.RLock()
+	calls = mock.calls.IsOrganizationControlProject
+	mock.lockIsOrganizationControlProject.RUnlock()
 	return calls
 }
 

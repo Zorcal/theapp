@@ -7,6 +7,7 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
+import "user.proto";
 
 option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
@@ -106,6 +107,61 @@ service OrgService {
       }
     };
   }
+
+  // Creates a system user when needed and adds that user to the organization selected through
+  // its control project.
+  rpc CreateOrganizationUser(CreateOrganizationUserRequest) returns (User) {
+    option (google.api.http) = {
+      post: "/v1/organizations/users"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid email or project metadata."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Missing or invalid credentials."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Organization-user creation access is missing or the selected project is not the organization's control project."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unexpected server error."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      parameters: {
+        headers: {
+          name: "x-project-id"
+          description: "ID of the organization control project."
+          type: INTEGER
+          required: true
+        }
+      }
+    };
+  }
 }
 
 // Organization represents a tenant.
@@ -133,4 +189,10 @@ message CreateOrganizationRequest {
 
   // Display name for the organization's initial non-control project.
   string project_name = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for creating or assigning an organization user.
+message CreateOrganizationUserRequest {
+  // Email address identifying the system user.
+  string email = 1 [(google.api.field_behavior) = REQUIRED];
 }

@@ -160,7 +160,7 @@ func NewServerIntegrationTest(t *testing.T) ServerIntegrationTest {
 	authCore := auth.NewCore(pgAuthStore, pgUserStore, pgRBACStore, pgdbTransactor, authCoreCfg)
 	userCore := user.NewCore(pgUserStore)
 	rbacCore := rbac.NewCore(pgRBACStore, pgdbTransactor)
-	orgCore := org.NewCore(pgOrgStore, pgRBACStore, pgdbTransactor)
+	orgCore := org.NewCore(pgOrgStore, pgUserStore, pgRBACStore, pgdbTransactor)
 
 	dbosCtx := dbostest.New(t, context.Background(), pool)
 
@@ -300,12 +300,11 @@ func newBufconnClientConn(t *testing.T, cfg ServerConfig) *grpc.ClientConn {
 	return conn
 }
 
-func seedOrgMembership(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID, orgID int) {
+func seedOrgMembership(t *testing.T, ctx context.Context, store *pgorg.Store, userID uuid.UUID, orgID int) {
 	t.Helper()
 
-	// TODO: Replace this direct insert when the organization store exposes membership creation.
-	if _, err := pool.Exec(ctx, "INSERT INTO org.org_membership (user_id, org_id) VALUES ($1, $2)", userID, orgID); err != nil {
-		t.Fatalf("seed organization membership (user %d, organization %d): %v", userID, orgID, err)
+	if err := store.EnsureOrganizationMember(ctx, userID, orgID); err != nil {
+		t.Fatalf("seed organization membership (user %s, organization %d): %v", userID, orgID, err)
 	}
 }
 

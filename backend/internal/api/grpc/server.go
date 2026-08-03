@@ -81,6 +81,12 @@ var systemControlProjectMethods = set.Set[string]{
 	"/theapp.v1.SystemRoleService/ListSystemRoleAssignments": {},
 }
 
+// organizationControlProjectMethods lists methods that must be called through the selected
+// organization's control project.
+var organizationControlProjectMethods = set.Set[string]{
+	"/theapp.v1.OrgService/CreateOrganizationUser": {},
+}
+
 // permissionRegistry maps every protected (non-public, see publicMethods) gRPC method to the
 // permissions required to call it. All listed permissions must be held — this is a conjunction
 // (AND), never a disjunction. A method with no entry here is denied rather than let through
@@ -92,7 +98,8 @@ var permissionRegistry = map[string][]mdl.Permission{
 
 	"/theapp.v1.ProjectService/ListProjects": {},
 
-	"/theapp.v1.OrgService/CreateOrganization": {mdl.PermissionOrgCreate},
+	"/theapp.v1.OrgService/CreateOrganization":     {mdl.PermissionOrgCreate},
+	"/theapp.v1.OrgService/CreateOrganizationUser": {mdl.PermissionOrgUserCreate},
 
 	"/theapp.v1.UserService/GetUser":    {mdl.PermissionUserRead},
 	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},
@@ -141,6 +148,7 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			authUnaryInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
 			permissionUnaryInterceptor(),
 			systemControlProjectUnaryInterceptor(cfg.OrganizationCore),
+			organizationControlProjectUnaryInterceptor(cfg.OrganizationCore),
 			idempotencyUnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
@@ -150,6 +158,7 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 			authStreamInterceptor(cfg.JWTKey, cfg.JWTIssuer, cfg.JWTAudience, cfg.AuthCore),
 			permissionStreamInterceptor(),
 			systemControlProjectStreamInterceptor(cfg.OrganizationCore),
+			organizationControlProjectStreamInterceptor(cfg.OrganizationCore),
 		),
 	)
 

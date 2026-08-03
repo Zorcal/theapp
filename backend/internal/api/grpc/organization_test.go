@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -25,7 +26,7 @@ func TestOrganizationService_Integration(t *testing.T) {
 
 	systemOrg := seedOrganization(t, ctx, srv.orgStore, mdl.SystemOrgName, "control")
 	creator := seedUser(t, ctx, srv.userStore, "organization-creator@test.com", "Organization Creator")
-	seedOrgMembership(t, ctx, srv.pool, creator.ID, systemOrg.ID)
+	seedOrgMembership(t, ctx, srv.orgStore, creator.ExternalID, systemOrg.ID)
 	seedSystemRoleAssignment(t, ctx, srv.rbacStore, creator.ExternalID, "superadmin")
 
 	// Create an organization through the API.
@@ -47,6 +48,30 @@ func TestOrganizationService_Integration(t *testing.T) {
 	if created.GetControlProjectId() <= 0 {
 		t.Errorf("CreateOrganization() control_project_id = %d, want positive", created.GetControlProjectId())
 	}
+
+	// Create and reassign an organization user through the API.
+
+	organizationCtx := authCtxForUserAtProject(t, ctx, creator.ExternalID, int(created.GetControlProjectId()))
+
+	createdUser, err := srv.organizationServiceClient.CreateOrganizationUser(organizationCtx, &pb.CreateOrganizationUserRequest{
+		Email: "member@test.com",
+	})
+	if err != nil {
+		t.Fatalf("CreateOrganizationUser() error = %v", err)
+	}
+
+	if got, want := createdUser.GetEmail(), "member@test.com"; got != want {
+		t.Errorf("CreateOrganizationUser() email = %q, want %q", got, want)
+	}
+
+	existingUser, err := srv.organizationServiceClient.CreateOrganizationUser(organizationCtx, &pb.CreateOrganizationUserRequest{
+		Email: "member@test.com",
+	})
+	if err != nil {
+		t.Fatalf("CreateOrganizationUser() existing member error = %v", err)
+	}
+
+	testingx.AssertDiff(t, existingUser, createdUser, defaultDiffOpts())
 }
 
 func TestOrganizationService_CreateOrganization(t *testing.T) {
@@ -195,6 +220,95 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 			if got.Code() != tt.want.Code() || got.Message() != tt.want.Message() {
 				t.Errorf("CreateOrganization() status = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestOrganizationService_CreateOrganizationUser(t *testing.T) {
+	now := time.Now()
+	mockedUser := mdl.User{
+		ID:        uuid.New(),
+		Email:     "member@test.com",
+		CreatedAt: now.Add(time.Hour * -3),
+		UpdatedAt: new(now),
+		ETag:      uuid.NewString(),
+	}
+	organizationCore := &MockedOrganizationCore{
+		IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
+			return true, nil
+		},
+		CreateOrganizationUserFunc: func(_ context.Context, _ mdl.CreateOrganizationUser) (mdl.User, error) {
+			return mockedUser, nil
+		},
+	}
+	srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: organizationCore})
+
+	got, err := srv.organizationServiceClient.CreateOrganizationUser(
+		authCtxForTestUser(t, t.Context()),
+		&pb.CreateOrganizationUserRequest{Email: mockedUser.Email},
+	)
+	if err != nil {
+		t.Fatalf("CreateOrganizationUser() error = %v, want nil", err)
+	}
+
+	want := &pb.User{
+		Id:         mockedUser.ID.String(),
+		Email:      mockedUser.Email,
+		CreateTime: timestamppb.New(mockedUser.CreatedAt),
+		UpdateTime: timestamppb.New(*mockedUser.UpdatedAt),
+		Etag:       mockedUser.ETag,
+	}
+	testingx.AssertDiff(t, got, want, defaultDiffOpts())
+}
+
+func TestOrganizationService_CreateOrganizationUser_error(t *testing.T) {
+	tests := []struct {
+		name             string
+		organizationCore OrganizationCore
+		in               *pb.CreateOrganizationUserRequest
+		want             *status.Status
+	}{
+		{
+			name: "validated request",
+			organizationCore: &MockedOrganizationCore{
+				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
+					return true, nil
+				},
+			},
+			in: &pb.CreateOrganizationUserRequest{},
+			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
+				{Field: "email", Description: "required"},
+			})),
+		},
+		{
+			name: "core",
+			organizationCore: &MockedOrganizationCore{
+				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
+					return true, nil
+				},
+				CreateOrganizationUserFunc: func(_ context.Context, _ mdl.CreateOrganizationUser) (mdl.User, error) {
+					return mdl.User{}, errors.New("boom")
+				},
+			},
+			in:   &pb.CreateOrganizationUserRequest{Email: "member@test.com"},
+			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: tt.organizationCore})
+
+			_, err := srv.organizationServiceClient.CreateOrganizationUser(authCtxForTestUser(t, t.Context()), tt.in)
+			if err == nil {
+				t.Fatal("CreateOrganizationUser() error = nil, want error")
+			}
+
+			got, ok := status.FromError(err)
+			if !ok {
+				t.Fatalf("CreateOrganizationUser() error = %q, want a gRPC status error", err)
+			}
+
+			testingx.AssertDiff(t, got.Proto(), tt.want.Proto(), defaultDiffOpts())
 		})
 	}
 }

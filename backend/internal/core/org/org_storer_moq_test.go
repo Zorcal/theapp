@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 )
 
 // Ensure, that MockedOrgStorer does implement OrgStorer.
@@ -33,6 +34,12 @@ var _ OrgStorer = &MockedOrgStorer{}
 //			},
 //			CreateProjectFunc: func(ctx context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
 //				panic("mock out the CreateProject method")
+//			},
+//			EnsureOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) error {
+//				panic("mock out the EnsureOrganizationMember method")
+//			},
+//			IsOrganizationControlProjectFunc: func(ctx context.Context, orgID int, projectID int) (bool, error) {
+//				panic("mock out the IsOrganizationControlProject method")
 //			},
 //			IsOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
 //				panic("mock out the IsOrganizationMember method")
@@ -61,6 +68,12 @@ type MockedOrgStorer struct {
 
 	// CreateProjectFunc mocks the CreateProject method.
 	CreateProjectFunc func(ctx context.Context, cp pgorg.CreateProject) (pgorg.Project, error)
+
+	// EnsureOrganizationMemberFunc mocks the EnsureOrganizationMember method.
+	EnsureOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) error
+
+	// IsOrganizationControlProjectFunc mocks the IsOrganizationControlProject method.
+	IsOrganizationControlProjectFunc func(ctx context.Context, orgID int, projectID int) (bool, error)
 
 	// IsOrganizationMemberFunc mocks the IsOrganizationMember method.
 	IsOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) (bool, error)
@@ -109,6 +122,24 @@ type MockedOrgStorer struct {
 			// Cp is the cp argument value.
 			Cp pgorg.CreateProject
 		}
+		// EnsureOrganizationMember holds details about calls to the EnsureOrganizationMember method.
+		EnsureOrganizationMember []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
+		}
+		// IsOrganizationControlProject holds details about calls to the IsOrganizationControlProject method.
+		IsOrganizationControlProject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// OrgID is the orgID argument value.
+			OrgID int
+			// ProjectID is the projectID argument value.
+			ProjectID int
+		}
 		// IsOrganizationMember holds details about calls to the IsOrganizationMember method.
 		IsOrganizationMember []struct {
 			// Ctx is the ctx argument value.
@@ -135,13 +166,15 @@ type MockedOrgStorer struct {
 			Name string
 		}
 	}
-	lockAccessibleProjects    sync.RWMutex
-	lockAddOrganizationMember sync.RWMutex
-	lockCreateOrganization    sync.RWMutex
-	lockCreateProject         sync.RWMutex
-	lockIsOrganizationMember  sync.RWMutex
-	lockOrganizationByName    sync.RWMutex
-	lockProjectByName         sync.RWMutex
+	lockAccessibleProjects           sync.RWMutex
+	lockAddOrganizationMember        sync.RWMutex
+	lockCreateOrganization           sync.RWMutex
+	lockCreateProject                sync.RWMutex
+	lockEnsureOrganizationMember     sync.RWMutex
+	lockIsOrganizationControlProject sync.RWMutex
+	lockIsOrganizationMember         sync.RWMutex
+	lockOrganizationByName           sync.RWMutex
+	lockProjectByName                sync.RWMutex
 }
 
 // AccessibleProjects calls AccessibleProjectsFunc.
@@ -304,6 +337,86 @@ func (mock *MockedOrgStorer) CreateProjectCalls() []struct {
 	return calls
 }
 
+// EnsureOrganizationMember calls EnsureOrganizationMemberFunc.
+func (mock *MockedOrgStorer) EnsureOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error {
+	if mock.EnsureOrganizationMemberFunc == nil {
+		panic("MockedOrgStorer.EnsureOrganizationMemberFunc: method is nil but OrgStorer.EnsureOrganizationMember was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		OrgID:  orgID,
+	}
+	mock.lockEnsureOrganizationMember.Lock()
+	mock.calls.EnsureOrganizationMember = append(mock.calls.EnsureOrganizationMember, callInfo)
+	mock.lockEnsureOrganizationMember.Unlock()
+	return mock.EnsureOrganizationMemberFunc(ctx, userID, orgID)
+}
+
+// EnsureOrganizationMemberCalls gets all the calls that were made to EnsureOrganizationMember.
+// Check the length with:
+//
+//	len(mockedOrgStorer.EnsureOrganizationMemberCalls())
+func (mock *MockedOrgStorer) EnsureOrganizationMemberCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}
+	mock.lockEnsureOrganizationMember.RLock()
+	calls = mock.calls.EnsureOrganizationMember
+	mock.lockEnsureOrganizationMember.RUnlock()
+	return calls
+}
+
+// IsOrganizationControlProject calls IsOrganizationControlProjectFunc.
+func (mock *MockedOrgStorer) IsOrganizationControlProject(ctx context.Context, orgID int, projectID int) (bool, error) {
+	if mock.IsOrganizationControlProjectFunc == nil {
+		panic("MockedOrgStorer.IsOrganizationControlProjectFunc: method is nil but OrgStorer.IsOrganizationControlProject was just called")
+	}
+	callInfo := struct {
+		Ctx       context.Context
+		OrgID     int
+		ProjectID int
+	}{
+		Ctx:       ctx,
+		OrgID:     orgID,
+		ProjectID: projectID,
+	}
+	mock.lockIsOrganizationControlProject.Lock()
+	mock.calls.IsOrganizationControlProject = append(mock.calls.IsOrganizationControlProject, callInfo)
+	mock.lockIsOrganizationControlProject.Unlock()
+	return mock.IsOrganizationControlProjectFunc(ctx, orgID, projectID)
+}
+
+// IsOrganizationControlProjectCalls gets all the calls that were made to IsOrganizationControlProject.
+// Check the length with:
+//
+//	len(mockedOrgStorer.IsOrganizationControlProjectCalls())
+func (mock *MockedOrgStorer) IsOrganizationControlProjectCalls() []struct {
+	Ctx       context.Context
+	OrgID     int
+	ProjectID int
+} {
+	var calls []struct {
+		Ctx       context.Context
+		OrgID     int
+		ProjectID int
+	}
+	mock.lockIsOrganizationControlProject.RLock()
+	calls = mock.calls.IsOrganizationControlProject
+	mock.lockIsOrganizationControlProject.RUnlock()
+	return calls
+}
+
 // IsOrganizationMember calls IsOrganizationMemberFunc.
 func (mock *MockedOrgStorer) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
 	if mock.IsOrganizationMemberFunc == nil {
@@ -417,6 +530,78 @@ func (mock *MockedOrgStorer) ProjectByNameCalls() []struct {
 	mock.lockProjectByName.RLock()
 	calls = mock.calls.ProjectByName
 	mock.lockProjectByName.RUnlock()
+	return calls
+}
+
+// Ensure, that MockedOrganizationUserStore does implement OrganizationUserStore.
+// If this is not the case, regenerate this file with moq.
+var _ OrganizationUserStore = &MockedOrganizationUserStore{}
+
+// MockedOrganizationUserStore is a mock implementation of OrganizationUserStore.
+//
+//	func TestSomethingThatUsesOrganizationUserStore(t *testing.T) {
+//
+//		// make and configure a mocked OrganizationUserStore
+//		mockedOrganizationUserStore := &MockedOrganizationUserStore{
+//			GetOrCreateUserByEmailFunc: func(ctx context.Context, email string) (pguser.User, error) {
+//				panic("mock out the GetOrCreateUserByEmail method")
+//			},
+//		}
+//
+//		// use mockedOrganizationUserStore in code that requires OrganizationUserStore
+//		// and then make assertions.
+//
+//	}
+type MockedOrganizationUserStore struct {
+	// GetOrCreateUserByEmailFunc mocks the GetOrCreateUserByEmail method.
+	GetOrCreateUserByEmailFunc func(ctx context.Context, email string) (pguser.User, error)
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// GetOrCreateUserByEmail holds details about calls to the GetOrCreateUserByEmail method.
+		GetOrCreateUserByEmail []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Email is the email argument value.
+			Email string
+		}
+	}
+	lockGetOrCreateUserByEmail sync.RWMutex
+}
+
+// GetOrCreateUserByEmail calls GetOrCreateUserByEmailFunc.
+func (mock *MockedOrganizationUserStore) GetOrCreateUserByEmail(ctx context.Context, email string) (pguser.User, error) {
+	if mock.GetOrCreateUserByEmailFunc == nil {
+		panic("MockedOrganizationUserStore.GetOrCreateUserByEmailFunc: method is nil but OrganizationUserStore.GetOrCreateUserByEmail was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Email string
+	}{
+		Ctx:   ctx,
+		Email: email,
+	}
+	mock.lockGetOrCreateUserByEmail.Lock()
+	mock.calls.GetOrCreateUserByEmail = append(mock.calls.GetOrCreateUserByEmail, callInfo)
+	mock.lockGetOrCreateUserByEmail.Unlock()
+	return mock.GetOrCreateUserByEmailFunc(ctx, email)
+}
+
+// GetOrCreateUserByEmailCalls gets all the calls that were made to GetOrCreateUserByEmail.
+// Check the length with:
+//
+//	len(mockedOrganizationUserStore.GetOrCreateUserByEmailCalls())
+func (mock *MockedOrganizationUserStore) GetOrCreateUserByEmailCalls() []struct {
+	Ctx   context.Context
+	Email string
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Email string
+	}
+	mock.lockGetOrCreateUserByEmail.RLock()
+	calls = mock.calls.GetOrCreateUserByEmail
+	mock.lockGetOrCreateUserByEmail.RUnlock()
 	return calls
 }
 

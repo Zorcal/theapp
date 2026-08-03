@@ -84,13 +84,33 @@ func (s *Store) AddOrganizationMember(ctx context.Context, userID uuid.UUID, org
 	return nil
 }
 
+// EnsureOrganizationMember adds a user to an organization when the membership does not exist.
+// Returns [sql.ErrNoRows] if the user or organization does not exist.
+func (s *Store) EnsureOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error {
+	q := ensureOrganizationMemberQuery(userID, orgID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		var orgIDSink int
+		if err := q.Queue(ctx, b, &orgIDSink); err != nil {
+			return fmt.Errorf("ensure organization member: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // IsOrganizationMember reports whether userID is a member of orgID.
 func (s *Store) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
-	q := organizationMemberQuery(userID, orgID)
+	q := isOrganizationMemberQuery(userID, orgID)
 
-	var member bool
+	var isMember bool
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &member); err != nil {
+		if err := q.Queue(ctx, b, &isMember); err != nil {
 			return fmt.Errorf("check organization membership: %w", err)
 		}
 		return nil
@@ -100,7 +120,26 @@ func (s *Store) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgI
 		return false, err
 	}
 
-	return member, nil
+	return isMember, nil
+}
+
+// IsOrganizationControlProject reports whether projectID is orgID's control project.
+func (s *Store) IsOrganizationControlProject(ctx context.Context, orgID, projectID int) (bool, error) {
+	q := isOrganizationControlProjectQuery(orgID, projectID)
+
+	var isControlProject bool
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &isControlProject); err != nil {
+			return fmt.Errorf("check organization control project: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return isControlProject, nil
 }
 
 // OrganizationByName returns the organization with the given name.

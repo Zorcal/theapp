@@ -3,6 +3,7 @@ package org
 import (
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
@@ -15,6 +16,18 @@ func createOrganizationToPg(co mdl.CreateOrganization) pgorg.CreateOrganization 
 	return pgorg.CreateOrganization{
 		Name:               co.Name,
 		ControlProjectName: defaultControlProjectName,
+	}
+}
+
+func userFromPg(user pguser.User) mdl.User {
+	return mdl.User{
+		ID:              user.ExternalID,
+		Email:           user.Email,
+		Name:            user.Name,
+		EmailVerifiedAt: user.EmailVerifiedAt,
+		CreatedAt:       user.CreatedAt,
+		UpdatedAt:       user.UpdatedAt,
+		ETag:            user.ETag.String(),
 	}
 }
 

@@ -15,6 +15,10 @@ func CreateOrganizationFromPB(req *pb.CreateOrganizationRequest) mdl.CreateOrgan
 	}
 }
 
+func CreateOrganizationUserFromPB(req *pb.CreateOrganizationUserRequest) mdl.CreateOrganizationUser {
+	return mdl.CreateOrganizationUser{Email: req.GetEmail()}
+}
+
 func OrganizationToPB(organization mdl.Organization) *pb.Organization {
 	return &pb.Organization{
 		Id:               mustconv.Int32(organization.ID),

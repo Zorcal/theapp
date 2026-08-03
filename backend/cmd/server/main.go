@@ -261,7 +261,7 @@ func run(ctx context.Context, cfg Config) error {
 	pgdbTransactor := pgdb.NewTransactor(pgPool)
 	userCore := user.NewCore(pgUserStore)
 	rbacCore := rbac.NewCore(pgRBACStore, pgdbTransactor)
-	orgCore := org.NewCore(pgOrgStore, pgRBACStore, pgdbTransactor)
+	orgCore := org.NewCore(pgOrgStore, pgUserStore, pgRBACStore, pgdbTransactor)
 	authCoreCfg := auth.Config{
 		JWTKey:             []byte(cfg.Auth.JWTSecret),
 		JWTIssuer:          cfg.Auth.JWTIssuer,

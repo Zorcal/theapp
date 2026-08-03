@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OrgService_CreateOrganization_FullMethodName = "/theapp.v1.OrgService/CreateOrganization"
+	OrgService_CreateOrganization_FullMethodName     = "/theapp.v1.OrgService/CreateOrganization"
+	OrgService_CreateOrganizationUser_FullMethodName = "/theapp.v1.OrgService/CreateOrganizationUser"
 )
 
 // OrgServiceClient is the client API for OrgService service.
@@ -30,6 +31,9 @@ const (
 type OrgServiceClient interface {
 	// Creates an organization with a control project and a named default project.
 	CreateOrganization(ctx context.Context, in *CreateOrganizationRequest, opts ...grpc.CallOption) (*Organization, error)
+	// Creates a system user when needed and adds that user to the organization selected through
+	// its control project.
+	CreateOrganizationUser(ctx context.Context, in *CreateOrganizationUserRequest, opts ...grpc.CallOption) (*User, error)
 }
 
 type orgServiceClient struct {
@@ -50,6 +54,16 @@ func (c *orgServiceClient) CreateOrganization(ctx context.Context, in *CreateOrg
 	return out, nil
 }
 
+func (c *orgServiceClient) CreateOrganizationUser(ctx context.Context, in *CreateOrganizationUserRequest, opts ...grpc.CallOption) (*User, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(User)
+	err := c.cc.Invoke(ctx, OrgService_CreateOrganizationUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrgServiceServer is the server API for OrgService service.
 // All implementations should embed UnimplementedOrgServiceServer
 // for forward compatibility.
@@ -58,6 +72,9 @@ func (c *orgServiceClient) CreateOrganization(ctx context.Context, in *CreateOrg
 type OrgServiceServer interface {
 	// Creates an organization with a control project and a named default project.
 	CreateOrganization(context.Context, *CreateOrganizationRequest) (*Organization, error)
+	// Creates a system user when needed and adds that user to the organization selected through
+	// its control project.
+	CreateOrganizationUser(context.Context, *CreateOrganizationUserRequest) (*User, error)
 }
 
 // UnimplementedOrgServiceServer should be embedded to have
@@ -69,6 +86,9 @@ type UnimplementedOrgServiceServer struct{}
 
 func (UnimplementedOrgServiceServer) CreateOrganization(context.Context, *CreateOrganizationRequest) (*Organization, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateOrganization not implemented")
+}
+func (UnimplementedOrgServiceServer) CreateOrganizationUser(context.Context, *CreateOrganizationUserRequest) (*User, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateOrganizationUser not implemented")
 }
 func (UnimplementedOrgServiceServer) testEmbeddedByValue() {}
 
@@ -108,6 +128,24 @@ func _OrgService_CreateOrganization_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrgService_CreateOrganizationUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOrganizationUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrgServiceServer).CreateOrganizationUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrgService_CreateOrganizationUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrgServiceServer).CreateOrganizationUser(ctx, req.(*CreateOrganizationUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrgService_ServiceDesc is the grpc.ServiceDesc for OrgService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -118,6 +156,10 @@ var OrgService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateOrganization",
 			Handler:    _OrgService_CreateOrganization_Handler,
+		},
+		{
+			MethodName: "CreateOrganizationUser",
+			Handler:    _OrgService_CreateOrganizationUser_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

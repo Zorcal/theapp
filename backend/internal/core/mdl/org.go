@@ -35,6 +35,22 @@ func (co CreateOrganization) Validate() error {
 	return nil
 }
 
+// CreateOrganizationUser identifies the system user to create if needed and add to the
+// authenticated organization.
+type CreateOrganizationUser struct {
+	Email string
+}
+
+func (cou CreateOrganizationUser) Validate() error {
+	if cou.Email == "" {
+		return validationError("email required")
+	}
+	if !IsValidEmail(cou.Email) {
+		return validationError("email invalid")
+	}
+	return nil
+}
+
 // Project represents a project within an organization. IsControl marks the one project every
 // organization is automatically given alongside itself, used to anchor permission checks (e.g.
 // org:create, project:create) that have no project of their own to check against yet.

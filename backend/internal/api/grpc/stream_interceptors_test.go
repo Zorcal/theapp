@@ -480,6 +480,58 @@ func TestSystemControlProjectStreamInterceptor_error(t *testing.T) {
 	})
 }
 
+func TestOrganizationControlProjectStreamInterceptor(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		core     OrganizationCore
+		authSess mdl.AuthSession
+	}{
+		{
+			name:   "unprotected method",
+			method: "/theapp.v1.ProjectService/ListProjects",
+		},
+		{
+			name:   "control project",
+			method: "/theapp.v1.OrgService/CreateOrganizationUser",
+			core: &MockedOrganizationCore{
+				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
+					return true, nil
+				},
+			},
+			authSess: mdl.AuthSession{ProjectID: new(2), OrgID: new(1)},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := mdl.ContextWithAuthSession(t.Context(), tt.authSess)
+			interceptor := organizationControlProjectStreamInterceptor(tt.core)
+			handler := func(_ any, _ grpc.ServerStream) error { return nil }
+
+			if err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{FullMethod: tt.method}, handler); err != nil {
+				t.Errorf("organizationControlProjectStreamInterceptor() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestOrganizationControlProjectStreamInterceptor_error(t *testing.T) {
+	organizationCore := &MockedOrganizationCore{
+		IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
+			return false, nil
+		},
+	}
+	interceptor := organizationControlProjectStreamInterceptor(organizationCore)
+	handler := func(_ any, _ grpc.ServerStream) error { return nil }
+
+	sess := mdl.AuthSession{ProjectID: new(2), OrgID: new(1)}
+	ctx := mdl.ContextWithAuthSession(t.Context(), sess)
+	err := interceptor(nil, fakeServerStream{ctx: ctx}, &grpc.StreamServerInfo{FullMethod: "/theapp.v1.OrgService/CreateOrganizationUser"}, handler)
+	if got, want := status.Code(err), codes.PermissionDenied; got != want {
+		t.Errorf("organizationControlProjectStreamInterceptor() code = %v, want %v", got, want)
+	}
+}
+
 // validStreamAuthCtx returns a context carrying a validly signed JWT Bearer token in the gRPC
 // incoming metadata, for tests that need authStreamInterceptor's bearer check to succeed.
 func validStreamAuthCtx(t *testing.T) context.Context {

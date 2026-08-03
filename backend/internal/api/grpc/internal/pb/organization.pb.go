@@ -162,11 +162,58 @@ func (x *CreateOrganizationRequest) GetProjectName() string {
 	return ""
 }
 
+// Request message for creating or assigning an organization user.
+type CreateOrganizationUserRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Email address identifying the system user.
+	Email         string `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateOrganizationUserRequest) Reset() {
+	*x = CreateOrganizationUserRequest{}
+	mi := &file_organization_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateOrganizationUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateOrganizationUserRequest) ProtoMessage() {}
+
+func (x *CreateOrganizationUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organization_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateOrganizationUserRequest.ProtoReflect.Descriptor instead.
+func (*CreateOrganizationUserRequest) Descriptor() ([]byte, []int) {
+	return file_organization_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CreateOrganizationUserRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
 var File_organization_proto protoreflect.FileDescriptor
 
 const file_organization_proto_rawDesc = "" +
 	"\n" +
-	"\x12organization.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xee\x01\n" +
+	"\x12organization.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\n" +
+	"user.proto\"\xee\x01\n" +
 	"\fOrganization\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\x05B\x03\xe0A\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x121\n" +
@@ -177,7 +224,9 @@ const file_organization_proto_rawDesc = "" +
 	"updateTime\"\x85\x01\n" +
 	"\x19CreateOrganizationRequest\x12@\n" +
 	"\forganization\x18\x01 \x01(\v2\x17.theapp.v1.OrganizationB\x03\xe0A\x02R\forganization\x12&\n" +
-	"\fproject_name\x18\x02 \x01(\tB\x03\xe0A\x02R\vprojectName2\xa9\x05\n" +
+	"\fproject_name\x18\x02 \x01(\tB\x03\xe0A\x02R\vprojectName\":\n" +
+	"\x1dCreateOrganizationUserRequest\x12\x19\n" +
+	"\x05email\x18\x01 \x01(\tB\x03\xe0A\x02R\x05email2\xbd\t\n" +
 	"\n" +
 	"OrgService\x12\x9a\x05\n" +
 	"\x12CreateOrganization\x12$.theapp.v1.CreateOrganizationRequest\x1a\x17.theapp.v1.Organization\"\xc4\x04\x92A\xa4\x04Jf\n" +
@@ -200,7 +249,22 @@ const file_organization_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrF\n" +
 	"D\n" +
-	"\fx-project-id\x120ID of the system organization's control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/organizationsB\xd7\x02\x92A\xa9\x01\x12\x1d\n" +
+	"\fx-project-id\x120ID of the system organization's control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/organizations\x12\x91\x04\n" +
+	"\x16CreateOrganizationUser\x12(.theapp.v1.CreateOrganizationUserRequest\x1a\x0f.theapp.v1.User\"\xbb\x03\x92A\x95\x03JC\n" +
+	"\x03400\x12<\n" +
+	"\"Invalid email or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ\x91\x01\n" +
+	"\x03403\x12\x89\x01\n" +
+	"oOrganization-user creation access is missing or the selected project is not the organization's control project.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Statusr=\n" +
+	";\n" +
+	"\fx-project-id\x12'ID of the organization control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/organizations/usersB\xd7\x02\x92A\xa9\x01\x12\x1d\n" +
 	"\x17theapp Organization API2\x02v1Zv\n" +
 	"t\n" +
 	"\n" +
@@ -223,20 +287,24 @@ func file_organization_proto_rawDescGZIP() []byte {
 	return file_organization_proto_rawDescData
 }
 
-var file_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_organization_proto_goTypes = []any{
-	(*Organization)(nil),              // 0: theapp.v1.Organization
-	(*CreateOrganizationRequest)(nil), // 1: theapp.v1.CreateOrganizationRequest
-	(*timestamppb.Timestamp)(nil),     // 2: google.protobuf.Timestamp
+	(*Organization)(nil),                  // 0: theapp.v1.Organization
+	(*CreateOrganizationRequest)(nil),     // 1: theapp.v1.CreateOrganizationRequest
+	(*CreateOrganizationUserRequest)(nil), // 2: theapp.v1.CreateOrganizationUserRequest
+	(*timestamppb.Timestamp)(nil),         // 3: google.protobuf.Timestamp
+	(*User)(nil),                          // 4: theapp.v1.User
 }
 var file_organization_proto_depIdxs = []int32{
-	2, // 0: theapp.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
-	2, // 1: theapp.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
+	3, // 0: theapp.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
+	3, // 1: theapp.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
 	0, // 2: theapp.v1.CreateOrganizationRequest.organization:type_name -> theapp.v1.Organization
 	1, // 3: theapp.v1.OrgService.CreateOrganization:input_type -> theapp.v1.CreateOrganizationRequest
-	0, // 4: theapp.v1.OrgService.CreateOrganization:output_type -> theapp.v1.Organization
-	4, // [4:5] is the sub-list for method output_type
-	3, // [3:4] is the sub-list for method input_type
+	2, // 4: theapp.v1.OrgService.CreateOrganizationUser:input_type -> theapp.v1.CreateOrganizationUserRequest
+	0, // 5: theapp.v1.OrgService.CreateOrganization:output_type -> theapp.v1.Organization
+	4, // 6: theapp.v1.OrgService.CreateOrganizationUser:output_type -> theapp.v1.User
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name
 	3, // [3:3] is the sub-list for extension extendee
 	0, // [0:3] is the sub-list for field type_name
@@ -247,13 +315,14 @@ func file_organization_proto_init() {
 	if File_organization_proto != nil {
 		return
 	}
+	file_user_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_organization_proto_rawDesc), len(file_organization_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
