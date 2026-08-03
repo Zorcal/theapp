@@ -246,6 +246,12 @@
               "properties": {}
             }
           },
+          "400": {
+            "description": "Invalid idempotency key.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
           "401": {
             "description": "Missing or invalid credentials.",
             "schema": {

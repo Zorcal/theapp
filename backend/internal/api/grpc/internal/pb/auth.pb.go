@@ -417,7 +417,7 @@ const file_auth_proto_rawDesc = "" +
 	"\x05email\x18\x02 \x01(\tB\x03\xe0A\x03R\x05email\x12K\n" +
 	"\x13project_permissions\x18\x03 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x12projectPermissions\x12U\n" +
 	"\x18organization_permissions\x18\x04 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x17organizationPermissions\x12I\n" +
-	"\x12system_permissions\x18\x05 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x11systemPermissions2\xf9\x0f\n" +
+	"\x12system_permissions\x18\x05 \x03(\x0e2\x15.theapp.v1.PermissionB\x03\xe0A\x03R\x11systemPermissions2\xb5\x10\n" +
 	"\vAuthService\x12\x92\x03\n" +
 	"\x10RequestMagicLink\x12\".theapp.v1.RequestMagicLinkRequest\x1a\x16.google.protobuf.Empty\"\xc1\x02\x92A\x9f\x02J7\n" +
 	"\x03400\x120\n" +
@@ -457,8 +457,11 @@ const file_auth_proto_rawDesc = "" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +
-	"\x14\x1a\x12.google.rpc.Statusb\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/revoke\x12\xed\x01\n" +
-	"\x11RevokeAllSessions\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\xa7\x01\x92A}J@\n" +
+	"\x14\x1a\x12.google.rpc.Statusb\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/v1/auth/revoke\x12\xa9\x02\n" +
+	"\x11RevokeAllSessions\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\xe3\x01\x92A\xb8\x01J9\n" +
+	"\x03400\x122\n" +
+	"\x18Invalid idempotency key.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +

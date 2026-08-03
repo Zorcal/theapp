@@ -39,6 +39,12 @@
               "$ref": "#/definitions/rpcStatus"
             }
           },
+          "404": {
+            "description": "Authenticated user not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
           "500": {
             "description": "Unexpected server error.",
             "schema": {

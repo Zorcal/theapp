@@ -48,7 +48,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid role data or project metadata."
+          description: "Invalid role data or project metadata, or the role name already exists."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -342,7 +342,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid role data, update mask, or project metadata."
+          description: "Invalid role data, update mask, or project metadata; the role name already exists; managed role permissions cannot be updated; or project assignments conflict with organization-scoped permissions."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -405,7 +405,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid or conflicting permission changes or project metadata."
+          description: "Invalid or conflicting permission changes or project metadata; managed role permissions cannot be modified; or project assignments conflict with organization-scoped permissions."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -465,7 +465,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid role ID or project metadata."
+          description: "Invalid role ID or project metadata, or the role is managed and cannot be deleted."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -528,7 +528,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid IDs or project metadata."
+          description: "Invalid IDs or project metadata, or the role requires organization scope."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }

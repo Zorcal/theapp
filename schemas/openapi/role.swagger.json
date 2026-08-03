@@ -265,7 +265,7 @@
             }
           },
           "400": {
-            "description": "Invalid role data or project metadata.",
+            "description": "Invalid role data or project metadata, or the role name already exists.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -403,7 +403,7 @@
             }
           },
           "400": {
-            "description": "Invalid role ID or project metadata.",
+            "description": "Invalid role ID or project metadata, or the role is managed and cannot be deleted.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -472,7 +472,7 @@
             }
           },
           "400": {
-            "description": "Invalid or conflicting permission changes or project metadata.",
+            "description": "Invalid or conflicting permission changes or project metadata; managed role permissions cannot be modified; or project assignments conflict with organization-scoped permissions.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -549,7 +549,7 @@
             }
           },
           "400": {
-            "description": "Invalid role data, update mask, or project metadata.",
+            "description": "Invalid role data, update mask, or project metadata; the role name already exists; managed role permissions cannot be updated; or project assignments conflict with organization-scoped permissions.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -703,7 +703,7 @@
             }
           },
           "400": {
-            "description": "Invalid IDs or project metadata.",
+            "description": "Invalid IDs or project metadata, or the role requires organization scope.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }

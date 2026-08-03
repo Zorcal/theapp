@@ -65,7 +65,7 @@ service SystemRoleService {
       responses: {
         key: "403"
         value: {
-          description: "System-role read access is missing or the project is not the system control project."
+          description: "System-role read access or system-organization membership is missing, or the project is not the system control project."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -119,7 +119,7 @@ service SystemRoleService {
       responses: {
         key: "403"
         value: {
-          description: "Assignment authority is missing or the project is not the system control project."
+          description: "Assignment authority or system-organization membership is missing, or the project is not the system control project."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -191,7 +191,7 @@ service SystemRoleService {
       responses: {
         key: "403"
         value: {
-          description: "Unassignment authority is missing or the project is not the system control project."
+          description: "Unassignment authority or system-organization membership is missing, or the project is not the system control project."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -251,7 +251,7 @@ service SystemRoleService {
       responses: {
         key: "403"
         value: {
-          description: "System-role read access is missing or the project is not the system control project."
+          description: "System-role read access or system-organization membership is missing, or the project is not the system control project."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }

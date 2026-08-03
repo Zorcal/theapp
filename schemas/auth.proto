@@ -200,6 +200,15 @@ service AuthService {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       responses: {
+        key: "400"
+        value: {
+          description: "Invalid idempotency key."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
         key: "401"
         value: {
           description: "Missing or invalid credentials."

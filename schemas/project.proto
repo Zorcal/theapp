@@ -59,6 +59,15 @@ service ProjectService {
         }
       }
       responses: {
+        key: "404"
+        value: {
+          description: "Authenticated user not found."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
         key: "500"
         value: {
           description: "Unexpected server error."

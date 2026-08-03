@@ -330,14 +330,17 @@ const file_project_proto_rawDesc = "" +
 	"\bprojects\x18\x01 \x03(\v2\x12.theapp.v1.ProjectR\bprojects\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xb0\x02\n" +
-	"\x0eProjectService\x12\x9d\x02\n" +
-	"\fListProjects\x12\x1e.theapp.v1.ListProjectsRequest\x1a\x1f.theapp.v1.ListProjectsResponse\"\xcb\x01\x92A\xb3\x01J4\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xf0\x02\n" +
+	"\x0eProjectService\x12\xdd\x02\n" +
+	"\fListProjects\x12\x1e.theapp.v1.ListProjectsRequest\x1a\x1f.theapp.v1.ListProjectsResponse\"\x8b\x02\x92A\xf3\x01J4\n" +
 	"\x03400\x12-\n" +
 	"\x13Invalid pagination.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ>\n" +
+	"\x03404\x127\n" +
+	"\x1dAuthenticated user not found.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +

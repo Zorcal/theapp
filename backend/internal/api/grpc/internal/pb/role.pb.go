@@ -1302,12 +1302,12 @@ const file_role_proto_rawDesc = "" +
 	"\bRoleKind\x12\x19\n" +
 	"\x15ROLE_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10ROLE_KIND_CUSTOM\x10\x01\x12 \n" +
-	"\x1cROLE_KIND_ORGANIZATION_ADMIN\x10\x022\x997\n" +
-	"\vRoleService\x12\x84\x04\n" +
+	"\x1cROLE_KIND_ORGANIZATION_ADMIN\x10\x022\x9a:\n" +
+	"\vRoleService\x12\xa5\x04\n" +
 	"\n" +
-	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"\xc6\x03\x92A\xae\x03JG\n" +
-	"\x03400\x12@\n" +
-	"&Invalid role data or project metadata.\x12\x16\n" +
+	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"\xe7\x03\x92A\xcf\x03Jh\n" +
+	"\x03400\x12a\n" +
+	"GInvalid role data or project metadata, or the role name already exists.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
@@ -1391,11 +1391,11 @@ const file_role_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrT\n" +
 	"R\n" +
-	"\fx-project-id\x12>ID of a project in the organization whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02#\x12!/v1/organization-role-assignments\x12\xaf\x04\n" +
+	"\fx-project-id\x12>ID of a project in the organization whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02#\x12!/v1/organization-role-assignments\x12\xc2\x05\n" +
 	"\n" +
-	"UpdateRole\x12\x1c.theapp.v1.UpdateRoleRequest\x1a\x0f.theapp.v1.Role\"\xf1\x03\x92A\xcf\x03JU\n" +
-	"\x03400\x12N\n" +
-	"4Invalid role data, update mask, or project metadata.\x12\x16\n" +
+	"UpdateRole\x12\x1c.theapp.v1.UpdateRoleRequest\x1a\x0f.theapp.v1.Role\"\x84\x05\x92A\xe2\x04J\xe7\x01\n" +
+	"\x03400\x12\xdf\x01\n" +
+	"\xc4\x01Invalid role data, update mask, or project metadata; the role name already exists; managed role permissions cannot be updated; or project assignments conflict with organization-scoped permissions.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
@@ -1410,10 +1410,10 @@ const file_role_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/roles/{role.id}\x12\xdc\x04\n" +
-	"\x15ModifyRolePermissions\x12'.theapp.v1.ModifyRolePermissionsRequest\x1a\x0f.theapp.v1.Role\"\x88\x04\x92A\xd9\x03J_\n" +
-	"\x03400\x12X\n" +
-	">Invalid or conflicting permission changes or project metadata.\x12\x16\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/roles/{role.id}\x12\xd2\x05\n" +
+	"\x15ModifyRolePermissions\x12'.theapp.v1.ModifyRolePermissionsRequest\x1a\x0f.theapp.v1.Role\"\xfe\x04\x92A\xcf\x04J\xd4\x01\n" +
+	"\x03400\x12\xcc\x01\n" +
+	"\xb1\x01Invalid or conflicting permission changes or project metadata; managed role permissions cannot be modified; or project assignments conflict with organization-scoped permissions.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
@@ -1428,11 +1428,11 @@ const file_role_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02%:\x01*\" /v1/roles/{id}:modifyPermissions\x12\x99\x04\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02%:\x01*\" /v1/roles/{id}:modifyPermissions\x12\xc7\x04\n" +
 	"\n" +
-	"DeleteRole\x12\x1c.theapp.v1.DeleteRoleRequest\x1a\x1d.theapp.v1.DeleteRoleResponse\"\xcd\x03\x92A\xb3\x03JE\n" +
-	"\x03400\x12>\n" +
-	"$Invalid role ID or project metadata.\x12\x16\n" +
+	"DeleteRole\x12\x1c.theapp.v1.DeleteRoleRequest\x1a\x1d.theapp.v1.DeleteRoleResponse\"\xfb\x03\x92A\xe1\x03Js\n" +
+	"\x03400\x12l\n" +
+	"RInvalid role ID or project metadata, or the role is managed and cannot be deleted.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
@@ -1447,10 +1447,10 @@ const file_role_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10*\x0e/v1/roles/{id}\x12\x95\x05\n" +
-	"\x13AssignRoleToProject\x12%.theapp.v1.AssignRoleToProjectRequest\x1a&.theapp.v1.AssignRoleToProjectResponse\"\xae\x04\x92A\x86\x04JA\n" +
-	"\x03400\x12:\n" +
-	" Invalid IDs or project metadata.\x12\x16\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10*\x0e/v1/roles/{id}\x12\xbe\x05\n" +
+	"\x13AssignRoleToProject\x12%.theapp.v1.AssignRoleToProjectRequest\x1a&.theapp.v1.AssignRoleToProjectResponse\"\xd7\x04\x92A\xaf\x04Jj\n" +
+	"\x03400\x12c\n" +
+	"IInvalid IDs or project metadata, or the role requires organization scope.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +

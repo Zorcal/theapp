@@ -28,7 +28,7 @@
             }
           },
           "400": {
-            "description": "Invalid organization or default project data.",
+            "description": "Invalid organization data, default project data, or project metadata.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }

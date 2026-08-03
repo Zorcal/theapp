@@ -177,12 +177,12 @@ const file_organization_proto_rawDesc = "" +
 	"updateTime\"\x85\x01\n" +
 	"\x19CreateOrganizationRequest\x12@\n" +
 	"\forganization\x18\x01 \x01(\v2\x17.theapp.v1.OrganizationB\x03\xe0A\x02R\forganization\x12&\n" +
-	"\fproject_name\x18\x02 \x01(\tB\x03\xe0A\x02R\vprojectName2\x91\x05\n" +
+	"\fproject_name\x18\x02 \x01(\tB\x03\xe0A\x02R\vprojectName2\xa9\x05\n" +
 	"\n" +
-	"OrgService\x12\x82\x05\n" +
-	"\x12CreateOrganization\x12$.theapp.v1.CreateOrganizationRequest\x1a\x17.theapp.v1.Organization\"\xac\x04\x92A\x8c\x04JN\n" +
-	"\x03400\x12G\n" +
-	"-Invalid organization or default project data.\x12\x16\n" +
+	"OrgService\x12\x9a\x05\n" +
+	"\x12CreateOrganization\x12$.theapp.v1.CreateOrganizationRequest\x1a\x17.theapp.v1.Organization\"\xc4\x04\x92A\xa4\x04Jf\n" +
+	"\x03400\x12_\n" +
+	"EInvalid organization data, default project data, or project metadata.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
