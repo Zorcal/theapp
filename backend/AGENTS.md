@@ -51,6 +51,19 @@ Keep function and method signatures and calls on one line when they fit comforta
 across lines only when the single line would become extremely long; do not default to placing each
 argument or parameter on its own line.
 
+## Naming
+
+- Length is not a virtue in a name; clarity of expression is.
+- Prefer minimum-length, maximum-information names, then let context fill in the rest.
+- Prefer established domain abbreviations in variable names, such as `org` instead of
+  `organization` and `sess` instead of `session`. Keep the full words in exported API, type, and
+  method names where they describe domain concepts.
+- Boolean variables should read as predicates. Prefix them with `is` or `has` when that makes the
+  condition clearer (`isMember`, `hasPermission`). A state already expressed as an adjective or
+  predicate does not need a forced prefix (`rateLimited`, `exists`), and conventional comma-`ok`
+  values remain `ok`. Prefer a concise name such as `exists` when the small scope makes its subject
+  obvious; don't lengthen it merely to encode context already visible next to the declaration.
+
 ## Imports
 
 Avoid import aliases. Only alias an import when two imported packages would otherwise have the same name and both are used in the same file.

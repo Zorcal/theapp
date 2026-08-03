@@ -187,12 +187,12 @@ func (c *Core) authorizeSystemRoleChange(ctx context.Context, actorUserID uuid.U
 // registered permission at system scope. It must run inside the write transaction after the
 // management and target user locks are acquired.
 func (c *Core) ensureFullyPrivilegedSystemUserRemains(ctx context.Context, targetUserID uuid.UUID, roleName string) error {
-	remain, err := c.roleStorer.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, targetUserID, roleName)
+	hasFullyPrivilegedUser, err := c.roleStorer.FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx, targetUserID, roleName)
 	if err != nil {
 		return fmt.Errorf("fully privileged system user after unassign: %w", err)
 	}
 
-	if !remain {
+	if !hasFullyPrivilegedUser {
 		return mdl.ErrLastFullyPrivilegedSystemAdmin
 	}
 

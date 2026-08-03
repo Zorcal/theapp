@@ -18,7 +18,7 @@ import (
 type organizationService struct {
 	pb.UnimplementedOrgServiceServer
 
-	organizationCore OrganizationCore
+	orgCore OrganizationCore
 }
 
 //go:generate moq -rm -fmt goimports -out organization_core_moq_test.go . OrganizationCore:MockedOrganizationCore
@@ -49,7 +49,7 @@ func (s *organizationService) CreateOrganizationUser(ctx context.Context, req *p
 		return nil, fmt.Errorf("validate create organization user request: %w", err)
 	}
 
-	user, err := s.organizationCore.CreateOrganizationUser(ctx, conv.CreateOrganizationUserFromPB(req))
+	user, err := s.orgCore.CreateOrganizationUser(ctx, conv.CreateOrganizationUserFromPB(req))
 	if err != nil {
 		if errors.Is(err, mdl.ErrValidation) {
 			return nil, status.Error(codes.InvalidArgument, "invalid organization user")
@@ -65,7 +65,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, req *pb.Cr
 		return nil, fmt.Errorf("validate create organization request: %w", err)
 	}
 
-	org, err := s.organizationCore.CreateOrganization(ctx, conv.CreateOrganizationFromPB(req))
+	org, err := s.orgCore.CreateOrganization(ctx, conv.CreateOrganizationFromPB(req))
 	if err != nil {
 		switch {
 		case errors.Is(err, mdl.ErrValidation):

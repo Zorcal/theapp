@@ -82,37 +82,37 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 
 	// Create an organization user and repeat the operation without duplicating the user or membership.
 
-	organizationCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
+	orgCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
 		User:  mdl.AuthUser{UserID: creator.ExternalID},
 		OrgID: new(createdOrg.ID),
 	})
 
-	createdOrganizationUser, err := core.CreateOrganizationUser(organizationCtx, mdl.CreateOrganizationUser{
+	createdOrgUser, err := core.CreateOrganizationUser(orgCtx, mdl.CreateOrganizationUser{
 		Email: "organization-user@test.com",
 	})
 	if err != nil {
 		t.Fatalf("CreateOrganizationUser() error = %v", err)
 	}
 
-	testingx.AssertDiff(t, createdOrganizationUser, mdl.User{Email: "organization-user@test.com"}, diffOpts...)
+	testingx.AssertDiff(t, createdOrgUser, mdl.User{Email: "organization-user@test.com"}, diffOpts...)
 
-	member, err := orgStore.IsOrganizationMember(ctx, createdOrganizationUser.ID, createdOrg.ID)
+	isMember, err := orgStore.IsOrganizationMember(ctx, createdOrgUser.ID, createdOrg.ID)
 	if err != nil {
 		t.Fatalf("IsOrganizationMember() error = %v", err)
 	}
-	if !member {
+	if !isMember {
 		t.Error("IsOrganizationMember() = false, want true")
 	}
 
 	// Creating the user with the organization again is a no-op.
-	existingOrganizationUser, err := core.CreateOrganizationUser(organizationCtx, mdl.CreateOrganizationUser{
-		Email: createdOrganizationUser.Email,
+	existingOrgUser, err := core.CreateOrganizationUser(orgCtx, mdl.CreateOrganizationUser{
+		Email: createdOrgUser.Email,
 	})
 	if err != nil {
 		t.Fatalf("CreateOrganizationUser() repeated error = %v", err)
 	}
 
-	testingx.AssertDiff(t, existingOrganizationUser, createdOrganizationUser)
+	testingx.AssertDiff(t, existingOrgUser, createdOrgUser)
 
 	// Create another project in the organization.
 
@@ -706,11 +706,11 @@ func TestCore_IsOrganizationMember(t *testing.T) {
 	}
 	core := NewCore(orgStorer, nil, nil, immediateTransactor{})
 
-	member, err := core.IsOrganizationMember(t.Context(), uuid.New(), 1)
+	isMember, err := core.IsOrganizationMember(t.Context(), uuid.New(), 1)
 	if err != nil {
 		t.Fatalf("IsOrganizationMember() error = %v", err)
 	}
-	if !member {
+	if !isMember {
 		t.Error("IsOrganizationMember() = false, want true")
 	}
 }
@@ -779,12 +779,12 @@ func TestCore_CreateOrganizationUser(t *testing.T) {
 			return nil
 		},
 	}
-	organizationUserStore := &MockedOrganizationUserStore{
+	orgUserStore := &MockedOrganizationUserStore{
 		GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 			return pgUser, nil
 		},
 	}
-	core := NewCore(orgStorer, organizationUserStore, nil, immediateTransactor{})
+	core := NewCore(orgStorer, orgUserStore, nil, immediateTransactor{})
 	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(1)})
 
 	got, err := core.CreateOrganizationUser(ctx, mdl.CreateOrganizationUser{Email: want.Email})
@@ -800,24 +800,24 @@ func TestCore_CreateOrganizationUser_error(t *testing.T) {
 	pgUser := pguser.User{ExternalID: uuid.New()}
 
 	tests := []struct {
-		name                  string
-		in                    mdl.CreateOrganizationUser
-		orgStorer             OrgStorer
-		organizationUserStore OrganizationUserStore
-		want                  error
+		name         string
+		in           mdl.CreateOrganizationUser
+		orgStorer    OrgStorer
+		orgUserStore OrganizationUserStore
+		want         error
 	}{
 		{
-			name:                  "validation",
-			in:                    mdl.CreateOrganizationUser{},
-			orgStorer:             &MockedOrgStorer{},
-			organizationUserStore: &MockedOrganizationUserStore{},
-			want:                  mdl.ErrValidation,
+			name:         "validation",
+			in:           mdl.CreateOrganizationUser{},
+			orgStorer:    &MockedOrgStorer{},
+			orgUserStore: &MockedOrganizationUserStore{},
+			want:         mdl.ErrValidation,
 		},
 		{
 			name:      "user store",
 			in:        mdl.CreateOrganizationUser{Email: "member@test.com"},
 			orgStorer: &MockedOrgStorer{},
-			organizationUserStore: &MockedOrganizationUserStore{
+			orgUserStore: &MockedOrganizationUserStore{
 				GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 					return pguser.User{}, dbErr
 				},
@@ -832,7 +832,7 @@ func TestCore_CreateOrganizationUser_error(t *testing.T) {
 					return dbErr
 				},
 			},
-			organizationUserStore: &MockedOrganizationUserStore{
+			orgUserStore: &MockedOrganizationUserStore{
 				GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 					return pgUser, nil
 				},
@@ -847,7 +847,7 @@ func TestCore_CreateOrganizationUser_error(t *testing.T) {
 					return sql.ErrNoRows
 				},
 			},
-			organizationUserStore: &MockedOrganizationUserStore{
+			orgUserStore: &MockedOrganizationUserStore{
 				GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 					return pgUser, nil
 				},
@@ -859,7 +859,7 @@ func TestCore_CreateOrganizationUser_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.orgStorer, tt.organizationUserStore, nil, immediateTransactor{})
+			core := NewCore(tt.orgStorer, tt.orgUserStore, nil, immediateTransactor{})
 			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{OrgID: new(1)})
 
 			if _, err := core.CreateOrganizationUser(ctx, tt.in); !errors.Is(err, tt.want) {

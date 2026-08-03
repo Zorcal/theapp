@@ -161,7 +161,7 @@ func TestSystemRoleService_ListSystemRoles(t *testing.T) {
 			}, 3, nil
 		},
 	}
-	organizationCore := &MockedOrganizationCore{
+	orgCore := &MockedOrganizationCore{
 		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 			return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 		},
@@ -172,7 +172,7 @@ func TestSystemRoleService_ListSystemRoles(t *testing.T) {
 	srvTest := NewServerTest(t, ServerConfig{
 		Log:              testingx.NewLogger(t),
 		SystemRoleCore:   systemRoleCore,
-		OrganizationCore: organizationCore,
+		OrganizationCore: orgCore,
 	})
 
 	got, err := srvTest.systemRoleServiceClient.ListSystemRoles(
@@ -202,15 +202,15 @@ func TestSystemRoleService_ListSystemRoles(t *testing.T) {
 
 func TestSystemRoleService_ListSystemRoles_error(t *testing.T) {
 	tests := []struct {
-		name             string
-		organizationCore OrganizationCore
-		systemRoleCore   SystemRoleCore
-		in               *pb.ListSystemRolesRequest
-		want             *status.Status
+		name           string
+		orgCore        OrganizationCore
+		systemRoleCore SystemRoleCore
+		in             *pb.ListSystemRolesRequest
+		want           *status.Status
 	}{
 		{
 			name: "validated request",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -224,7 +224,7 @@ func TestSystemRoleService_ListSystemRoles_error(t *testing.T) {
 		},
 		{
 			name: "core error",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -246,7 +246,7 @@ func TestSystemRoleService_ListSystemRoles_error(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
 				Log:              testingx.NewLogger(t),
 				SystemRoleCore:   tt.systemRoleCore,
-				OrganizationCore: tt.organizationCore,
+				OrganizationCore: tt.orgCore,
 			})
 
 			_, err := srvTest.systemRoleServiceClient.ListSystemRoles(authCtxForTestUser(t, t.Context()), tt.in)
@@ -268,7 +268,7 @@ func TestSystemRoleService_AssignSystemRole(t *testing.T) {
 	systemRoleCore := &MockedSystemRoleCore{
 		AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error { return nil },
 	}
-	organizationCore := &MockedOrganizationCore{
+	orgCore := &MockedOrganizationCore{
 		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 			return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 		},
@@ -279,7 +279,7 @@ func TestSystemRoleService_AssignSystemRole(t *testing.T) {
 	srvTest := NewServerTest(t, ServerConfig{
 		Log:              testingx.NewLogger(t),
 		SystemRoleCore:   systemRoleCore,
-		OrganizationCore: organizationCore,
+		OrganizationCore: orgCore,
 	})
 
 	got, err := srvTest.systemRoleServiceClient.AssignSystemRole(
@@ -295,15 +295,15 @@ func TestSystemRoleService_AssignSystemRole(t *testing.T) {
 
 func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 	tests := []struct {
-		name             string
-		organizationCore OrganizationCore
-		systemRoleCore   SystemRoleCore
-		in               *pb.AssignSystemRoleRequest
-		want             *status.Status
+		name           string
+		orgCore        OrganizationCore
+		systemRoleCore SystemRoleCore
+		in             *pb.AssignSystemRoleRequest
+		want           *status.Status
 	}{
 		{
 			name: "validated request",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -319,7 +319,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "not found",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -337,7 +337,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "permission denied",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -355,7 +355,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "already assigned",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -373,7 +373,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "core error",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -395,7 +395,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
 				Log:              testingx.NewLogger(t),
 				SystemRoleCore:   tt.systemRoleCore,
-				OrganizationCore: tt.organizationCore,
+				OrganizationCore: tt.orgCore,
 			})
 
 			_, err := srvTest.systemRoleServiceClient.AssignSystemRole(authCtxForTestUser(t, t.Context()), tt.in)
@@ -417,7 +417,7 @@ func TestSystemRoleService_UnassignSystemRole(t *testing.T) {
 	systemRoleCore := &MockedSystemRoleCore{
 		UnassignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error { return nil },
 	}
-	organizationCore := &MockedOrganizationCore{
+	orgCore := &MockedOrganizationCore{
 		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 			return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 		},
@@ -428,7 +428,7 @@ func TestSystemRoleService_UnassignSystemRole(t *testing.T) {
 	srvTest := NewServerTest(t, ServerConfig{
 		Log:              testingx.NewLogger(t),
 		SystemRoleCore:   systemRoleCore,
-		OrganizationCore: organizationCore,
+		OrganizationCore: orgCore,
 	})
 
 	got, err := srvTest.systemRoleServiceClient.UnassignSystemRole(
@@ -444,15 +444,15 @@ func TestSystemRoleService_UnassignSystemRole(t *testing.T) {
 
 func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 	tests := []struct {
-		name             string
-		organizationCore OrganizationCore
-		systemRoleCore   SystemRoleCore
-		in               *pb.UnassignSystemRoleRequest
-		want             *status.Status
+		name           string
+		orgCore        OrganizationCore
+		systemRoleCore SystemRoleCore
+		in             *pb.UnassignSystemRoleRequest
+		want           *status.Status
 	}{
 		{
 			name: "validated request",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -468,7 +468,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "not found",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -486,7 +486,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "permission denied",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -504,7 +504,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "last fully privileged system administrator",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -522,7 +522,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "core error",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -544,7 +544,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
 				Log:              testingx.NewLogger(t),
 				SystemRoleCore:   tt.systemRoleCore,
-				OrganizationCore: tt.organizationCore,
+				OrganizationCore: tt.orgCore,
 			})
 
 			_, err := srvTest.systemRoleServiceClient.UnassignSystemRole(
@@ -573,7 +573,7 @@ func TestSystemRoleService_ListSystemRoleAssignments(t *testing.T) {
 			}, 1, nil
 		},
 	}
-	organizationCore := &MockedOrganizationCore{
+	orgCore := &MockedOrganizationCore{
 		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 			return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 		},
@@ -584,7 +584,7 @@ func TestSystemRoleService_ListSystemRoleAssignments(t *testing.T) {
 	srvTest := NewServerTest(t, ServerConfig{
 		Log:              testingx.NewLogger(t),
 		SystemRoleCore:   systemRoleCore,
-		OrganizationCore: organizationCore,
+		OrganizationCore: orgCore,
 	})
 
 	got, err := srvTest.systemRoleServiceClient.ListSystemRoleAssignments(
@@ -606,15 +606,15 @@ func TestSystemRoleService_ListSystemRoleAssignments(t *testing.T) {
 
 func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 	tests := []struct {
-		name             string
-		organizationCore OrganizationCore
-		systemRoleCore   SystemRoleCore
-		in               *pb.ListSystemRoleAssignmentsRequest
-		want             *status.Status
+		name           string
+		orgCore        OrganizationCore
+		systemRoleCore SystemRoleCore
+		in             *pb.ListSystemRoleAssignmentsRequest
+		want           *status.Status
 	}{
 		{
 			name: "validated request",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -630,7 +630,7 @@ func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 		},
 		{
 			name: "user not found",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -648,7 +648,7 @@ func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 		},
 		{
 			name: "core error",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -670,7 +670,7 @@ func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 			srvTest := NewServerTest(t, ServerConfig{
 				Log:              testingx.NewLogger(t),
 				SystemRoleCore:   tt.systemRoleCore,
-				OrganizationCore: tt.organizationCore,
+				OrganizationCore: tt.orgCore,
 			})
 
 			_, err := srvTest.systemRoleServiceClient.ListSystemRoleAssignments(authCtxForTestUser(t, t.Context()), tt.in)

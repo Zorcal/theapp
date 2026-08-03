@@ -56,8 +56,8 @@ func StatusCheck(ctx context.Context, db *pgxpool.Pool) error {
 	// Run a simple query to determine connectivity.
 	// Running this query forces a round trip through the database.
 	const q = `SELECT TRUE`
-	var tmp bool
-	if err := db.QueryRow(ctx, q).Scan(&tmp); err != nil {
+	var isConnected bool
+	if err := db.QueryRow(ctx, q).Scan(&isConnected); err != nil {
 		return fmt.Errorf("query row: %w", err)
 	}
 

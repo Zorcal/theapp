@@ -135,9 +135,9 @@ func (s *Store) SystemPermissions(ctx context.Context, userID uuid.UUID) ([]stri
 func (s *Store) FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx context.Context, userID uuid.UUID, roleName string) (bool, error) {
 	q := fullyPrivilegedUserRemainsAfterSystemRoleUnassignQuery(userID, roleName)
 
-	var remain bool
+	var hasFullyPrivilegedUser bool
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &remain); err != nil {
+		if err := q.Queue(ctx, b, &hasFullyPrivilegedUser); err != nil {
 			return fmt.Errorf("fully privileged system user remains after unassign: %w", err)
 		}
 		return nil
@@ -147,7 +147,7 @@ func (s *Store) FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx context.Co
 		return false, err
 	}
 
-	return remain, nil
+	return hasFullyPrivilegedUser, nil
 }
 
 // AssignSystemRole grants userID the system role named roleName at system scope.

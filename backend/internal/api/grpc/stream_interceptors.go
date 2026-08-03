@@ -111,7 +111,7 @@ func systemControlProjectStreamInterceptor(core OrganizationCore) grpc.StreamSer
 // permissionStreamInterceptor.
 func organizationControlProjectStreamInterceptor(core OrganizationCore) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		if !organizationControlProjectMethods.Contains(info.FullMethod) {
+		if !orgControlProjectMethods.Contains(info.FullMethod) {
 			return handler(srv, ss)
 		}
 

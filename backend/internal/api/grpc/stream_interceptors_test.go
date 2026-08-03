@@ -313,9 +313,9 @@ func TestPermissionStreamInterceptor(t *testing.T) {
 
 	t.Run("permission granted", func(t *testing.T) {
 		var gotSess mdl.AuthSession
-		var gotOK bool
+		var hasSess bool
 		handler := func(_ any, ss grpc.ServerStream) error {
-			gotSess, gotOK = mdl.AuthSessionFromContext(ss.Context())
+			gotSess, hasSess = mdl.AuthSessionFromContext(ss.Context())
 			return nil
 		}
 
@@ -334,7 +334,7 @@ func TestPermissionStreamInterceptor(t *testing.T) {
 			t.Fatalf("permissionStreamInterceptor() error = %v, want nil", err)
 		}
 
-		if !gotOK {
+		if !hasSess {
 			t.Fatal("AuthSessionFromContext() ok = false, want true")
 		}
 
@@ -409,7 +409,7 @@ func TestSystemControlProjectStreamInterceptor(t *testing.T) {
 		handler := func(_ any, _ grpc.ServerStream) error {
 			return nil
 		}
-		organizationCore := &MockedOrganizationCore{
+		orgCore := &MockedOrganizationCore{
 			OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 				return mdl.Organization{ID: 1, ControlProjectID: 2}, nil
 			},
@@ -417,7 +417,7 @@ func TestSystemControlProjectStreamInterceptor(t *testing.T) {
 				return true, nil
 			},
 		}
-		interceptor := systemControlProjectStreamInterceptor(organizationCore)
+		interceptor := systemControlProjectStreamInterceptor(orgCore)
 
 		sess := mdl.AuthSession{
 			User:      mdl.AuthUser{UserID: uuid.New()},
@@ -437,12 +437,12 @@ func TestSystemControlProjectStreamInterceptor_error(t *testing.T) {
 	}
 
 	t.Run("wrong project", func(t *testing.T) {
-		organizationCore := &MockedOrganizationCore{
+		orgCore := &MockedOrganizationCore{
 			OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 				return mdl.Organization{ID: 1, ControlProjectID: 2}, nil
 			},
 		}
-		interceptor := systemControlProjectStreamInterceptor(organizationCore)
+		interceptor := systemControlProjectStreamInterceptor(orgCore)
 
 		sess := mdl.AuthSession{
 			User:      mdl.AuthUser{UserID: uuid.New()},
@@ -457,7 +457,7 @@ func TestSystemControlProjectStreamInterceptor_error(t *testing.T) {
 	})
 
 	t.Run("not a member", func(t *testing.T) {
-		organizationCore := &MockedOrganizationCore{
+		orgCore := &MockedOrganizationCore{
 			OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 				return mdl.Organization{ID: 1, ControlProjectID: 2}, nil
 			},
@@ -465,7 +465,7 @@ func TestSystemControlProjectStreamInterceptor_error(t *testing.T) {
 				return false, nil
 			},
 		}
-		interceptor := systemControlProjectStreamInterceptor(organizationCore)
+		interceptor := systemControlProjectStreamInterceptor(orgCore)
 
 		sess := mdl.AuthSession{
 			User:      mdl.AuthUser{UserID: uuid.New()},
@@ -516,12 +516,12 @@ func TestOrganizationControlProjectStreamInterceptor(t *testing.T) {
 }
 
 func TestOrganizationControlProjectStreamInterceptor_error(t *testing.T) {
-	organizationCore := &MockedOrganizationCore{
+	orgCore := &MockedOrganizationCore{
 		IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
 			return false, nil
 		},
 	}
-	interceptor := organizationControlProjectStreamInterceptor(organizationCore)
+	interceptor := organizationControlProjectStreamInterceptor(orgCore)
 	handler := func(_ any, _ grpc.ServerStream) error { return nil }
 
 	sess := mdl.AuthSession{ProjectID: new(2), OrgID: new(1)}

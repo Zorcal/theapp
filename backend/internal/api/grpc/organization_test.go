@@ -31,7 +31,7 @@ func TestOrganizationService_Integration(t *testing.T) {
 
 	// Create an organization through the API.
 
-	created, err := srv.organizationServiceClient.CreateOrganization(
+	created, err := srv.orgServiceClient.CreateOrganization(
 		authCtxForUserAtProject(t, ctx, creator.ExternalID, systemOrg.ControlProjectID),
 		&pb.CreateOrganizationRequest{
 			Organization: &pb.Organization{Name: "acme"},
@@ -51,9 +51,9 @@ func TestOrganizationService_Integration(t *testing.T) {
 
 	// Create and reassign an organization user through the API.
 
-	organizationCtx := authCtxForUserAtProject(t, ctx, creator.ExternalID, int(created.GetControlProjectId()))
+	orgCtx := authCtxForUserAtProject(t, ctx, creator.ExternalID, int(created.GetControlProjectId()))
 
-	createdUser, err := srv.organizationServiceClient.CreateOrganizationUser(organizationCtx, &pb.CreateOrganizationUserRequest{
+	createdUser, err := srv.orgServiceClient.CreateOrganizationUser(orgCtx, &pb.CreateOrganizationUserRequest{
 		Email: "member@test.com",
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func TestOrganizationService_Integration(t *testing.T) {
 		t.Errorf("CreateOrganizationUser() email = %q, want %q", got, want)
 	}
 
-	existingUser, err := srv.organizationServiceClient.CreateOrganizationUser(organizationCtx, &pb.CreateOrganizationUserRequest{
+	existingUser, err := srv.orgServiceClient.CreateOrganizationUser(orgCtx, &pb.CreateOrganizationUserRequest{
 		Email: "member@test.com",
 	})
 	if err != nil {
@@ -86,7 +86,7 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 		ControlProjectID: 3,
 		CreatedAt:        now,
 	}
-	organizationCore := &MockedOrganizationCore{
+	orgCore := &MockedOrganizationCore{
 		OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 			return systemOrg, nil
 		},
@@ -97,9 +97,9 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 			return createdOrg, nil
 		},
 	}
-	srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: organizationCore})
+	srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: orgCore})
 
-	got, err := srv.organizationServiceClient.CreateOrganization(
+	got, err := srv.orgServiceClient.CreateOrganization(
 		authCtxForTestUser(t, t.Context()),
 		&pb.CreateOrganizationRequest{Organization: &pb.Organization{Name: "acme"}, ProjectName: "widgets"},
 	)
@@ -120,14 +120,14 @@ func TestOrganizationService_CreateOrganization(t *testing.T) {
 
 func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 	tests := []struct {
-		name             string
-		organizationCore OrganizationCore
-		in               *pb.CreateOrganizationRequest
-		want             *status.Status
+		name    string
+		orgCore OrganizationCore
+		in      *pb.CreateOrganizationRequest
+		want    *status.Status
 	}{
 		{
 			name: "validated request",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -140,7 +140,7 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 		},
 		{
 			name: "system organization membership",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -153,7 +153,7 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 		},
 		{
 			name: "already exists",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -169,7 +169,7 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 		},
 		{
 			name: "control project name conflict",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -185,7 +185,7 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 		},
 		{
 			name: "internal",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				OrganizationByNameFunc: func(_ context.Context, _ string) (mdl.Organization, error) {
 					return mdl.Organization{ID: 1, ControlProjectID: 1}, nil
 				},
@@ -204,10 +204,10 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := NewServerTest(t, ServerConfig{
 				Log:              testingx.NewLogger(t),
-				OrganizationCore: tt.organizationCore,
+				OrganizationCore: tt.orgCore,
 			})
 
-			_, err := srv.organizationServiceClient.CreateOrganization(authCtxForTestUser(t, t.Context()), tt.in)
+			_, err := srv.orgServiceClient.CreateOrganization(authCtxForTestUser(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("CreateOrganization() error = nil, want error")
 			}
@@ -233,7 +233,7 @@ func TestOrganizationService_CreateOrganizationUser(t *testing.T) {
 		UpdatedAt: new(now),
 		ETag:      uuid.NewString(),
 	}
-	organizationCore := &MockedOrganizationCore{
+	orgCore := &MockedOrganizationCore{
 		IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
 			return true, nil
 		},
@@ -241,9 +241,9 @@ func TestOrganizationService_CreateOrganizationUser(t *testing.T) {
 			return mockedUser, nil
 		},
 	}
-	srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: organizationCore})
+	srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: orgCore})
 
-	got, err := srv.organizationServiceClient.CreateOrganizationUser(
+	got, err := srv.orgServiceClient.CreateOrganizationUser(
 		authCtxForTestUser(t, t.Context()),
 		&pb.CreateOrganizationUserRequest{Email: mockedUser.Email},
 	)
@@ -263,14 +263,14 @@ func TestOrganizationService_CreateOrganizationUser(t *testing.T) {
 
 func TestOrganizationService_CreateOrganizationUser_error(t *testing.T) {
 	tests := []struct {
-		name             string
-		organizationCore OrganizationCore
-		in               *pb.CreateOrganizationUserRequest
-		want             *status.Status
+		name    string
+		orgCore OrganizationCore
+		in      *pb.CreateOrganizationUserRequest
+		want    *status.Status
 	}{
 		{
 			name: "validated request",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
 					return true, nil
 				},
@@ -282,7 +282,7 @@ func TestOrganizationService_CreateOrganizationUser_error(t *testing.T) {
 		},
 		{
 			name: "core",
-			organizationCore: &MockedOrganizationCore{
+			orgCore: &MockedOrganizationCore{
 				IsOrganizationControlProjectFunc: func(_ context.Context, _, _ int) (bool, error) {
 					return true, nil
 				},
@@ -296,9 +296,9 @@ func TestOrganizationService_CreateOrganizationUser_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: tt.organizationCore})
+			srv := NewServerTest(t, ServerConfig{Log: testingx.NewLogger(t), OrganizationCore: tt.orgCore})
 
-			_, err := srv.organizationServiceClient.CreateOrganizationUser(authCtxForTestUser(t, t.Context()), tt.in)
+			_, err := srv.orgServiceClient.CreateOrganizationUser(authCtxForTestUser(t, t.Context()), tt.in)
 			if err == nil {
 				t.Fatal("CreateOrganizationUser() error = nil, want error")
 			}

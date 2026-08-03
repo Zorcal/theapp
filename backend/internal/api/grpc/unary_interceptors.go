@@ -237,11 +237,11 @@ func requireSystemControlProject(ctx context.Context, core OrganizationCore) err
 		return fmt.Errorf("require system control project: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
 	}
 
-	member, err := core.IsOrganizationMember(ctx, sess.User.UserID, systemOrg.ID)
+	isMember, err := core.IsOrganizationMember(ctx, sess.User.UserID, systemOrg.ID)
 	if err != nil {
 		return fmt.Errorf("check system organization membership: %w", err)
 	}
-	if !member {
+	if !isMember {
 		return fmt.Errorf("require system organization membership: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
 	}
 
@@ -252,7 +252,7 @@ func requireSystemControlProject(ctx context.Context, core OrganizationCore) err
 // organization's control project. Must run after authUnaryInterceptor and permissionUnaryInterceptor.
 func organizationControlProjectUnaryInterceptor(core OrganizationCore) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if !organizationControlProjectMethods.Contains(info.FullMethod) {
+		if !orgControlProjectMethods.Contains(info.FullMethod) {
 			return handler(ctx, req)
 		}
 
@@ -272,11 +272,11 @@ func requireOrganizationControlProject(ctx context.Context, core OrganizationCor
 
 	// Resolve this only for infrequent organization-administration methods. Adding control-project
 	// metadata to every auth session would put the same database work on the authenticated hot path.
-	controlProject, err := core.IsOrganizationControlProject(ctx, sess.MustOrgID(), sess.MustProjectID())
+	isControlProject, err := core.IsOrganizationControlProject(ctx, sess.MustOrgID(), sess.MustProjectID())
 	if err != nil {
 		return fmt.Errorf("check organization control project: %w", err)
 	}
-	if !controlProject {
+	if !isControlProject {
 		return fmt.Errorf("require organization control project: %w", status.Error(codes.PermissionDenied, codes.PermissionDenied.String()))
 	}
 

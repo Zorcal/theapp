@@ -79,14 +79,14 @@ type Transactor interface {
 // Core holds the business logic for the organization and project domain.
 type Core struct {
 	orgStorer             OrgStorer
-	organizationUserStore OrganizationUserStore
+	orgUserStore          OrganizationUserStore
 	roleBootstrapperStore RoleBootstrapperStore
 	transactor            Transactor
 }
 
 // NewCore constructs a Core backed by the provided stores and Transactor.
 func NewCore(os OrgStorer, ous OrganizationUserStore, rb RoleBootstrapperStore, tr Transactor) *Core {
-	return &Core{orgStorer: os, organizationUserStore: ous, roleBootstrapperStore: rb, transactor: tr}
+	return &Core{orgStorer: os, orgUserStore: ous, roleBootstrapperStore: rb, transactor: tr}
 }
 
 // CreateOrganization creates a new organization, along with a default project named
@@ -103,7 +103,7 @@ func (c *Core) CreateOrganization(ctx context.Context, co mdl.CreateOrganization
 		return mdl.Organization{}, errors.New("auth session missing")
 	}
 
-	organization, err := c.createOrganization(ctx, co, &sess.User.UserID)
+	org, err := c.createOrganization(ctx, co, &sess.User.UserID)
 	if err != nil {
 		if errors.Is(err, errOrgCreatorNotFound) {
 			return mdl.Organization{}, fmt.Errorf("create organization: %w", mdl.ErrNotFound)
@@ -111,7 +111,7 @@ func (c *Core) CreateOrganization(ctx context.Context, co mdl.CreateOrganization
 		return mdl.Organization{}, fmt.Errorf("create organization: %w", err)
 	}
 
-	return organization, nil
+	return org, nil
 }
 
 // BootstrapOrganization creates an organization without creator membership or managed role state.
@@ -224,22 +224,22 @@ func (c *Core) OrganizationByName(ctx context.Context, name string) (mdl.Organiz
 
 // IsOrganizationMember reports whether userID is a member of orgID.
 func (c *Core) IsOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) (bool, error) {
-	member, err := c.orgStorer.IsOrganizationMember(ctx, userID, orgID)
+	isMember, err := c.orgStorer.IsOrganizationMember(ctx, userID, orgID)
 	if err != nil {
 		return false, fmt.Errorf("organization member: %w", err)
 	}
 
-	return member, nil
+	return isMember, nil
 }
 
 // IsOrganizationControlProject reports whether projectID is orgID's control project.
 func (c *Core) IsOrganizationControlProject(ctx context.Context, orgID, projectID int) (bool, error) {
-	controlProject, err := c.orgStorer.IsOrganizationControlProject(ctx, orgID, projectID)
+	isControlProject, err := c.orgStorer.IsOrganizationControlProject(ctx, orgID, projectID)
 	if err != nil {
 		return false, fmt.Errorf("organization control project: %w", err)
 	}
 
-	return controlProject, nil
+	return isControlProject, nil
 }
 
 // CreateOrganizationUser returns the system user with cou.Email, creating it when necessary, and
@@ -261,7 +261,7 @@ func (c *Core) CreateOrganizationUser(ctx context.Context, cou mdl.CreateOrganiz
 	var pgUser pguser.User
 	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
 		var err error
-		pgUser, err = c.organizationUserStore.GetOrCreateUserByEmail(ctx, cou.Email)
+		pgUser, err = c.orgUserStore.GetOrCreateUserByEmail(ctx, cou.Email)
 		if err != nil {
 			return fmt.Errorf("get or create organization user: %w", err)
 		}

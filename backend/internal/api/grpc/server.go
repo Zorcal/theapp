@@ -30,9 +30,9 @@ type ServerConfig struct {
 	JWTKey      []byte
 	JWTIssuer   string
 	JWTAudience string
-	// Reflection registers the gRPC reflection service. Enable for local development so ad-hoc clients (grpcurl, Evans,
+	// ReflectionEnabled registers the gRPC reflection service. Enable for local development so ad-hoc clients (grpcurl, Evans,
 	// ...) can discover the schema; keep it off elsewhere so the schema isn't exposed publicly.
-	Reflection bool
+	ReflectionEnabled bool
 }
 
 // publicMethods lists gRPC methods that do not require a valid JWT. All other
@@ -58,10 +58,10 @@ var noProjectMethods = set.Set[string]{
 	"/theapp.v1.UserService/UpdateUser": {},
 }
 
-// organizationScopedPermissions identifies permissions that must be resolved without
+// orgScopedPermissions identifies permissions that must be resolved without
 // project-scoped role assignments. The request project identifies the organization in which the
 // method operates.
-var organizationScopedPermissions = set.Set[mdl.Permission]{
+var orgScopedPermissions = set.Set[mdl.Permission]{
 	mdl.PermissionCustomRoleCreate:             {},
 	mdl.PermissionCustomRoleUpdate:             {},
 	mdl.PermissionCustomRoleDelete:             {},
@@ -81,9 +81,9 @@ var systemControlProjectMethods = set.Set[string]{
 	"/theapp.v1.SystemRoleService/ListSystemRoleAssignments": {},
 }
 
-// organizationControlProjectMethods lists methods that must be called through the selected
+// orgControlProjectMethods lists methods that must be called through the selected
 // organization's control project.
-var organizationControlProjectMethods = set.Set[string]{
+var orgControlProjectMethods = set.Set[string]{
 	"/theapp.v1.OrgService/CreateOrganizationUser": {},
 }
 
@@ -128,7 +128,7 @@ var permissionRegistry = map[string][]mdl.Permission{
 }
 
 func methodRequiresOrganizationScope(method string) bool {
-	return slices.ContainsFunc(permissionRegistry[method], organizationScopedPermissions.Contains)
+	return slices.ContainsFunc(permissionRegistry[method], orgScopedPermissions.Contains)
 }
 
 // NewServer constructs the GRPC server.
@@ -186,10 +186,10 @@ func NewServer(cfg ServerConfig) *grpc.Server {
 	})
 
 	pb.RegisterOrgServiceServer(srv, &organizationService{
-		organizationCore: cfg.OrganizationCore,
+		orgCore: cfg.OrganizationCore,
 	})
 
-	if cfg.Reflection {
+	if cfg.ReflectionEnabled {
 		reflection.Register(srv)
 	}
 

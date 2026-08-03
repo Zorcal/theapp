@@ -179,11 +179,11 @@ func templateName() (string, error) {
 // lock and a database is only marked as a template once its build has fully succeeded.
 func ensureTemplate(ctx context.Context, admin *pgxpool.Pool, tmpl string) error {
 	// Quick check before taking the lock, to avoid contention on the common path where the template already exists.
-	ready, err := templateReady(ctx, admin, tmpl)
+	isReady, err := templateReady(ctx, admin, tmpl)
 	if err != nil {
 		return fmt.Errorf("check template: %w", err)
 	}
-	if ready {
+	if isReady {
 		return nil
 	}
 
@@ -200,11 +200,11 @@ func ensureTemplate(ctx context.Context, admin *pgxpool.Pool, tmpl string) error
 	}
 
 	// Double-check now that we hold the lock: another process may have built the template while we waited.
-	ready, err = templateReady(ctx, conn, tmpl)
+	isReady, err = templateReady(ctx, conn, tmpl)
 	if err != nil {
 		return fmt.Errorf("re-check template: %w", err)
 	}
-	if ready {
+	if isReady {
 		return nil
 	}
 
@@ -251,11 +251,11 @@ func buildDatabase(ctx context.Context, e execer, dbName string) error {
 // templateReady reports whether tmpl exists and is marked as a template.
 func templateReady(ctx context.Context, q queryer, tmpl string) (bool, error) {
 	const sql = `SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1 AND datistemplate)`
-	var ready bool
-	if err := q.QueryRow(ctx, sql, tmpl).Scan(&ready); err != nil {
+	var isReady bool
+	if err := q.QueryRow(ctx, sql, tmpl).Scan(&isReady); err != nil {
 		return false, err
 	}
-	return ready, nil
+	return isReady, nil
 }
 
 // advisoryKey derives a stable PostgreSQL advisory lock key from the template name, so all processes building the same

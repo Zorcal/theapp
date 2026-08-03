@@ -171,8 +171,8 @@ func fullyPrivilegedUserRemainsAfterSystemRoleUnassignQuery(userID uuid.UUID, ro
 		SQL:  sql,
 		Args: params,
 		Scan: func(row pgx.CollectableRow) (bool, error) {
-			var remain bool
-			return remain, row.Scan(&remain)
+			var hasFullyPrivilegedUser bool
+			return hasFullyPrivilegedUser, row.Scan(&hasFullyPrivilegedUser)
 		},
 		Expect: pgdb.ExpectOne,
 	}

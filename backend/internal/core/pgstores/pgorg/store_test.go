@@ -171,7 +171,7 @@ func TestStore_AddOrganizationMember(t *testing.T) {
 		t.Fatalf("AddOrganizationMember() error = %v", err)
 	}
 
-	if exists := checkOrgMembership(t, pool, user.ID, org.ID); !exists {
+	if isMember := checkOrgMembership(t, pool, user.ID, org.ID); !isMember {
 		t.Error("AddOrganizationMember() organization membership does not exist")
 	}
 }
@@ -873,17 +873,17 @@ func mustProjectByID(t *testing.T, orgStore *pgorg.Store, projectID int) pgorg.P
 func checkOrgMembership(t *testing.T, pool *pgxpool.Pool, userID, orgID int) bool {
 	t.Helper()
 
-	var exists bool
+	var isMember bool
 	if err := pool.QueryRow(
 		t.Context(),
 		"SELECT EXISTS (SELECT FROM org.org_membership WHERE user_id = $1 AND org_id = $2)",
 		userID,
 		orgID,
-	).Scan(&exists); err != nil {
+	).Scan(&isMember); err != nil {
 		t.Fatalf("check organization membership (user %d, org %d): %v", userID, orgID, err)
 	}
 
-	return exists
+	return isMember
 }
 
 func mustProjectByName(t *testing.T, orgStore *pgorg.Store, orgID int, name string) pgorg.Project {
