@@ -19,6 +19,14 @@ func CreateOrganizationUserFromPB(req *pb.CreateOrganizationUserRequest) mdl.Cre
 	return mdl.CreateOrganizationUser{Email: req.GetEmail()}
 }
 
+func OrganizationUserFilterFromPB(filter *pb.OrganizationUserFilter) mdl.OrganizationUserFilter {
+	if filter.GetProjectId() == 0 {
+		return mdl.OrganizationUserFilter{}
+	}
+
+	return mdl.OrganizationUserFilter{ProjectID: new(int(filter.GetProjectId()))}
+}
+
 func OrganizationToPB(organization mdl.Organization) *pb.Organization {
 	return &pb.Organization{
 		Id:               mustconv.Int32(organization.ID),

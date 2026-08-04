@@ -26,6 +26,9 @@ var _ OrganizationCore = &MockedOrganizationCore{}
 //			CreateOrganizationUserFunc: func(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error) {
 //				panic("mock out the CreateOrganizationUser method")
 //			},
+//			OrganizationUsersFunc: func(ctx context.Context, filter mdl.OrganizationUserFilter, pageSize int, pageOffset int) ([]mdl.User, int, error) {
+//				panic("mock out the OrganizationUsers method")
+//			},
 //		}
 //
 //		// use mockedOrganizationCore in code that requires OrganizationCore
@@ -38,6 +41,9 @@ type MockedOrganizationCore struct {
 
 	// CreateOrganizationUserFunc mocks the CreateOrganizationUser method.
 	CreateOrganizationUserFunc func(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error)
+
+	// OrganizationUsersFunc mocks the OrganizationUsers method.
+	OrganizationUsersFunc func(ctx context.Context, filter mdl.OrganizationUserFilter, pageSize int, pageOffset int) ([]mdl.User, int, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -55,9 +61,21 @@ type MockedOrganizationCore struct {
 			// User is the user argument value.
 			User mdl.CreateOrganizationUser
 		}
+		// OrganizationUsers holds details about calls to the OrganizationUsers method.
+		OrganizationUsers []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Filter is the filter argument value.
+			Filter mdl.OrganizationUserFilter
+			// PageSize is the pageSize argument value.
+			PageSize int
+			// PageOffset is the pageOffset argument value.
+			PageOffset int
+		}
 	}
 	lockCreateOrganization     sync.RWMutex
 	lockCreateOrganizationUser sync.RWMutex
+	lockOrganizationUsers      sync.RWMutex
 }
 
 // CreateOrganization calls CreateOrganizationFunc.
@@ -129,5 +147,49 @@ func (mock *MockedOrganizationCore) CreateOrganizationUserCalls() []struct {
 	mock.lockCreateOrganizationUser.RLock()
 	calls = mock.calls.CreateOrganizationUser
 	mock.lockCreateOrganizationUser.RUnlock()
+	return calls
+}
+
+// OrganizationUsers calls OrganizationUsersFunc.
+func (mock *MockedOrganizationCore) OrganizationUsers(ctx context.Context, filter mdl.OrganizationUserFilter, pageSize int, pageOffset int) ([]mdl.User, int, error) {
+	if mock.OrganizationUsersFunc == nil {
+		panic("MockedOrganizationCore.OrganizationUsersFunc: method is nil but OrganizationCore.OrganizationUsers was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		Filter     mdl.OrganizationUserFilter
+		PageSize   int
+		PageOffset int
+	}{
+		Ctx:        ctx,
+		Filter:     filter,
+		PageSize:   pageSize,
+		PageOffset: pageOffset,
+	}
+	mock.lockOrganizationUsers.Lock()
+	mock.calls.OrganizationUsers = append(mock.calls.OrganizationUsers, callInfo)
+	mock.lockOrganizationUsers.Unlock()
+	return mock.OrganizationUsersFunc(ctx, filter, pageSize, pageOffset)
+}
+
+// OrganizationUsersCalls gets all the calls that were made to OrganizationUsers.
+// Check the length with:
+//
+//	len(mockedOrganizationCore.OrganizationUsersCalls())
+func (mock *MockedOrganizationCore) OrganizationUsersCalls() []struct {
+	Ctx        context.Context
+	Filter     mdl.OrganizationUserFilter
+	PageSize   int
+	PageOffset int
+} {
+	var calls []struct {
+		Ctx        context.Context
+		Filter     mdl.OrganizationUserFilter
+		PageSize   int
+		PageOffset int
+	}
+	mock.lockOrganizationUsers.RLock()
+	calls = mock.calls.OrganizationUsers
+	mock.lockOrganizationUsers.RUnlock()
 	return calls
 }

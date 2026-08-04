@@ -348,7 +348,13 @@ organization-user capability must update both the permissions used for newly cre
 organization-admin roles and the rollout path for existing organizations; it must not leave older
 organizations with a permanently weaker administrator role.
 
-Listing users scoped to an organization is a separate endpoint from `UserService.ListUsers`, for the same reason it's a distinct endpoint above: it's an org-level concern, not part of the user directory. It's likewise anchored on the org's control project via `x-project-id`. Unlike the create-or-assign endpoint, the project ID isn't only used for permission anchoring here — the request body also carries a project ID filter, letting the caller ask "which users have a role in project X", resolved through the same three-way union used for permission resolution everywhere else, rather than through `org_membership` (which only answers "belongs to the org," not "has a role in this specific project").
+Listing users scoped to an organization is a separate endpoint from `UserService.ListUsers`, for
+the same reason: it is an org-level concern, not part of the system user directory. It is likewise
+anchored on the organization's control project via `x-project-id` and requires `org:user-read`.
+The optional project filter answers which organization members have effective access to that
+project. It uses the canonical system-, organization-, and project-assignment union rather than
+`org_membership`, which only establishes that a user belongs to the organization. A missing project
+or a project from another organization is rejected.
 
 ## Deleting organizations and projects
 

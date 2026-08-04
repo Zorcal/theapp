@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
@@ -37,6 +38,95 @@ func createOrganizationQuery(co CreateOrganization) pgdb.TypedQuery[Organization
 		Scan:   pgx.RowToStructByName[Organization],
 		Expect: pgdb.ExpectOne,
 	}
+}
+
+func organizationUsersQuery(orgID int, filter OrganizationUserFilter, pageSize, pageOffset int) pgdb.TypedQuery[pguser.User] {
+	params := pgx.NamedArgs{
+		"org_id":      orgID,
+		"page_size":   pageSize,
+		"page_offset": pageOffset,
+	}
+	sql := fmt.Sprintf(`
+		SELECT usr.id, usr.external_id, usr.email, usr.name, usr.email_verified_at,
+		       usr.created_at, usr.updated_at, usr.etag
+		FROM org.organizations AS organization
+		JOIN org.org_membership AS membership ON membership.org_id = organization.id
+		JOIN useraccess.users AS usr ON usr.id = membership.user_id
+		%s
+		ORDER BY usr.email, usr.id
+		LIMIT @page_size OFFSET @page_offset`, organizationUsersWhereClause(filter, params))
+
+	return pgdb.TypedQuery[pguser.User]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowToStructByName[pguser.User],
+		Expect: pgdb.ExpectMany,
+	}
+}
+
+func organizationUserCountQuery(orgID int, filter OrganizationUserFilter) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"org_id": orgID}
+	sql := fmt.Sprintf(`
+		SELECT (
+			SELECT COUNT(*)
+			FROM org.organizations AS organization
+			JOIN org.org_membership AS membership ON membership.org_id = organization.id
+			JOIN useraccess.users AS usr ON usr.id = membership.user_id
+			%s
+		)
+		FROM org.organizations AS organization_scope
+		%s`, organizationUsersWhereClause(filter, params), organizationUsersScopeWhereClause(filter, params))
+
+	return pgdb.TypedQuery[int]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowTo[int],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
+// organizationUsersScopeWhereClause ensures the selected project belongs to the organization.
+// Keeping this anchor outside the aggregate distinguishes an invalid project from a valid project
+// without matching users.
+func organizationUsersScopeWhereClause(filter OrganizationUserFilter, params pgx.NamedArgs) string {
+	clauses := []string{
+		"organization_scope.id = @org_id",
+	}
+
+	if filter.ProjectID != nil {
+		params["project_id"] = *filter.ProjectID
+		clauses = append(clauses, `EXISTS (
+			SELECT FROM org.projects AS project
+			WHERE project.id = @project_id AND project.org_id = organization_scope.id
+		)`)
+	}
+
+	return "WHERE " + strings.Join(clauses, " AND ")
+}
+
+// organizationUsersWhereClause builds the organization anchor and optional project filter,
+// adding any required named parameters to params as a side effect.
+func organizationUsersWhereClause(filter OrganizationUserFilter, params pgx.NamedArgs) string {
+	clauses := []string{
+		"organization.id = @org_id",
+	}
+
+	if filter.ProjectID != nil {
+		params["project_id"] = *filter.ProjectID
+		clauses = append(
+			clauses,
+			`EXISTS (
+SELECT FROM org.projects AS project
+WHERE project.id = @project_id AND project.org_id = organization.id
+		)`,
+			`EXISTS (
+SELECT FROM rbac.accessible_project_ids(usr.id) AS accessible
+WHERE accessible.project_id = @project_id
+)`,
+		)
+	}
+
+	return "WHERE " + strings.Join(clauses, " AND ")
 }
 
 func organizationByNameQuery(name string) pgdb.TypedQuery[Organization] {
@@ -160,7 +250,7 @@ func accessibleProjectsQuery(userID uuid.UUID, filter ProjectFilter, pageSize, p
 		JOIN org.projects AS project ON project.id = accessible.project_id
 		%s
 		ORDER BY project.org_id, project.name COLLATE org.project_name_natural
-		LIMIT @page_size OFFSET @page_offset`, whereClause(filter, params))
+		LIMIT @page_size OFFSET @page_offset`, projectWhereClause(filter, params))
 
 	return pgdb.TypedQuery[Project]{
 		SQL:    sql,
@@ -192,7 +282,7 @@ func accessibleProjectCountQuery(userID uuid.UUID, filter ProjectFilter) pgdb.Ty
 			FROM org.projects AS project
 			%s
 		) AS project ON project.id = accessible.project_id
-		GROUP BY target.id`, whereClause(filter, params))
+		GROUP BY target.id`, projectWhereClause(filter, params))
 
 	return pgdb.TypedQuery[int]{
 		SQL:    sql,
@@ -202,9 +292,9 @@ func accessibleProjectCountQuery(userID uuid.UUID, filter ProjectFilter) pgdb.Ty
 	}
 }
 
-// whereClause builds an optional WHERE clause from f, adding any required
+// projectWhereClause builds an optional WHERE clause from f, adding any required
 // named parameters to params as a side effect.
-func whereClause(f ProjectFilter, params pgx.NamedArgs) string {
+func projectWhereClause(f ProjectFilter, params pgx.NamedArgs) string {
 	var clauses []string
 	if name := strings.TrimSpace(f.Name); name != "" {
 		params["name_prefix"] = name + "%"

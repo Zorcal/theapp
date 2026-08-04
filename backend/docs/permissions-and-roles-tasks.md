@@ -238,11 +238,13 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
     relation rather than `org_membership`. Add any organization/project-first indexes still needed
     for this listing and later deletion cleanup after accounting for the final composite keys. Run
     `make generate`. Depends on 45, 46.
+	**This task is complete.**
 51. Add the organization-scoped user-management permissions, include them in newly created
     organization-admin roles, and wire both endpoints behind them. After permission seeding, run an
     idempotent reconciliation that synchronizes every role identified by
     `managed_key = 'organization_admin'` with the canonical permission set. Test multiple
     organizations and a second reconciliation run. Depends on 49, 50.
+	**This task is complete.**
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
 

@@ -31,6 +31,14 @@ func userFromPg(user pguser.User) mdl.User {
 	}
 }
 
+func usersFromPg(users []pguser.User) []mdl.User {
+	return slicesx.Map(users, userFromPg)
+}
+
+func organizationUserFilterToPg(filter mdl.OrganizationUserFilter) pgorg.OrganizationUserFilter {
+	return pgorg.OrganizationUserFilter{ProjectID: filter.ProjectID}
+}
+
 func organizationFromPg(o pgorg.Organization) mdl.Organization {
 	return mdl.Organization{
 		ID:               o.ID,

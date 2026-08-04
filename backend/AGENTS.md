@@ -85,6 +85,9 @@ Table tests are a subtest structured as a data-driven loop; the naming rule abov
 - Each case has a `name` field used as the subtest name (`t.Run(tt.name, ...)`) — exceptions are rare.
 - No blank line between the slice declaration and the `for` loop.
 - Never use a `wantErr bool` field. Split success and error cases into separate functions named `TestXyz` and `TestXyz_error`.
+- When error cases assert a specific error identity, give every case a `want error` field, even when
+  all cases currently expect the same error. Keep each case self-contained and ready to accept a
+  different error later. Omit `want` only when the contract is that any non-nil error is sufficient.
 - Each test case struct field on its own line, using named fields.
 
 ### Error reporting

@@ -511,6 +511,7 @@ func seededSystemRoles() []pgrbac.SystemRole {
 				"custom-role:update",
 				"org:create",
 				"org:user-create",
+				"org:user-read",
 				"project:create",
 				"project:discover-all",
 				"system-role:assign",

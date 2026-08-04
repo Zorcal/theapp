@@ -208,6 +208,177 @@ func (x *CreateOrganizationUserRequest) GetEmail() string {
 	return ""
 }
 
+type OrganizationUserFilter struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Restrict results to organization members with effective access to this project.
+	ProjectId     int32 `protobuf:"varint,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OrganizationUserFilter) Reset() {
+	*x = OrganizationUserFilter{}
+	mi := &file_organization_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OrganizationUserFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OrganizationUserFilter) ProtoMessage() {}
+
+func (x *OrganizationUserFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_organization_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OrganizationUserFilter.ProtoReflect.Descriptor instead.
+func (*OrganizationUserFilter) Descriptor() ([]byte, []int) {
+	return file_organization_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *OrganizationUserFilter) GetProjectId() int32 {
+	if x != nil {
+		return x.ProjectId
+	}
+	return 0
+}
+
+type ListOrganizationUsersRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Maximum number of users to return. Defaults to 50 and is capped at 100.
+	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// Opaque token returned by the previous page.
+	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Optional criteria restricting the users returned.
+	Filter        *OrganizationUserFilter `protobuf:"bytes,3,opt,name=filter,proto3" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOrganizationUsersRequest) Reset() {
+	*x = ListOrganizationUsersRequest{}
+	mi := &file_organization_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOrganizationUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOrganizationUsersRequest) ProtoMessage() {}
+
+func (x *ListOrganizationUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organization_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOrganizationUsersRequest.ProtoReflect.Descriptor instead.
+func (*ListOrganizationUsersRequest) Descriptor() ([]byte, []int) {
+	return file_organization_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListOrganizationUsersRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListOrganizationUsersRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListOrganizationUsersRequest) GetFilter() *OrganizationUserFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+type ListOrganizationUsersResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Organization users in email order.
+	Users []*User `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	// Total number of users matching the filter, independent of pagination.
+	TotalSize int32 `protobuf:"varint,2,opt,name=total_size,json=totalSize,proto3" json:"total_size,omitempty"`
+	// Opaque token for the next page, or empty when this is the final page.
+	NextPageToken string `protobuf:"bytes,3,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOrganizationUsersResponse) Reset() {
+	*x = ListOrganizationUsersResponse{}
+	mi := &file_organization_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOrganizationUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOrganizationUsersResponse) ProtoMessage() {}
+
+func (x *ListOrganizationUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_organization_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOrganizationUsersResponse.ProtoReflect.Descriptor instead.
+func (*ListOrganizationUsersResponse) Descriptor() ([]byte, []int) {
+	return file_organization_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListOrganizationUsersResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+func (x *ListOrganizationUsersResponse) GetTotalSize() int32 {
+	if x != nil {
+		return x.TotalSize
+	}
+	return 0
+}
+
+func (x *ListOrganizationUsersResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 var File_organization_proto protoreflect.FileDescriptor
 
 const file_organization_proto_rawDesc = "" +
@@ -226,7 +397,20 @@ const file_organization_proto_rawDesc = "" +
 	"\forganization\x18\x01 \x01(\v2\x17.theapp.v1.OrganizationB\x03\xe0A\x02R\forganization\x12&\n" +
 	"\fproject_name\x18\x02 \x01(\tB\x03\xe0A\x02R\vprojectName\":\n" +
 	"\x1dCreateOrganizationUserRequest\x12\x19\n" +
-	"\x05email\x18\x01 \x01(\tB\x03\xe0A\x02R\x05email2\xbd\t\n" +
+	"\x05email\x18\x01 \x01(\tB\x03\xe0A\x02R\x05email\"7\n" +
+	"\x16OrganizationUserFilter\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\x05R\tprojectId\"\x95\x01\n" +
+	"\x1cListOrganizationUsersRequest\x12\x1b\n" +
+	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\x129\n" +
+	"\x06filter\x18\x03 \x01(\v2!.theapp.v1.OrganizationUserFilterR\x06filter\"\x8d\x01\n" +
+	"\x1dListOrganizationUsersResponse\x12%\n" +
+	"\x05users\x18\x01 \x03(\v2\x0f.theapp.v1.UserR\x05users\x12\x1d\n" +
+	"\n" +
+	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xc4\x0e\n" +
 	"\n" +
 	"OrgService\x12\x9a\x05\n" +
 	"\x12CreateOrganization\x12$.theapp.v1.CreateOrganizationRequest\x1a\x17.theapp.v1.Organization\"\xc4\x04\x92A\xa4\x04Jf\n" +
@@ -264,7 +448,25 @@ const file_organization_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.Statusr=\n" +
 	";\n" +
-	"\fx-project-id\x12'ID of the organization control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/organizations/usersB\xd7\x02\x92A\xa9\x01\x12\x1d\n" +
+	"\fx-project-id\x12'ID of the organization control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/organizations/users\x12\x84\x05\n" +
+	"\x15ListOrganizationUsers\x12'.theapp.v1.ListOrganizationUsersRequest\x1a(.theapp.v1.ListOrganizationUsersResponse\"\x97\x04\x92A\xf4\x03JT\n" +
+	"\x03400\x12M\n" +
+	"3Invalid pagination, filtering, or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ\x8d\x01\n" +
+	"\x03403\x12\x85\x01\n" +
+	"kOrganization-user read access is missing or the selected project is not the organization's control project.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJP\n" +
+	"\x03404\x12I\n" +
+	"/Filtered project not found in the organization.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Statusr=\n" +
+	";\n" +
+	"\fx-project-id\x12'ID of the organization control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/organizations/usersB\xd7\x02\x92A\xa9\x01\x12\x1d\n" +
 	"\x17theapp Organization API2\x02v1Zv\n" +
 	"t\n" +
 	"\n" +
@@ -287,27 +489,34 @@ func file_organization_proto_rawDescGZIP() []byte {
 	return file_organization_proto_rawDescData
 }
 
-var file_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_organization_proto_goTypes = []any{
 	(*Organization)(nil),                  // 0: theapp.v1.Organization
 	(*CreateOrganizationRequest)(nil),     // 1: theapp.v1.CreateOrganizationRequest
 	(*CreateOrganizationUserRequest)(nil), // 2: theapp.v1.CreateOrganizationUserRequest
-	(*timestamppb.Timestamp)(nil),         // 3: google.protobuf.Timestamp
-	(*User)(nil),                          // 4: theapp.v1.User
+	(*OrganizationUserFilter)(nil),        // 3: theapp.v1.OrganizationUserFilter
+	(*ListOrganizationUsersRequest)(nil),  // 4: theapp.v1.ListOrganizationUsersRequest
+	(*ListOrganizationUsersResponse)(nil), // 5: theapp.v1.ListOrganizationUsersResponse
+	(*timestamppb.Timestamp)(nil),         // 6: google.protobuf.Timestamp
+	(*User)(nil),                          // 7: theapp.v1.User
 }
 var file_organization_proto_depIdxs = []int32{
-	3, // 0: theapp.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
-	3, // 1: theapp.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
+	6, // 0: theapp.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
+	6, // 1: theapp.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
 	0, // 2: theapp.v1.CreateOrganizationRequest.organization:type_name -> theapp.v1.Organization
-	1, // 3: theapp.v1.OrgService.CreateOrganization:input_type -> theapp.v1.CreateOrganizationRequest
-	2, // 4: theapp.v1.OrgService.CreateOrganizationUser:input_type -> theapp.v1.CreateOrganizationUserRequest
-	0, // 5: theapp.v1.OrgService.CreateOrganization:output_type -> theapp.v1.Organization
-	4, // 6: theapp.v1.OrgService.CreateOrganizationUser:output_type -> theapp.v1.User
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	3, // 3: theapp.v1.ListOrganizationUsersRequest.filter:type_name -> theapp.v1.OrganizationUserFilter
+	7, // 4: theapp.v1.ListOrganizationUsersResponse.users:type_name -> theapp.v1.User
+	1, // 5: theapp.v1.OrgService.CreateOrganization:input_type -> theapp.v1.CreateOrganizationRequest
+	2, // 6: theapp.v1.OrgService.CreateOrganizationUser:input_type -> theapp.v1.CreateOrganizationUserRequest
+	4, // 7: theapp.v1.OrgService.ListOrganizationUsers:input_type -> theapp.v1.ListOrganizationUsersRequest
+	0, // 8: theapp.v1.OrgService.CreateOrganization:output_type -> theapp.v1.Organization
+	7, // 9: theapp.v1.OrgService.CreateOrganizationUser:output_type -> theapp.v1.User
+	5, // 10: theapp.v1.OrgService.ListOrganizationUsers:output_type -> theapp.v1.ListOrganizationUsersResponse
+	8, // [8:11] is the sub-list for method output_type
+	5, // [5:8] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_organization_proto_init() }
@@ -322,7 +531,7 @@ func file_organization_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_organization_proto_rawDesc), len(file_organization_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

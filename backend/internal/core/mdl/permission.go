@@ -63,6 +63,10 @@ const (
 	// PermissionOrgUserCreate authorizes creating a system user when needed and adding
 	// that user to the organization resolved from the request's control project.
 	PermissionOrgUserCreate Permission = "org:user-create"
+
+	// PermissionOrgUserRead authorizes listing users in the organization resolved from
+	// the request's control project.
+	PermissionOrgUserRead Permission = "org:user-read"
 )
 
 // All custom role service permissions. They authorize role management only within the organization
@@ -93,6 +97,7 @@ func AllPermissions() []Permission {
 		PermissionOrgCreate,
 		PermissionProjectCreate,
 		PermissionOrgUserCreate,
+		PermissionOrgUserRead,
 		PermissionCustomRoleCreate,
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
@@ -136,6 +141,7 @@ func PermissionsAssignableToCustomRoles() []Permission {
 		PermissionOrgCreate,
 		PermissionProjectCreate,
 		PermissionOrgUserCreate,
+		PermissionOrgUserRead,
 	}
 }
 
@@ -145,6 +151,7 @@ func OrganizationAdminPermissions() []Permission {
 	return []Permission{
 		PermissionProjectCreate,
 		PermissionOrgUserCreate,
+		PermissionOrgUserRead,
 		PermissionCustomRoleCreate,
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
@@ -172,7 +179,8 @@ func PermissionAssignmentScope(permission Permission) AssignmentScope {
 		PermissionCustomRoleUnassignOrg,
 		PermissionCustomRoleReadOrgAssignments,
 		PermissionProjectCreate,
-		PermissionOrgUserCreate:
+		PermissionOrgUserCreate,
+		PermissionOrgUserRead:
 		return AssignmentScopeOrganization
 	case PermissionCustomRoleAssignProject,
 		PermissionCustomRoleUnassignProject,

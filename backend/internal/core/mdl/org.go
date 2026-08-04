@@ -70,6 +70,11 @@ type ProjectFilter struct {
 	Name string
 }
 
+// OrganizationUserFilter specifies optional criteria for listing an organization's users.
+type OrganizationUserFilter struct {
+	ProjectID *int
+}
+
 // CreateProject holds the fields needed to create a new project.
 type CreateProject struct {
 	OrgID int

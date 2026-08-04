@@ -94,6 +94,89 @@
       }
     },
     "/v1/organizations/users": {
+      "get": {
+        "summary": "Lists users belonging to the organization selected through its control project.",
+        "operationId": "OrgService_ListOrganizationUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListOrganizationUsersResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination, filtering, or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization-user read access is missing or the selected project is not the organization's control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Filtered project not found in the organization.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of users to return. Defaults to 50 and is capped at 100.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Opaque token returned by the previous page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter.projectId",
+            "description": "Restrict results to organization members with effective access to this project.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the organization control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      },
       "post": {
         "summary": "Creates a system user when needed and adds that user to the organization selected through\nits control project.",
         "operationId": "OrgService_CreateOrganizationUser",
@@ -225,6 +308,28 @@
         "email"
       ]
     },
+    "v1ListOrganizationUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1User"
+          },
+          "description": "Organization users in email order."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of users matching the filter, independent of pagination."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Opaque token for the next page, or empty when this is the final page."
+        }
+      }
+    },
     "v1Organization": {
       "type": "object",
       "properties": {
@@ -258,6 +363,16 @@
         }
       },
       "description": "Organization represents a tenant."
+    },
+    "v1OrganizationUserFilter": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Restrict results to organization members with effective access to this project."
+        }
+      }
     },
     "v1User": {
       "type": "object",

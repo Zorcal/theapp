@@ -13,6 +13,7 @@ INSERT INTO rbac.permissions (name) VALUES
     ('org:create'),
     ('project:create'),
     ('org:user-create'),
+    ('org:user-read'),
     ('project:discover-all'),
     ('custom-role:create'),
     ('custom-role:read'),
@@ -92,6 +93,7 @@ SELECT pg_temp.sync_managed_role_permissions(
     ARRAY[
         ('project:create'),
         ('org:user-create'),
+        ('org:user-read'),
         ('custom-role:create'),
         ('custom-role:read'),
         ('custom-role:update'),

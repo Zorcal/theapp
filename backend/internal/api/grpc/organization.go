@@ -12,6 +12,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/validate"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/pkg/mustconv"
 )
 
 type organizationService struct {
@@ -34,6 +35,9 @@ type OrganizationCore interface {
 	// and adds that user to the authenticated organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	CreateOrganizationUser(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error)
+	// OrganizationUsers returns a page and total count of users in the authenticated organization.
+	// Returns [mdl.ErrNotFound] if the project filter selects a project outside the organization.
+	OrganizationUsers(ctx context.Context, filter mdl.OrganizationUserFilter, pageSize, pageOffset int) ([]mdl.User, int, error)
 }
 
 func (s *organizationService) CreateOrganizationUser(ctx context.Context, req *pb.CreateOrganizationUserRequest) (*pb.User, error) {
@@ -74,4 +78,48 @@ func (s *organizationService) CreateOrganization(ctx context.Context, req *pb.Cr
 	}
 
 	return conv.OrganizationToPB(org), nil
+}
+
+func (s *organizationService) ListOrganizationUsers(ctx context.Context, req *pb.ListOrganizationUsersRequest) (*pb.ListOrganizationUsersResponse, error) {
+	if err := validate.ListOrganizationUsers(req); err != nil {
+		return nil, fmt.Errorf("validate list organization users request: %w", err)
+	}
+
+	pageSize := int(req.GetPageSize())
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 50
+	}
+
+	pageToken, err := conv.DecodePageToken[*pb.OrganizationUserFilter](req.GetPageToken())
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", status.Error(codes.InvalidArgument, "invalid page_token"), err)
+	}
+
+	users, count, err := s.orgCore.OrganizationUsers(
+		ctx,
+		conv.OrganizationUserFilterFromPB(req.GetFilter()),
+		pageSize,
+		pageToken.Offset,
+	)
+	if err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "filtered project not found in organization")
+		}
+		return nil, fmt.Errorf("list organization users: %w", err)
+	}
+
+	var nextPageToken string
+	nextPageOffset := pageToken.Offset + pageSize
+	if nextPageOffset < count {
+		nextPageToken, err = conv.EncodePageToken(nextPageOffset, "", req.GetFilter())
+		if err != nil {
+			return nil, fmt.Errorf("encode next_page_token: %w", err)
+		}
+	}
+
+	return &pb.ListOrganizationUsersResponse{
+		Users:         conv.UsersToPB(users),
+		TotalSize:     mustconv.Int32(count),
+		NextPageToken: nextPageToken,
+	}, nil
 }

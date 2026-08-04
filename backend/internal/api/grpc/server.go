@@ -85,6 +85,7 @@ var systemControlProjectMethods = set.Set[string]{
 // organization's control project.
 var orgControlProjectMethods = set.Set[string]{
 	"/theapp.v1.OrgService/CreateOrganizationUser": {},
+	"/theapp.v1.OrgService/ListOrganizationUsers":  {},
 }
 
 // permissionRegistry maps every protected (non-public, see publicMethods) gRPC method to the
@@ -100,6 +101,7 @@ var permissionRegistry = map[string][]mdl.Permission{
 
 	"/theapp.v1.OrgService/CreateOrganization":     {mdl.PermissionOrgCreate},
 	"/theapp.v1.OrgService/CreateOrganizationUser": {mdl.PermissionOrgUserCreate},
+	"/theapp.v1.OrgService/ListOrganizationUsers":  {mdl.PermissionOrgUserRead},
 
 	"/theapp.v1.UserService/GetUser":    {mdl.PermissionUserRead},
 	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},

@@ -162,6 +162,36 @@ service OrgService {
       }
     };
   }
+
+  // Lists users belonging to the organization selected through its control project.
+  rpc ListOrganizationUsers(ListOrganizationUsersRequest) returns (ListOrganizationUsersResponse) {
+    option (google.api.http) = {get: "/v1/organizations/users"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {description: "Invalid pagination, filtering, or project metadata." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      responses: {
+        key: "401"
+        value: {description: "Missing or invalid credentials." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      responses: {
+        key: "403"
+        value: {description: "Organization-user read access is missing or the selected project is not the organization's control project." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      responses: {
+        key: "404"
+        value: {description: "Filtered project not found in the organization." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      responses: {
+        key: "500"
+        value: {description: "Unexpected server error." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      parameters: {
+        headers: {name: "x-project-id" description: "ID of the organization control project." type: INTEGER required: true}
+      }
+    };
+  }
 }
 
 // Organization represents a tenant.
@@ -195,4 +225,31 @@ message CreateOrganizationRequest {
 message CreateOrganizationUserRequest {
   // Email address identifying the system user.
   string email = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message OrganizationUserFilter {
+  // Restrict results to organization members with effective access to this project.
+  int32 project_id = 1;
+}
+
+message ListOrganizationUsersRequest {
+  // Maximum number of users to return. Defaults to 50 and is capped at 100.
+  int32 page_size = 1;
+
+  // Opaque token returned by the previous page.
+  string page_token = 2;
+
+  // Optional criteria restricting the users returned.
+  OrganizationUserFilter filter = 3;
+}
+
+message ListOrganizationUsersResponse {
+  // Organization users in email order.
+  repeated User users = 1;
+
+  // Total number of users matching the filter, independent of pagination.
+  int32 total_size = 2;
+
+  // Opaque token for the next page, or empty when this is the final page.
+  string next_page_token = 3;
 }

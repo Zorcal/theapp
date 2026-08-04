@@ -8,11 +8,39 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
 type Store struct {
 	pool *pgxpool.Pool
+}
+
+// OrganizationUsers returns a page and total count of organization members matching filter.
+// Returns [sql.ErrNoRows] if filter selects a project outside the organization.
+func (s *Store) OrganizationUsers(ctx context.Context, orgID int, filter OrganizationUserFilter, pageSize, pageOffset int) ([]pguser.User, int, error) {
+	usersQ := organizationUsersQuery(orgID, filter, pageSize, pageOffset)
+	countQ := organizationUserCountQuery(orgID, filter)
+
+	var (
+		users []pguser.User
+		count int
+	)
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := usersQ.QueueMany(ctx, b, &users); err != nil {
+			return fmt.Errorf("organization users: %w", err)
+		}
+		if err := countQ.Queue(ctx, b, &count); err != nil {
+			return fmt.Errorf("organization user count: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return nil, 0, err
+	}
+
+	return users, count, nil
 }
 
 func NewStore(pool *pgxpool.Pool) *Store {

@@ -221,6 +221,115 @@ func TestStore_AddOrganizationMember_error(t *testing.T) {
 	})
 }
 
+func TestStore_OrganizationUsers(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+	userStore := pguser.NewStore(pool)
+	rbacStore := pgrbac.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "organization-users")
+	project := seedProject(t, orgStore, org.ID, "project")
+	emptyProject := seedProject(t, orgStore, org.ID, "empty project")
+	firstUser := seedUser(t, userStore, "a-member@test.com")
+	secondUser := seedUser(t, userStore, "b-member@test.com")
+	otherUser := seedUser(t, userStore, "other-member@test.com")
+	seedOrgMembership(t, pool, firstUser.ID, org.ID)
+	seedOrgMembership(t, pool, secondUser.ID, org.ID)
+	otherOrg := seedOrg(t, orgStore, "other-organization-users")
+	seedOrgMembership(t, pool, otherUser.ID, otherOrg.ID)
+	// Give only the second target-organization member effective access to the filtered project.
+	role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "project role"})
+	seedProjectRoleAssignment(t, ctx, rbacStore, secondUser.ExternalID, role.ExternalID, project.ID)
+
+	tests := []struct {
+		name       string
+		filter     pgorg.OrganizationUserFilter
+		pageSize   int
+		pageOffset int
+		want       []pguser.User
+		wantCount  int
+	}{
+		{
+			name:      "all members",
+			pageSize:  10,
+			want:      []pguser.User{firstUser, secondUser},
+			wantCount: 2,
+		},
+		{
+			name:       "pagination",
+			pageSize:   1,
+			pageOffset: 1,
+			want:       []pguser.User{secondUser},
+			wantCount:  2,
+		},
+		{
+			name:      "project access",
+			filter:    pgorg.OrganizationUserFilter{ProjectID: new(project.ID)},
+			pageSize:  10,
+			want:      []pguser.User{secondUser},
+			wantCount: 1,
+		},
+		{
+			name:      "project without access",
+			filter:    pgorg.OrganizationUserFilter{ProjectID: new(emptyProject.ID)},
+			pageSize:  10,
+			want:      []pguser.User{},
+			wantCount: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, count, err := orgStore.OrganizationUsers(ctx, org.ID, tt.filter, tt.pageSize, tt.pageOffset)
+			if err != nil {
+				t.Fatalf("OrganizationUsers() error = %v", err)
+			}
+
+			testingx.AssertDiff(t, got, tt.want)
+
+			if count != tt.wantCount {
+				t.Errorf("OrganizationUsers() count = %d, want %d", count, tt.wantCount)
+			}
+		})
+	}
+}
+
+func TestStore_OrganizationUsers_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	orgStore := pgorg.NewStore(pool)
+
+	org := seedOrg(t, orgStore, "organization-users-errors")
+	otherOrg := seedOrg(t, orgStore, "other-organization-users-errors")
+	otherProject := seedProject(t, orgStore, otherOrg.ID, "project")
+
+	tests := []struct {
+		name      string
+		projectID int
+		want      error
+	}{
+		{
+			name:      "unknown project",
+			projectID: 999999,
+			want:      sql.ErrNoRows,
+		},
+		{
+			name:      "project in another org",
+			projectID: otherProject.ID,
+			want:      sql.ErrNoRows,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := orgStore.OrganizationUsers(ctx, org.ID, pgorg.OrganizationUserFilter{ProjectID: new(tt.projectID)}, 10, 0)
+
+			if !errors.Is(err, tt.want) {
+				t.Errorf("OrganizationUsers(project ID %d) error = %v, want %v", tt.projectID, err, tt.want)
+			}
+		})
+	}
+}
+
 func TestStore_EnsureOrganizationMember(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
@@ -239,7 +348,6 @@ func TestStore_EnsureOrganizationMember(t *testing.T) {
 	}
 
 	// Ensuring an existing membership is a no-op.
-
 	if err := orgStore.EnsureOrganizationMember(ctx, user.ExternalID, org.ID); err != nil {
 		t.Fatalf("EnsureOrganizationMember() existing membership error = %v, want nil", err)
 	}

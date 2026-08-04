@@ -39,6 +39,9 @@ type OrgStorer interface {
 	// EnsureOrganizationMember adds a user to an organization when the membership does not exist.
 	// Returns [sql.ErrNoRows] if the user or organization does not exist.
 	EnsureOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error
+	// OrganizationUsers returns a page and total count of organization members matching filter.
+	// Returns [sql.ErrNoRows] if filter selects a project outside the organization.
+	OrganizationUsers(ctx context.Context, orgID int, filter pgorg.OrganizationUserFilter, pageSize, pageOffset int) ([]pguser.User, int, error)
 	// OrganizationByName returns the organization with the given name.
 	// Returns [sql.ErrNoRows] if no such organization exists.
 	OrganizationByName(ctx context.Context, name string) (pgorg.Organization, error)
@@ -254,6 +257,28 @@ func (c *Core) CreateOrganizationUser(ctx context.Context, cou mdl.CreateOrganiz
 	}
 
 	return userFromPg(pgUser), nil
+}
+
+// OrganizationUsers returns a page and total count of users in the authenticated organization.
+// Returns [mdl.ErrNotFound] if the project filter selects a project outside the organization.
+func (c *Core) OrganizationUsers(ctx context.Context, filter mdl.OrganizationUserFilter, pageSize, pageOffset int) ([]mdl.User, int, error) {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return nil, 0, errors.New("auth session missing")
+	}
+	if sess.Project == nil {
+		return nil, 0, errors.New("project context missing")
+	}
+
+	users, count, err := c.orgStorer.OrganizationUsers(ctx, sess.Project.OrgID, organizationUserFilterToPg(filter), pageSize, pageOffset)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, mdl.ErrNotFound
+		}
+		return nil, 0, fmt.Errorf("organization users: %w", err)
+	}
+
+	return usersFromPg(users), count, nil
 }
 
 // ProjectByName returns the project named name owned by orgID.

@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	OrgService_CreateOrganization_FullMethodName     = "/theapp.v1.OrgService/CreateOrganization"
 	OrgService_CreateOrganizationUser_FullMethodName = "/theapp.v1.OrgService/CreateOrganizationUser"
+	OrgService_ListOrganizationUsers_FullMethodName  = "/theapp.v1.OrgService/ListOrganizationUsers"
 )
 
 // OrgServiceClient is the client API for OrgService service.
@@ -34,6 +35,8 @@ type OrgServiceClient interface {
 	// Creates a system user when needed and adds that user to the organization selected through
 	// its control project.
 	CreateOrganizationUser(ctx context.Context, in *CreateOrganizationUserRequest, opts ...grpc.CallOption) (*User, error)
+	// Lists users belonging to the organization selected through its control project.
+	ListOrganizationUsers(ctx context.Context, in *ListOrganizationUsersRequest, opts ...grpc.CallOption) (*ListOrganizationUsersResponse, error)
 }
 
 type orgServiceClient struct {
@@ -64,6 +67,16 @@ func (c *orgServiceClient) CreateOrganizationUser(ctx context.Context, in *Creat
 	return out, nil
 }
 
+func (c *orgServiceClient) ListOrganizationUsers(ctx context.Context, in *ListOrganizationUsersRequest, opts ...grpc.CallOption) (*ListOrganizationUsersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOrganizationUsersResponse)
+	err := c.cc.Invoke(ctx, OrgService_ListOrganizationUsers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrgServiceServer is the server API for OrgService service.
 // All implementations should embed UnimplementedOrgServiceServer
 // for forward compatibility.
@@ -75,6 +88,8 @@ type OrgServiceServer interface {
 	// Creates a system user when needed and adds that user to the organization selected through
 	// its control project.
 	CreateOrganizationUser(context.Context, *CreateOrganizationUserRequest) (*User, error)
+	// Lists users belonging to the organization selected through its control project.
+	ListOrganizationUsers(context.Context, *ListOrganizationUsersRequest) (*ListOrganizationUsersResponse, error)
 }
 
 // UnimplementedOrgServiceServer should be embedded to have
@@ -89,6 +104,9 @@ func (UnimplementedOrgServiceServer) CreateOrganization(context.Context, *Create
 }
 func (UnimplementedOrgServiceServer) CreateOrganizationUser(context.Context, *CreateOrganizationUserRequest) (*User, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateOrganizationUser not implemented")
+}
+func (UnimplementedOrgServiceServer) ListOrganizationUsers(context.Context, *ListOrganizationUsersRequest) (*ListOrganizationUsersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOrganizationUsers not implemented")
 }
 func (UnimplementedOrgServiceServer) testEmbeddedByValue() {}
 
@@ -146,6 +164,24 @@ func _OrgService_CreateOrganizationUser_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrgService_ListOrganizationUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOrganizationUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrgServiceServer).ListOrganizationUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrgService_ListOrganizationUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrgServiceServer).ListOrganizationUsers(ctx, req.(*ListOrganizationUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrgService_ServiceDesc is the grpc.ServiceDesc for OrgService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -160,6 +196,10 @@ var OrgService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateOrganizationUser",
 			Handler:    _OrgService_CreateOrganizationUser_Handler,
+		},
+		{
+			MethodName: "ListOrganizationUsers",
+			Handler:    _OrgService_ListOrganizationUsers_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

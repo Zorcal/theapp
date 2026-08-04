@@ -4,7 +4,11 @@ import (
 	"strings"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
@@ -61,5 +65,26 @@ func CreateOrganizationUser(req *pb.CreateOrganizationUserRequest) error {
 			Field: "email", Description: "must be a valid email address",
 		})
 	}
+	return nil
+}
+
+func ListOrganizationUsers(req *pb.ListOrganizationUsersRequest) error {
+	if req == nil {
+		return requiredRequest("request")
+	}
+	if req.GetFilter().GetProjectId() < 0 {
+		return invalidArgument(&errdetails.BadRequest_FieldViolation{
+			Field: "filter.project_id", Description: "must not be negative",
+		})
+	}
+
+	pageToken, err := conv.DecodePageToken[*pb.OrganizationUserFilter](req.GetPageToken())
+	if err != nil {
+		return status.Error(codes.InvalidArgument, "invalid page_token")
+	}
+	if req.GetPageToken() != "" && !proto.Equal(pageToken.Filter, req.GetFilter()) {
+		return status.Error(codes.InvalidArgument, "page_token filter mismatch")
+	}
+
 	return nil
 }

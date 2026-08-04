@@ -41,6 +41,9 @@ var _ OrgStorer = &MockedOrgStorer{}
 //			OrganizationByNameFunc: func(ctx context.Context, name string) (pgorg.Organization, error) {
 //				panic("mock out the OrganizationByName method")
 //			},
+//			OrganizationUsersFunc: func(ctx context.Context, orgID int, filter pgorg.OrganizationUserFilter, pageSize int, pageOffset int) ([]pguser.User, int, error) {
+//				panic("mock out the OrganizationUsers method")
+//			},
 //			ProjectByNameFunc: func(ctx context.Context, orgID int, name string) (pgorg.Project, error) {
 //				panic("mock out the ProjectByName method")
 //			},
@@ -68,6 +71,9 @@ type MockedOrgStorer struct {
 
 	// OrganizationByNameFunc mocks the OrganizationByName method.
 	OrganizationByNameFunc func(ctx context.Context, name string) (pgorg.Organization, error)
+
+	// OrganizationUsersFunc mocks the OrganizationUsers method.
+	OrganizationUsersFunc func(ctx context.Context, orgID int, filter pgorg.OrganizationUserFilter, pageSize int, pageOffset int) ([]pguser.User, int, error)
 
 	// ProjectByNameFunc mocks the ProjectByName method.
 	ProjectByNameFunc func(ctx context.Context, orgID int, name string) (pgorg.Project, error)
@@ -126,6 +132,19 @@ type MockedOrgStorer struct {
 			// Name is the name argument value.
 			Name string
 		}
+		// OrganizationUsers holds details about calls to the OrganizationUsers method.
+		OrganizationUsers []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// OrgID is the orgID argument value.
+			OrgID int
+			// Filter is the filter argument value.
+			Filter pgorg.OrganizationUserFilter
+			// PageSize is the pageSize argument value.
+			PageSize int
+			// PageOffset is the pageOffset argument value.
+			PageOffset int
+		}
 		// ProjectByName holds details about calls to the ProjectByName method.
 		ProjectByName []struct {
 			// Ctx is the ctx argument value.
@@ -142,6 +161,7 @@ type MockedOrgStorer struct {
 	lockCreateProject            sync.RWMutex
 	lockEnsureOrganizationMember sync.RWMutex
 	lockOrganizationByName       sync.RWMutex
+	lockOrganizationUsers        sync.RWMutex
 	lockProjectByName            sync.RWMutex
 }
 
@@ -378,6 +398,54 @@ func (mock *MockedOrgStorer) OrganizationByNameCalls() []struct {
 	mock.lockOrganizationByName.RLock()
 	calls = mock.calls.OrganizationByName
 	mock.lockOrganizationByName.RUnlock()
+	return calls
+}
+
+// OrganizationUsers calls OrganizationUsersFunc.
+func (mock *MockedOrgStorer) OrganizationUsers(ctx context.Context, orgID int, filter pgorg.OrganizationUserFilter, pageSize int, pageOffset int) ([]pguser.User, int, error) {
+	if mock.OrganizationUsersFunc == nil {
+		panic("MockedOrgStorer.OrganizationUsersFunc: method is nil but OrgStorer.OrganizationUsers was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		OrgID      int
+		Filter     pgorg.OrganizationUserFilter
+		PageSize   int
+		PageOffset int
+	}{
+		Ctx:        ctx,
+		OrgID:      orgID,
+		Filter:     filter,
+		PageSize:   pageSize,
+		PageOffset: pageOffset,
+	}
+	mock.lockOrganizationUsers.Lock()
+	mock.calls.OrganizationUsers = append(mock.calls.OrganizationUsers, callInfo)
+	mock.lockOrganizationUsers.Unlock()
+	return mock.OrganizationUsersFunc(ctx, orgID, filter, pageSize, pageOffset)
+}
+
+// OrganizationUsersCalls gets all the calls that were made to OrganizationUsers.
+// Check the length with:
+//
+//	len(mockedOrgStorer.OrganizationUsersCalls())
+func (mock *MockedOrgStorer) OrganizationUsersCalls() []struct {
+	Ctx        context.Context
+	OrgID      int
+	Filter     pgorg.OrganizationUserFilter
+	PageSize   int
+	PageOffset int
+} {
+	var calls []struct {
+		Ctx        context.Context
+		OrgID      int
+		Filter     pgorg.OrganizationUserFilter
+		PageSize   int
+		PageOffset int
+	}
+	mock.lockOrganizationUsers.RLock()
+	calls = mock.calls.OrganizationUsers
+	mock.lockOrganizationUsers.RUnlock()
 	return calls
 }
 

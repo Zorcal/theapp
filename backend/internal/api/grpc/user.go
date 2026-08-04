@@ -9,7 +9,6 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
@@ -120,16 +119,6 @@ func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (
 	}
 
 	filter := conv.UserFilterFromPB(req.GetFilter())
-
-	// Validate caller hasn't changed sorting or filter criteria mid-pagination.
-	if req.GetPageToken() != "" {
-		if pageToken.OrderBy != req.GetOrderBy() {
-			return nil, status.Errorf(codes.InvalidArgument, "page_token order_by mismatch")
-		}
-		if !proto.Equal(pageToken.Filter, req.GetFilter()) {
-			return nil, status.Errorf(codes.InvalidArgument, "page_token filter mismatch")
-		}
-	}
 
 	usrs, totalCount, err := s.userCore.Users(ctx, filter, orderBys, pageSize, pageToken.Offset)
 	if err != nil {
