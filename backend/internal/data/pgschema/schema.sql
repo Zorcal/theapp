@@ -88,27 +88,32 @@ CREATE FUNCTION rbac.accessible_project_ids(target_user_id integer) RETURNS TABL
     LANGUAGE sql STABLE STRICT
     AS $_$
     SELECT assignment.project_id
-    FROM rbac.project_role_assignments AS assignment
-    WHERE assignment.user_id = $1
+    FROM useraccess.users AS usr
+    JOIN rbac.project_role_assignments AS assignment ON assignment.user_id = usr.id
+    WHERE usr.id = $1 AND usr.deleted_at IS NULL
 
     UNION
 
     SELECT project.id
-    FROM rbac.org_role_assignments AS assignment
+    FROM useraccess.users AS usr
+    JOIN rbac.org_role_assignments AS assignment ON assignment.user_id = usr.id
     JOIN org.projects AS project ON project.org_id = assignment.org_id
-    WHERE assignment.user_id = $1
+    WHERE usr.id = $1 AND usr.deleted_at IS NULL
 
     UNION
 
     SELECT project.id
-    FROM org.projects AS project
-    WHERE EXISTS (
-        SELECT 1
-        FROM rbac.system_permission_ids($1) AS granted
-        JOIN rbac.permissions AS permission
-            ON permission.id = granted.permission_id
-            AND permission.name = 'project:discover-all'
-    )
+    FROM useraccess.users AS usr
+    CROSS JOIN org.projects AS project
+    WHERE usr.id = $1
+        AND usr.deleted_at IS NULL
+        AND EXISTS (
+            SELECT 1
+            FROM rbac.system_permission_ids($1) AS granted
+            JOIN rbac.permissions AS permission
+                ON permission.id = granted.permission_id
+                AND permission.name = 'project:discover-all'
+        )
 $_$;
 
 
@@ -120,9 +125,11 @@ CREATE FUNCTION rbac.org_permission_ids(target_user_id integer, target_org_id in
     LANGUAGE sql STABLE STRICT
     AS $_$
     SELECT role_permission.permission_id
-    FROM rbac.org_role_assignments AS assignment
+    FROM useraccess.users AS usr
+    JOIN rbac.org_role_assignments AS assignment ON assignment.user_id = usr.id
     JOIN rbac.custom_role_permissions AS role_permission ON role_permission.role_id = assignment.role_id
-    WHERE assignment.user_id = $1
+    WHERE usr.id = $1
+        AND usr.deleted_at IS NULL
         AND assignment.org_id = $2
 
     UNION
@@ -140,9 +147,11 @@ CREATE FUNCTION rbac.project_permission_ids(target_user_id integer, target_proje
     LANGUAGE sql STABLE STRICT
     AS $_$
     SELECT role_permission.permission_id
-    FROM rbac.project_role_assignments AS assignment
+    FROM useraccess.users AS usr
+    JOIN rbac.project_role_assignments AS assignment ON assignment.user_id = usr.id
     JOIN rbac.custom_role_permissions AS role_permission ON role_permission.role_id = assignment.role_id
-    WHERE assignment.user_id = $1
+    WHERE usr.id = $1
+        AND usr.deleted_at IS NULL
         AND assignment.project_id = $2
 
     UNION
@@ -192,9 +201,10 @@ CREATE FUNCTION rbac.system_permission_ids(target_user_id integer) RETURNS TABLE
     LANGUAGE sql STABLE STRICT
     AS $_$
     SELECT DISTINCT role_permission.permission_id
-    FROM rbac.system_role_assignments AS assignment
+    FROM useraccess.users AS usr
+    JOIN rbac.system_role_assignments AS assignment ON assignment.user_id = usr.id
     JOIN rbac.system_role_permissions AS role_permission ON role_permission.role_id = assignment.role_id
-    WHERE assignment.user_id = $1
+    WHERE usr.id = $1 AND usr.deleted_at IS NULL
 $_$;
 
 
@@ -520,6 +530,7 @@ CREATE TABLE useraccess.users (
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone,
     email_verified_at timestamp with time zone,
+    deleted_at timestamp with time zone,
     etag uuid NOT NULL
 );
 

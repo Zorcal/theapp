@@ -261,6 +261,10 @@ func (noopUserCore) UpdateUser(_ context.Context, _ mdl.UpdateUser) (mdl.User, e
 	return mdl.User{}, nil
 }
 
+func (noopUserCore) DeleteUser(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
 type noopAuthCore struct{}
 
 func (noopAuthCore) VerifyMagicLink(_ context.Context, _ mdl.VerifyMagicLink) (mdl.AuthTokenPair, error) {

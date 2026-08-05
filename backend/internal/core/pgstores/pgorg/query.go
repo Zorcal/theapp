@@ -48,7 +48,7 @@ func organizationUsersQuery(orgID int, filter OrganizationUserFilter, pageSize, 
 	}
 	sql := fmt.Sprintf(`
 		SELECT usr.id, usr.external_id, usr.email, usr.name, usr.email_verified_at,
-		       usr.created_at, usr.updated_at, usr.etag
+		       usr.created_at, usr.updated_at, usr.deleted_at, usr.etag
 		FROM org.organizations AS organization
 		JOIN org.org_membership AS membership ON membership.org_id = organization.id
 		JOIN useraccess.users AS usr ON usr.id = membership.user_id
@@ -109,6 +109,7 @@ func organizationUsersScopeWhereClause(filter OrganizationUserFilter, params pgx
 func organizationUsersWhereClause(filter OrganizationUserFilter, params pgx.NamedArgs) string {
 	clauses := []string{
 		"organization.id = @org_id",
+		"usr.deleted_at IS NULL",
 	}
 
 	if filter.ProjectID != nil {
@@ -189,6 +190,7 @@ func addOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[int
 		CROSS JOIN useraccess.users AS usr
 		WHERE organization.id = @org_id
 			AND usr.external_id = @user_id
+			AND usr.deleted_at IS NULL
 		RETURNING org_id`
 
 	return pgdb.TypedQuery[int]{
@@ -210,7 +212,9 @@ func ensureOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[
 				SELECT organization.id AS org_id, usr.id AS user_id
 				FROM org.organizations AS organization
 				CROSS JOIN useraccess.users AS usr
-				WHERE organization.id = @org_id AND usr.external_id = @user_id
+				WHERE organization.id = @org_id
+					AND usr.external_id = @user_id
+					AND usr.deleted_at IS NULL
 			),
 			inserted AS (
 				INSERT INTO org.org_membership (org_id, user_id)
@@ -242,7 +246,7 @@ func accessibleProjectsQuery(userID uuid.UUID, filter ProjectFilter, pageSize, p
 			target_user AS (
 				SELECT id
 				FROM useraccess.users
-				WHERE external_id = @user_id
+				WHERE external_id = @user_id AND deleted_at IS NULL
 			)
 		SELECT project.id, project.org_id, project.name, project.is_control, project.created_at, project.updated_at, project.etag
 		FROM target_user AS target
@@ -272,7 +276,7 @@ func accessibleProjectCountQuery(userID uuid.UUID, filter ProjectFilter) pgdb.Ty
 			target_user AS (
 				SELECT id
 				FROM useraccess.users
-				WHERE external_id = @user_id
+				WHERE external_id = @user_id AND deleted_at IS NULL
 			)
 		SELECT count(project.id)
 		FROM target_user AS target

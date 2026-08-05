@@ -16,7 +16,7 @@ func projectPermissionsQuery(userID uuid.UUID, projectID int) pgdb.TypedQuery[Pr
 			proj.org_id,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names
 		FROM org.projects AS proj
-		JOIN useraccess.users AS u ON u.external_id = @user_id
+		JOIN useraccess.users AS u ON u.external_id = @user_id AND u.deleted_at IS NULL
 		LEFT JOIN LATERAL rbac.project_permission_ids(u.id, proj.id) AS granted ON true
 		LEFT JOIN rbac.permissions AS p ON p.id = granted.permission_id
 		WHERE proj.id = @project_id
@@ -40,7 +40,7 @@ func orgPermissionsByProjectIDQuery(userID uuid.UUID, projectID int) pgdb.TypedQ
 			proj.org_id,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names
 		FROM org.projects AS proj
-		JOIN useraccess.users AS u ON u.external_id = @user_id
+		JOIN useraccess.users AS u ON u.external_id = @user_id AND u.deleted_at IS NULL
 		LEFT JOIN LATERAL rbac.org_permission_ids(u.id, proj.org_id) AS granted ON true
 		LEFT JOIN rbac.permissions AS p ON p.id = granted.permission_id
 		WHERE proj.id = @project_id

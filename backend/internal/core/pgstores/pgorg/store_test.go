@@ -236,6 +236,10 @@ func TestStore_OrganizationUsers(t *testing.T) {
 	otherUser := seedUser(t, userStore, "other-member@test.com")
 	seedOrgMembership(t, pool, firstUser.ID, org.ID)
 	seedOrgMembership(t, pool, secondUser.ID, org.ID)
+	softDeletedUser := seedUser(t, userStore, "deleted-member@test.com")
+	seedOrgMembership(t, pool, softDeletedUser.ID, org.ID)
+	mustSoftDeleteUser(t, userStore, softDeletedUser.ExternalID)
+
 	otherOrg := seedOrg(t, orgStore, "other-organization-users")
 	seedOrgMembership(t, pool, otherUser.ID, otherOrg.ID)
 	// Give only the second target-organization member effective access to the filtered project.
@@ -763,6 +767,14 @@ func seedUser(t *testing.T, orgStore *pguser.Store, email string) pguser.User {
 	}
 
 	return user
+}
+
+func mustSoftDeleteUser(t *testing.T, userStore *pguser.Store, userID uuid.UUID) {
+	t.Helper()
+
+	if err := userStore.SoftDeleteUser(t.Context(), userID); err != nil {
+		t.Fatalf("soft delete user %s: %v", userID, err)
+	}
 }
 
 func seedOrgMembership(t *testing.T, pool *pgxpool.Pool, userID, orgID int) {

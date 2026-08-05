@@ -251,7 +251,9 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 ## Phase 21 — soft delete for users
 
 52. Migration: `deleted_at` on `users`, plus the user soft-delete operation and its `user:delete` permission. The delete runs in the same transaction as the global recovery check, takes the system-role-management lock, and rejects deleting a user when no other active user would retain every registered permission through system-scoped assignments.
+	**This task is complete.**
 53. Exclude soft-deleted users (`deleted_at IS NULL`) from all three legs of the resolver (24) and from the fully privileged system-user recovery check. Retained system-role assignment rows do not make a soft-deleted user a valid recovery administrator. Depends on 24, 39, 52.
+	**This task is complete.**
 54. CI test (real Postgres): a soft-deleted user with live rows in all three assignment tables resolves to zero permissions and does not satisfy the global recovery invariant. Cover rejection of deleting the final fully privileged active user and success when another such user remains. Depends on 53.
 
 **Checkpoint:** the CI test in task 54 passes.

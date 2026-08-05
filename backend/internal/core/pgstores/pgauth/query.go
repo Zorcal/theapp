@@ -32,6 +32,7 @@ func authSessionDataQuery(userID uuid.UUID, projectID *int) pgdb.TypedQuery[Auth
 		LEFT JOIN org.projects AS p ON p.id = @project_id
 		LEFT JOIN org.organizations AS o ON o.id = p.org_id
 		WHERE u.external_id = @user_id
+		  AND u.deleted_at IS NULL
 		  AND (@project_id::BIGINT IS NULL OR p.id IS NOT NULL)`
 
 	return pgdb.TypedQuery[AuthSessionData]{
@@ -55,12 +56,12 @@ func createMagicLinkTokenQuery(cm CreateMagicLinkToken) pgdb.TypedQuery[MagicLin
 			INSERT INTO useraccess.magic_link_tokens (user_id, token_hash, expires_at)
 			SELECT id, @token_hash, @expires_at
 			FROM useraccess.users
-			WHERE id = @user_id
+			WHERE id = @user_id AND deleted_at IS NULL
 			RETURNING id, user_id, expires_at, created_at
 		)
 		SELECT ins.id, ins.user_id, u.external_id AS user_external_id, ins.expires_at, ins.created_at
 		FROM ins
-		JOIN useraccess.users AS u ON u.id = ins.user_id`
+		JOIN useraccess.users AS u ON u.id = ins.user_id AND u.deleted_at IS NULL`
 
 	return pgdb.TypedQuery[MagicLinkToken]{
 		SQL:    sql,
@@ -75,7 +76,7 @@ func magicLinkTokenByHashQuery(hash string) pgdb.TypedQuery[MagicLinkToken] {
 	const sql = `
 		SELECT mlt.id, mlt.user_id, u.external_id AS user_external_id, mlt.expires_at, mlt.created_at
 		FROM useraccess.magic_link_tokens AS mlt
-		JOIN useraccess.users AS u ON u.id = mlt.user_id
+		JOIN useraccess.users AS u ON u.id = mlt.user_id AND u.deleted_at IS NULL
 		WHERE mlt.token_hash = @token_hash
 		  AND mlt.used_at IS NULL
 		  AND mlt.expires_at > NOW()`
@@ -163,12 +164,12 @@ func createRefreshTokenQuery(cr CreateRefreshToken) pgdb.TypedQuery[RefreshToken
 			INSERT INTO useraccess.refresh_tokens (user_id, token_hash, expires_at)
 			SELECT id, @token_hash, @expires_at
 			FROM useraccess.users
-			WHERE id = @user_id
+			WHERE id = @user_id AND deleted_at IS NULL
 			RETURNING id, user_id, expires_at, created_at
 		)
 		SELECT ins.id, ins.user_id, u.external_id AS user_external_id, ins.expires_at, ins.created_at
 		FROM ins
-		JOIN useraccess.users AS u ON u.id = ins.user_id`
+		JOIN useraccess.users AS u ON u.id = ins.user_id AND u.deleted_at IS NULL`
 
 	return pgdb.TypedQuery[RefreshToken]{
 		SQL:    sql,
@@ -192,6 +193,7 @@ func consumeRefreshTokenQuery(hash string) pgdb.TypedQuery[RefreshToken] {
 		  AND rt.revoked_at IS NULL
 		  AND rt.expires_at > NOW()
 		  AND u.id = rt.user_id
+		  AND u.deleted_at IS NULL
 		RETURNING rt.id, rt.user_id, u.external_id AS user_external_id, rt.expires_at, rt.created_at`
 
 	return pgdb.TypedQuery[RefreshToken]{
@@ -204,6 +206,8 @@ func consumeRefreshTokenQuery(hash string) pgdb.TypedQuery[RefreshToken] {
 
 func revokeAllUserRefreshTokensQuery(userExternalID uuid.UUID) pgdb.TypedQuery[int] {
 	params := pgx.NamedArgs{"external_id": userExternalID}
+	// Revocation is credential cleanup, not active-user resolution. It must continue to address
+	// the retained user row after soft deletion.
 	const sql = `
 		UPDATE useraccess.refresh_tokens AS rt
 		SET revoked_at = NOW()

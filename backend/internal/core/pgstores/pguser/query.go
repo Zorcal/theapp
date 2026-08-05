@@ -14,9 +14,9 @@ import (
 func userByEmailQuery(email string) pgdb.TypedQuery[User] {
 	params := pgx.NamedArgs{"email": email}
 	const sql = `
-		SELECT id, external_id, email, name, email_verified_at, created_at, updated_at, etag
+		SELECT id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag
 		FROM useraccess.users
-		WHERE email = @email`
+		WHERE email = @email AND deleted_at IS NULL`
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,
@@ -31,9 +31,9 @@ func userByExternalIDQuery(id uuid.UUID) pgdb.TypedQuery[User] {
 		"external_id": id,
 	}
 	const sql = `
-		SELECT id, external_id, email, name, email_verified_at, created_at, updated_at, etag
+		SELECT id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag
 		FROM useraccess.users
-		WHERE external_id = @external_id`
+		WHERE external_id = @external_id AND deleted_at IS NULL`
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,
@@ -49,7 +49,8 @@ func getOrCreateUserByEmailQuery(email string) pgdb.TypedQuery[User] {
 		INSERT INTO useraccess.users (external_id, email, name, created_at, etag)
 		VALUES (gen_random_uuid(), @email, '', NOW(), gen_random_uuid())
 		ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, etag`
+		WHERE useraccess.users.deleted_at IS NULL
+		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag`
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,
@@ -67,7 +68,7 @@ func createUserQuery(cu CreateUser) pgdb.TypedQuery[User] {
 	const sql = `
 		INSERT INTO useraccess.users (external_id, email, name, created_at, etag)
 		VALUES (gen_random_uuid(), @email, @name, NOW(), gen_random_uuid())
-		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, etag`
+		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag`
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,
@@ -91,8 +92,8 @@ func updateUserQuery(uu UpdateUser) pgdb.TypedQuery[User] {
 	sql := fmt.Sprintf(`
 		UPDATE useraccess.users
 		SET %s
-		WHERE external_id = @external_id
-		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, etag`,
+		WHERE external_id = @external_id AND deleted_at IS NULL
+		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag`,
 		strings.Join(setClauses, ", "))
 
 	return pgdb.TypedQuery[User]{
@@ -109,7 +110,7 @@ func usersQuery(filter Filter, orderBys []order.By[OrderByField], pageSize, page
 		"page_offset": pageOffset,
 	}
 	sql := fmt.Sprintf(`
-		SELECT id, external_id, email, name, email_verified_at, created_at, updated_at, etag
+		SELECT id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag
 		FROM useraccess.users
 		%s
 		ORDER BY %s
@@ -145,10 +146,28 @@ func userCountQuery(filter Filter) pgdb.TypedQuery[int] {
 	}
 }
 
+func softDeleteUserQuery(externalID uuid.UUID) pgdb.TypedQuery[int] {
+	params := pgx.NamedArgs{"external_id": externalID}
+	const sql = `
+		UPDATE useraccess.users
+		SET deleted_at = NOW(), updated_at = NOW(), etag = gen_random_uuid()
+		WHERE external_id = @external_id AND deleted_at IS NULL
+		RETURNING id`
+
+	return pgdb.TypedQuery[int]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowTo[int],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 // whereClause builds an optional WHERE clause from f, adding any required
 // named parameters to params as a side effect.
 func whereClause(f Filter, params pgx.NamedArgs) string {
-	var clauses []string
+	clauses := []string{
+		"deleted_at IS NULL",
+	}
 	if email := strings.TrimSpace(f.Email); email != "" {
 		params["email_prefix"] = email + "%"
 		clauses = append(clauses, "email ILIKE @email_prefix")
@@ -156,9 +175,6 @@ func whereClause(f Filter, params pgx.NamedArgs) string {
 	if name := strings.TrimSpace(f.Name); name != "" {
 		params["name_prefix"] = name + "%"
 		clauses = append(clauses, "name ILIKE @name_prefix")
-	}
-	if len(clauses) == 0 {
-		return ""
 	}
 	return "WHERE " + strings.Join(clauses, " AND ")
 }
@@ -168,8 +184,8 @@ func markEmailVerifiedQuery(externalID uuid.UUID) pgdb.TypedQuery[User] {
 	const sql = `
 		UPDATE useraccess.users
 		SET email_verified_at = COALESCE(email_verified_at, NOW())
-		WHERE external_id = @external_id
-		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, etag`
+		WHERE external_id = @external_id AND deleted_at IS NULL
+		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag`
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,

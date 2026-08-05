@@ -74,27 +74,43 @@ func TestStore_PermissionsByScope_error(t *testing.T) {
 	user := seedUser(t, userStore, "permissions-by-scope-error@test.com")
 	org := seedOrg(t, orgStore, "permissions-by-scope-error-org")
 	project := seedProject(t, orgStore, org.ID, "permissions-by-scope-error-project")
+	softDeletedUser := seedUser(t, userStore, "deleted-permissions-by-scope@test.com")
+	seedOrgMembership(t, ctx, pool, softDeletedUser.ID, org.ID)
+	role := seedCustomRole(t, rbacStore, pgrbac.CreateCustomRole{OrgID: org.ID, Name: "deleted user role", PermissionNames: []string{"custom-role:read"}})
+	seedProjectRoleAssignment(t, ctx, rbacStore, softDeletedUser.ExternalID, role.ExternalID, project.ID)
+	seedOrgRoleAssignment(t, ctx, rbacStore, softDeletedUser.ExternalID, role.ExternalID, org.ID)
+	seedSystemRoleAssignment(t, rbacStore, softDeletedUser.ExternalID, "superadmin")
+	mustSoftDeleteUser(t, userStore, softDeletedUser.ExternalID)
 
 	tests := []struct {
 		name      string
 		userID    uuid.UUID
 		projectID int
+		want      error
 	}{
 		{
 			name:      "user missing",
 			userID:    uuid.New(),
 			projectID: project.ID,
+			want:      sql.ErrNoRows,
+		},
+		{
+			name:      "user deleted with retained assignments",
+			userID:    softDeletedUser.ExternalID,
+			projectID: project.ID,
+			want:      sql.ErrNoRows,
 		},
 		{
 			name:      "project missing",
 			userID:    user.ExternalID,
 			projectID: -1,
+			want:      sql.ErrNoRows,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := rbacStore.PermissionsByScope(ctx, tt.userID, tt.projectID); !errors.Is(err, sql.ErrNoRows) {
-				t.Errorf("PermissionsByScope() error = %v, want sql.ErrNoRows", err)
+			if _, err := rbacStore.PermissionsByScope(ctx, tt.userID, tt.projectID); !errors.Is(err, tt.want) {
+				t.Errorf("PermissionsByScope() error = %v, want %v", err, tt.want)
 			}
 		})
 	}
@@ -494,6 +510,14 @@ func seedUser(t *testing.T, userStore *pguser.Store, email string) pguser.User {
 	return usr
 }
 
+func mustSoftDeleteUser(t *testing.T, userStore *pguser.Store, userID uuid.UUID) {
+	t.Helper()
+
+	if err := userStore.SoftDeleteUser(t.Context(), userID); err != nil {
+		t.Fatalf("soft delete user %s: %v", userID, err)
+	}
+}
+
 func seededSystemRoles() []pgrbac.SystemRole {
 	return []pgrbac.SystemRole{
 		{
@@ -518,6 +542,7 @@ func seededSystemRoles() []pgrbac.SystemRole {
 				"system-role:read",
 				"system-role:unassign",
 				"user:create",
+				"user:delete",
 				"user:read",
 				"user:update",
 			},

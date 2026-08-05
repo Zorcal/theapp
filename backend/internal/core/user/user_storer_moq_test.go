@@ -25,6 +25,9 @@ var _ UserStorer = &MockedUserStorer{}
 //			CreateUserFunc: func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
 //				panic("mock out the CreateUser method")
 //			},
+//			SoftDeleteUserFunc: func(ctx context.Context, id uuid.UUID) error {
+//				panic("mock out the SoftDeleteUser method")
+//			},
 //			UpdateUserFunc: func(ctx context.Context, uu pguser.UpdateUser) (pguser.User, error) {
 //				panic("mock out the UpdateUser method")
 //			},
@@ -47,6 +50,9 @@ type MockedUserStorer struct {
 	// CreateUserFunc mocks the CreateUser method.
 	CreateUserFunc func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
 
+	// SoftDeleteUserFunc mocks the SoftDeleteUser method.
+	SoftDeleteUserFunc func(ctx context.Context, id uuid.UUID) error
+
 	// UpdateUserFunc mocks the UpdateUser method.
 	UpdateUserFunc func(ctx context.Context, uu pguser.UpdateUser) (pguser.User, error)
 
@@ -67,6 +73,13 @@ type MockedUserStorer struct {
 			Ctx context.Context
 			// Cu is the cu argument value.
 			Cu pguser.CreateUser
+		}
+		// SoftDeleteUser holds details about calls to the SoftDeleteUser method.
+		SoftDeleteUser []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID uuid.UUID
 		}
 		// UpdateUser holds details about calls to the UpdateUser method.
 		UpdateUser []struct {
@@ -104,6 +117,7 @@ type MockedUserStorer struct {
 		}
 	}
 	lockCreateUser       sync.RWMutex
+	lockSoftDeleteUser   sync.RWMutex
 	lockUpdateUser       sync.RWMutex
 	lockUserByEmail      sync.RWMutex
 	lockUserByExternalID sync.RWMutex
@@ -143,6 +157,42 @@ func (mock *MockedUserStorer) CreateUserCalls() []struct {
 	mock.lockCreateUser.RLock()
 	calls = mock.calls.CreateUser
 	mock.lockCreateUser.RUnlock()
+	return calls
+}
+
+// SoftDeleteUser calls SoftDeleteUserFunc.
+func (mock *MockedUserStorer) SoftDeleteUser(ctx context.Context, id uuid.UUID) error {
+	if mock.SoftDeleteUserFunc == nil {
+		panic("MockedUserStorer.SoftDeleteUserFunc: method is nil but UserStorer.SoftDeleteUser was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockSoftDeleteUser.Lock()
+	mock.calls.SoftDeleteUser = append(mock.calls.SoftDeleteUser, callInfo)
+	mock.lockSoftDeleteUser.Unlock()
+	return mock.SoftDeleteUserFunc(ctx, id)
+}
+
+// SoftDeleteUserCalls gets all the calls that were made to SoftDeleteUser.
+// Check the length with:
+//
+//	len(mockedUserStorer.SoftDeleteUserCalls())
+func (mock *MockedUserStorer) SoftDeleteUserCalls() []struct {
+	Ctx context.Context
+	ID  uuid.UUID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}
+	mock.lockSoftDeleteUser.RLock()
+	calls = mock.calls.SoftDeleteUser
+	mock.lockSoftDeleteUser.RUnlock()
 	return calls
 }
 
@@ -299,5 +349,121 @@ func (mock *MockedUserStorer) UsersCalls() []struct {
 	mock.lockUsers.RLock()
 	calls = mock.calls.Users
 	mock.lockUsers.RUnlock()
+	return calls
+}
+
+// Ensure, that MockedRBACStorer does implement RBACStorer.
+// If this is not the case, regenerate this file with moq.
+var _ RBACStorer = &MockedRBACStorer{}
+
+// MockedRBACStorer is a mock implementation of RBACStorer.
+//
+//	func TestSomethingThatUsesRBACStorer(t *testing.T) {
+//
+//		// make and configure a mocked RBACStorer
+//		mockedRBACStorer := &MockedRBACStorer{
+//			FullyPrivilegedUserRemainsAfterDeleteFunc: func(ctx context.Context, id uuid.UUID) (bool, error) {
+//				panic("mock out the FullyPrivilegedUserRemainsAfterDelete method")
+//			},
+//			LockSystemRoleManagementFunc: func(ctx context.Context) error {
+//				panic("mock out the LockSystemRoleManagement method")
+//			},
+//		}
+//
+//		// use mockedRBACStorer in code that requires RBACStorer
+//		// and then make assertions.
+//
+//	}
+type MockedRBACStorer struct {
+	// FullyPrivilegedUserRemainsAfterDeleteFunc mocks the FullyPrivilegedUserRemainsAfterDelete method.
+	FullyPrivilegedUserRemainsAfterDeleteFunc func(ctx context.Context, id uuid.UUID) (bool, error)
+
+	// LockSystemRoleManagementFunc mocks the LockSystemRoleManagement method.
+	LockSystemRoleManagementFunc func(ctx context.Context) error
+
+	// calls tracks calls to the methods.
+	calls struct {
+		// FullyPrivilegedUserRemainsAfterDelete holds details about calls to the FullyPrivilegedUserRemainsAfterDelete method.
+		FullyPrivilegedUserRemainsAfterDelete []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID uuid.UUID
+		}
+		// LockSystemRoleManagement holds details about calls to the LockSystemRoleManagement method.
+		LockSystemRoleManagement []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+	}
+	lockFullyPrivilegedUserRemainsAfterDelete sync.RWMutex
+	lockLockSystemRoleManagement              sync.RWMutex
+}
+
+// FullyPrivilegedUserRemainsAfterDelete calls FullyPrivilegedUserRemainsAfterDeleteFunc.
+func (mock *MockedRBACStorer) FullyPrivilegedUserRemainsAfterDelete(ctx context.Context, id uuid.UUID) (bool, error) {
+	if mock.FullyPrivilegedUserRemainsAfterDeleteFunc == nil {
+		panic("MockedRBACStorer.FullyPrivilegedUserRemainsAfterDeleteFunc: method is nil but RBACStorer.FullyPrivilegedUserRemainsAfterDelete was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockFullyPrivilegedUserRemainsAfterDelete.Lock()
+	mock.calls.FullyPrivilegedUserRemainsAfterDelete = append(mock.calls.FullyPrivilegedUserRemainsAfterDelete, callInfo)
+	mock.lockFullyPrivilegedUserRemainsAfterDelete.Unlock()
+	return mock.FullyPrivilegedUserRemainsAfterDeleteFunc(ctx, id)
+}
+
+// FullyPrivilegedUserRemainsAfterDeleteCalls gets all the calls that were made to FullyPrivilegedUserRemainsAfterDelete.
+// Check the length with:
+//
+//	len(mockedRBACStorer.FullyPrivilegedUserRemainsAfterDeleteCalls())
+func (mock *MockedRBACStorer) FullyPrivilegedUserRemainsAfterDeleteCalls() []struct {
+	Ctx context.Context
+	ID  uuid.UUID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}
+	mock.lockFullyPrivilegedUserRemainsAfterDelete.RLock()
+	calls = mock.calls.FullyPrivilegedUserRemainsAfterDelete
+	mock.lockFullyPrivilegedUserRemainsAfterDelete.RUnlock()
+	return calls
+}
+
+// LockSystemRoleManagement calls LockSystemRoleManagementFunc.
+func (mock *MockedRBACStorer) LockSystemRoleManagement(ctx context.Context) error {
+	if mock.LockSystemRoleManagementFunc == nil {
+		panic("MockedRBACStorer.LockSystemRoleManagementFunc: method is nil but RBACStorer.LockSystemRoleManagement was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockLockSystemRoleManagement.Lock()
+	mock.calls.LockSystemRoleManagement = append(mock.calls.LockSystemRoleManagement, callInfo)
+	mock.lockLockSystemRoleManagement.Unlock()
+	return mock.LockSystemRoleManagementFunc(ctx)
+}
+
+// LockSystemRoleManagementCalls gets all the calls that were made to LockSystemRoleManagement.
+// Check the length with:
+//
+//	len(mockedRBACStorer.LockSystemRoleManagementCalls())
+func (mock *MockedRBACStorer) LockSystemRoleManagementCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockLockSystemRoleManagement.RLock()
+	calls = mock.calls.LockSystemRoleManagement
+	mock.lockLockSystemRoleManagement.RUnlock()
 	return calls
 }

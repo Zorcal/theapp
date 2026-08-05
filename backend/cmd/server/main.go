@@ -259,7 +259,7 @@ func run(ctx context.Context, cfg Config) error {
 	// Setup cores.
 
 	pgdbTransactor := pgdb.NewTransactor(pgPool)
-	userCore := user.NewCore(pgUserStore)
+	userCore := user.NewCore(pgUserStore, pgRBACStore, pgdbTransactor)
 	rbacCore := rbac.NewCore(pgRBACStore, pgdbTransactor)
 	orgCore := org.NewCore(pgOrgStore, pgUserStore, pgRBACStore, pgdbTransactor)
 	authCoreCfg := auth.Config{

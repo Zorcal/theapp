@@ -107,6 +107,7 @@ var permissionRegistry = map[string][]mdl.Permission{
 	"/theapp.v1.UserService/ListUsers":  {mdl.PermissionUserRead},
 	"/theapp.v1.UserService/CreateUser": {mdl.PermissionUserCreate},
 	"/theapp.v1.UserService/UpdateUser": {mdl.PermissionUserUpdate},
+	"/theapp.v1.UserService/DeleteUser": {mdl.PermissionUserDelete},
 
 	"/theapp.v1.SystemRoleService/ListSystemRoles":           {mdl.PermissionSystemRoleRead},
 	"/theapp.v1.SystemRoleService/AssignSystemRole":          {mdl.PermissionSystemRoleAssign},

@@ -25,6 +25,7 @@ type User struct {
 	EmailVerifiedAt *time.Time `db:"email_verified_at"`
 	CreatedAt       time.Time  `db:"created_at"`
 	UpdatedAt       *time.Time `db:"updated_at"`
+	DeletedAt       *time.Time `db:"deleted_at"`
 	ETag            uuid.UUID  `db:"etag"`
 }
 

@@ -126,6 +126,20 @@ func TestUpdateUser_error(t *testing.T) {
 	runValidationErrorTests(t, "UpdateUser", UpdateUser, tests)
 }
 
+func TestDeleteUser(t *testing.T) {
+	if err := DeleteUser(&pb.DeleteUserRequest{Id: uuid.NewString()}); err != nil {
+		t.Errorf("DeleteUser() error = %v, want nil", err)
+	}
+}
+
+func TestDeleteUser_error(t *testing.T) {
+	tests := idValidationTests(
+		(*pb.DeleteUserRequest)(nil),
+		&pb.DeleteUserRequest{Id: "bad"},
+	)
+	runValidationErrorTests(t, "DeleteUser", DeleteUser, tests)
+}
+
 func TestListUsers(t *testing.T) {
 	if err := ListUsers(&pb.ListUsersRequest{}); err != nil {
 		t.Errorf("ListUsers() error = %v, want nil", err)

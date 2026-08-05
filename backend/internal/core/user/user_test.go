@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/order"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
@@ -21,7 +22,10 @@ import (
 
 func TestCore_integration(t *testing.T) {
 	ctx := context.Background()
-	core := NewCore(pguser.NewStore(pgtest.New(t, ctx)))
+	pool := pgtest.New(t, ctx)
+	userStore := pguser.NewStore(pool)
+	rbacStore := pgrbac.NewStore(pool)
+	core := NewCore(userStore, rbacStore, immediateTransactor{})
 
 	diffOpts := cmp.Options{
 		cmpopts.IgnoreFields(mdl.User{}, "ID", "ETag"),
@@ -131,7 +135,7 @@ func TestCore_UserByID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.userStorer)
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
 
 			got, err := core.UserByID(t.Context(), tt.in)
 			if err != nil {
@@ -168,7 +172,7 @@ func TestCore_UserByID_error(t *testing.T) {
 				UserByExternalIDFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
 					return pguser.User{}, tt.mockErr
 				},
-			})
+			}, nil, immediateTransactor{})
 
 			if _, err := core.UserByID(t.Context(), uuid.New()); !errors.Is(err, tt.want) {
 				t.Errorf("UserByID() error = %v, want %v", err, tt.want)
@@ -233,7 +237,7 @@ func TestCore_UserByEmail(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.userStorer)
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
 
 			got, err := core.UserByEmail(t.Context(), tt.in)
 			if err != nil {
@@ -270,7 +274,7 @@ func TestCore_UserByEmail_error(t *testing.T) {
 				UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 					return pguser.User{}, tt.mockErr
 				},
-			})
+			}, nil, immediateTransactor{})
 
 			if _, err := core.UserByEmail(t.Context(), "alice@test.com"); !errors.Is(err, tt.want) {
 				t.Errorf("UserByEmail() error = %v, want %v", err, tt.want)
@@ -317,7 +321,7 @@ func TestCore_UpdateUser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.userStorer)
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
 
 			got, err := core.UpdateUser(t.Context(), tt.in)
 			if err != nil {
@@ -363,7 +367,7 @@ func TestCore_UpdateUser_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.userStorer)
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
 
 			if _, err := core.UpdateUser(t.Context(), tt.in); !errors.Is(err, tt.want) {
 				t.Errorf("UpdateUser() error = %v, want %v", err, tt.want)
@@ -376,7 +380,7 @@ func TestCore_UpdateUser_error(t *testing.T) {
 			UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
 				return pguser.User{}, errors.New("db error")
 			},
-		})
+		}, nil, immediateTransactor{})
 		_, err := core.UpdateUser(t.Context(), mdl.UpdateUser{
 			ID:     uuid.New(),
 			Name:   "Alice Updated",
@@ -451,7 +455,7 @@ func TestCore_CreateUser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.userStorer)
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
 
 			got, err := core.CreateUser(t.Context(), tt.in)
 			if err != nil {
@@ -494,7 +498,7 @@ func TestCore_CreateUser_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.userStorer)
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
 
 			if _, err := core.CreateUser(t.Context(), tt.in); !errors.Is(err, tt.want) {
 				t.Errorf("CreateUser() error = %v, want %v", err, tt.want)
@@ -507,7 +511,7 @@ func TestCore_CreateUser_error(t *testing.T) {
 			CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
 				return pguser.User{}, errors.New("db error")
 			},
-		})
+		}, nil, immediateTransactor{})
 		_, err := core.CreateUser(t.Context(), in)
 		if err == nil {
 			t.Fatalf("CreateUser() error = nil, want error")
@@ -575,7 +579,7 @@ func TestCore_Users(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.userStorer)
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
 
 			gotUsers, gotCount, err := core.Users(t.Context(), mdl.UserFilter{}, tt.orderBys, 10, 0)
 			if err != nil {
@@ -616,7 +620,7 @@ func TestCore_Users_error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.userStorer)
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
 
 			_, _, err := core.Users(t.Context(), mdl.UserFilter{}, tt.orderBys, 10, 0)
 			if err == nil {
@@ -626,4 +630,125 @@ func TestCore_Users_error(t *testing.T) {
 			testingx.AssertErrContains(t, err, tt.wantErrStrs...)
 		})
 	}
+}
+
+func TestCore_DeleteUser(t *testing.T) {
+	userStore := &MockedUserStorer{
+		SoftDeleteUserFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+	}
+	rbacStore := &MockedRBACStorer{
+		LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+		FullyPrivilegedUserRemainsAfterDeleteFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+			return true, nil
+		},
+	}
+	core := NewCore(userStore, rbacStore, immediateTransactor{})
+
+	if err := core.DeleteUser(t.Context(), uuid.New()); err != nil {
+		t.Fatalf("DeleteUser() error = %v", err)
+	}
+}
+
+func TestCore_DeleteUser_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		userStorer *MockedUserStorer
+		rbacStorer *MockedRBACStorer
+		transactor Transactor
+		want       error
+	}{
+		{
+			name:       "transaction",
+			userStorer: &MockedUserStorer{},
+			rbacStorer: nil,
+			transactor: errorTransactor{err: dbErr},
+			want:       dbErr,
+		},
+		{
+			name:       "lock system-role management",
+			userStorer: &MockedUserStorer{},
+			rbacStorer: &MockedRBACStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return dbErr },
+			},
+			transactor: immediateTransactor{},
+			want:       dbErr,
+		},
+		{
+			name:       "user not found",
+			userStorer: &MockedUserStorer{},
+			rbacStorer: &MockedRBACStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				FullyPrivilegedUserRemainsAfterDeleteFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, sql.ErrNoRows
+				},
+			},
+			transactor: immediateTransactor{},
+			want:       mdl.ErrNotFound,
+		},
+		{
+			name:       "recovery check",
+			userStorer: &MockedUserStorer{},
+			rbacStorer: &MockedRBACStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				FullyPrivilegedUserRemainsAfterDeleteFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, dbErr
+				},
+			},
+			transactor: immediateTransactor{},
+			want:       dbErr,
+		},
+		{
+			name:       "last fully privileged system administrator",
+			userStorer: &MockedUserStorer{},
+			rbacStorer: &MockedRBACStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				FullyPrivilegedUserRemainsAfterDeleteFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, nil
+				},
+			},
+			transactor: immediateTransactor{},
+			want:       mdl.ErrLastFullyPrivilegedSystemAdmin,
+		},
+		{
+			name: "soft delete",
+			userStorer: &MockedUserStorer{
+				SoftDeleteUserFunc: func(_ context.Context, _ uuid.UUID) error {
+					// The user was found by the recovery check earlier in the transaction, so
+					// sql.ErrNoRows is deliberately preserved as an internal error.
+					return sql.ErrNoRows
+				},
+			},
+			rbacStorer: &MockedRBACStorer{
+				LockSystemRoleManagementFunc: func(_ context.Context) error { return nil },
+				FullyPrivilegedUserRemainsAfterDeleteFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return true, nil
+				},
+			},
+			transactor: immediateTransactor{},
+			want:       sql.ErrNoRows,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.userStorer, tt.rbacStorer, tt.transactor)
+
+			if err := core.DeleteUser(t.Context(), uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("DeleteUser() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+type immediateTransactor struct{}
+
+func (immediateTransactor) RunTx(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+type errorTransactor struct{ err error }
+
+func (tr errorTransactor) RunTx(_ context.Context, _ func(context.Context) error) error {
+	return tr.err
 }

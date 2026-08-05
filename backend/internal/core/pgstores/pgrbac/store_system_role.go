@@ -22,6 +22,8 @@ func (s *Store) LockSystemRoleManagement(ctx context.Context) error {
 // LockSystemRoleUser acquires a transaction-level advisory lock that serializes system-role
 // assignment changes for userID. It must be called within a transaction.
 func (s *Store) LockSystemRoleUser(ctx context.Context, userID uuid.UUID) error {
+	// The retained row supplies a stable lock identity even after soft deletion. Active-user
+	// validation belongs to the operation performed after the lock is acquired.
 	const query = `
 		SELECT pg_advisory_xact_lock(hashtext('rbac.system-role-user'), id)
 		FROM useraccess.users
@@ -83,7 +85,7 @@ func (s *Store) SystemRoleByName(ctx context.Context, name string) (SystemRole, 
 
 // UserSystemRolesByExternalID returns a page of system roles assigned to userID, ordered by role
 // name, along with the total count.
-// Returns [sql.ErrNoRows] if no such user exists.
+// Returns [sql.ErrNoRows] if no such active user exists.
 func (s *Store) UserSystemRolesByExternalID(ctx context.Context, userID uuid.UUID, pageSize, pageOffset int) ([]SystemRole, int, error) {
 	rolesQ := userSystemRolesByExternalIDQuery(userID, pageSize, pageOffset)
 	countQ := userSystemRoleCountByExternalIDQuery(userID)
@@ -110,7 +112,7 @@ func (s *Store) UserSystemRolesByExternalID(ctx context.Context, userID uuid.UUI
 }
 
 // SystemPermissions returns the names of the permissions userID holds through system-scope role assignments only.
-// Returns [sql.ErrNoRows] if no such user exists.
+// Returns [sql.ErrNoRows] if no such active user exists.
 func (s *Store) SystemPermissions(ctx context.Context, userID uuid.UUID) ([]string, error) {
 	q := systemPermissionNamesQuery(userID)
 
@@ -150,6 +152,27 @@ func (s *Store) FullyPrivilegedUserRemainsAfterSystemRoleUnassign(ctx context.Co
 	return hasFullyPrivilegedUser, nil
 }
 
+// FullyPrivilegedUserRemainsAfterDelete reports whether another active user holds every registered
+// permission through system-scope assignments.
+// Returns [sql.ErrNoRows] if userID does not identify an active user.
+func (s *Store) FullyPrivilegedUserRemainsAfterDelete(ctx context.Context, userID uuid.UUID) (bool, error) {
+	q := fullyPrivilegedUserRemainsAfterDeleteQuery(userID)
+
+	var remains bool
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		if err := q.Queue(ctx, b, &remains); err != nil {
+			return fmt.Errorf("fully privileged user remains after delete: %w", err)
+		}
+		return nil
+	}
+
+	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
+		return false, err
+	}
+
+	return remains, nil
+}
+
 // AssignSystemRole grants userID the system role named roleName at system scope.
 // Returns [sql.ErrNoRows] if no user with that ID or system role named roleName exists.
 // Returns [pgdb.ErrAlreadyExists] if userID already has the system role.
@@ -173,7 +196,7 @@ func (s *Store) AssignSystemRole(ctx context.Context, userID uuid.UUID, roleName
 }
 
 // UnassignSystemRole revokes the system role named roleName from userID.
-// Returns [sql.ErrNoRows] if userID does not have that system role or no such user exists.
+// Returns [sql.ErrNoRows] if userID does not have that system role or no such active user exists.
 func (s *Store) UnassignSystemRole(ctx context.Context, userID uuid.UUID, roleName string) error {
 	q := unassignSystemRoleQuery(userID, roleName)
 

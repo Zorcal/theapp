@@ -409,7 +409,7 @@ func assignCustomRoleToProjectQuery(userID, roleID uuid.UUID, projectID int) pgd
 		FROM (
 			SELECT id
 			FROM useraccess.users
-			WHERE external_id = @user_id
+			WHERE external_id = @user_id AND deleted_at IS NULL
 		) AS u
 		CROSS JOIN (
 			SELECT id, org_id
@@ -455,6 +455,7 @@ func unassignCustomRoleFromProjectQuery(userID, roleID uuid.UUID, projectID int)
 			JOIN org.org_membership AS m ON m.user_id = u.id
 			JOIN org.projects AS p ON p.org_id = m.org_id
 			WHERE u.external_id = @user_id
+				AND u.deleted_at IS NULL
 				AND p.id = @project_id
 		)
 			AND role_id = (
@@ -494,7 +495,7 @@ func assignCustomRoleToOrgQuery(userID, roleID uuid.UUID, orgID int) pgdb.TypedQ
 		JOIN rbac.custom_roles AS r
 			ON r.org_id = m.org_id
 			AND r.external_id = @role_id
-		WHERE u.external_id = @user_id
+		WHERE u.external_id = @user_id AND u.deleted_at IS NULL
 		RETURNING role_id`
 
 	return pgdb.TypedQuery[int]{
@@ -523,6 +524,7 @@ func unassignCustomRoleFromOrgQuery(userID, roleID uuid.UUID, orgID int) pgdb.Ty
 				ON m.user_id = u.id
 				AND m.org_id = @org_id
 			WHERE u.external_id = @user_id
+				AND u.deleted_at IS NULL
 		)
 			AND role_id = (
 				SELECT id
@@ -563,7 +565,7 @@ func userProjectCustomRolesQuery(userID uuid.UUID, projectID, pageSize, pageOffs
 		JOIN rbac.custom_roles AS r ON r.id = a.role_id AND r.org_id = proj.org_id
 		LEFT JOIN rbac.custom_role_permissions AS rp ON rp.role_id = r.id
 		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
-		WHERE u.external_id = @user_id
+		WHERE u.external_id = @user_id AND u.deleted_at IS NULL
 		GROUP BY r.id
 		ORDER BY r.name, r.id
 		LIMIT @page_size OFFSET @page_offset`
@@ -587,7 +589,7 @@ func userProjectCustomRoleCountQuery(userID uuid.UUID, projectID int) pgdb.Typed
 		JOIN org.projects AS proj ON proj.id = @project_id
 		JOIN org.org_membership AS m ON m.user_id = u.id AND m.org_id = proj.org_id
 		LEFT JOIN rbac.project_role_assignments AS a ON a.user_id = u.id AND a.project_id = proj.id
-		WHERE u.external_id = @user_id
+		WHERE u.external_id = @user_id AND u.deleted_at IS NULL
 		GROUP BY u.id, proj.id`
 
 	return pgdb.TypedQuery[int]{
@@ -619,7 +621,7 @@ func userOrgCustomRolesQuery(userID uuid.UUID, orgID, pageSize, pageOffset int) 
 		JOIN rbac.custom_roles AS r ON r.id = a.role_id AND r.org_id = m.org_id
 		LEFT JOIN rbac.custom_role_permissions AS rp ON rp.role_id = r.id
 		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
-		WHERE u.external_id = @user_id
+		WHERE u.external_id = @user_id AND u.deleted_at IS NULL
 		GROUP BY r.id
 		ORDER BY r.name, r.id
 		LIMIT @page_size OFFSET @page_offset`
@@ -642,7 +644,7 @@ func userOrgCustomRoleCountQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[in
 		FROM useraccess.users AS u
 		JOIN org.org_membership AS m ON m.user_id = u.id AND m.org_id = @org_id
 		LEFT JOIN rbac.org_role_assignments AS a ON a.user_id = u.id AND a.org_id = m.org_id
-		WHERE u.external_id = @user_id
+		WHERE u.external_id = @user_id AND u.deleted_at IS NULL
 		GROUP BY u.id, m.org_id`
 
 	return pgdb.TypedQuery[int]{

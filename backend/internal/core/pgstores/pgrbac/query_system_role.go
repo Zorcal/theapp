@@ -72,11 +72,11 @@ func userSystemRolesByExternalIDQuery(userID uuid.UUID, pageSize, pageOffset int
 			r.name,
 			COALESCE(array_agg(p.name ORDER BY p.name) FILTER (WHERE p.name IS NOT NULL), '{}') AS permission_names
 		FROM rbac.system_role_assignments AS sra
-		JOIN useraccess.users AS u ON u.id = sra.user_id
+		JOIN useraccess.users AS u ON u.id = sra.user_id AND u.deleted_at IS NULL
 		JOIN rbac.system_roles AS r ON r.id = sra.role_id
 		LEFT JOIN rbac.system_role_permissions AS rp ON rp.role_id = r.id
 		LEFT JOIN rbac.permissions AS p ON p.id = rp.permission_id
-		WHERE u.external_id = @user_id
+		WHERE u.external_id = @user_id AND u.deleted_at IS NULL
 		GROUP BY r.id
 		ORDER BY r.name
 		LIMIT @page_size OFFSET @page_offset`
@@ -96,7 +96,7 @@ func userSystemRoleCountByExternalIDQuery(userID uuid.UUID) pgdb.TypedQuery[int]
 		SELECT COUNT(sra.role_id)
 		FROM useraccess.users AS u
 		LEFT JOIN rbac.system_role_assignments AS sra ON sra.user_id = u.id
-		WHERE u.external_id = @user_id
+		WHERE u.external_id = @user_id AND u.deleted_at IS NULL
 		GROUP BY u.id`
 
 	return pgdb.TypedQuery[int]{
@@ -117,7 +117,7 @@ func systemPermissionNamesQuery(userID uuid.UUID) pgdb.TypedQuery[[]string] {
 		FROM useraccess.users AS u
 		LEFT JOIN LATERAL rbac.system_permission_ids(u.id) AS granted ON true
 		LEFT JOIN rbac.permissions AS p ON p.id = granted.permission_id
-		WHERE u.external_id = @user_id
+		WHERE u.external_id = @user_id AND u.deleted_at IS NULL
 		GROUP BY u.id`
 
 	return pgdb.TypedQuery[[]string]{
@@ -145,7 +145,7 @@ func fullyPrivilegedUserRemainsAfterSystemRoleUnassignQuery(userID uuid.UUID, ro
 			excluded_assignment AS (
 				SELECT sra.user_id, sra.role_id
 				FROM rbac.system_role_assignments AS sra
-				JOIN useraccess.users AS u ON u.id = sra.user_id
+				JOIN useraccess.users AS u ON u.id = sra.user_id AND u.deleted_at IS NULL
 				JOIN rbac.system_roles AS r ON r.id = sra.role_id
 				WHERE u.external_id = @user_id
 					AND r.name = @role_name
@@ -154,6 +154,7 @@ func fullyPrivilegedUserRemainsAfterSystemRoleUnassignQuery(userID uuid.UUID, ro
 		SELECT EXISTS (
 			SELECT sra.user_id
 			FROM rbac.system_role_assignments AS sra
+			JOIN useraccess.users AS u ON u.id = sra.user_id AND u.deleted_at IS NULL
 			JOIN rbac.system_role_permissions AS rp ON rp.role_id = sra.role_id
 			WHERE (sra.user_id, sra.role_id) != (
 				excluded_assignment.user_id,
@@ -178,6 +179,38 @@ func fullyPrivilegedUserRemainsAfterSystemRoleUnassignQuery(userID uuid.UUID, ro
 	}
 }
 
+func fullyPrivilegedUserRemainsAfterDeleteQuery(userID uuid.UUID) pgdb.TypedQuery[bool] {
+	params := pgx.NamedArgs{"user_id": userID}
+
+	// Anchor the result on an active target user so a missing or already deleted user returns
+	// sql.ErrNoRows. The target is excluded from the candidate administrators.
+	const sql = `
+		WITH target_user AS (
+			SELECT id
+			FROM useraccess.users
+			WHERE external_id = @user_id AND deleted_at IS NULL
+		)
+		SELECT EXISTS (
+			SELECT assignment.user_id
+			FROM rbac.system_role_assignments AS assignment
+			JOIN useraccess.users AS usr ON usr.id = assignment.user_id AND usr.deleted_at IS NULL
+			JOIN rbac.system_role_permissions AS role_permission ON role_permission.role_id = assignment.role_id
+			WHERE assignment.user_id != target_user.id
+			GROUP BY assignment.user_id
+			HAVING COUNT(DISTINCT role_permission.permission_id) = (
+				SELECT COUNT(*) FROM rbac.permissions
+			)
+		)
+		FROM target_user`
+
+	return pgdb.TypedQuery[bool]{
+		SQL:    sql,
+		Args:   params,
+		Scan:   pgx.RowTo[bool],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func assignSystemRoleQuery(userID uuid.UUID, roleName string) pgdb.TypedQuery[int] {
 	params := pgx.NamedArgs{"user_id": userID, "role_name": roleName}
 	const sql = `
@@ -186,7 +219,7 @@ func assignSystemRoleQuery(userID uuid.UUID, roleName string) pgdb.TypedQuery[in
 		FROM (
 			SELECT id
 			FROM useraccess.users
-			WHERE external_id = @user_id
+			WHERE external_id = @user_id AND deleted_at IS NULL
 		) AS u
 		CROSS JOIN (
 			SELECT id
@@ -213,7 +246,7 @@ func unassignSystemRoleQuery(userID uuid.UUID, roleName string) pgdb.TypedQuery[
 		WHERE user_id = (
 			SELECT id
 			FROM useraccess.users
-			WHERE external_id = @user_id
+			WHERE external_id = @user_id AND deleted_at IS NULL
 		)
 			AND role_id = (
 				SELECT id
