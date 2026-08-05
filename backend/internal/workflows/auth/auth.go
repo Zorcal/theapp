@@ -37,7 +37,8 @@ type magicLinkTemplateData struct {
 // AuthCore is the subset of non-durable auth operations WorkflowCore depends on.
 // Implemented by *core/auth.Core.
 type AuthCore interface {
-	// MagicLinkToken ensures the user exists, rate-checks, invalidates prior tokens, and creates a new one.
+	// MagicLinkToken creates a token for a provisioned user.
+	// Returns [mdl.ErrNotFound] if no user has been provisioned with rml.Email.
 	// Returns [mdl.ErrRateLimited] if a token was already issued to rml.Email within the rate-limit window.
 	// Returns [mdl.ErrValidation] if rml is invalid.
 	MagicLinkToken(ctx context.Context, rml mdl.RequestMagicLink) (string, error)
@@ -69,7 +70,8 @@ func RegisterWorkflows(ctx dbos.DBOSContext, wc *WorkflowCore) {
 // RequestMagicLink sends a sign-in link to emailAddr durably. If the process crashes after the token is stored but
 // before the email is sent, DBOS resumes from the email step on restart. If ctx carries a workflow ID, DBOS
 // deduplicates on it so retrying with the same key returns the original result without sending a second email.
-// Returns nil without sending an email if emailAddr is rate-limited.
+// Returns nil without sending an email if emailAddr is rate-limited or does not belong to a
+// provisioned user, keeping those states indistinguishable to callers.
 func (w *WorkflowCore) RequestMagicLink(ctx context.Context, emailAddr string) error {
 	opts := []dbos.WorkflowOption{}
 	if id := workflows.WorkflowID(ctx); id != "" {
@@ -91,7 +93,7 @@ func (w *WorkflowCore) RequestMagicLink(ctx context.Context, emailAddr string) e
 func (w *WorkflowCore) requestMagicLinkWorkflow(ctx dbos.DBOSContext, emailAddr string) (struct{}, error) {
 	rawToken, err := dbos.RunAsStep(ctx, w.storeTokenStep(emailAddr), dbos.WithStepName("store-token"))
 	if err != nil {
-		if errors.Is(err, mdl.ErrRateLimited) {
+		if errors.Is(err, mdl.ErrRateLimited) || errors.Is(err, mdl.ErrNotFound) {
 			return struct{}{}, nil
 		}
 		return struct{}{}, fmt.Errorf("run step: generate magic link token: %w", err)

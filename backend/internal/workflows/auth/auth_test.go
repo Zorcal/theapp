@@ -27,6 +27,8 @@ func TestWorkflowCore_integration(t *testing.T) {
 	dbosCtx := dbostest.New(t, ctx, pool)
 
 	emailSender := &testingx.CaptureEmailSender{}
+	userStore := pguser.NewStore(pool)
+	seedUser(t, ctx, userStore, "alice@test.com")
 
 	cfg := auth.Config{
 		JWTKey:             []byte("test-secret"),
@@ -40,13 +42,7 @@ func TestWorkflowCore_integration(t *testing.T) {
 		RefreshTokenTTL:    720 * time.Hour,
 	}
 
-	authCore := auth.NewCore(
-		pgauth.NewStore(pool),
-		pguser.NewStore(pool),
-		pgrbac.NewStore(pool),
-		pgdb.NewTransactor(pool),
-		cfg,
-	)
+	authCore := auth.NewCore(pgauth.NewStore(pool), userStore, pgrbac.NewStore(pool), pgdb.NewTransactor(pool), cfg)
 
 	wc := NewWorkflowCore(authCore, emailSender, cfg, dbosCtx)
 	RegisterWorkflows(dbosCtx, wc)
@@ -139,6 +135,34 @@ func TestWorkflowCore_RequestMagicLink_rateLimited(t *testing.T) {
 	}
 }
 
+// TestWorkflowCore_RequestMagicLink_userNotFound verifies that an unknown-user request
+// (MagicLinkToken returns mdl.ErrNotFound) succeeds without sending an email, rather than revealing
+// whether the address belongs to a provisioned user.
+func TestWorkflowCore_RequestMagicLink_userNotFound(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	dbosCtx := dbostest.New(t, ctx, pool)
+
+	authCore := &MockedAuthCore{
+		MagicLinkTokenFunc: func(_ context.Context, _ mdl.RequestMagicLink) (string, error) {
+			return "", mdl.ErrNotFound
+		},
+	}
+	emailSender := &testingx.CaptureEmailSender{}
+
+	wc := NewWorkflowCore(authCore, emailSender, testWorkflowCoreConfig(), dbosCtx)
+	RegisterWorkflows(dbosCtx, wc)
+	dbostest.Launch(t, dbosCtx)
+
+	if err := wc.RequestMagicLink(ctx, "unknown@test.com"); err != nil {
+		t.Fatalf("RequestMagicLink() error = %v, want nil", err)
+	}
+
+	if got, want := emailSender.Count(), 0; got != want {
+		t.Errorf("CaptureEmailSender.Count() = %d, want %d", got, want)
+	}
+}
+
 func TestWorkflowCore_RequestMagicLink_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
@@ -171,5 +195,13 @@ func testWorkflowCoreConfig() auth.Config {
 		MagicLinkFromEmail: "noreply@test.com",
 		MagicLinkBaseURL:   "http://localhost:3000/auth/verify",
 		MagicLinkTTL:       15 * time.Minute,
+	}
+}
+
+func seedUser(t *testing.T, ctx context.Context, store *pguser.Store, email string) {
+	t.Helper()
+
+	if _, err := store.CreateUser(ctx, pguser.CreateUser{Email: email}); err != nil {
+		t.Fatalf("seed user: %v", err)
 	}
 }

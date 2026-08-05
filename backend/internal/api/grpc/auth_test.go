@@ -25,7 +25,11 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 	srv := NewServerIntegrationTest(t)
 	ctx := t.Context()
 
-	// Request a magic link. The auth core creates the user automatically.
+	// Provision the user before authentication.
+
+	seedUser(t, ctx, srv.userStore, "alice@test.com", "Alice")
+
+	// Request a magic link.
 
 	if _, err := srv.authServiceClient.RequestMagicLink(ctx, &pb.RequestMagicLinkRequest{
 		Email: "alice@test.com",
@@ -49,7 +53,7 @@ func TestAuth_MagicLinkIntegration(t *testing.T) {
 		t.Error("VerifyMagicLink() refresh_token = empty, want non-empty")
 	}
 
-	// A freshly created user holds no role yet, so a protected endpoint denies them.
+	// The provisioned user holds no role yet, so a protected endpoint denies them.
 
 	authedCtx := metadata.AppendToOutgoingContext(
 		authCtxWithToken(ctx, pair.GetAccessToken()),

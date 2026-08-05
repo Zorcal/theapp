@@ -26,16 +26,11 @@ func TestCore_integration(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	userStore := pguser.NewStore(pool)
 	rbacStore := pgrbac.NewStore(pool)
+	core := NewCore(pgauth.NewStore(pool), userStore, rbacStore, pgdb.NewTransactor(pool), testConfig())
 
-	core := NewCore(
-		pgauth.NewStore(pool),
-		userStore,
-		rbacStore,
-		pgdb.NewTransactor(pool),
-		testConfig(),
-	)
+	seedUser(t, ctx, userStore, "alice@test.com")
 
-	// MagicLinkToken — new user is created and a token is returned.
+	// MagicLinkToken — a provisioned user receives a token.
 	firstToken, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"})
 	if err != nil {
 		t.Fatalf("MagicLinkToken() error = %v", err)
@@ -152,7 +147,7 @@ func TestCore_MagicLinkToken(t *testing.T) {
 
 	t.Run("existing user gets token", func(t *testing.T) {
 		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 				return pguser.User{
 					ID:         1,
 					ExternalID: userID,
@@ -172,32 +167,10 @@ func TestCore_MagicLinkToken(t *testing.T) {
 		}
 	})
 
-	t.Run("new user is created and gets token", func(t *testing.T) {
-		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, email string) (pguser.User, error) {
-				return pguser.User{
-					ID:         1,
-					ExternalID: userID,
-					Email:      email,
-				}, nil
-			},
-		}
-
-		core := NewCore(authStorerMock, userStorerMock, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
-
-		tok, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "new@test.com"})
-		if err != nil {
-			t.Fatalf("MagicLinkToken() error = %v", err)
-		}
-		if tok == "" {
-			t.Error("MagicLinkToken() = empty, want non-empty token")
-		}
-	})
-
 	t.Run("email is normalized to lowercase", func(t *testing.T) {
 		var lookedUpEmail string
 		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, e string) (pguser.User, error) {
+			UserByEmailFunc: func(_ context.Context, e string) (pguser.User, error) {
 				lookedUpEmail = e
 				return pguser.User{
 					ID:         1,
@@ -231,11 +204,11 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 		}
 	})
 
-	t.Run("get or create user", func(t *testing.T) {
+	t.Run("user lookup", func(t *testing.T) {
 		dbErr := errors.New("db error")
 
 		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 				return pguser.User{}, dbErr
 			},
 		}
@@ -253,11 +226,24 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 		}
 	})
 
+	t.Run("user not found", func(t *testing.T) {
+		userStorer := &MockedUserStorer{
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+				return pguser.User{}, sql.ErrNoRows
+			},
+		}
+		core := NewCore(&MockedAuthStorer{}, userStorer, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
+
+		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "unknown@test.com"}); !errors.Is(err, mdl.ErrNotFound) {
+			t.Errorf("MagicLinkToken() error = %v, want %v", err, mdl.ErrNotFound)
+		}
+	})
+
 	t.Run("rate limit check", func(t *testing.T) {
 		rateLimitErr := errors.New("db error")
 
 		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 				return pguser.User{
 					ID:         1,
 					ExternalID: userID,
@@ -285,7 +271,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 
 	t.Run("rate limited", func(t *testing.T) {
 		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 				return pguser.User{
 					ID:         1,
 					ExternalID: userID,
@@ -319,7 +305,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 		invalidateErr := errors.New("db error")
 
 		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 				return pguser.User{
 					ID:         1,
 					ExternalID: userID,
@@ -351,7 +337,7 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 		tokenErr := errors.New("db error")
 
 		userStorerMock := &MockedUserStorer{
-			GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
 				return pguser.User{
 					ID:         1,
 					ExternalID: userID,
@@ -1352,6 +1338,7 @@ func TestCore_txRollback(t *testing.T) {
 		realAuthStore := pgauth.NewStore(pool)
 		realUserStore := pguser.NewStore(pool)
 		realRBACStore := pgrbac.NewStore(pool)
+		seedUser(t, ctx, realUserStore, "alice@test.com")
 
 		// Get a raw token using the real store.
 		coreSetup := NewCore(realAuthStore, realUserStore, realRBACStore, pgdb.NewTransactor(pool), testConfig())
@@ -1390,6 +1377,7 @@ func TestCore_txRollback(t *testing.T) {
 		realAuthStore := pgauth.NewStore(pool)
 		realUserStore := pguser.NewStore(pool)
 		realRBACStore := pgrbac.NewStore(pool)
+		seedUser(t, ctx, realUserStore, "bob@test.com")
 		coreReal := NewCore(realAuthStore, realUserStore, realRBACStore, pgdb.NewTransactor(pool), testConfig())
 
 		magicTok, err := coreReal.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "bob@test.com"})
@@ -1460,6 +1448,16 @@ func seedSystemRoleAssignment(t *testing.T, ctx context.Context, s *pgrbac.Store
 	if err := s.AssignSystemRole(ctx, userID, roleName); err != nil {
 		t.Fatalf("seed system role assignment: %v", err)
 	}
+}
+
+func seedUser(t *testing.T, ctx context.Context, store *pguser.Store, email string) pguser.User {
+	t.Helper()
+
+	user, err := store.CreateUser(ctx, pguser.CreateUser{Email: email})
+	if err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	return user
 }
 
 // failingRefreshTokenStorer wraps a real Store but always returns err from CreateRefreshToken.

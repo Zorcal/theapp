@@ -74,7 +74,7 @@
     },
     "/v1/auth/magic-link": {
       "post": {
-        "summary": "RequestMagicLink sends a sign-in link to the given email address.\nIf no account exists for the address, one is created automatically.\nAlways returns success to avoid leaking whether the address is registered.",
+        "summary": "RequestMagicLink sends a sign-in link when the given email address belongs to a provisioned\nuser and is not rate-limited. An unknown address is not provisioned and receives no email.\nBoth cases return success so callers cannot determine whether the address is registered.",
         "operationId": "AuthService_RequestMagicLink",
         "responses": {
           "200": {

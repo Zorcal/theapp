@@ -21,11 +21,11 @@ var _ UserStorer = &MockedUserStorer{}
 //
 //		// make and configure a mocked UserStorer
 //		mockedUserStorer := &MockedUserStorer{
-//			GetOrCreateUserByEmailFunc: func(ctx context.Context, email string) (pguser.User, error) {
-//				panic("mock out the GetOrCreateUserByEmail method")
-//			},
 //			MarkEmailVerifiedFunc: func(ctx context.Context, externalID uuid.UUID) error {
 //				panic("mock out the MarkEmailVerified method")
+//			},
+//			UserByEmailFunc: func(ctx context.Context, email string) (pguser.User, error) {
+//				panic("mock out the UserByEmail method")
 //			},
 //		}
 //
@@ -34,21 +34,14 @@ var _ UserStorer = &MockedUserStorer{}
 //
 //	}
 type MockedUserStorer struct {
-	// GetOrCreateUserByEmailFunc mocks the GetOrCreateUserByEmail method.
-	GetOrCreateUserByEmailFunc func(ctx context.Context, email string) (pguser.User, error)
-
 	// MarkEmailVerifiedFunc mocks the MarkEmailVerified method.
 	MarkEmailVerifiedFunc func(ctx context.Context, externalID uuid.UUID) error
 
+	// UserByEmailFunc mocks the UserByEmail method.
+	UserByEmailFunc func(ctx context.Context, email string) (pguser.User, error)
+
 	// calls tracks calls to the methods.
 	calls struct {
-		// GetOrCreateUserByEmail holds details about calls to the GetOrCreateUserByEmail method.
-		GetOrCreateUserByEmail []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Email is the email argument value.
-			Email string
-		}
 		// MarkEmailVerified holds details about calls to the MarkEmailVerified method.
 		MarkEmailVerified []struct {
 			// Ctx is the ctx argument value.
@@ -56,45 +49,16 @@ type MockedUserStorer struct {
 			// ExternalID is the externalID argument value.
 			ExternalID uuid.UUID
 		}
+		// UserByEmail holds details about calls to the UserByEmail method.
+		UserByEmail []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Email is the email argument value.
+			Email string
+		}
 	}
-	lockGetOrCreateUserByEmail sync.RWMutex
-	lockMarkEmailVerified      sync.RWMutex
-}
-
-// GetOrCreateUserByEmail calls GetOrCreateUserByEmailFunc.
-func (mock *MockedUserStorer) GetOrCreateUserByEmail(ctx context.Context, email string) (pguser.User, error) {
-	if mock.GetOrCreateUserByEmailFunc == nil {
-		panic("MockedUserStorer.GetOrCreateUserByEmailFunc: method is nil but UserStorer.GetOrCreateUserByEmail was just called")
-	}
-	callInfo := struct {
-		Ctx   context.Context
-		Email string
-	}{
-		Ctx:   ctx,
-		Email: email,
-	}
-	mock.lockGetOrCreateUserByEmail.Lock()
-	mock.calls.GetOrCreateUserByEmail = append(mock.calls.GetOrCreateUserByEmail, callInfo)
-	mock.lockGetOrCreateUserByEmail.Unlock()
-	return mock.GetOrCreateUserByEmailFunc(ctx, email)
-}
-
-// GetOrCreateUserByEmailCalls gets all the calls that were made to GetOrCreateUserByEmail.
-// Check the length with:
-//
-//	len(mockedUserStorer.GetOrCreateUserByEmailCalls())
-func (mock *MockedUserStorer) GetOrCreateUserByEmailCalls() []struct {
-	Ctx   context.Context
-	Email string
-} {
-	var calls []struct {
-		Ctx   context.Context
-		Email string
-	}
-	mock.lockGetOrCreateUserByEmail.RLock()
-	calls = mock.calls.GetOrCreateUserByEmail
-	mock.lockGetOrCreateUserByEmail.RUnlock()
-	return calls
+	lockMarkEmailVerified sync.RWMutex
+	lockUserByEmail       sync.RWMutex
 }
 
 // MarkEmailVerified calls MarkEmailVerifiedFunc.
@@ -130,5 +94,41 @@ func (mock *MockedUserStorer) MarkEmailVerifiedCalls() []struct {
 	mock.lockMarkEmailVerified.RLock()
 	calls = mock.calls.MarkEmailVerified
 	mock.lockMarkEmailVerified.RUnlock()
+	return calls
+}
+
+// UserByEmail calls UserByEmailFunc.
+func (mock *MockedUserStorer) UserByEmail(ctx context.Context, email string) (pguser.User, error) {
+	if mock.UserByEmailFunc == nil {
+		panic("MockedUserStorer.UserByEmailFunc: method is nil but UserStorer.UserByEmail was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Email string
+	}{
+		Ctx:   ctx,
+		Email: email,
+	}
+	mock.lockUserByEmail.Lock()
+	mock.calls.UserByEmail = append(mock.calls.UserByEmail, callInfo)
+	mock.lockUserByEmail.Unlock()
+	return mock.UserByEmailFunc(ctx, email)
+}
+
+// UserByEmailCalls gets all the calls that were made to UserByEmail.
+// Check the length with:
+//
+//	len(mockedUserStorer.UserByEmailCalls())
+func (mock *MockedUserStorer) UserByEmailCalls() []struct {
+	Ctx   context.Context
+	Email string
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Email string
+	}
+	mock.lockUserByEmail.RLock()
+	calls = mock.calls.UserByEmail
+	mock.lockUserByEmail.RUnlock()
 	return calls
 }

@@ -63,9 +63,9 @@ type AuthStorer interface {
 
 // UserStorer defines the user database operations required by Core.
 type UserStorer interface {
-	// GetOrCreateUserByEmail returns the user with the given email, creating one if none exists.
-	// Safe under concurrent calls for the same email.
-	GetOrCreateUserByEmail(ctx context.Context, email string) (pguser.User, error)
+	// UserByEmail returns the user with the given email.
+	// Returns [sql.ErrNoRows] if no such user exists.
+	UserByEmail(ctx context.Context, email string) (pguser.User, error)
 	// MarkEmailVerified marks the email as verified for the user with the given external ID.
 	// Returns [sql.ErrNoRows] if no such user exists.
 	MarkEmailVerified(ctx context.Context, externalID uuid.UUID) error
@@ -130,8 +130,9 @@ func NewCore(as AuthStorer, us UserStorer, ps PermissionStorer, tr Transactor, c
 	}
 }
 
-// MagicLinkToken ensures the user exists, rate-checks, invalidates prior tokens, and creates a
-// new one inside a transaction. Returns the raw token.
+// MagicLinkToken looks up the user, rate-checks, invalidates prior tokens, and creates a new one
+// inside a transaction. Returns the raw token.
+// Returns [mdl.ErrNotFound] if no user has been provisioned with rml.Email.
 // Returns [mdl.ErrRateLimited] if a token was already issued to rml.Email within the rate-limit window.
 // Returns [mdl.ErrValidation] if rml is invalid.
 func (c *Core) MagicLinkToken(ctx context.Context, rml mdl.RequestMagicLink) (string, error) {
@@ -141,9 +142,12 @@ func (c *Core) MagicLinkToken(ctx context.Context, rml mdl.RequestMagicLink) (st
 
 	emailAddr := strings.ToLower(rml.Email)
 
-	pgUser, err := c.userStorer.GetOrCreateUserByEmail(ctx, emailAddr)
+	pgUser, err := c.userStorer.UserByEmail(ctx, emailAddr)
 	if err != nil {
-		return "", fmt.Errorf("get or create user: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", mdl.ErrNotFound
+		}
+		return "", fmt.Errorf("user by email: %w", err)
 	}
 
 	var rawTok string

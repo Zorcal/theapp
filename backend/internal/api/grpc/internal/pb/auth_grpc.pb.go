@@ -34,9 +34,9 @@ const (
 //
 // AuthService provides passwordless authentication via magic-link emails.
 type AuthServiceClient interface {
-	// RequestMagicLink sends a sign-in link to the given email address.
-	// If no account exists for the address, one is created automatically.
-	// Always returns success to avoid leaking whether the address is registered.
+	// RequestMagicLink sends a sign-in link when the given email address belongs to a provisioned
+	// user and is not rate-limited. An unknown address is not provisioned and receives no email.
+	// Both cases return success so callers cannot determine whether the address is registered.
 	RequestMagicLink(ctx context.Context, in *RequestMagicLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// VerifyMagicLink exchanges a magic-link token for an access/refresh token pair.
 	VerifyMagicLink(ctx context.Context, in *VerifyMagicLinkRequest, opts ...grpc.CallOption) (*TokenPair, error)
@@ -127,9 +127,9 @@ func (c *authServiceClient) GetAuthContext(ctx context.Context, in *GetAuthConte
 //
 // AuthService provides passwordless authentication via magic-link emails.
 type AuthServiceServer interface {
-	// RequestMagicLink sends a sign-in link to the given email address.
-	// If no account exists for the address, one is created automatically.
-	// Always returns success to avoid leaking whether the address is registered.
+	// RequestMagicLink sends a sign-in link when the given email address belongs to a provisioned
+	// user and is not rate-limited. An unknown address is not provisioned and receives no email.
+	// Both cases return success so callers cannot determine whether the address is registered.
 	RequestMagicLink(context.Context, *RequestMagicLinkRequest) (*emptypb.Empty, error)
 	// VerifyMagicLink exchanges a magic-link token for an access/refresh token pair.
 	VerifyMagicLink(context.Context, *VerifyMagicLinkRequest) (*TokenPair, error)
