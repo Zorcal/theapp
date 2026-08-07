@@ -34,6 +34,7 @@ func TestPermissionService_ListPermissions(t *testing.T) {
 			{Permission: pb.Permission_PERMISSION_PROJECT_CREATE, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
 			{Permission: pb.Permission_PERMISSION_ORGANIZATION_USER_CREATE, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
 			{Permission: pb.Permission_PERMISSION_ORGANIZATION_USER_READ, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
+			{Permission: pb.Permission_PERMISSION_ORGANIZATION_USER_REMOVE, MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION},
 		},
 	}
 

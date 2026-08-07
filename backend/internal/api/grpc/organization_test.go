@@ -86,6 +86,20 @@ func TestOrganizationService_Integration(t *testing.T) {
 	if got, want := len(users.GetUsers()), 2; got != want {
 		t.Errorf("ListOrganizationUsers() users length = %d, want %d", got, want)
 	}
+
+	// Remove the organization user through the API.
+
+	if _, err := srv.orgServiceClient.RemoveOrganizationUser(orgCtx, &pb.RemoveOrganizationUserRequest{Id: createdUser.GetId()}); err != nil {
+		t.Fatalf("RemoveOrganizationUser() error = %v", err)
+	}
+
+	users, err = srv.orgServiceClient.ListOrganizationUsers(orgCtx, &pb.ListOrganizationUsersRequest{})
+	if err != nil {
+		t.Fatalf("ListOrganizationUsers() after removal error = %v", err)
+	}
+	if got, want := users.GetTotalSize(), int32(1); got != want {
+		t.Errorf("ListOrganizationUsers() total_size after removal = %d, want %d", got, want)
+	}
 }
 
 func TestOrganizationService_CreateOrganization(t *testing.T) {
@@ -237,6 +251,16 @@ func TestOrganizationService_CreateOrganizationUser_error(t *testing.T) {
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "email", Description: "required"},
 			})),
+		},
+		{
+			name: "deleted user",
+			orgCore: &MockedOrganizationCore{
+				CreateOrganizationUserFunc: func(_ context.Context, _ mdl.CreateOrganizationUser) (mdl.User, error) {
+					return mdl.User{}, mdl.ErrUserDeleted
+				},
+			},
+			in:   &pb.CreateOrganizationUserRequest{Email: "member@test.com"},
+			want: status.New(codes.FailedPrecondition, "a deleted user with this email must be restored"),
 		},
 		{
 			name: "core",

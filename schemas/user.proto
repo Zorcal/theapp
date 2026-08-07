@@ -264,6 +264,33 @@ service UserService {
       }
     };
   }
+
+  // Restores a soft-deleted user and reactivates its retained memberships and role assignments.
+  rpc RestoreUser(RestoreUserRequest) returns (User) {
+    option (google.api.http) = {post: "/v1/users/{id}:restore"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {
+        key: "400"
+        value: {description: "Invalid user ID." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      responses: {
+        key: "401"
+        value: {description: "Missing or invalid credentials." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      responses: {
+        key: "403"
+        value: {description: "User restoration access is missing." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      responses: {
+        key: "404"
+        value: {description: "Deleted user not found." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+      responses: {
+        key: "500"
+        value: {description: "Unexpected server error." schema: {json_schema: {ref: ".google.rpc.Status"}}}
+      }
+    };
+  }
 }
 
 // User represents a user in the system.
@@ -312,6 +339,11 @@ message GetUserRequest {
 
 message DeleteUserRequest {
   // Unique identifier of the active user to delete.
+  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
+}
+
+message RestoreUserRequest {
+  // Unique identifier of the deleted user to restore.
   string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
 }
 

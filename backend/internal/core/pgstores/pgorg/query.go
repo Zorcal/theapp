@@ -234,6 +234,22 @@ func ensureOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[
 	}
 }
 
+func removeOrganizationMemberQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[int] {
+	return pgdb.TypedQuery[int]{
+		SQL: `
+			DELETE FROM org.org_membership AS membership
+			USING useraccess.users AS usr
+			WHERE usr.external_id = @user_id
+				AND usr.deleted_at IS NULL
+				AND membership.user_id = usr.id
+				AND membership.org_id = @org_id
+			RETURNING membership.org_id`,
+		Args:   pgx.NamedArgs{"user_id": userID, "org_id": orgID},
+		Scan:   pgx.RowTo[int],
+		Expect: pgdb.ExpectOne,
+	}
+}
+
 func accessibleProjectsQuery(userID uuid.UUID, filter ProjectFilter, pageSize, pageOffset int) pgdb.TypedQuery[Project] {
 	params := pgx.NamedArgs{
 		"user_id":     userID,

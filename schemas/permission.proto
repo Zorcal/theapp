@@ -56,6 +56,8 @@ enum Permission {
   PERMISSION_ORGANIZATION_USER_CREATE = 20;
   PERMISSION_ORGANIZATION_USER_READ = 21;
   PERMISSION_USER_DELETE = 22;
+  PERMISSION_USER_RESTORE = 23;
+  PERMISSION_ORGANIZATION_USER_REMOVE = 24;
 }
 
 // AssignmentScope is the narrowest scope at which a permission or role is meaningful.

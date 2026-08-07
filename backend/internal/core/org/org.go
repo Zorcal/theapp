@@ -39,6 +39,9 @@ type OrgStorer interface {
 	// EnsureOrganizationMember adds a user to an organization when the membership does not exist.
 	// Returns [sql.ErrNoRows] if the user or organization does not exist.
 	EnsureOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error
+	// RemoveOrganizationMember removes an active user's membership.
+	// Returns [sql.ErrNoRows] if the active user or membership does not exist.
+	RemoveOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error
 	// OrganizationUsers returns a page and total count of organization members matching filter.
 	// Returns [sql.ErrNoRows] if filter selects a project outside the organization.
 	OrganizationUsers(ctx context.Context, orgID int, filter pgorg.OrganizationUserFilter, pageSize, pageOffset int) ([]pguser.User, int, error)
@@ -58,6 +61,7 @@ type OrgStorer interface {
 // management.
 type OrganizationUserStore interface {
 	// GetOrCreateUserByEmail returns the user with the given email, creating one if none exists.
+	// Returns [pguser.ErrDeleted] if the email belongs to a deleted user.
 	GetOrCreateUserByEmail(ctx context.Context, email string) (pguser.User, error)
 }
 
@@ -68,6 +72,44 @@ type RoleBootstrapperStore interface {
 	CreateOrganizationAdminRole(ctx context.Context, orgID int, permissionNames []string) (pgrbac.CustomRole, error)
 	// AssignCustomRoleToOrg assigns an organization-owned role to an organization member.
 	AssignCustomRoleToOrg(ctx context.Context, userID, roleID uuid.UUID, orgID int) error
+	// DeleteOrganizationUserRoleAssignments removes all role assignments held by an active user
+	// within an organization.
+	// Returns [sql.ErrNoRows] if the active user or membership does not exist.
+	DeleteOrganizationUserRoleAssignments(ctx context.Context, userID uuid.UUID, orgID int) error
+}
+
+// RemoveOrganizationUser removes a user and their role assignments from the authenticated
+// organization without deleting the system identity.
+// Returns [mdl.ErrNotFound] if the active user is not an organization member.
+func (c *Core) RemoveOrganizationUser(ctx context.Context, userID uuid.UUID) error {
+	sess, ok := mdl.AuthSessionFromContext(ctx)
+	if !ok {
+		return errors.New("auth session missing")
+	}
+	if sess.Project == nil {
+		return errors.New("project context missing")
+	}
+
+	if err := c.transactor.RunTx(ctx, func(ctx context.Context) error {
+		if err := c.roleBootstrapperStore.DeleteOrganizationUserRoleAssignments(ctx, userID, sess.Project.OrgID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return mdl.ErrNotFound
+			}
+			return fmt.Errorf("delete organization user role assignments: %w", err)
+		}
+
+		if err := c.orgStorer.RemoveOrganizationMember(ctx, userID, sess.Project.OrgID); err != nil {
+			// The active membership was established earlier in this transaction, so sql.ErrNoRows
+			// is an impossible state that must remain an internal error.
+			return fmt.Errorf("remove organization member: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("remove organization user: %w", err)
+	}
+
+	return nil
 }
 
 // Transactor runs a function inside a database transaction.
@@ -242,6 +284,9 @@ func (c *Core) CreateOrganizationUser(ctx context.Context, cou mdl.CreateOrganiz
 		var err error
 		pgUser, err = c.orgUserStore.GetOrCreateUserByEmail(ctx, cou.Email)
 		if err != nil {
+			if errors.Is(err, pguser.ErrDeleted) {
+				return mdl.ErrUserDeleted
+			}
 			return fmt.Errorf("get or create organization user: %w", err)
 		}
 

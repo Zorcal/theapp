@@ -12,6 +12,7 @@ import (
 	_ "google.golang.org/genproto/googleapis/rpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -208,6 +209,52 @@ func (x *CreateOrganizationUserRequest) GetEmail() string {
 	return ""
 }
 
+// Request message for removing an organization user.
+type RemoveOrganizationUserRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unique identifier of the system user to remove from the organization.
+	Id            string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveOrganizationUserRequest) Reset() {
+	*x = RemoveOrganizationUserRequest{}
+	mi := &file_organization_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveOrganizationUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveOrganizationUserRequest) ProtoMessage() {}
+
+func (x *RemoveOrganizationUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_organization_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveOrganizationUserRequest.ProtoReflect.Descriptor instead.
+func (*RemoveOrganizationUserRequest) Descriptor() ([]byte, []int) {
+	return file_organization_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RemoveOrganizationUserRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 type OrganizationUserFilter struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Restrict results to organization members with effective access to this project.
@@ -218,7 +265,7 @@ type OrganizationUserFilter struct {
 
 func (x *OrganizationUserFilter) Reset() {
 	*x = OrganizationUserFilter{}
-	mi := &file_organization_proto_msgTypes[3]
+	mi := &file_organization_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -230,7 +277,7 @@ func (x *OrganizationUserFilter) String() string {
 func (*OrganizationUserFilter) ProtoMessage() {}
 
 func (x *OrganizationUserFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_organization_proto_msgTypes[3]
+	mi := &file_organization_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -243,7 +290,7 @@ func (x *OrganizationUserFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrganizationUserFilter.ProtoReflect.Descriptor instead.
 func (*OrganizationUserFilter) Descriptor() ([]byte, []int) {
-	return file_organization_proto_rawDescGZIP(), []int{3}
+	return file_organization_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *OrganizationUserFilter) GetProjectId() int32 {
@@ -267,7 +314,7 @@ type ListOrganizationUsersRequest struct {
 
 func (x *ListOrganizationUsersRequest) Reset() {
 	*x = ListOrganizationUsersRequest{}
-	mi := &file_organization_proto_msgTypes[4]
+	mi := &file_organization_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -279,7 +326,7 @@ func (x *ListOrganizationUsersRequest) String() string {
 func (*ListOrganizationUsersRequest) ProtoMessage() {}
 
 func (x *ListOrganizationUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_organization_proto_msgTypes[4]
+	mi := &file_organization_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -292,7 +339,7 @@ func (x *ListOrganizationUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOrganizationUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListOrganizationUsersRequest) Descriptor() ([]byte, []int) {
-	return file_organization_proto_rawDescGZIP(), []int{4}
+	return file_organization_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListOrganizationUsersRequest) GetPageSize() int32 {
@@ -330,7 +377,7 @@ type ListOrganizationUsersResponse struct {
 
 func (x *ListOrganizationUsersResponse) Reset() {
 	*x = ListOrganizationUsersResponse{}
-	mi := &file_organization_proto_msgTypes[5]
+	mi := &file_organization_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -342,7 +389,7 @@ func (x *ListOrganizationUsersResponse) String() string {
 func (*ListOrganizationUsersResponse) ProtoMessage() {}
 
 func (x *ListOrganizationUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_organization_proto_msgTypes[5]
+	mi := &file_organization_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -355,7 +402,7 @@ func (x *ListOrganizationUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOrganizationUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListOrganizationUsersResponse) Descriptor() ([]byte, []int) {
-	return file_organization_proto_rawDescGZIP(), []int{5}
+	return file_organization_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListOrganizationUsersResponse) GetUsers() []*User {
@@ -383,7 +430,7 @@ var File_organization_proto protoreflect.FileDescriptor
 
 const file_organization_proto_rawDesc = "" +
 	"\n" +
-	"\x12organization.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\n" +
+	"\x12organization.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\n" +
 	"user.proto\"\xee\x01\n" +
 	"\fOrganization\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\x05B\x03\xe0A\x03R\x02id\x12\x12\n" +
@@ -397,7 +444,9 @@ const file_organization_proto_rawDesc = "" +
 	"\forganization\x18\x01 \x01(\v2\x17.theapp.v1.OrganizationB\x03\xe0A\x02R\forganization\x12&\n" +
 	"\fproject_name\x18\x02 \x01(\tB\x03\xe0A\x02R\vprojectName\":\n" +
 	"\x1dCreateOrganizationUserRequest\x12\x19\n" +
-	"\x05email\x18\x01 \x01(\tB\x03\xe0A\x02R\x05email\"7\n" +
+	"\x05email\x18\x01 \x01(\tB\x03\xe0A\x02R\x05email\"4\n" +
+	"\x1dRemoveOrganizationUserRequest\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\"7\n" +
 	"\x16OrganizationUserFilter\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\x05R\tprojectId\"\x95\x01\n" +
@@ -410,7 +459,7 @@ const file_organization_proto_rawDesc = "" +
 	"\x05users\x18\x01 \x03(\v2\x0f.theapp.v1.UserR\x05users\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xc4\x0e\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xa8\x13\n" +
 	"\n" +
 	"OrgService\x12\x9a\x05\n" +
 	"\x12CreateOrganization\x12$.theapp.v1.CreateOrganizationRequest\x1a\x17.theapp.v1.Organization\"\xc4\x04\x92A\xa4\x04Jf\n" +
@@ -466,7 +515,25 @@ const file_organization_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.Statusr=\n" +
 	";\n" +
-	"\fx-project-id\x12'ID of the organization control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/organizations/usersB\xd7\x02\x92A\xa9\x01\x12\x1d\n" +
+	"\fx-project-id\x12'ID of the organization control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/v1/organizations/users\x12\xe1\x04\n" +
+	"\x16RemoveOrganizationUser\x12(.theapp.v1.RemoveOrganizationUserRequest\x1a\x16.google.protobuf.Empty\"\x84\x04\x92A\xdc\x03JE\n" +
+	"\x03400\x12>\n" +
+	"$Invalid user ID or project metadata.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
+	"\x03401\x129\n" +
+	"\x1fMissing or invalid credentials.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ\x90\x01\n" +
+	"\x03403\x12\x88\x01\n" +
+	"nOrganization-user removal access is missing or the selected project is not the organization's control project.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJD\n" +
+	"\x03404\x12=\n" +
+	"#Active organization user not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
+	"\x03500\x122\n" +
+	"\x18Unexpected server error.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.Statusr=\n" +
+	";\n" +
+	"\fx-project-id\x12'ID of the organization control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1e*\x1c/v1/organizations/users/{id}B\xd7\x02\x92A\xa9\x01\x12\x1d\n" +
 	"\x17theapp Organization API2\x02v1Zv\n" +
 	"t\n" +
 	"\n" +
@@ -489,31 +556,35 @@ func file_organization_proto_rawDescGZIP() []byte {
 	return file_organization_proto_rawDescData
 }
 
-var file_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_organization_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_organization_proto_goTypes = []any{
 	(*Organization)(nil),                  // 0: theapp.v1.Organization
 	(*CreateOrganizationRequest)(nil),     // 1: theapp.v1.CreateOrganizationRequest
 	(*CreateOrganizationUserRequest)(nil), // 2: theapp.v1.CreateOrganizationUserRequest
-	(*OrganizationUserFilter)(nil),        // 3: theapp.v1.OrganizationUserFilter
-	(*ListOrganizationUsersRequest)(nil),  // 4: theapp.v1.ListOrganizationUsersRequest
-	(*ListOrganizationUsersResponse)(nil), // 5: theapp.v1.ListOrganizationUsersResponse
-	(*timestamppb.Timestamp)(nil),         // 6: google.protobuf.Timestamp
-	(*User)(nil),                          // 7: theapp.v1.User
+	(*RemoveOrganizationUserRequest)(nil), // 3: theapp.v1.RemoveOrganizationUserRequest
+	(*OrganizationUserFilter)(nil),        // 4: theapp.v1.OrganizationUserFilter
+	(*ListOrganizationUsersRequest)(nil),  // 5: theapp.v1.ListOrganizationUsersRequest
+	(*ListOrganizationUsersResponse)(nil), // 6: theapp.v1.ListOrganizationUsersResponse
+	(*timestamppb.Timestamp)(nil),         // 7: google.protobuf.Timestamp
+	(*User)(nil),                          // 8: theapp.v1.User
+	(*emptypb.Empty)(nil),                 // 9: google.protobuf.Empty
 }
 var file_organization_proto_depIdxs = []int32{
-	6, // 0: theapp.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
-	6, // 1: theapp.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
+	7, // 0: theapp.v1.Organization.create_time:type_name -> google.protobuf.Timestamp
+	7, // 1: theapp.v1.Organization.update_time:type_name -> google.protobuf.Timestamp
 	0, // 2: theapp.v1.CreateOrganizationRequest.organization:type_name -> theapp.v1.Organization
-	3, // 3: theapp.v1.ListOrganizationUsersRequest.filter:type_name -> theapp.v1.OrganizationUserFilter
-	7, // 4: theapp.v1.ListOrganizationUsersResponse.users:type_name -> theapp.v1.User
+	4, // 3: theapp.v1.ListOrganizationUsersRequest.filter:type_name -> theapp.v1.OrganizationUserFilter
+	8, // 4: theapp.v1.ListOrganizationUsersResponse.users:type_name -> theapp.v1.User
 	1, // 5: theapp.v1.OrgService.CreateOrganization:input_type -> theapp.v1.CreateOrganizationRequest
 	2, // 6: theapp.v1.OrgService.CreateOrganizationUser:input_type -> theapp.v1.CreateOrganizationUserRequest
-	4, // 7: theapp.v1.OrgService.ListOrganizationUsers:input_type -> theapp.v1.ListOrganizationUsersRequest
-	0, // 8: theapp.v1.OrgService.CreateOrganization:output_type -> theapp.v1.Organization
-	7, // 9: theapp.v1.OrgService.CreateOrganizationUser:output_type -> theapp.v1.User
-	5, // 10: theapp.v1.OrgService.ListOrganizationUsers:output_type -> theapp.v1.ListOrganizationUsersResponse
-	8, // [8:11] is the sub-list for method output_type
-	5, // [5:8] is the sub-list for method input_type
+	5, // 7: theapp.v1.OrgService.ListOrganizationUsers:input_type -> theapp.v1.ListOrganizationUsersRequest
+	3, // 8: theapp.v1.OrgService.RemoveOrganizationUser:input_type -> theapp.v1.RemoveOrganizationUserRequest
+	0, // 9: theapp.v1.OrgService.CreateOrganization:output_type -> theapp.v1.Organization
+	8, // 10: theapp.v1.OrgService.CreateOrganizationUser:output_type -> theapp.v1.User
+	6, // 11: theapp.v1.OrgService.ListOrganizationUsers:output_type -> theapp.v1.ListOrganizationUsersResponse
+	9, // 12: theapp.v1.OrgService.RemoveOrganizationUser:output_type -> google.protobuf.Empty
+	9, // [9:13] is the sub-list for method output_type
+	5, // [5:9] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
 	5, // [5:5] is the sub-list for extension extendee
 	0, // [0:5] is the sub-list for field type_name
@@ -531,7 +602,7 @@ func file_organization_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_organization_proto_rawDesc), len(file_organization_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

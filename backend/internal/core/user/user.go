@@ -23,6 +23,9 @@ type UserStorer interface {
 	// SoftDeleteUser marks id as deleted.
 	// Returns [sql.ErrNoRows] if id does not identify an active user.
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
+	// RestoreUser restores id and returns it.
+	// Returns [sql.ErrNoRows] if id does not identify a deleted user.
+	RestoreUser(ctx context.Context, id uuid.UUID) (pguser.User, error)
 	// UserByExternalID returns the active user with the given external ID.
 	// Returns [sql.ErrNoRows] if no such active user exists.
 	UserByExternalID(ctx context.Context, id uuid.UUID) (pguser.User, error)
@@ -107,8 +110,11 @@ func (c *Core) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, err
 
 	pgUser, err := c.userStorer.CreateUser(ctx, pgCreateUser)
 	if err != nil {
-		if errors.Is(err, pgdb.ErrAlreadyExists) {
+		switch {
+		case errors.Is(err, pgdb.ErrAlreadyExists):
 			return mdl.User{}, mdl.ErrAlreadyExists
+		case errors.Is(err, pguser.ErrDeleted):
+			return mdl.User{}, mdl.ErrUserDeleted
 		}
 		return mdl.User{}, fmt.Errorf("create user: %w", err)
 	}
@@ -170,6 +176,20 @@ func (c *Core) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+// RestoreUser restores the soft-deleted user with the given ID and returns it.
+// Returns [mdl.ErrNotFound] if no deleted user with that ID exists.
+func (c *Core) RestoreUser(ctx context.Context, id uuid.UUID) (mdl.User, error) {
+	pgUser, err := c.userStorer.RestoreUser(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return mdl.User{}, mdl.ErrNotFound
+		}
+		return mdl.User{}, fmt.Errorf("restore user: %w", err)
+	}
+
+	return userFromPg(pgUser), nil
 }
 
 // Users returns a page of active users matching filter ordered by orderBys, along with the total

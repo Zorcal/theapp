@@ -240,6 +240,76 @@
           "OrgService"
         ]
       }
+    },
+    "/v1/organizations/users/{id}": {
+      "delete": {
+        "summary": "Removes a user and their role assignments from the organization selected through its control\nproject. The system user and memberships in other organizations remain unchanged.",
+        "operationId": "OrgService_RemoveOrganizationUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "400": {
+            "description": "Invalid user ID or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization-user removal access is missing or the selected project is not the organization's control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Active organization user not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "Unique identifier of the system user to remove from the organization.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the organization control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      }
     }
   },
   "definitions": {

@@ -495,6 +495,16 @@ func TestCore_CreateUser_error(t *testing.T) {
 			in:   in,
 			want: mdl.ErrAlreadyExists,
 		},
+		{
+			name: "deleted email",
+			userStorer: &MockedUserStorer{
+				CreateUserFunc: func(_ context.Context, _ pguser.CreateUser) (pguser.User, error) {
+					return pguser.User{}, pguser.ErrDeleted
+				},
+			},
+			in:   in,
+			want: mdl.ErrUserDeleted,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -736,6 +746,62 @@ func TestCore_DeleteUser_error(t *testing.T) {
 
 			if err := core.DeleteUser(t.Context(), uuid.New()); !errors.Is(err, tt.want) {
 				t.Errorf("DeleteUser() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestCore_RestoreUser(t *testing.T) {
+	now := time.Now()
+	id := uuid.New()
+	etag := uuid.New()
+	core := NewCore(&MockedUserStorer{
+		RestoreUserFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+			return pguser.User{ExternalID: id, Email: "restored@test.com", Name: "Restored", CreatedAt: now, ETag: etag}, nil
+		},
+	}, nil, immediateTransactor{})
+
+	got, err := core.RestoreUser(t.Context(), id)
+	if err != nil {
+		t.Fatalf("RestoreUser() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, got, mdl.User{ID: id, Email: "restored@test.com", Name: "Restored", CreatedAt: now, ETag: etag.String()})
+}
+
+func TestCore_RestoreUser_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		userStorer *MockedUserStorer
+		want       error
+	}{
+		{
+			name: "not found",
+			userStorer: &MockedUserStorer{
+				RestoreUserFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{}, sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "store",
+			userStorer: &MockedUserStorer{
+				RestoreUserFunc: func(_ context.Context, _ uuid.UUID) (pguser.User, error) {
+					return pguser.User{}, dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.userStorer, nil, immediateTransactor{})
+
+			if _, err := core.RestoreUser(t.Context(), uuid.New()); !errors.Is(err, tt.want) {
+				t.Errorf("RestoreUser() error = %v, want %v", err, tt.want)
 			}
 		})
 	}

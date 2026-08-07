@@ -1,10 +1,14 @@
 package pguser
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// ErrDeleted is returned when an operation identifies a soft-deleted user.
+var ErrDeleted = errors.New("user deleted")
 
 // OrderByField represents a field that user query results can be ordered by.
 type OrderByField string

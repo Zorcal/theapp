@@ -209,6 +209,8 @@ func TestStore_CreateUser_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
 	store := pguser.NewStore(pool)
+	deleted := seedUser(t, store, "deleted@test.com", "Deleted User")
+	mustSoftDeleteUser(t, store, deleted.ExternalID)
 
 	t.Run("duplicate email returns ErrAlreadyExists", func(t *testing.T) {
 		seedUser(t, store, "alice@test.com", "Alice Smith")
@@ -218,6 +220,15 @@ func TestStore_CreateUser_error(t *testing.T) {
 			Name:  "Alice Duplicate",
 		}); !errors.Is(err, pgdb.ErrAlreadyExists) {
 			t.Errorf("CreateUser() error = %v, want pgdb.ErrAlreadyExists", err)
+		}
+	})
+
+	t.Run("deleted email returns ErrDeleted", func(t *testing.T) {
+		if _, err := store.CreateUser(ctx, pguser.CreateUser{
+			Email: deleted.Email,
+			Name:  "Replacement User",
+		}); !errors.Is(err, pguser.ErrDeleted) {
+			t.Errorf("CreateUser() error = %v, want %v", err, pguser.ErrDeleted)
 		}
 	})
 }
@@ -529,6 +540,57 @@ func TestStore_SoftDeleteUser_error(t *testing.T) {
 	}
 }
 
+func TestStore_RestoreUser(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := pguser.NewStore(pool)
+
+	seeded := seedUser(t, store, "restored@test.com", "Restored User")
+	mustSoftDeleteUser(t, store, seeded.ExternalID)
+
+	restored, err := store.RestoreUser(ctx, seeded.ExternalID)
+	if err != nil {
+		t.Fatalf("RestoreUser() error = %v", err)
+	}
+
+	testingx.AssertDiff(t, restored, seeded, cmpopts.IgnoreFields(pguser.User{}, "UpdatedAt", "ETag"))
+
+	if restored.ETag == seeded.ETag {
+		t.Error("RestoreUser() ETag unchanged")
+	}
+}
+
+func TestStore_RestoreUser_error(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+	store := pguser.NewStore(pool)
+	active := seedUser(t, store, "active@test.com", "Active User")
+
+	tests := []struct {
+		name string
+		id   uuid.UUID
+		want error
+	}{
+		{
+			name: "unknown user",
+			id:   uuid.New(),
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "active user",
+			id:   active.ExternalID,
+			want: sql.ErrNoRows,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := store.RestoreUser(ctx, tt.id); !errors.Is(err, tt.want) {
+				t.Errorf("RestoreUser() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestStore_GetOrCreateUserByEmail(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
@@ -568,9 +630,9 @@ func TestStore_GetOrCreateUserByEmail_error(t *testing.T) {
 	softDeletedUser := seedUser(t, store, "deleted-existing@test.com", "Deleted Existing User")
 	mustSoftDeleteUser(t, store, softDeletedUser.ExternalID)
 
-	t.Run("not found", func(t *testing.T) {
-		if _, err := store.GetOrCreateUserByEmail(ctx, softDeletedUser.Email); !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("GetOrCreateUserByEmail() error = %v, want sql.ErrNoRows", err)
+	t.Run("deleted", func(t *testing.T) {
+		if _, err := store.GetOrCreateUserByEmail(ctx, softDeletedUser.Email); !errors.Is(err, pguser.ErrDeleted) {
+			t.Errorf("GetOrCreateUserByEmail() error = %v, want %v", err, pguser.ErrDeleted)
 		}
 	})
 }

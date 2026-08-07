@@ -47,6 +47,9 @@ var _ OrgStorer = &MockedOrgStorer{}
 //			ProjectByNameFunc: func(ctx context.Context, orgID int, name string) (pgorg.Project, error) {
 //				panic("mock out the ProjectByName method")
 //			},
+//			RemoveOrganizationMemberFunc: func(ctx context.Context, userID uuid.UUID, orgID int) error {
+//				panic("mock out the RemoveOrganizationMember method")
+//			},
 //		}
 //
 //		// use mockedOrgStorer in code that requires OrgStorer
@@ -77,6 +80,9 @@ type MockedOrgStorer struct {
 
 	// ProjectByNameFunc mocks the ProjectByName method.
 	ProjectByNameFunc func(ctx context.Context, orgID int, name string) (pgorg.Project, error)
+
+	// RemoveOrganizationMemberFunc mocks the RemoveOrganizationMember method.
+	RemoveOrganizationMemberFunc func(ctx context.Context, userID uuid.UUID, orgID int) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -154,6 +160,15 @@ type MockedOrgStorer struct {
 			// Name is the name argument value.
 			Name string
 		}
+		// RemoveOrganizationMember holds details about calls to the RemoveOrganizationMember method.
+		RemoveOrganizationMember []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
+		}
 	}
 	lockAccessibleProjects       sync.RWMutex
 	lockAddOrganizationMember    sync.RWMutex
@@ -163,6 +178,7 @@ type MockedOrgStorer struct {
 	lockOrganizationByName       sync.RWMutex
 	lockOrganizationUsers        sync.RWMutex
 	lockProjectByName            sync.RWMutex
+	lockRemoveOrganizationMember sync.RWMutex
 }
 
 // AccessibleProjects calls AccessibleProjectsFunc.
@@ -489,6 +505,46 @@ func (mock *MockedOrgStorer) ProjectByNameCalls() []struct {
 	return calls
 }
 
+// RemoveOrganizationMember calls RemoveOrganizationMemberFunc.
+func (mock *MockedOrgStorer) RemoveOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error {
+	if mock.RemoveOrganizationMemberFunc == nil {
+		panic("MockedOrgStorer.RemoveOrganizationMemberFunc: method is nil but OrgStorer.RemoveOrganizationMember was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		OrgID:  orgID,
+	}
+	mock.lockRemoveOrganizationMember.Lock()
+	mock.calls.RemoveOrganizationMember = append(mock.calls.RemoveOrganizationMember, callInfo)
+	mock.lockRemoveOrganizationMember.Unlock()
+	return mock.RemoveOrganizationMemberFunc(ctx, userID, orgID)
+}
+
+// RemoveOrganizationMemberCalls gets all the calls that were made to RemoveOrganizationMember.
+// Check the length with:
+//
+//	len(mockedOrgStorer.RemoveOrganizationMemberCalls())
+func (mock *MockedOrgStorer) RemoveOrganizationMemberCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}
+	mock.lockRemoveOrganizationMember.RLock()
+	calls = mock.calls.RemoveOrganizationMember
+	mock.lockRemoveOrganizationMember.RUnlock()
+	return calls
+}
+
 // Ensure, that MockedOrganizationUserStore does implement OrganizationUserStore.
 // If this is not the case, regenerate this file with moq.
 var _ OrganizationUserStore = &MockedOrganizationUserStore{}
@@ -577,6 +633,9 @@ var _ RoleBootstrapperStore = &MockedRoleBootstrapperStore{}
 //			CreateOrganizationAdminRoleFunc: func(ctx context.Context, orgID int, permissionNames []string) (pgrbac.CustomRole, error) {
 //				panic("mock out the CreateOrganizationAdminRole method")
 //			},
+//			DeleteOrganizationUserRoleAssignmentsFunc: func(ctx context.Context, userID uuid.UUID, orgID int) error {
+//				panic("mock out the DeleteOrganizationUserRoleAssignments method")
+//			},
 //		}
 //
 //		// use mockedRoleBootstrapperStore in code that requires RoleBootstrapperStore
@@ -589,6 +648,9 @@ type MockedRoleBootstrapperStore struct {
 
 	// CreateOrganizationAdminRoleFunc mocks the CreateOrganizationAdminRole method.
 	CreateOrganizationAdminRoleFunc func(ctx context.Context, orgID int, permissionNames []string) (pgrbac.CustomRole, error)
+
+	// DeleteOrganizationUserRoleAssignmentsFunc mocks the DeleteOrganizationUserRoleAssignments method.
+	DeleteOrganizationUserRoleAssignmentsFunc func(ctx context.Context, userID uuid.UUID, orgID int) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -612,9 +674,19 @@ type MockedRoleBootstrapperStore struct {
 			// PermissionNames is the permissionNames argument value.
 			PermissionNames []string
 		}
+		// DeleteOrganizationUserRoleAssignments holds details about calls to the DeleteOrganizationUserRoleAssignments method.
+		DeleteOrganizationUserRoleAssignments []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+			// OrgID is the orgID argument value.
+			OrgID int
+		}
 	}
-	lockAssignCustomRoleToOrg       sync.RWMutex
-	lockCreateOrganizationAdminRole sync.RWMutex
+	lockAssignCustomRoleToOrg                 sync.RWMutex
+	lockCreateOrganizationAdminRole           sync.RWMutex
+	lockDeleteOrganizationUserRoleAssignments sync.RWMutex
 }
 
 // AssignCustomRoleToOrg calls AssignCustomRoleToOrgFunc.
@@ -698,5 +770,45 @@ func (mock *MockedRoleBootstrapperStore) CreateOrganizationAdminRoleCalls() []st
 	mock.lockCreateOrganizationAdminRole.RLock()
 	calls = mock.calls.CreateOrganizationAdminRole
 	mock.lockCreateOrganizationAdminRole.RUnlock()
+	return calls
+}
+
+// DeleteOrganizationUserRoleAssignments calls DeleteOrganizationUserRoleAssignmentsFunc.
+func (mock *MockedRoleBootstrapperStore) DeleteOrganizationUserRoleAssignments(ctx context.Context, userID uuid.UUID, orgID int) error {
+	if mock.DeleteOrganizationUserRoleAssignmentsFunc == nil {
+		panic("MockedRoleBootstrapperStore.DeleteOrganizationUserRoleAssignmentsFunc: method is nil but RoleBootstrapperStore.DeleteOrganizationUserRoleAssignments was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+		OrgID:  orgID,
+	}
+	mock.lockDeleteOrganizationUserRoleAssignments.Lock()
+	mock.calls.DeleteOrganizationUserRoleAssignments = append(mock.calls.DeleteOrganizationUserRoleAssignments, callInfo)
+	mock.lockDeleteOrganizationUserRoleAssignments.Unlock()
+	return mock.DeleteOrganizationUserRoleAssignmentsFunc(ctx, userID, orgID)
+}
+
+// DeleteOrganizationUserRoleAssignmentsCalls gets all the calls that were made to DeleteOrganizationUserRoleAssignments.
+// Check the length with:
+//
+//	len(mockedRoleBootstrapperStore.DeleteOrganizationUserRoleAssignmentsCalls())
+func (mock *MockedRoleBootstrapperStore) DeleteOrganizationUserRoleAssignmentsCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+	OrgID  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+		OrgID  int
+	}
+	mock.lockDeleteOrganizationUserRoleAssignments.RLock()
+	calls = mock.calls.DeleteOrganizationUserRoleAssignments
+	mock.lockDeleteOrganizationUserRoleAssignments.RUnlock()
 	return calls
 }

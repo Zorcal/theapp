@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
@@ -35,9 +37,28 @@ type OrganizationCore interface {
 	// and adds that user to the authenticated organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	CreateOrganizationUser(ctx context.Context, user mdl.CreateOrganizationUser) (mdl.User, error)
+	// RemoveOrganizationUser removes a user and their role assignments from the authenticated
+	// organization without deleting the system identity.
+	// Returns [mdl.ErrNotFound] if the active user is not an organization member.
+	RemoveOrganizationUser(ctx context.Context, userID uuid.UUID) error
 	// OrganizationUsers returns a page and total count of users in the authenticated organization.
 	// Returns [mdl.ErrNotFound] if the project filter selects a project outside the organization.
 	OrganizationUsers(ctx context.Context, filter mdl.OrganizationUserFilter, pageSize, pageOffset int) ([]mdl.User, int, error)
+}
+
+func (s *organizationService) RemoveOrganizationUser(ctx context.Context, req *pb.RemoveOrganizationUserRequest) (*emptypb.Empty, error) {
+	if err := validate.RemoveOrganizationUser(req); err != nil {
+		return nil, fmt.Errorf("validate remove organization user request: %w", err)
+	}
+
+	if err := s.orgCore.RemoveOrganizationUser(ctx, uuid.MustParse(req.GetId())); err != nil {
+		if errors.Is(err, mdl.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "active organization user %q not found", req.GetId())
+		}
+		return nil, fmt.Errorf("remove organization user: %w", err)
+	}
+
+	return &emptypb.Empty{}, nil
 }
 
 func (s *organizationService) CreateOrganizationUser(ctx context.Context, req *pb.CreateOrganizationUserRequest) (*pb.User, error) {
@@ -47,8 +68,11 @@ func (s *organizationService) CreateOrganizationUser(ctx context.Context, req *p
 
 	user, err := s.orgCore.CreateOrganizationUser(ctx, conv.CreateOrganizationUserFromPB(req))
 	if err != nil {
-		if errors.Is(err, mdl.ErrValidation) {
+		switch {
+		case errors.Is(err, mdl.ErrValidation):
 			return nil, status.Error(codes.InvalidArgument, "invalid organization user")
+		case errors.Is(err, mdl.ErrUserDeleted):
+			return nil, status.Error(codes.FailedPrecondition, "a deleted user with this email must be restored")
 		}
 		return nil, fmt.Errorf("create organization user: %w", err)
 	}

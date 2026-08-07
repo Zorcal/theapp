@@ -223,6 +223,19 @@ func TestUserService_CreateUser_error(t *testing.T) {
 			want: invalidArgWithViolation("user.email", "a user with this email already exists"),
 		},
 		{
+			name: "deleted email",
+			userCore: &MockedUserCore{
+				CreateUserFunc: func(_ context.Context, _ mdl.CreateUser) (mdl.User, error) {
+					return mdl.User{}, mdl.ErrUserDeleted
+				},
+			},
+			in: &pb.CreateUserRequest{User: &pb.User{
+				Email: "alice@test.com",
+				Name:  "Alice Smith",
+			}},
+			want: status.New(codes.FailedPrecondition, "a deleted user with this email must be restored"),
+		},
+		{
 			name: "core error",
 			userCore: &MockedUserCore{
 				CreateUserFunc: func(_ context.Context, _ mdl.CreateUser) (mdl.User, error) {

@@ -334,6 +334,23 @@ func (s *Store) UnassignCustomRoleFromOrg(ctx context.Context, userID, roleID uu
 	return nil
 }
 
+// DeleteOrganizationUserRoleAssignments removes every custom-role assignment held by an active
+// organization member within orgID.
+// Returns [sql.ErrNoRows] if the active user or organization membership does not exist.
+func (s *Store) DeleteOrganizationUserRoleAssignments(ctx context.Context, userID uuid.UUID, orgID int) error {
+	q := deleteOrganizationUserRoleAssignmentsQuery(userID, orgID)
+
+	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
+		var userIDSink int
+		if err := q.Queue(ctx, b, &userIDSink); err != nil {
+			return fmt.Errorf("delete organization user role assignments: %w", err)
+		}
+		return nil
+	}
+
+	return pgdb.RunBatch(ctx, s.pool, doInBatch)
+}
+
 // UserProjectCustomRoles returns a page and total count of custom roles assigned directly to
 // userID in projectID.
 // Returns [sql.ErrNoRows] if the user, project, or organization membership does not exist.

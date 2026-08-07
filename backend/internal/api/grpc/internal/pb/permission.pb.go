@@ -51,6 +51,8 @@ const (
 	Permission_PERMISSION_ORGANIZATION_USER_CREATE                  Permission = 20
 	Permission_PERMISSION_ORGANIZATION_USER_READ                    Permission = 21
 	Permission_PERMISSION_USER_DELETE                               Permission = 22
+	Permission_PERMISSION_USER_RESTORE                              Permission = 23
+	Permission_PERMISSION_ORGANIZATION_USER_REMOVE                  Permission = 24
 )
 
 // Enum value maps for Permission.
@@ -79,6 +81,8 @@ var (
 		20: "PERMISSION_ORGANIZATION_USER_CREATE",
 		21: "PERMISSION_ORGANIZATION_USER_READ",
 		22: "PERMISSION_USER_DELETE",
+		23: "PERMISSION_USER_RESTORE",
+		24: "PERMISSION_ORGANIZATION_USER_REMOVE",
 	}
 	Permission_value = map[string]int32{
 		"PERMISSION_UNSPECIFIED":                               0,
@@ -104,6 +108,8 @@ var (
 		"PERMISSION_ORGANIZATION_USER_CREATE":                  20,
 		"PERMISSION_ORGANIZATION_USER_READ":                    21,
 		"PERMISSION_USER_DELETE":                               22,
+		"PERMISSION_USER_RESTORE":                              23,
+		"PERMISSION_ORGANIZATION_USER_REMOVE":                  24,
 	}
 )
 
@@ -335,7 +341,7 @@ const file_permission_proto_rawDesc = "" +
 	"\x18minimum_assignment_scope\x18\x02 \x01(\x0e2\x1a.theapp.v1.AssignmentScopeR\x16minimumAssignmentScope\"\x18\n" +
 	"\x16ListPermissionsRequest\"\\\n" +
 	"\x17ListPermissionsResponse\x12A\n" +
-	"\vpermissions\x18\x01 \x03(\v2\x1f.theapp.v1.PermissionDescriptorR\vpermissions*\xea\x06\n" +
+	"\vpermissions\x18\x01 \x03(\v2\x1f.theapp.v1.PermissionDescriptorR\vpermissions*\xb0\a\n" +
 	"\n" +
 	"Permission\x12\x1a\n" +
 	"\x16PERMISSION_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -361,7 +367,9 @@ const file_permission_proto_rawDesc = "" +
 	"\x19PERMISSION_PROJECT_CREATE\x10\x13\x12'\n" +
 	"#PERMISSION_ORGANIZATION_USER_CREATE\x10\x14\x12%\n" +
 	"!PERMISSION_ORGANIZATION_USER_READ\x10\x15\x12\x1a\n" +
-	"\x16PERMISSION_USER_DELETE\x10\x16*\x91\x01\n" +
+	"\x16PERMISSION_USER_DELETE\x10\x16\x12\x1b\n" +
+	"\x17PERMISSION_USER_RESTORE\x10\x17\x12'\n" +
+	"#PERMISSION_ORGANIZATION_USER_REMOVE\x10\x18*\x91\x01\n" +
 	"\x0fAssignmentScope\x12 \n" +
 	"\x1cASSIGNMENT_SCOPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18ASSIGNMENT_SCOPE_PROJECT\x10\x01\x12!\n" +

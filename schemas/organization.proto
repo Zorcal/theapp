@@ -5,6 +5,7 @@ package theapp.v1;
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 import "google/rpc/status.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 import "user.proto";
@@ -192,6 +193,20 @@ service OrgService {
       }
     };
   }
+
+  // Removes a user and their role assignments from the organization selected through its control
+  // project. The system user and memberships in other organizations remain unchanged.
+  rpc RemoveOrganizationUser(RemoveOrganizationUserRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/v1/organizations/users/{id}"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      responses: {key: "400" value: {description: "Invalid user ID or project metadata." schema: {json_schema: {ref: ".google.rpc.Status"}}}}
+      responses: {key: "401" value: {description: "Missing or invalid credentials." schema: {json_schema: {ref: ".google.rpc.Status"}}}}
+      responses: {key: "403" value: {description: "Organization-user removal access is missing or the selected project is not the organization's control project." schema: {json_schema: {ref: ".google.rpc.Status"}}}}
+      responses: {key: "404" value: {description: "Active organization user not found." schema: {json_schema: {ref: ".google.rpc.Status"}}}}
+      responses: {key: "500" value: {description: "Unexpected server error." schema: {json_schema: {ref: ".google.rpc.Status"}}}}
+      parameters: {headers: {name: "x-project-id" description: "ID of the organization control project." type: INTEGER required: true}}
+    };
+  }
 }
 
 // Organization represents a tenant.
@@ -225,6 +240,12 @@ message CreateOrganizationRequest {
 message CreateOrganizationUserRequest {
   // Email address identifying the system user.
   string email = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Request message for removing an organization user.
+message RemoveOrganizationUserRequest {
+  // Unique identifier of the system user to remove from the organization.
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
 message OrganizationUserFilter {

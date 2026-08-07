@@ -28,6 +28,9 @@ var _ UserCore = &MockedUserCore{}
 //			DeleteUserFunc: func(ctx context.Context, id uuid.UUID) error {
 //				panic("mock out the DeleteUser method")
 //			},
+//			RestoreUserFunc: func(ctx context.Context, id uuid.UUID) (mdl.User, error) {
+//				panic("mock out the RestoreUser method")
+//			},
 //			UpdateUserFunc: func(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error) {
 //				panic("mock out the UpdateUser method")
 //			},
@@ -50,6 +53,9 @@ type MockedUserCore struct {
 	// DeleteUserFunc mocks the DeleteUser method.
 	DeleteUserFunc func(ctx context.Context, id uuid.UUID) error
 
+	// RestoreUserFunc mocks the RestoreUser method.
+	RestoreUserFunc func(ctx context.Context, id uuid.UUID) (mdl.User, error)
+
 	// UpdateUserFunc mocks the UpdateUser method.
 	UpdateUserFunc func(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error)
 
@@ -70,6 +76,13 @@ type MockedUserCore struct {
 		}
 		// DeleteUser holds details about calls to the DeleteUser method.
 		DeleteUser []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID uuid.UUID
+		}
+		// RestoreUser holds details about calls to the RestoreUser method.
+		RestoreUser []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// ID is the id argument value.
@@ -103,11 +116,12 @@ type MockedUserCore struct {
 			PageOffset int
 		}
 	}
-	lockCreateUser sync.RWMutex
-	lockDeleteUser sync.RWMutex
-	lockUpdateUser sync.RWMutex
-	lockUserByID   sync.RWMutex
-	lockUsers      sync.RWMutex
+	lockCreateUser  sync.RWMutex
+	lockDeleteUser  sync.RWMutex
+	lockRestoreUser sync.RWMutex
+	lockUpdateUser  sync.RWMutex
+	lockUserByID    sync.RWMutex
+	lockUsers       sync.RWMutex
 }
 
 // CreateUser calls CreateUserFunc.
@@ -179,6 +193,42 @@ func (mock *MockedUserCore) DeleteUserCalls() []struct {
 	mock.lockDeleteUser.RLock()
 	calls = mock.calls.DeleteUser
 	mock.lockDeleteUser.RUnlock()
+	return calls
+}
+
+// RestoreUser calls RestoreUserFunc.
+func (mock *MockedUserCore) RestoreUser(ctx context.Context, id uuid.UUID) (mdl.User, error) {
+	if mock.RestoreUserFunc == nil {
+		panic("MockedUserCore.RestoreUserFunc: method is nil but UserCore.RestoreUser was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockRestoreUser.Lock()
+	mock.calls.RestoreUser = append(mock.calls.RestoreUser, callInfo)
+	mock.lockRestoreUser.Unlock()
+	return mock.RestoreUserFunc(ctx, id)
+}
+
+// RestoreUserCalls gets all the calls that were made to RestoreUser.
+// Check the length with:
+//
+//	len(mockedUserCore.RestoreUserCalls())
+func (mock *MockedUserCore) RestoreUserCalls() []struct {
+	Ctx context.Context
+	ID  uuid.UUID
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  uuid.UUID
+	}
+	mock.lockRestoreUser.RLock()
+	calls = mock.calls.RestoreUser
+	mock.lockRestoreUser.RUnlock()
 	return calls
 }
 

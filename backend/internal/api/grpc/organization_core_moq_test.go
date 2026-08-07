@@ -7,6 +7,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 )
 
@@ -29,6 +30,9 @@ var _ OrganizationCore = &MockedOrganizationCore{}
 //			OrganizationUsersFunc: func(ctx context.Context, filter mdl.OrganizationUserFilter, pageSize int, pageOffset int) ([]mdl.User, int, error) {
 //				panic("mock out the OrganizationUsers method")
 //			},
+//			RemoveOrganizationUserFunc: func(ctx context.Context, userID uuid.UUID) error {
+//				panic("mock out the RemoveOrganizationUser method")
+//			},
 //		}
 //
 //		// use mockedOrganizationCore in code that requires OrganizationCore
@@ -44,6 +48,9 @@ type MockedOrganizationCore struct {
 
 	// OrganizationUsersFunc mocks the OrganizationUsers method.
 	OrganizationUsersFunc func(ctx context.Context, filter mdl.OrganizationUserFilter, pageSize int, pageOffset int) ([]mdl.User, int, error)
+
+	// RemoveOrganizationUserFunc mocks the RemoveOrganizationUser method.
+	RemoveOrganizationUserFunc func(ctx context.Context, userID uuid.UUID) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -72,10 +79,18 @@ type MockedOrganizationCore struct {
 			// PageOffset is the pageOffset argument value.
 			PageOffset int
 		}
+		// RemoveOrganizationUser holds details about calls to the RemoveOrganizationUser method.
+		RemoveOrganizationUser []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserID is the userID argument value.
+			UserID uuid.UUID
+		}
 	}
 	lockCreateOrganization     sync.RWMutex
 	lockCreateOrganizationUser sync.RWMutex
 	lockOrganizationUsers      sync.RWMutex
+	lockRemoveOrganizationUser sync.RWMutex
 }
 
 // CreateOrganization calls CreateOrganizationFunc.
@@ -191,5 +206,41 @@ func (mock *MockedOrganizationCore) OrganizationUsersCalls() []struct {
 	mock.lockOrganizationUsers.RLock()
 	calls = mock.calls.OrganizationUsers
 	mock.lockOrganizationUsers.RUnlock()
+	return calls
+}
+
+// RemoveOrganizationUser calls RemoveOrganizationUserFunc.
+func (mock *MockedOrganizationCore) RemoveOrganizationUser(ctx context.Context, userID uuid.UUID) error {
+	if mock.RemoveOrganizationUserFunc == nil {
+		panic("MockedOrganizationCore.RemoveOrganizationUserFunc: method is nil but OrganizationCore.RemoveOrganizationUser was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+	}{
+		Ctx:    ctx,
+		UserID: userID,
+	}
+	mock.lockRemoveOrganizationUser.Lock()
+	mock.calls.RemoveOrganizationUser = append(mock.calls.RemoveOrganizationUser, callInfo)
+	mock.lockRemoveOrganizationUser.Unlock()
+	return mock.RemoveOrganizationUserFunc(ctx, userID)
+}
+
+// RemoveOrganizationUserCalls gets all the calls that were made to RemoveOrganizationUser.
+// Check the length with:
+//
+//	len(mockedOrganizationCore.RemoveOrganizationUserCalls())
+func (mock *MockedOrganizationCore) RemoveOrganizationUserCalls() []struct {
+	Ctx    context.Context
+	UserID uuid.UUID
+} {
+	var calls []struct {
+		Ctx    context.Context
+		UserID uuid.UUID
+	}
+	mock.lockRemoveOrganizationUser.RLock()
+	calls = mock.calls.RemoveOrganizationUser
+	mock.lockRemoveOrganizationUser.RUnlock()
 	return calls
 }
