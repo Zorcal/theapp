@@ -4,9 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
+	"github.com/zorcal/theapp/backend/internal/telemetry"
 )
 
 // Transactor runs a function inside a database transaction. It can be injected
@@ -20,16 +26,21 @@ func NewTransactor(pool *pgxpool.Pool) *Transactor {
 	return &Transactor{pool: pool}
 }
 
-// RunTx begins a transaction, embeds it in ctx, and calls fn with the
-// enriched context. On success it commits; on error it rolls back.
+// RunTx begins a transaction, embeds it in ctx, and calls fn with the enriched context. A newly
+// opened transaction receives transaction-local project, user, and trace settings from ctx. On
+// success it commits; on error it rolls back.
 // If ctx already carries a transaction, that transaction is reused and
 // RunTx neither commits nor rolls back — the outer caller owns the lifecycle.
 func (t *Transactor) RunTx(ctx context.Context, fn func(ctx context.Context) error) error {
-	return RunTx(ctx, t.pool, fn)
+	if err := RunTx(ctx, t.pool, fn); err != nil {
+		return err
+	}
+	return nil
 }
 
-// RunTx begins a transaction, embeds it in ctx, and calls fn with the
-// enriched context. On success it commits; on error it rolls back.
+// RunTx begins a transaction, embeds it in ctx, and calls fn with the enriched context. A newly
+// opened transaction receives transaction-local project, user, and trace settings from ctx. On
+// success it commits; on error it rolls back.
 //
 // If ctx already carries a transaction (i.e. RunTx is being called from within
 // an outer RunTx), the existing transaction is reused and this call neither
@@ -83,8 +94,45 @@ func beginPoolTx(ctx context.Context, p *pgxpool.Pool) (pgx.Tx, context.Context,
 	}
 
 	ctx = ctxtWithTx(ctx, tx)
+	if err := setLocalSettings(ctx, tx); err != nil {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			err = errors.Join(err, fmt.Errorf("rollback tx: %w", rollbackErr))
+		}
+		return nil, nil, fmt.Errorf("set transaction-local settings: %w", err)
+	}
 
 	return tx, ctx, nil
+}
+
+func setLocalSettings(ctx context.Context, tx pgx.Tx) error {
+	var (
+		settings []string
+		args     []any
+	)
+	add := func(name, value string) {
+		args = append(args, value)
+		settings = append(settings, fmt.Sprintf("set_config('%s', $%d, true)", name, len(args)))
+	}
+
+	if sess, ok := mdl.AuthSessionFromContext(ctx); ok {
+		if sess.Project != nil {
+			add("app.project_id", strconv.Itoa(sess.Project.ID))
+		}
+		if sess.User.UserID != uuid.Nil {
+			add("app.user_id", sess.User.UserID.String())
+		}
+	}
+	if traceID := telemetry.GetTraceID(ctx); traceID != "" {
+		add("app.trace_id", traceID)
+	}
+	if len(settings) == 0 {
+		return nil
+	}
+
+	if _, err := tx.Exec(ctx, "SELECT "+strings.Join(settings, ", "), args...); err != nil {
+		return err
+	}
+	return nil
 }
 
 type txContextKey struct{}

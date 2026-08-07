@@ -83,7 +83,7 @@ func (c *Core) PlaceOrder(ctx context.Context, co mdl.CreateOrder) error {
 
 Wire up `pgdb.NewTransactor(pool)` at the composition root (`main.go`). `*pgdb.Transactor` satisfies the interface structurally.
 
-Nesting is safe: if `RunTx` is called with a context that already carries a transaction, it reuses it and leaves commit/rollback to the outer caller.
+Nesting is safe: if `RunTx` is called with a context that already carries a transaction, it reuses it and leaves commit/rollback to the outer caller. When the outer transaction starts, `pgdb` copies the selected project ID, authenticated user ID, and active trace ID from `ctx` into the transaction-local `app.project_id`, `app.user_id`, and `app.trace_id` PostgreSQL settings. Missing context values leave their corresponding settings unset, and PostgreSQL clears every setting when the transaction commits or rolls back.
 
 ## Error handling
 

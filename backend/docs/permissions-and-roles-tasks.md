@@ -248,9 +248,10 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
 
-## Phase 21 — pgdb transaction-local settings
+## Phase 21 — pgdb transaction-local settings — done
 
 52. `pgdb`: set `app.project_id`, `app.user_id`, `app.trace_id` as `SET LOCAL` transaction-scoped settings, sourced from `ctx`.
+	**This task is complete.**
 
 **Checkpoint:** a test transaction shows the three settings are visible via `current_setting()` and reset at commit/rollback.
 

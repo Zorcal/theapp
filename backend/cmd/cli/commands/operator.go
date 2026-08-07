@@ -14,8 +14,7 @@ import (
 
 const operatorFlagName = "operator"
 
-// operatorFlag is required on every mutating command, for actor attribution. It has no observable effect until
-// pgdb sets app.user_id from the resolved operator and auditing exists to record it.
+// operatorFlag is required on every mutating command for actor attribution.
 func operatorFlag() *cli.StringFlag {
 	return &cli.StringFlag{
 		Name:     operatorFlagName,
@@ -24,16 +23,20 @@ func operatorFlag() *cli.StringFlag {
 	}
 }
 
-// validateOperator checks that the --operator flag resolves to an existing user, by UUID or email.
+// contextWithOperator resolves the --operator flag and returns a context carrying that user as the
+// current actor.
 // Returns [mdl.ErrNotFound] if no such user exists.
-func validateOperator(ctx context.Context, cmd *cli.Command, userCore *user.Core) error {
+func contextWithOperator(ctx context.Context, cmd *cli.Command, userCore *user.Core) (context.Context, error) {
 	ref := cmd.String(operatorFlagName)
 
-	if _, err := resolveUser(ctx, userCore, ref); err != nil {
-		return fmt.Errorf("resolve user %q: %w", ref, err)
+	operator, err := resolveUser(ctx, userCore, ref)
+	if err != nil {
+		return nil, fmt.Errorf("resolve user %q: %w", ref, err)
 	}
 
-	return nil
+	return mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
+		User: mdl.AuthUser{UserID: operator.ID, Email: operator.Email},
+	}), nil
 }
 
 // resolveUser looks up a user by UUID or email, trying UUID first.

@@ -39,7 +39,8 @@ func newRoleAssignSystemCommand(userCore *user.Core, rbacCore *rbac.Core) *cli.C
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if err := validateOperator(ctx, cmd, userCore); err != nil {
+			ctx, err := contextWithOperator(ctx, cmd, userCore)
+			if err != nil {
 				return fmt.Errorf("resolve operator: %w", err)
 			}
 

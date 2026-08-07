@@ -3,11 +3,15 @@ package pgdb_test
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel/trace"
 
+	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 	"github.com/zorcal/theapp/backend/internal/data/pgtest"
 )
@@ -120,6 +124,73 @@ func TestTransactor_RunTx(t *testing.T) {
 	}
 }
 
+func TestRunTx_transactionLocalSettings(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.New(t, ctx)
+
+	projectID := 42
+	userID := uuid.New()
+	traceID := trace.TraceID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	spanID := trace.SpanID{1, 2, 3, 4, 5, 6, 7, 8}
+
+	ctx = mdl.ContextWithAuthSession(ctx, mdl.AuthSession{
+		User:    mdl.AuthUser{UserID: userID},
+		Project: &mdl.AuthProject{ID: projectID},
+	})
+	ctx = trace.ContextWithSpanContext(ctx, trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: traceID,
+		SpanID:  spanID,
+	}))
+
+	if err := pgdb.RunTx(ctx, pool, func(ctx context.Context) error {
+		tx := pgdb.TxFromCtx(ctx)
+		var (
+			gotProjectID string
+			gotUserID    string
+			gotTraceID   string
+		)
+		if err := tx.QueryRow(ctx, `SELECT
+			current_setting('app.project_id'),
+			current_setting('app.user_id'),
+			current_setting('app.trace_id')`).Scan(&gotProjectID, &gotUserID, &gotTraceID); err != nil {
+			return err
+		}
+
+		if got, want := gotProjectID, strconv.Itoa(projectID); got != want {
+			t.Errorf("current_setting(app.project_id) = %q, want %q", got, want)
+		}
+		if got, want := gotUserID, userID.String(); got != want {
+			t.Errorf("current_setting(app.user_id) = %q, want %q", got, want)
+		}
+		if got, want := gotTraceID, traceID.String(); got != want {
+			t.Errorf("current_setting(app.trace_id) = %q, want %q", got, want)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("RunTx() error = %v", err)
+	}
+
+	assertTxSettingsReset(t, ctx, pool)
+}
+
+func TestRunTx_transactionLocalSettingsResetOnRollback(t *testing.T) {
+	ctx := mdl.ContextWithAuthSession(context.Background(), mdl.AuthSession{
+		User:    mdl.AuthUser{UserID: uuid.New()},
+		Project: &mdl.AuthProject{ID: 42},
+	})
+	pool := pgtest.New(t, ctx)
+
+	sentinel := errors.New("sentinel")
+
+	if err := pgdb.RunTx(ctx, pool, func(context.Context) error {
+		return sentinel
+	}); !errors.Is(err, sentinel) {
+		t.Fatalf("RunTx() error = %v, want %v", err, sentinel)
+	}
+
+	assertTxSettingsReset(t, ctx, pool)
+}
+
 func TestRunExec(t *testing.T) {
 	t.Run("commits on success", func(t *testing.T) {
 		ctx := context.Background()
@@ -225,6 +296,32 @@ func countTxRows(t *testing.T, ctx context.Context, pool *pgxpool.Pool) int {
 		t.Fatalf("count rows: %v", err)
 	}
 	return n
+}
+
+func assertTxSettingsReset(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+
+	var (
+		projectID string
+		userID    string
+		traceID   string
+	)
+	if err := pool.QueryRow(ctx, `SELECT
+		COALESCE(current_setting('app.project_id', true), ''),
+		COALESCE(current_setting('app.user_id', true), ''),
+		COALESCE(current_setting('app.trace_id', true), '')`).Scan(&projectID, &userID, &traceID); err != nil {
+		t.Fatalf("query transaction-local settings after transaction: %v", err)
+	}
+
+	if projectID != "" {
+		t.Errorf("current_setting(app.project_id) after transaction = %q, want empty", projectID)
+	}
+	if userID != "" {
+		t.Errorf("current_setting(app.user_id) after transaction = %q, want empty", userID)
+	}
+	if traceID != "" {
+		t.Errorf("current_setting(app.trace_id) after transaction = %q, want empty", traceID)
+	}
 }
 
 // insertInTx executes an INSERT on the transaction carried in ctx. It is the
