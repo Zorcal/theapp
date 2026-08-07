@@ -27,12 +27,12 @@ a later phase's schema up front — which matters because that shape may still c
 The CLI (`cmd/cli`) grows the same way, in its own dedicated phases rather than as tasks
 folded into whichever feature phase happens to need a new command: phase 1 stands the tool up with
 a `user create` command; phase 5 adds granting `superadmin`; phase 9 adds bootstrapping `theapp`/
-`dev`/`control`; phase 27 adds seeding the `robot` user. Each CLI phase depends only on the scaffold
+`dev`/`control`; phase 25 adds seeding the `robot` user. Each CLI phase depends only on the scaffold
 (phase 1) plus whatever core-layer function it wires up, never on another CLI phase.
 
 ## Phase 1 — CLI tool scaffold and user creation — done
 
-1. `cmd/cli` CLI scaffold ([urfave/cli](https://github.com/urfave/cli), shell completion, commands split into their own files under a `commands` package), alongside the existing `cmd/server` entrypoint. Every mutating command takes a required `--operator` flag (resolved by UUID or email, the same way any user lookup is) for actor attribution — it has no observable effect until `pgdb` sets `app.user_id` from it (phase 21) and auditing exists to record it (phase 26), but building it into the scaffold now means no later command has to retrofit it.
+1. `cmd/cli` CLI scaffold ([urfave/cli](https://github.com/urfave/cli), shell completion, commands split into their own files under a `commands` package), alongside the existing `cmd/server` entrypoint. Every mutating command takes a required `--operator` flag (resolved by UUID or email, the same way any user lookup is) for actor attribution — it has no observable effect until `pgdb` sets `app.user_id` from it (phase 21) and auditing exists to record it (phase 24), but building it into the scaffold now means no later command has to retrofit it.
 2. `user create` command, wired to the existing user-creation core logic. Depends on 1.
 
 Also delivered in this phase, beyond the original task list: a `db migrate` command (no `--operator` — it's schema DDL, not an audited data write, and it's what creates the `users` table in the first place); a `user list` command (paginated, no `--operator` since it's read-only); and `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) to seed a local bootstrap operator, since `--operator` always requiring an existing user means the very first one in a fresh environment can't come from the CLI itself.
@@ -255,56 +255,42 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 
 **Checkpoint:** a test transaction shows the three settings are visible via `current_setting()` and reset at commit/rollback.
 
-## Phase 22 — RLS on project-scoped resource tables
+## Phase 22 — is_protected backstop
 
-53. RLS + `FORCE ROW LEVEL SECURITY` on project-scoped resource tables, keyed on `app.project_id`. Depends on 17, 52.
-54. CI test (real Postgres): app-role connection, set `app.project_id`, assert cross-project `SELECT` returns nothing. Depends on 53.
-
-**Checkpoint:** the CI test in task 54 passes.
-
-## Phase 23 — RLS on assignment tables and the cross-user listing function
-
-55. RLS on `project_role_assignments` / `org_role_assignments` / `system_role_assignments`, keyed on `app.user_id`. Depends on 9, 22, 52.
-56. `SECURITY DEFINER` function for "list everyone with a role in project X". Reuse the canonical project permission relation for the function's internal authorization check rather than duplicating the scope union. Depends on 55.
-
-**Checkpoint:** assignment-table RLS holds, and the one function that legitimately needs to see across users works correctly.
-
-## Phase 24 — is_protected backstop
-
-57. `is_protected` columns + trigger on `organizations`/`projects`/`users`. Depends on 17.
+53. `is_protected` columns + trigger on `organizations`/`projects`/`users`. Depends on 17.
 
 **Checkpoint:** deleting or renaming `theapp`/`dev`/`control`/`robot`/a protected user is rejected at the DB level.
 
-## Phase 25 — auditing: the audit_log table and trigger
+## Phase 23 — auditing: the audit_log table and trigger
 
-58. Migration: `audit_log` table plus the generic audit trigger function and the `audit.enable(table, excluded_columns)` migration helper.
-59. Revoke `UPDATE`/`DELETE` on `audit_log` for the app's runtime DB role. Depends on 58.
+54. Migration: `audit_log` table plus the generic audit trigger function and the `audit.enable(table, excluded_columns)` migration helper.
+55. Revoke `UPDATE`/`DELETE` on `audit_log` for the app's runtime DB role. Depends on 54.
 
 **Checkpoint:** `audit.enable` can be attached to a table (proven on one test table) and produces correctly-shaped, immutable rows.
 
-## Phase 26 — auditing: wire onto existing tables
+## Phase 24 — auditing: wire onto existing tables
 
-60. Wire `audit.enable(...)` onto every table introduced in phases 1–24 that should be audited, with `excluded_columns` for any secret-bearing columns. Depends on 52, 58.
+56. Wire `audit.enable(...)` onto every table introduced in phases 1–22 that should be audited, with `excluded_columns` for any secret-bearing columns. Depends on 52, 54.
 
 **Checkpoint:** every relevant table is audited.
 
-## Phase 27 — CLI: seed robot user
+## Phase 25 — CLI: seed robot user
 
-61. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 60 lands.
+57. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 56 lands.
 
 **Checkpoint:** the `robot` user exists and is used to attribute system-initiated audit rows.
 
-## Phase 28 — optimistic concurrency with ETags
+## Phase 26 — optimistic concurrency with ETags
 
-62. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
-63. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 62.
+58. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
+59. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 58.
 
 **Checkpoint:** mutable resources use one consistent ETag contract, and stale mutations cannot overwrite newer state.
 
 ## Ongoing / cross-cutting
 
-64. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 22.
-65. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
+60. Project-scoped resource isolation: when the first ordinary project-owned resource is introduced, filter every core-layer store method by both resource ID and project ID (`WHERE id = $1 AND project_id = $2`). Add RLS with `FORCE ROW LEVEL SECURITY`, keyed on `app.project_id`, and a real-Postgres test using the runtime app role that proves a row from another project is invisible. Apply the same review checklist to every later project-scoped resource.
+61. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
 
 ## Notes
 
@@ -314,6 +300,13 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
   project for organization administration and one default project for customer workloads. Add
   public project creation and deletion, together with explicit ordered cleanup for project and
   organization deletion, when there is an operational need for additional projects.
+- Project-resource RLS is intentionally introduced with the first ordinary project-owned resource.
+  The current schema has project and assignment infrastructure, but no resource table for such a
+  policy to protect; a synthetic table would not prove a production access path.
+- Assignment tables intentionally remain outside RLS because cross-project resolution and
+  cross-user administration are ordinary access patterns. Composite foreign keys enforce tenant
+  consistency, while core permission checks authorize access. Revisit RLS only with a design that
+  covers every cross-user path through narrowly scoped privileged functions.
 - Review happens once per phase, at the phase boundary — see "Working process" above. The phase checkpoints describe what should be true and demonstrable by the time that review happens.
 - Phase 14's checkpoint calls out a phase that is intentionally not yet safe to expose broadly. It's the one phase in this breakdown where "reviewed and committed" doesn't mean "safe to deploy publicly" — flag this distinction if it ever needs to leave a dev/staging environment before phase 16 lands.
 - `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) seeds a local-only bootstrap operator user (`operator@theapp.com`) and grants it `superadmin` at system scope, so every `cmd/cli` command has a valid, usable `--operator` without a manual `psql` insert. The `superadmin` grant is a direct SQL insert rather than a CLI call, since phase 5 hasn't added a CLI command for it yet — switch the script to that command once it exists. It's a standing dev convenience, not a task with its own checkpoint — revisit it whenever a phase changes what a fresh local environment needs to be immediately useful (e.g. phase 9 might have it add `theapp` org membership) instead of leaving that as another manual step.
