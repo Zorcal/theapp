@@ -14,7 +14,6 @@ type User struct {
 	EmailVerifiedAt *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       *time.Time
-	DeletedAt       *time.Time
 	ETag            string
 }
 

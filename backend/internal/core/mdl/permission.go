@@ -35,7 +35,6 @@ const (
 	PermissionUserRead   Permission = "user:read"
 	PermissionUserCreate Permission = "user:create"
 	PermissionUserUpdate Permission = "user:update"
-	PermissionUserDelete Permission = "user:delete"
 )
 
 // All system role service permissions are system-wide, can only be granted through a system-scope
@@ -91,7 +90,6 @@ func AllPermissions() []Permission {
 		PermissionUserRead,
 		PermissionUserCreate,
 		PermissionUserUpdate,
-		PermissionUserDelete,
 		PermissionSystemRoleRead,
 		PermissionSystemRoleAssign,
 		PermissionSystemRoleUnassign,
@@ -120,7 +118,6 @@ func SystemOnlyPermissions() []Permission {
 		PermissionUserRead,
 		PermissionUserCreate,
 		PermissionUserUpdate,
-		PermissionUserDelete,
 		PermissionSystemRoleRead,
 		PermissionSystemRoleAssign,
 		PermissionSystemRoleUnassign,

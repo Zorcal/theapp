@@ -21,7 +21,7 @@ func NewStore(pool *pgxpool.Pool) *Store {
 
 // PermissionsByScope returns userID's resolved permission names for projectID at project,
 // organization, and system scope in one database batch.
-// Returns [sql.ErrNoRows] if no such active user or project exists.
+// Returns [sql.ErrNoRows] if no such user or project exists.
 func (s *Store) PermissionsByScope(ctx context.Context, userID uuid.UUID, projectID int) (PermissionsByScope, error) {
 	projectPermsQ := projectPermissionsQuery(userID, projectID)
 	orgPermsQ := orgPermissionsByProjectIDQuery(userID, projectID)
@@ -56,7 +56,7 @@ func (s *Store) PermissionsByScope(ctx context.Context, userID uuid.UUID, projec
 
 // ProjectPermissions returns projectID's org and the names of the permissions userID holds for
 // projectID, resolved from project-, org-, and system-scope role assignments.
-// Returns [sql.ErrNoRows] if no such active user or project exists.
+// Returns [sql.ErrNoRows] if no such user or project exists.
 func (s *Store) ProjectPermissions(ctx context.Context, userID uuid.UUID, projectID int) (ProjectPermissions, error) {
 	q := projectPermissionsQuery(userID, projectID)
 
@@ -77,7 +77,7 @@ func (s *Store) ProjectPermissions(ctx context.Context, userID uuid.UUID, projec
 
 // OrgPermissionsByProjectID returns projectID's org and the names of the permissions userID holds
 // there through organization- and system-scope role assignments.
-// Returns [sql.ErrNoRows] if no such active user or project exists.
+// Returns [sql.ErrNoRows] if no such user or project exists.
 func (s *Store) OrgPermissionsByProjectID(ctx context.Context, userID uuid.UUID, projectID int) (OrgPermissions, error) {
 	q := orgPermissionsByProjectIDQuery(userID, projectID)
 

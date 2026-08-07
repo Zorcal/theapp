@@ -34,7 +34,6 @@ func userFromPg(u pguser.User) mdl.User {
 		EmailVerifiedAt: u.EmailVerifiedAt,
 		CreatedAt:       u.CreatedAt,
 		UpdatedAt:       u.UpdatedAt,
-		DeletedAt:       u.DeletedAt,
 		ETag:            u.ETag.String(),
 	}
 }

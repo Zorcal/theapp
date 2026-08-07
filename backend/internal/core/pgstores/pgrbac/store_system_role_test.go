@@ -427,57 +427,6 @@ func TestStore_FullyPrivilegedUserRemainsAfterSystemRoleUnassign_error(t *testin
 	})
 }
 
-func TestStore_FullyPrivilegedUserRemainsAfterDelete(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	rbacStore := pgrbac.NewStore(pool)
-	userStore := pguser.NewStore(pool)
-
-	target := seedUser(t, userStore, "delete-target@test.com")
-	recovery := seedUser(t, userStore, "delete-recovery@test.com")
-	seedSystemRoleAssignment(t, rbacStore, target.ExternalID, "superadmin")
-
-	got, err := rbacStore.FullyPrivilegedUserRemainsAfterDelete(ctx, target.ExternalID)
-	if err != nil {
-		t.Fatalf("FullyPrivilegedUserRemainsAfterDelete() error = %v", err)
-	}
-	if got {
-		t.Error("FullyPrivilegedUserRemainsAfterDelete() = true, want false")
-	}
-
-	seedSystemRoleAssignment(t, rbacStore, recovery.ExternalID, "superadmin")
-
-	got, err = rbacStore.FullyPrivilegedUserRemainsAfterDelete(ctx, target.ExternalID)
-	if err != nil {
-		t.Fatalf("FullyPrivilegedUserRemainsAfterDelete() error = %v", err)
-	}
-	if !got {
-		t.Error("FullyPrivilegedUserRemainsAfterDelete() = false, want true")
-	}
-
-	mustSoftDeleteUser(t, userStore, recovery.ExternalID)
-
-	got, err = rbacStore.FullyPrivilegedUserRemainsAfterDelete(ctx, target.ExternalID)
-	if err != nil {
-		t.Fatalf("FullyPrivilegedUserRemainsAfterDelete() error = %v", err)
-	}
-	if got {
-		t.Error("FullyPrivilegedUserRemainsAfterDelete() = true for deleted recovery user, want false")
-	}
-}
-
-func TestStore_FullyPrivilegedUserRemainsAfterDelete_error(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	rbacStore := pgrbac.NewStore(pool)
-
-	t.Run("not found", func(t *testing.T) {
-		if _, err := rbacStore.FullyPrivilegedUserRemainsAfterDelete(ctx, uuid.New()); !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("FullyPrivilegedUserRemainsAfterDelete() error = %v, want sql.ErrNoRows", err)
-		}
-	})
-}
-
 func TestStore_UnassignSystemRole_error(t *testing.T) {
 	t.Run("user not found", func(t *testing.T) {
 		ctx := context.Background()

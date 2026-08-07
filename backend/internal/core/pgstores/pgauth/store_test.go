@@ -96,39 +96,31 @@ func TestStore_AuthSessionData_error(t *testing.T) {
 	userStore := pguser.NewStore(pool)
 
 	user := seedUser(t, userStore, "auth-session-error@test.com")
-	softDeletedUser := seedUser(t, userStore, "deleted-auth-session@test.com")
-	mustSoftDeleteUser(t, userStore, softDeletedUser.ExternalID)
 
-	tests := []struct {
-		name      string
-		userID    uuid.UUID
-		projectID *int
-		want      error
-	}{
-		{
-			name:   "unknown user",
-			userID: uuid.New(),
-			want:   sql.ErrNoRows,
-		},
-		{
-			name:   "deleted user",
-			userID: softDeletedUser.ExternalID,
-			want:   sql.ErrNoRows,
-		},
-		{
-			name:      "unknown project",
-			userID:    user.ExternalID,
-			projectID: new(-1),
-			want:      sql.ErrNoRows,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if _, err := authStore.AuthSessionData(ctx, tt.userID, tt.projectID); !errors.Is(err, tt.want) {
-				t.Errorf("AuthSessionData(%v, %v) error = %v, want %v", tt.userID, tt.projectID, err, tt.want)
-			}
-		})
-	}
+	t.Run("not found", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			userID    uuid.UUID
+			projectID *int
+		}{
+			{
+				name:   "user",
+				userID: uuid.New(),
+			},
+			{
+				name:      "project",
+				userID:    user.ExternalID,
+				projectID: new(-1),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				if _, err := authStore.AuthSessionData(ctx, tt.userID, tt.projectID); !errors.Is(err, sql.ErrNoRows) {
+					t.Errorf("AuthSessionData() error = %v, want sql.ErrNoRows", err)
+				}
+			})
+		}
+	})
 }
 
 func TestStore_MagicLinkToken(t *testing.T) {
@@ -581,14 +573,6 @@ func seedUser(t *testing.T, s *pguser.Store, email string) pguser.User {
 		t.Fatalf("seed user %q: %v", email, err)
 	}
 	return u
-}
-
-func mustSoftDeleteUser(t *testing.T, userStore *pguser.Store, userID uuid.UUID) {
-	t.Helper()
-
-	if err := userStore.SoftDeleteUser(t.Context(), userID); err != nil {
-		t.Fatalf("soft delete user %s: %v", userID, err)
-	}
 }
 
 func seedOrganization(t *testing.T, s *pgorg.Store, name string) pgorg.Organization {

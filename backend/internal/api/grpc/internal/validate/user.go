@@ -24,16 +24,6 @@ func GetUser(req *pb.GetUserRequest) error {
 	return nil
 }
 
-func DeleteUser(req *pb.DeleteUserRequest) error {
-	if req == nil {
-		return requiredRequest("id")
-	}
-	if err := validUUID(req.GetId(), "id"); err != nil {
-		return err
-	}
-	return nil
-}
-
 func CreateUser(req *pb.CreateUserRequest) error {
 	if req == nil {
 		return requiredRequest("user")

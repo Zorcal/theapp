@@ -16,7 +16,7 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
-// OrganizationUsers returns a page and total count of active organization members matching filter.
+// OrganizationUsers returns a page and total count of organization members matching filter.
 // Returns [sql.ErrNoRows] if filter selects a project outside the organization.
 func (s *Store) OrganizationUsers(ctx context.Context, orgID int, filter OrganizationUserFilter, pageSize, pageOffset int) ([]pguser.User, int, error) {
 	usersQ := organizationUsersQuery(orgID, filter, pageSize, pageOffset)

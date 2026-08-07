@@ -7,7 +7,6 @@ CREATE TABLE useraccess.users (
     , created_at TIMESTAMPTZ NOT NULL
     , updated_at TIMESTAMPTZ
     , email_verified_at TIMESTAMPTZ
-    , deleted_at TIMESTAMPTZ
     , etag UUID UNIQUE NOT NULL
 );
 

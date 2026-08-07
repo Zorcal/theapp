@@ -38,32 +38,12 @@ func TestStore_UserByEmail_error(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := pguser.NewStore(pool)
 
-	deleted := seedUser(t, store, "deleted@test.com", "Deleted User")
-	mustSoftDeleteUser(t, store, deleted.ExternalID)
-
-	tests := []struct {
-		name  string
-		email string
-		want  error
-	}{
-		{
-			name:  "unknown user",
-			email: "nobody@test.com",
-			want:  sql.ErrNoRows,
-		},
-		{
-			name:  "deleted user",
-			email: deleted.Email,
-			want:  sql.ErrNoRows,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if _, err := store.UserByEmail(ctx, tt.email); !errors.Is(err, tt.want) {
-				t.Errorf("UserByEmail(%q) error = %v, want %v", tt.email, err, tt.want)
-			}
-		})
-	}
+	t.Run("not found", func(t *testing.T) {
+		_, err := store.UserByEmail(ctx, "nobody@test.com")
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UserByEmail(nobody) error = %v, want sql.ErrNoRows", err)
+		}
+	})
 }
 
 func TestStore_UserByExternalID(t *testing.T) {
@@ -86,32 +66,13 @@ func TestStore_UserByExternalID_error(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := pguser.NewStore(pool)
 
-	deleted := seedUser(t, store, "deleted@test.com", "Deleted User")
-	mustSoftDeleteUser(t, store, deleted.ExternalID)
-
-	tests := []struct {
-		name string
-		id   uuid.UUID
-		want error
-	}{
-		{
-			name: "unknown user",
-			id:   uuid.New(),
-			want: sql.ErrNoRows,
-		},
-		{
-			name: "deleted user",
-			id:   deleted.ExternalID,
-			want: sql.ErrNoRows,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if _, err := store.UserByExternalID(ctx, tt.id); !errors.Is(err, tt.want) {
-				t.Errorf("UserByExternalID(%v) error = %v, want %v", tt.id, err, tt.want)
-			}
-		})
-	}
+	t.Run("not found", func(t *testing.T) {
+		id := uuid.New()
+		_, err := store.UserByExternalID(ctx, id)
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UserByExternalID(%v) error = %v, want sql.ErrNoRows", id, err)
+		}
+	})
 }
 
 func TestStore_CreateUser(t *testing.T) {
@@ -230,7 +191,6 @@ func TestStore_Users(t *testing.T) {
 	charlie := seedUser(t, store, "charlie@test.com", "Charlie Brown")
 	alice := seedUser(t, store, "alice@test.com", "Alice Smith")
 	bob := seedUser(t, store, "bob@test.com", "Bob Jones")
-	seedSoftDeletedUser(t, store)
 
 	diffOpts := cmp.Options{
 		cmpopts.EquateApproxTime(time.Minute),
@@ -440,93 +400,17 @@ func TestStore_UpdateUser_error(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := pguser.NewStore(pool)
 
-	softDeletedUserID := seedSoftDeletedUser(t, store)
-
-	tests := []struct {
-		name string
-		id   uuid.UUID
-		want error
-	}{
-		{
-			name: "unknown user",
-			id:   uuid.New(),
-			want: sql.ErrNoRows,
-		},
-		{
-			name: "deleted user",
-			id:   softDeletedUserID,
-			want: sql.ErrNoRows,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := store.UpdateUser(ctx, pguser.UpdateUser{
-				ExternalID: tt.id,
-				Name:       "Alice Jones",
-				Fields:     pguser.UserUpdateFields{Name: true},
-			})
-
-			if !errors.Is(err, tt.want) {
-				t.Errorf("UpdateUser(%v) error = %v, want %v", tt.id, err, tt.want)
-			}
+	t.Run("not found", func(t *testing.T) {
+		id := uuid.New()
+		_, err := store.UpdateUser(ctx, pguser.UpdateUser{
+			ExternalID: id,
+			Name:       "Alice Jones",
+			Fields:     pguser.UserUpdateFields{Name: true},
 		})
-	}
-}
-
-func TestStore_SoftDeleteUser(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	store := pguser.NewStore(pool)
-
-	seeded := seedUser(t, store, "deleted@test.com", "Deleted User")
-
-	if err := store.SoftDeleteUser(ctx, seeded.ExternalID); err != nil {
-		t.Fatalf("SoftDeleteUser() error = %v", err)
-	}
-
-	var isDeleted bool
-	if err := pool.QueryRow(ctx, `
-		SELECT deleted_at IS NOT NULL
-		FROM useraccess.users
-		WHERE external_id = $1`, seeded.ExternalID).Scan(&isDeleted); err != nil {
-		t.Fatalf("check deleted user error = %v", err)
-	}
-
-	if !isDeleted {
-		t.Error("SoftDeleteUser() user remains active")
-	}
-}
-
-func TestStore_SoftDeleteUser_error(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	store := pguser.NewStore(pool)
-
-	softDeletedUserID := seedSoftDeletedUser(t, store)
-
-	tests := []struct {
-		name string
-		id   uuid.UUID
-		want error
-	}{
-		{
-			name: "unknown user",
-			id:   uuid.New(),
-			want: sql.ErrNoRows,
-		},
-		{
-			name: "already deleted user",
-			id:   softDeletedUserID,
-			want: sql.ErrNoRows,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := store.SoftDeleteUser(ctx, tt.id); !errors.Is(err, tt.want) {
-				t.Errorf("SoftDeleteUser() error = %v, want %v", err, tt.want)
-			}
-		})
-	}
+		if !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("UpdateUser(%v) error = %v, want sql.ErrNoRows", id, err)
+		}
+	})
 }
 
 func TestStore_GetOrCreateUserByEmail(t *testing.T) {
@@ -560,21 +444,6 @@ func TestStore_GetOrCreateUserByEmail(t *testing.T) {
 	})
 }
 
-func TestStore_GetOrCreateUserByEmail_error(t *testing.T) {
-	ctx := context.Background()
-	pool := pgtest.New(t, ctx)
-	store := pguser.NewStore(pool)
-
-	softDeletedUser := seedUser(t, store, "deleted-existing@test.com", "Deleted Existing User")
-	mustSoftDeleteUser(t, store, softDeletedUser.ExternalID)
-
-	t.Run("not found", func(t *testing.T) {
-		if _, err := store.GetOrCreateUserByEmail(ctx, softDeletedUser.Email); !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("GetOrCreateUserByEmail() error = %v, want sql.ErrNoRows", err)
-		}
-	})
-}
-
 func seedUser(t *testing.T, s *pguser.Store, email, name string) pguser.User {
 	t.Helper()
 
@@ -587,23 +456,4 @@ func seedUser(t *testing.T, s *pguser.Store, email, name string) pguser.User {
 	}
 
 	return seeded
-}
-
-func seedSoftDeletedUser(t *testing.T, store *pguser.Store) uuid.UUID {
-	t.Helper()
-
-	usr := seedUser(t, store, "already-deleted@test.com", "Already Deleted")
-	if err := store.SoftDeleteUser(t.Context(), usr.ExternalID); err != nil {
-		t.Fatalf("seed deleted user error: %v", err)
-	}
-
-	return usr.ExternalID
-}
-
-func mustSoftDeleteUser(t *testing.T, store *pguser.Store, userID uuid.UUID) {
-	t.Helper()
-
-	if err := store.SoftDeleteUser(t.Context(), userID); err != nil {
-		t.Fatalf("soft delete user %s: %v", userID, err)
-	}
 }

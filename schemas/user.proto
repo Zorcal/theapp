@@ -233,37 +233,6 @@ service UserService {
       }
     };
   }
-
-  // Soft-deletes a user while retaining the user and assignment records for recovery and audit.
-  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {delete: "/v1/users/{id}"};
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      responses: {
-        key: "400"
-        value: {description: "Invalid user ID." schema: {json_schema: {ref: ".google.rpc.Status"}}}
-      }
-      responses: {
-        key: "401"
-        value: {description: "Missing or invalid credentials." schema: {json_schema: {ref: ".google.rpc.Status"}}}
-      }
-      responses: {
-        key: "403"
-        value: {description: "User deletion access is missing." schema: {json_schema: {ref: ".google.rpc.Status"}}}
-      }
-      responses: {
-        key: "404"
-        value: {description: "Active user not found." schema: {json_schema: {ref: ".google.rpc.Status"}}}
-      }
-      responses: {
-        key: "412"
-        value: {description: "Deleting the user would remove the last fully privileged system administrator." schema: {json_schema: {ref: ".google.rpc.Status"}}}
-      }
-      responses: {
-        key: "500"
-        value: {description: "Unexpected server error." schema: {json_schema: {ref: ".google.rpc.Status"}}}
-      }
-    };
-  }
 }
 
 // User represents a user in the system.
@@ -308,11 +277,6 @@ message GetUserRequest {
     (google.api.field_behavior) = REQUIRED,
     (google.api.field_info).format = UUID4
   ];
-}
-
-message DeleteUserRequest {
-  // Unique identifier of the active user to delete.
-  string id = 1 [(google.api.field_behavior) = REQUIRED, (google.api.field_info).format = UUID4];
 }
 
 // Request message for updating a user.

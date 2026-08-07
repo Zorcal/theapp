@@ -7,7 +7,6 @@ INSERT INTO rbac.permissions (name) VALUES
     ('user:read'),
     ('user:create'),
     ('user:update'),
-    ('user:delete'),
     ('system-role:read'),
     ('system-role:assign'),
     ('system-role:unassign'),

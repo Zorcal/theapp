@@ -110,7 +110,7 @@ type Config struct {
 	RefreshTokenTTL    time.Duration // refresh token lifetime
 }
 
-// Core holds the business logic for the authentication domain.
+// Core holds the business logic for authentication.
 type Core struct {
 	authStorer       AuthStorer
 	userStorer       UserStorer

@@ -12,7 +12,6 @@ var permissionToPB = map[mdl.Permission]pb.Permission{
 	mdl.PermissionUserRead:                         pb.Permission_PERMISSION_USER_READ,
 	mdl.PermissionUserCreate:                       pb.Permission_PERMISSION_USER_CREATE,
 	mdl.PermissionUserUpdate:                       pb.Permission_PERMISSION_USER_UPDATE,
-	mdl.PermissionUserDelete:                       pb.Permission_PERMISSION_USER_DELETE,
 	mdl.PermissionSystemRoleRead:                   pb.Permission_PERMISSION_SYSTEM_ROLE_READ,
 	mdl.PermissionSystemRoleAssign:                 pb.Permission_PERMISSION_SYSTEM_ROLE_ASSIGN,
 	mdl.PermissionSystemRoleUnassign:               pb.Permission_PERMISSION_SYSTEM_ROLE_UNASSIGN,
