@@ -356,9 +356,11 @@ project. It uses the canonical system-, organization-, and project-assignment un
 `org_membership`, which only establishes that a user belongs to the organization. A missing project
 or a project from another organization is rejected.
 
-## Deleting organizations and projects
-
-Deleting a project or organization leaves behind role assignments and custom roles that reference it. Rather than relying on `ON DELETE CASCADE` to clean these up implicitly, the core layer deletes dependent rows explicitly, in the correct order, in the same transaction as the delete — so the cleanup is visible as ordinary code rather than hidden in schema constraints.
+Each organization currently has one control project for organization administration and one
+default project for customer workloads. Public multi-project management is intentionally
+postponed until there is an operational need for additional projects. Project and organization
+deletion must then include explicit, ordered cleanup of dependent assignments and roles rather
+than relying on `ON DELETE CASCADE`.
 
 ## Auditing
 
