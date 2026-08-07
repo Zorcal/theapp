@@ -32,11 +32,10 @@ type PermissionDescriptor struct {
 // All user service permissions. User permissions are system-wide rather than project- or org-scoped — they can only be
 // granted through a system-scope role assignment.
 const (
-	PermissionUserRead    Permission = "user:read"
-	PermissionUserCreate  Permission = "user:create"
-	PermissionUserUpdate  Permission = "user:update"
-	PermissionUserDelete  Permission = "user:delete"
-	PermissionUserRestore Permission = "user:restore"
+	PermissionUserRead   Permission = "user:read"
+	PermissionUserCreate Permission = "user:create"
+	PermissionUserUpdate Permission = "user:update"
+	PermissionUserDelete Permission = "user:delete"
 )
 
 // All system role service permissions are system-wide, can only be granted through a system-scope
@@ -69,10 +68,6 @@ const (
 	// PermissionOrgUserRead authorizes listing users in the organization resolved from
 	// the request's control project.
 	PermissionOrgUserRead Permission = "org:user-read"
-
-	// PermissionOrgUserRemove authorizes removing a user and their role assignments from the
-	// organization resolved from the request's control project.
-	PermissionOrgUserRemove Permission = "org:user-remove"
 )
 
 // All custom role service permissions. They authorize role management only within the organization
@@ -97,7 +92,6 @@ func AllPermissions() []Permission {
 		PermissionUserCreate,
 		PermissionUserUpdate,
 		PermissionUserDelete,
-		PermissionUserRestore,
 		PermissionSystemRoleRead,
 		PermissionSystemRoleAssign,
 		PermissionSystemRoleUnassign,
@@ -106,7 +100,6 @@ func AllPermissions() []Permission {
 		PermissionProjectCreate,
 		PermissionOrgUserCreate,
 		PermissionOrgUserRead,
-		PermissionOrgUserRemove,
 		PermissionCustomRoleCreate,
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
@@ -128,7 +121,6 @@ func SystemOnlyPermissions() []Permission {
 		PermissionUserCreate,
 		PermissionUserUpdate,
 		PermissionUserDelete,
-		PermissionUserRestore,
 		PermissionSystemRoleRead,
 		PermissionSystemRoleAssign,
 		PermissionSystemRoleUnassign,
@@ -153,7 +145,6 @@ func PermissionsAssignableToCustomRoles() []Permission {
 		PermissionProjectCreate,
 		PermissionOrgUserCreate,
 		PermissionOrgUserRead,
-		PermissionOrgUserRemove,
 	}
 }
 
@@ -164,7 +155,6 @@ func OrganizationAdminPermissions() []Permission {
 		PermissionProjectCreate,
 		PermissionOrgUserCreate,
 		PermissionOrgUserRead,
-		PermissionOrgUserRemove,
 		PermissionCustomRoleCreate,
 		PermissionCustomRoleRead,
 		PermissionCustomRoleUpdate,
@@ -193,8 +183,7 @@ func PermissionAssignmentScope(permission Permission) AssignmentScope {
 		PermissionCustomRoleReadOrgAssignments,
 		PermissionProjectCreate,
 		PermissionOrgUserCreate,
-		PermissionOrgUserRead,
-		PermissionOrgUserRemove:
+		PermissionOrgUserRead:
 		return AssignmentScopeOrganization
 	case PermissionCustomRoleAssignProject,
 		PermissionCustomRoleUnassignProject,

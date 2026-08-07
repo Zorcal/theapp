@@ -251,7 +251,6 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 ## Phase 21 — soft delete for users
 
 52. Migration: `deleted_at` on `users`, plus the user soft-delete operation and its `user:delete` permission. The delete runs in the same transaction as the global recovery check, takes the system-role-management lock, and rejects deleting a user when no other active user would retain every registered permission through system-scoped assignments.
-	Global deletion is distinct from removing an organization membership. Add an explicit system-level restore operation with `user:restore`; creation reports a deleted identity instead of restoring it implicitly. Organization removal uses `org:user-remove`, deletes assignments within that organization before membership, and never implicitly deletes the global identity.
 	**This task is complete.**
 53. Exclude soft-deleted users (`deleted_at IS NULL`) from all three legs of the resolver (24) and from the fully privileged system-user recovery check. Retained system-role assignment rows do not make a soft-deleted user a valid recovery administrator. Depends on 24, 39, 52.
 	**This task is complete.**

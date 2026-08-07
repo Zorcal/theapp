@@ -3,7 +3,6 @@ package pguser
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -58,9 +57,6 @@ func (s *Store) GetOrCreateUserByEmail(ctx context.Context, email string) (User,
 
 	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
 		return User{}, err
-	}
-	if user.DeletedAt != nil {
-		return User{}, ErrDeleted
 	}
 
 	return user, nil
@@ -179,45 +175,6 @@ func (s *Store) CreateUser(ctx context.Context, cu CreateUser) (User, error) {
 	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
 		if err := insertQ.Queue(ctx, b, &user); err != nil {
 			return fmt.Errorf("create user: %w", err)
-		}
-		return nil
-	}
-
-	if err := pgdb.RunBatch(ctx, s.pool, doInBatch); err != nil {
-		if !errors.Is(err, pgdb.ErrAlreadyExists) {
-			return User{}, err
-		}
-
-		deletedQ := userDeletedByEmailQuery(cu.Email)
-		var isDeleted bool
-		checkDeletionState := func(ctx context.Context, b *pgdb.Batch) error {
-			if queryErr := deletedQ.Queue(ctx, b, &isDeleted); queryErr != nil {
-				return fmt.Errorf("deleted user by email: %w", queryErr)
-			}
-			return nil
-		}
-		if queryErr := pgdb.RunBatch(ctx, s.pool, checkDeletionState); queryErr != nil {
-			return User{}, fmt.Errorf("check conflicting user deletion state: %w", queryErr)
-		}
-		if isDeleted {
-			return User{}, ErrDeleted
-		}
-
-		return User{}, err
-	}
-
-	return user, nil
-}
-
-// RestoreUser restores the soft-deleted user with userID and returns it.
-// Returns [sql.ErrNoRows] if userID does not identify a deleted user.
-func (s *Store) RestoreUser(ctx context.Context, userID uuid.UUID) (User, error) {
-	q := restoreUserQuery(userID)
-
-	var user User
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		if err := q.Queue(ctx, b, &user); err != nil {
-			return fmt.Errorf("restore user: %w", err)
 		}
 		return nil
 	}

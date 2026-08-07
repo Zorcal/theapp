@@ -108,34 +108,6 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 
 	testingx.AssertDiff(t, existingOrgUser, createdOrgUser)
 
-	// Remove an organization user without deleting their identity or membership elsewhere.
-
-	otherCreator := seedUser(t, userStore, "other-organization-creator@test.com", "Other Creator")
-	otherCreateCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{User: mdl.AuthUser{UserID: otherCreator.ExternalID}})
-	otherOrg, err := core.CreateOrganization(otherCreateCtx, mdl.CreateOrganization{Name: "other", ProjectName: "other"})
-	if err != nil {
-		t.Fatalf("CreateOrganization() other organization error = %v", err)
-	}
-	otherOrgCtx := mdl.ContextWithAuthSession(ctx, mdl.AuthSession{Project: &mdl.AuthProject{OrgID: otherOrg.ID}})
-	if _, err := core.CreateOrganizationUser(otherOrgCtx, mdl.CreateOrganizationUser{Email: createdOrgUser.Email}); err != nil {
-		t.Fatalf("CreateOrganizationUser() other organization error = %v", err)
-	}
-
-	seedOrgCustomRoleAssignment(t, rbacStore, createdOrgUser.ID, creatorRoles[0].ExternalID, createdOrg.ID)
-
-	if err := core.RemoveOrganizationUser(orgCtx, createdOrgUser.ID); err != nil {
-		t.Fatalf("RemoveOrganizationUser() error = %v", err)
-	}
-	if checkOrgMembership(t, pool, createdOrgUser.ID, createdOrg.ID) {
-		t.Error("removed organization membership = true, want false")
-	}
-	if !checkOrgMembership(t, pool, createdOrgUser.ID, otherOrg.ID) {
-		t.Error("other organization membership = false, want true")
-	}
-	if _, err := userStore.UserByExternalID(ctx, createdOrgUser.ID); err != nil {
-		t.Fatalf("UserByExternalID() after organization removal error = %v", err)
-	}
-
 	// Create another project in the organization.
 
 	createdProject, err := core.CreateProject(ctx, mdl.CreateProject{OrgID: createdOrg.ID, Name: "widgets"})
@@ -782,17 +754,6 @@ func TestCore_CreateOrganizationUser_error(t *testing.T) {
 			want: dbErr,
 		},
 		{
-			name:      "deleted user",
-			in:        mdl.CreateOrganizationUser{Email: "member@test.com"},
-			orgStorer: &MockedOrgStorer{},
-			orgUserStore: &MockedOrganizationUserStore{
-				GetOrCreateUserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
-					return pguser.User{}, pguser.ErrDeleted
-				},
-			},
-			want: mdl.ErrUserDeleted,
-		},
-		{
 			name: "membership store",
 			in:   mdl.CreateOrganizationUser{Email: "member@test.com"},
 			orgStorer: &MockedOrgStorer{
@@ -843,101 +804,6 @@ func TestCore_CreateOrganizationUser_error(t *testing.T) {
 			t.Error("CreateOrganizationUser() error = nil, want error")
 		}
 	})
-}
-
-func TestCore_RemoveOrganizationUser_error(t *testing.T) {
-	dbErr := errors.New("db error")
-
-	tests := []struct {
-		name       string
-		orgStorer  OrgStorer
-		roleStorer RoleBootstrapperStore
-		transactor Transactor
-		want       error
-	}{
-		{
-			name:       "transaction",
-			orgStorer:  &MockedOrgStorer{},
-			roleStorer: &MockedRoleBootstrapperStore{},
-			transactor: errorTransactor{err: dbErr},
-			want:       dbErr,
-		},
-		{
-			name:      "membership not found",
-			orgStorer: &MockedOrgStorer{},
-			roleStorer: &MockedRoleBootstrapperStore{
-				DeleteOrganizationUserRoleAssignmentsFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
-					return sql.ErrNoRows
-				},
-			},
-			transactor: immediateTransactor{},
-			want:       mdl.ErrNotFound,
-		},
-		{
-			name:      "role assignments store",
-			orgStorer: &MockedOrgStorer{},
-			roleStorer: &MockedRoleBootstrapperStore{
-				DeleteOrganizationUserRoleAssignmentsFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
-					return dbErr
-				},
-			},
-			transactor: immediateTransactor{},
-			want:       dbErr,
-		},
-		{
-			name: "membership store",
-			orgStorer: &MockedOrgStorer{
-				RemoveOrganizationMemberFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
-					// The membership was established earlier in the transaction, so sql.ErrNoRows
-					// is deliberately preserved as an internal error.
-					return sql.ErrNoRows
-				},
-			},
-			roleStorer: &MockedRoleBootstrapperStore{
-				DeleteOrganizationUserRoleAssignmentsFunc: func(_ context.Context, _ uuid.UUID, _ int) error {
-					return nil
-				},
-			},
-			transactor: immediateTransactor{},
-			want:       sql.ErrNoRows,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			core := NewCore(tt.orgStorer, nil, tt.roleStorer, tt.transactor)
-			ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{Project: &mdl.AuthProject{OrgID: 1}})
-
-			if err := core.RemoveOrganizationUser(ctx, uuid.New()); !errors.Is(err, tt.want) {
-				t.Errorf("RemoveOrganizationUser() error = %v, want %v", err, tt.want)
-			}
-		})
-	}
-
-	testsMissingAuth := []struct {
-		name string
-		sess *mdl.AuthSession
-	}{
-		{
-			name: "auth session",
-		},
-		{
-			name: "project context",
-			sess: new(mdl.AuthSession),
-		},
-	}
-	for _, tt := range testsMissingAuth {
-		t.Run(tt.name+" missing", func(t *testing.T) {
-			core := NewCore(&MockedOrgStorer{}, nil, &MockedRoleBootstrapperStore{}, immediateTransactor{})
-			ctx := t.Context()
-			if tt.sess != nil {
-				ctx = mdl.ContextWithAuthSession(ctx, *tt.sess)
-			}
-
-			if err := core.RemoveOrganizationUser(ctx, uuid.New()); err == nil {
-				t.Error("RemoveOrganizationUser() error = nil, want error")
-			}
-		})
-	}
 }
 
 func TestCore_OrganizationUsers(t *testing.T) {
@@ -1196,12 +1062,6 @@ func (immediateTransactor) RunTx(ctx context.Context, fn func(context.Context) e
 	return fn(ctx)
 }
 
-type errorTransactor struct{ err error }
-
-func (tr errorTransactor) RunTx(_ context.Context, _ func(context.Context) error) error {
-	return tr.err
-}
-
 func seedUser(t *testing.T, userStore *pguser.Store, email, name string) pguser.User {
 	t.Helper()
 
@@ -1218,14 +1078,6 @@ func seedSystemRoleAssignment(t *testing.T, rbacStore *pgrbac.Store, userID uuid
 
 	if err := rbacStore.AssignSystemRole(t.Context(), userID, roleName); err != nil {
 		t.Fatalf("seed system role assignment (user %s, role %q): %v", userID, roleName, err)
-	}
-}
-
-func seedOrgCustomRoleAssignment(t *testing.T, rbacStore *pgrbac.Store, userID, roleID uuid.UUID, orgID int) {
-	t.Helper()
-
-	if err := rbacStore.AssignCustomRoleToOrg(t.Context(), userID, roleID, orgID); err != nil {
-		t.Fatalf("seed organization custom role assignment: %v", err)
 	}
 }
 

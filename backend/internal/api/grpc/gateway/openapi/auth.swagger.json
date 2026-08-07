@@ -441,9 +441,7 @@
         "PERMISSION_PROJECT_CREATE",
         "PERMISSION_ORGANIZATION_USER_CREATE",
         "PERMISSION_ORGANIZATION_USER_READ",
-        "PERMISSION_USER_DELETE",
-        "PERMISSION_USER_RESTORE",
-        "PERMISSION_ORGANIZATION_USER_REMOVE"
+        "PERMISSION_USER_DELETE"
       ],
       "default": "PERMISSION_UNSPECIFIED",
       "description": "Permission is a capability that can be granted through a role."

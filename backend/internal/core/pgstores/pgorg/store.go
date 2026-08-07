@@ -132,22 +132,6 @@ func (s *Store) EnsureOrganizationMember(ctx context.Context, userID uuid.UUID, 
 	return nil
 }
 
-// RemoveOrganizationMember removes an active user's organization membership.
-// Returns [sql.ErrNoRows] if the active user or membership does not exist.
-func (s *Store) RemoveOrganizationMember(ctx context.Context, userID uuid.UUID, orgID int) error {
-	q := removeOrganizationMemberQuery(userID, orgID)
-
-	doInBatch := func(ctx context.Context, b *pgdb.Batch) error {
-		var orgIDSink int
-		if err := q.Queue(ctx, b, &orgIDSink); err != nil {
-			return fmt.Errorf("remove organization member: %w", err)
-		}
-		return nil
-	}
-
-	return pgdb.RunBatch(ctx, s.pool, doInBatch)
-}
-
 // OrganizationByName returns the organization with the given name.
 // Returns [sql.ErrNoRows] if no such organization exists.
 func (s *Store) OrganizationByName(ctx context.Context, name string) (Organization, error) {

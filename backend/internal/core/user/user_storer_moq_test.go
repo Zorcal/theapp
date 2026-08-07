@@ -25,9 +25,6 @@ var _ UserStorer = &MockedUserStorer{}
 //			CreateUserFunc: func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error) {
 //				panic("mock out the CreateUser method")
 //			},
-//			RestoreUserFunc: func(ctx context.Context, id uuid.UUID) (pguser.User, error) {
-//				panic("mock out the RestoreUser method")
-//			},
 //			SoftDeleteUserFunc: func(ctx context.Context, id uuid.UUID) error {
 //				panic("mock out the SoftDeleteUser method")
 //			},
@@ -53,9 +50,6 @@ type MockedUserStorer struct {
 	// CreateUserFunc mocks the CreateUser method.
 	CreateUserFunc func(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
 
-	// RestoreUserFunc mocks the RestoreUser method.
-	RestoreUserFunc func(ctx context.Context, id uuid.UUID) (pguser.User, error)
-
 	// SoftDeleteUserFunc mocks the SoftDeleteUser method.
 	SoftDeleteUserFunc func(ctx context.Context, id uuid.UUID) error
 
@@ -79,13 +73,6 @@ type MockedUserStorer struct {
 			Ctx context.Context
 			// Cu is the cu argument value.
 			Cu pguser.CreateUser
-		}
-		// RestoreUser holds details about calls to the RestoreUser method.
-		RestoreUser []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// ID is the id argument value.
-			ID uuid.UUID
 		}
 		// SoftDeleteUser holds details about calls to the SoftDeleteUser method.
 		SoftDeleteUser []struct {
@@ -130,7 +117,6 @@ type MockedUserStorer struct {
 		}
 	}
 	lockCreateUser       sync.RWMutex
-	lockRestoreUser      sync.RWMutex
 	lockSoftDeleteUser   sync.RWMutex
 	lockUpdateUser       sync.RWMutex
 	lockUserByEmail      sync.RWMutex
@@ -171,42 +157,6 @@ func (mock *MockedUserStorer) CreateUserCalls() []struct {
 	mock.lockCreateUser.RLock()
 	calls = mock.calls.CreateUser
 	mock.lockCreateUser.RUnlock()
-	return calls
-}
-
-// RestoreUser calls RestoreUserFunc.
-func (mock *MockedUserStorer) RestoreUser(ctx context.Context, id uuid.UUID) (pguser.User, error) {
-	if mock.RestoreUserFunc == nil {
-		panic("MockedUserStorer.RestoreUserFunc: method is nil but UserStorer.RestoreUser was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-		ID  uuid.UUID
-	}{
-		Ctx: ctx,
-		ID:  id,
-	}
-	mock.lockRestoreUser.Lock()
-	mock.calls.RestoreUser = append(mock.calls.RestoreUser, callInfo)
-	mock.lockRestoreUser.Unlock()
-	return mock.RestoreUserFunc(ctx, id)
-}
-
-// RestoreUserCalls gets all the calls that were made to RestoreUser.
-// Check the length with:
-//
-//	len(mockedUserStorer.RestoreUserCalls())
-func (mock *MockedUserStorer) RestoreUserCalls() []struct {
-	Ctx context.Context
-	ID  uuid.UUID
-} {
-	var calls []struct {
-		Ctx context.Context
-		ID  uuid.UUID
-	}
-	mock.lockRestoreUser.RLock()
-	calls = mock.calls.RestoreUser
-	mock.lockRestoreUser.RUnlock()
 	return calls
 }
 

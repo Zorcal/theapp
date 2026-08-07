@@ -46,9 +46,6 @@ type UserCore interface {
 	// Returns [mdl.ErrLastFullyPrivilegedSystemAdmin] if deletion would leave no fully privileged
 	// active system administrator.
 	DeleteUser(ctx context.Context, id uuid.UUID) error
-	// RestoreUser restores the soft-deleted user with the given ID and returns it.
-	// Returns [mdl.ErrNotFound] if no deleted user with that ID exists.
-	RestoreUser(ctx context.Context, id uuid.UUID) (mdl.User, error)
 }
 
 func (s *userService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.User, error) {
@@ -78,13 +75,10 @@ func (s *userService) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 
 	usr, err := s.userCore.CreateUser(ctx, cu)
 	if err != nil {
-		switch {
-		case errors.Is(err, mdl.ErrAlreadyExists):
+		if errors.Is(err, mdl.ErrAlreadyExists) {
 			return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "user.email", Description: "a user with this email already exists"},
 			})
-		case errors.Is(err, mdl.ErrUserDeleted):
-			return nil, status.Error(codes.FailedPrecondition, "a deleted user with this email must be restored")
 		}
 		return nil, fmt.Errorf("create user: %w", err)
 	}
@@ -128,23 +122,6 @@ func (s *userService) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest)
 	}
 
 	return &emptypb.Empty{}, nil
-}
-
-func (s *userService) RestoreUser(ctx context.Context, req *pb.RestoreUserRequest) (*pb.User, error) {
-	if err := validate.RestoreUser(req); err != nil {
-		return nil, fmt.Errorf("validate restore user request: %w", err)
-	}
-
-	id := uuid.MustParse(req.GetId())
-	usr, err := s.userCore.RestoreUser(ctx, id)
-	if err != nil {
-		if errors.Is(err, mdl.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "deleted user %q not found", req.GetId())
-		}
-		return nil, fmt.Errorf("restore user: %w", err)
-	}
-
-	return conv.UserToPB(usr), nil
 }
 
 func (s *userService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {

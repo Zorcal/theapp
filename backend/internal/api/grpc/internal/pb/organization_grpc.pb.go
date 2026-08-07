@@ -11,7 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -23,7 +22,6 @@ const (
 	OrgService_CreateOrganization_FullMethodName     = "/theapp.v1.OrgService/CreateOrganization"
 	OrgService_CreateOrganizationUser_FullMethodName = "/theapp.v1.OrgService/CreateOrganizationUser"
 	OrgService_ListOrganizationUsers_FullMethodName  = "/theapp.v1.OrgService/ListOrganizationUsers"
-	OrgService_RemoveOrganizationUser_FullMethodName = "/theapp.v1.OrgService/RemoveOrganizationUser"
 )
 
 // OrgServiceClient is the client API for OrgService service.
@@ -39,9 +37,6 @@ type OrgServiceClient interface {
 	CreateOrganizationUser(ctx context.Context, in *CreateOrganizationUserRequest, opts ...grpc.CallOption) (*User, error)
 	// Lists users belonging to the organization selected through its control project.
 	ListOrganizationUsers(ctx context.Context, in *ListOrganizationUsersRequest, opts ...grpc.CallOption) (*ListOrganizationUsersResponse, error)
-	// Removes a user and their role assignments from the organization selected through its control
-	// project. The system user and memberships in other organizations remain unchanged.
-	RemoveOrganizationUser(ctx context.Context, in *RemoveOrganizationUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type orgServiceClient struct {
@@ -82,16 +77,6 @@ func (c *orgServiceClient) ListOrganizationUsers(ctx context.Context, in *ListOr
 	return out, nil
 }
 
-func (c *orgServiceClient) RemoveOrganizationUser(ctx context.Context, in *RemoveOrganizationUserRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, OrgService_RemoveOrganizationUser_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // OrgServiceServer is the server API for OrgService service.
 // All implementations should embed UnimplementedOrgServiceServer
 // for forward compatibility.
@@ -105,9 +90,6 @@ type OrgServiceServer interface {
 	CreateOrganizationUser(context.Context, *CreateOrganizationUserRequest) (*User, error)
 	// Lists users belonging to the organization selected through its control project.
 	ListOrganizationUsers(context.Context, *ListOrganizationUsersRequest) (*ListOrganizationUsersResponse, error)
-	// Removes a user and their role assignments from the organization selected through its control
-	// project. The system user and memberships in other organizations remain unchanged.
-	RemoveOrganizationUser(context.Context, *RemoveOrganizationUserRequest) (*emptypb.Empty, error)
 }
 
 // UnimplementedOrgServiceServer should be embedded to have
@@ -125,9 +107,6 @@ func (UnimplementedOrgServiceServer) CreateOrganizationUser(context.Context, *Cr
 }
 func (UnimplementedOrgServiceServer) ListOrganizationUsers(context.Context, *ListOrganizationUsersRequest) (*ListOrganizationUsersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListOrganizationUsers not implemented")
-}
-func (UnimplementedOrgServiceServer) RemoveOrganizationUser(context.Context, *RemoveOrganizationUserRequest) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method RemoveOrganizationUser not implemented")
 }
 func (UnimplementedOrgServiceServer) testEmbeddedByValue() {}
 
@@ -203,24 +182,6 @@ func _OrgService_ListOrganizationUsers_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
-func _OrgService_RemoveOrganizationUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveOrganizationUserRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrgServiceServer).RemoveOrganizationUser(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrgService_RemoveOrganizationUser_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrgServiceServer).RemoveOrganizationUser(ctx, req.(*RemoveOrganizationUserRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // OrgService_ServiceDesc is the grpc.ServiceDesc for OrgService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -239,10 +200,6 @@ var OrgService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListOrganizationUsers",
 			Handler:    _OrgService_ListOrganizationUsers_Handler,
-		},
-		{
-			MethodName: "RemoveOrganizationUser",
-			Handler:    _OrgService_RemoveOrganizationUser_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -68,13 +68,6 @@ func CreateOrganizationUser(req *pb.CreateOrganizationUserRequest) error {
 	return nil
 }
 
-func RemoveOrganizationUser(req *pb.RemoveOrganizationUserRequest) error {
-	if req == nil {
-		return requiredRequest("id")
-	}
-	return validUUID(req.GetId(), "id")
-}
-
 func ListOrganizationUsers(req *pb.ListOrganizationUsersRequest) error {
 	if req == nil {
 		return requiredRequest("request")

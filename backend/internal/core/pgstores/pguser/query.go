@@ -49,27 +49,13 @@ func getOrCreateUserByEmailQuery(email string) pgdb.TypedQuery[User] {
 		INSERT INTO useraccess.users (external_id, email, name, created_at, etag)
 		VALUES (gen_random_uuid(), @email, '', NOW(), gen_random_uuid())
 		ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+		WHERE useraccess.users.deleted_at IS NULL
 		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag`
 
 	return pgdb.TypedQuery[User]{
 		SQL:    sql,
 		Args:   params,
 		Scan:   pgx.RowToStructByName[User],
-		Expect: pgdb.ExpectOne,
-	}
-}
-
-func userDeletedByEmailQuery(email string) pgdb.TypedQuery[bool] {
-	params := pgx.NamedArgs{"email": email}
-	const sql = `
-		SELECT deleted_at IS NOT NULL
-		FROM useraccess.users
-		WHERE email = @email`
-
-	return pgdb.TypedQuery[bool]{
-		SQL:    sql,
-		Args:   params,
-		Scan:   pgx.RowTo[bool],
 		Expect: pgdb.ExpectOne,
 	}
 }
@@ -172,22 +158,6 @@ func softDeleteUserQuery(externalID uuid.UUID) pgdb.TypedQuery[int] {
 		SQL:    sql,
 		Args:   params,
 		Scan:   pgx.RowTo[int],
-		Expect: pgdb.ExpectOne,
-	}
-}
-
-func restoreUserQuery(externalID uuid.UUID) pgdb.TypedQuery[User] {
-	params := pgx.NamedArgs{"external_id": externalID}
-	const sql = `
-		UPDATE useraccess.users
-		SET deleted_at = NULL, updated_at = NOW(), etag = gen_random_uuid()
-		WHERE external_id = @external_id AND deleted_at IS NOT NULL
-		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, deleted_at, etag`
-
-	return pgdb.TypedQuery[User]{
-		SQL:    sql,
-		Args:   params,
-		Scan:   pgx.RowToStructByName[User],
 		Expect: pgdb.ExpectOne,
 	}
 }

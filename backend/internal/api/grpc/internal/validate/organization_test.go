@@ -45,28 +45,6 @@ func TestCreateOrganizationUser_error(t *testing.T) {
 	runValidationErrorTests(t, "CreateOrganizationUser", CreateOrganizationUser, tests)
 }
 
-func TestRemoveOrganizationUser(t *testing.T) {
-	if err := RemoveOrganizationUser(&pb.RemoveOrganizationUserRequest{Id: "c81e728d-9d4c-4f63-8fb8-6f8742310b79"}); err != nil {
-		t.Errorf("RemoveOrganizationUser() error = %v, want nil", err)
-	}
-}
-
-func TestRemoveOrganizationUser_error(t *testing.T) {
-	tests := []validationTest[*pb.RemoveOrganizationUserRequest]{
-		{
-			name: "missing request",
-			in:   nil,
-			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "id", description: "required"}),
-		},
-		{
-			name: "invalid ID",
-			in:   &pb.RemoveOrganizationUserRequest{Id: "invalid"},
-			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "id", description: "must be a valid UUID"}),
-		},
-	}
-	runValidationErrorTests(t, "RemoveOrganizationUser", RemoveOrganizationUser, tests)
-}
-
 func TestCreateOrganization_error(t *testing.T) {
 	tests := []validationTest[*pb.CreateOrganizationRequest]{
 		{

@@ -303,33 +303,6 @@ func deleteCustomRoleOrgAssignmentsQuery(orgID int, roleID uuid.UUID) pgdb.Typed
 	}
 }
 
-func deleteOrganizationUserRoleAssignmentsQuery(userID uuid.UUID, orgID int) pgdb.TypedQuery[int] {
-	return pgdb.TypedQuery[int]{
-		SQL: `
-			WITH target_user AS (
-				SELECT usr.id
-				FROM useraccess.users AS usr
-				JOIN org.org_membership AS membership
-					ON membership.user_id = usr.id AND membership.org_id = @org_id
-				WHERE usr.external_id = @user_id AND usr.deleted_at IS NULL
-			),
-			deleted_project_assignments AS (
-				DELETE FROM rbac.project_role_assignments AS assignment
-				USING target_user
-				WHERE assignment.user_id = target_user.id AND assignment.org_id = @org_id
-			),
-			deleted_org_assignments AS (
-				DELETE FROM rbac.org_role_assignments AS assignment
-				USING target_user
-				WHERE assignment.user_id = target_user.id AND assignment.org_id = @org_id
-			)
-			SELECT id FROM target_user`,
-		Args:   pgx.NamedArgs{"user_id": userID, "org_id": orgID},
-		Scan:   pgx.RowTo[int],
-		Expect: pgdb.ExpectOne,
-	}
-}
-
 func customRolesQuery(orgID, pageSize, pageOffset int) pgdb.TypedQuery[CustomRole] {
 	params := pgx.NamedArgs{
 		"org_id":      orgID,
