@@ -248,94 +248,85 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 
 **Checkpoint:** a user can be created-or-assigned into an organization, and users can be listed scoped to an organization or filtered down to a specific project within it, both via the API.
 
-## Phase 21 — soft delete for users
+## Phase 21 — project creation endpoint
 
-52. Migration: `deleted_at` on `users`, plus the user soft-delete operation and its `user:delete` permission. The delete runs in the same transaction as the global recovery check, takes the system-role-management lock, and rejects deleting a user when no other active user would retain every registered permission through system-scoped assignments.
-53. Exclude soft-deleted users (`deleted_at IS NULL`) from all three legs of the resolver (24) and from the fully privileged system-user recovery check. Retained system-role assignment rows do not make a soft-deleted user a valid recovery administrator. Depends on 24, 39, 52.
-54. CI test (real Postgres): a soft-deleted user with live rows in all three assignment tables resolves to zero permissions and does not satisfy the global recovery invariant. Cover rejection of deleting the final fully privileged active user and success when another such user remains. Depends on 53.
-
-**Checkpoint:** the CI test in task 54 passes.
-
-## Phase 22 — project creation endpoint
-
-55. Extend `schemas/project.proto` and `ProjectService` with create/delete project RPCs. Run `make generate`.
-56. Project creation gRPC endpoint: wires 19 behind the organization-scoped `project:create`
+52. Extend `schemas/project.proto` and `ProjectService` with create/delete project RPCs. Run `make generate`.
+53. Project creation gRPC endpoint: wires 19 behind the organization-scoped `project:create`
     permission, anchored on the org's default project to resolve the target organization. Unlike
     project-scoped `org:create` on `theapp/control`, `project:create` cannot be granted by a
     project-scope role assignment because creating a sibling project changes organization-level
-    state. Depends on 25, 55.
+    state. Depends on 25, 52.
 
 **Checkpoint:** a project can be created end-to-end via the API within an existing org.
 
-## Phase 23 — explicit org/project deletion cleanup
+## Phase 22 — explicit org/project deletion cleanup
 
-57. Explicit, ordered cleanup for org/project deletion (assignments and custom roles) in the same transaction. Foreign keys retain `NO ACTION`; do not use `ON DELETE CASCADE`. Depends on 35, 46, 56.
+54. Explicit, ordered cleanup for org/project deletion (assignments and custom roles) in the same transaction. Foreign keys retain `NO ACTION`; do not use `ON DELETE CASCADE`. Depends on 35, 46, 53.
 
 **Checkpoint:** deleting an org or project leaves no dangling assignment/role/mapping rows.
 
-## Phase 24 — pgdb transaction-local settings
+## Phase 23 — pgdb transaction-local settings
 
-58. `pgdb`: set `app.project_id`, `app.user_id`, `app.trace_id` as `SET LOCAL` transaction-scoped settings, sourced from `ctx`.
+55. `pgdb`: set `app.project_id`, `app.user_id`, `app.trace_id` as `SET LOCAL` transaction-scoped settings, sourced from `ctx`.
 
 **Checkpoint:** a test transaction shows the three settings are visible via `current_setting()` and reset at commit/rollback.
 
-## Phase 25 — RLS on project-scoped resource tables
+## Phase 24 — RLS on project-scoped resource tables
 
-59. RLS + `FORCE ROW LEVEL SECURITY` on project-scoped resource tables, keyed on `app.project_id`. Depends on 17, 58.
-60. CI test (real Postgres): app-role connection, set `app.project_id`, assert cross-project `SELECT` returns nothing. Depends on 59.
+56. RLS + `FORCE ROW LEVEL SECURITY` on project-scoped resource tables, keyed on `app.project_id`. Depends on 17, 55.
+57. CI test (real Postgres): app-role connection, set `app.project_id`, assert cross-project `SELECT` returns nothing. Depends on 56.
 
-**Checkpoint:** the CI test in task 60 passes.
+**Checkpoint:** the CI test in task 57 passes.
 
-## Phase 26 — RLS on assignment tables and the cross-user listing function
+## Phase 25 — RLS on assignment tables and the cross-user listing function
 
-61. RLS on `project_role_assignments` / `org_role_assignments` / `system_role_assignments`, keyed on `app.user_id`. Depends on 9, 22, 58.
-62. `SECURITY DEFINER` function for "list everyone with a role in project X". Reuse the canonical project permission relation for the function's internal authorization check rather than duplicating the scope union. Depends on 61.
+58. RLS on `project_role_assignments` / `org_role_assignments` / `system_role_assignments`, keyed on `app.user_id`. Depends on 9, 22, 55.
+59. `SECURITY DEFINER` function for "list everyone with a role in project X". Reuse the canonical project permission relation for the function's internal authorization check rather than duplicating the scope union. Depends on 58.
 
 **Checkpoint:** assignment-table RLS holds, and the one function that legitimately needs to see across users works correctly.
 
-## Phase 27 — is_protected backstop
+## Phase 26 — is_protected backstop
 
-63. `is_protected` columns + trigger on `organizations`/`projects`/`users`. Depends on 17.
+60. `is_protected` columns + trigger on `organizations`/`projects`/`users`. Depends on 17.
 
 **Checkpoint:** deleting or renaming `theapp`/`dev`/`control`/`robot`/a protected user is rejected at the DB level.
 
-## Phase 28 — auditing: the audit_log table and trigger
+## Phase 27 — auditing: the audit_log table and trigger
 
-64. Migration: `audit_log` table plus the generic audit trigger function and the `audit.enable(table, excluded_columns)` migration helper.
-65. Revoke `UPDATE`/`DELETE` on `audit_log` for the app's runtime DB role. Depends on 64.
+61. Migration: `audit_log` table plus the generic audit trigger function and the `audit.enable(table, excluded_columns)` migration helper.
+62. Revoke `UPDATE`/`DELETE` on `audit_log` for the app's runtime DB role. Depends on 61.
 
 **Checkpoint:** `audit.enable` can be attached to a table (proven on one test table) and produces correctly-shaped, immutable rows.
 
-## Phase 29 — auditing: wire onto existing tables
+## Phase 28 — auditing: wire onto existing tables
 
-66. Wire `audit.enable(...)` onto every table introduced in phases 1–27 that should be audited, with `excluded_columns` for any secret-bearing columns. Depends on 58, 64.
+63. Wire `audit.enable(...)` onto every table introduced in phases 1–26 that should be audited, with `excluded_columns` for any secret-bearing columns. Depends on 55, 61.
 
 **Checkpoint:** every relevant table is audited.
 
-## Phase 30 — CLI: seed robot user
+## Phase 29 — CLI: seed robot user
 
-67. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 66 lands.
+64. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 63 lands.
 
 **Checkpoint:** the `robot` user exists and is used to attribute system-initiated audit rows.
 
-## Phase 31 — optimistic concurrency with ETags
+## Phase 30 — optimistic concurrency with ETags
 
-68. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
-69. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 68.
+65. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
+66. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 65.
 
 **Checkpoint:** mutable resources use one consistent ETag contract, and stale mutations cannot overwrite newer state.
 
 ## Ongoing / cross-cutting
 
-70. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 25.
-71. Periodic sweep job for soft-deleted users' assignment rows past retention. Depends on 52, existing DBOS workflow infra (`internal/workflows`).
-72. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
+67. Application-level `project_id` filter convention audit across every core-layer store method touching a project-scoped resource (`WHERE id = $1 AND project_id = $2`). Not a one-time task — apply it as a review checklist to every project-scoped store method as it's written, alongside phase 24.
+68. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
 
 ## Notes
 
 - The app isn't in production yet, so migrations for this feature don't need to be purely additive. Edit an existing migration file directly (e.g. add a column, change a table this feature just introduced) instead of creating a new migration to alter it. Reserve new migration files for genuinely new tables/objects. Only start appending forward-only migrations once this schema has shipped to a live environment. This is what makes the vertical-slice approach above practical — e.g. task 23 keeps custom-role ownership in the role-table migration from task 5 rather than layering an `ALTER TABLE` on top.
 - The same applies to the new proto schemas: edit them in place as message shapes settle instead of layering on deprecated fields — there are no external clients depending on them yet.
-- Tasks 50 and 56 should be written as soon as their dependencies land, not deferred to the end — they're what prove the backstop actually works.
+- Tasks 50 and 53 should be written as soon as their dependencies land, not deferred to the end — they're what prove the backstop actually works.
 - Review happens once per phase, at the phase boundary — see "Working process" above. The phase checkpoints describe what should be true and demonstrable by the time that review happens.
 - Phase 14's checkpoint calls out a phase that is intentionally not yet safe to expose broadly. It's the one phase in this breakdown where "reviewed and committed" doesn't mean "safe to deploy publicly" — flag this distinction if it ever needs to leave a dev/staging environment before phase 16 lands.
 - `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) seeds a local-only bootstrap operator user (`operator@theapp.com`) and grants it `superadmin` at system scope, so every `cmd/cli` command has a valid, usable `--operator` without a manual `psql` insert. The `superadmin` grant is a direct SQL insert rather than a CLI call, since phase 5 hasn't added a CLI command for it yet — switch the script to that command once it exists. It's a standing dev convenience, not a task with its own checkpoint — revisit it whenever a phase changes what a fresh local environment needs to be immediately useful (e.g. phase 9 might have it add `theapp` org membership) instead of leaving that as another manual step.
