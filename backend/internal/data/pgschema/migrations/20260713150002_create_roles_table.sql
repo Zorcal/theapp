@@ -53,6 +53,11 @@ CREATE TABLE rbac.custom_role_permissions (
     , PRIMARY KEY (role_id, permission_id)
 );
 
+SELECT audit.enable('rbac.system_roles');
+SELECT audit.enable('rbac.custom_roles');
+SELECT audit.enable('rbac.system_role_permissions');
+SELECT audit.enable('rbac.custom_role_permissions');
+
 
 -- migrate:down
 DROP TABLE rbac.custom_role_permissions;

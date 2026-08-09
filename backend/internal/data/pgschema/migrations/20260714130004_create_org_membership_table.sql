@@ -13,6 +13,8 @@ CREATE TABLE org.org_membership (
 -- listings and cleanup but cannot serve user_id-only operations.
 CREATE INDEX org_membership_user_id_idx ON org.org_membership (user_id);
 
+SELECT audit.enable('org.org_membership');
+
 
 -- migrate:down
 DROP TABLE org.org_membership;

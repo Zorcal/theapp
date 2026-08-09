@@ -27,12 +27,12 @@ a later phase's schema up front — which matters because that shape may still c
 The CLI (`cmd/cli`) grows the same way, in its own dedicated phases rather than as tasks
 folded into whichever feature phase happens to need a new command: phase 1 stands the tool up with
 a `user create` command; phase 5 adds granting `superadmin`; phase 9 adds bootstrapping `theapp`/
-`dev`/`control`; phase 25 adds seeding the `robot` user. Each CLI phase depends only on the scaffold
+`dev`/`control`; phase 24 adds seeding the `robot` user. Each CLI phase depends only on the scaffold
 (phase 1) plus whatever core-layer function it wires up, never on another CLI phase.
 
 ## Phase 1 — CLI tool scaffold and user creation — done
 
-1. `cmd/cli` CLI scaffold ([urfave/cli](https://github.com/urfave/cli), shell completion, commands split into their own files under a `commands` package), alongside the existing `cmd/server` entrypoint. Every mutating command takes a required `--operator` flag (resolved by UUID or email, the same way any user lookup is) for actor attribution — it has no observable effect until `pgdb` sets `app.user_id` from it (phase 21) and auditing exists to record it (phase 24), but building it into the scaffold now means no later command has to retrofit it.
+1. `cmd/cli` CLI scaffold ([urfave/cli](https://github.com/urfave/cli), shell completion, commands split into their own files under a `commands` package), alongside the existing `cmd/server` entrypoint. Every mutating command takes a required `--operator` flag (resolved by UUID or email, the same way any user lookup is) for actor attribution — it has no observable effect until `pgdb` sets `app.user_id` from it (phase 21) and auditing exists to record it (phase 23), but building it into the scaffold now means no later command has to retrofit it.
 2. `user create` command, wired to the existing user-creation core logic. Depends on 1.
 
 Also delivered in this phase, beyond the original task list: a `db migrate` command (no `--operator` — it's schema DDL, not an audited data write, and it's what creates the `users` table in the first place); a `user list` command (paginated, no `--operator` since it's read-only); and `scripts/seed-dev-operator.sh` (`make seed-dev-operator`) to seed a local bootstrap operator, since `--operator` always requiring an existing user means the very first one in a fresh environment can't come from the CLI itself.
@@ -255,42 +255,38 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 
 **Checkpoint:** a test transaction shows the three settings are visible via `current_setting()` and reset at commit/rollback.
 
-## Phase 22 — is_protected backstop
+## Phase 22 — auditing: the audit_log table and trigger — done
 
-53. `is_protected` columns + trigger on `organizations`/`projects`/`users`. Depends on 17.
-
-**Checkpoint:** deleting or renaming `theapp`/`dev`/`control`/`robot`/a protected user is rejected at the DB level.
-
-## Phase 23 — auditing: the audit_log table and trigger
-
-54. Migration: `audit_log` table plus the generic audit trigger function and the `audit.enable(table, excluded_columns)` migration helper.
-55. Revoke `UPDATE`/`DELETE` on `audit_log` for the app's runtime DB role. Depends on 54.
+53. Migration: `audit_log` table plus the generic audit trigger function and the `audit.enable(table, excluded_columns)` migration helper. Reject `UPDATE` and `DELETE` at the database level so audit rows are immutable.
+	**This task is complete.**
 
 **Checkpoint:** `audit.enable` can be attached to a table (proven on one test table) and produces correctly-shaped, immutable rows.
 
-## Phase 24 — auditing: wire onto existing tables
+## Phase 23 — auditing: wire onto existing tables — done
 
-56. Wire `audit.enable(...)` onto every table introduced in phases 1–22 that should be audited, with `excluded_columns` for any secret-bearing columns. Depends on 52, 54.
+54. Wire `audit.enable(...)` onto every table introduced in phases 1–21 that should be audited, with `excluded_columns` for any secret-bearing columns. Depends on 52, 53.
+	**This task is complete.**
 
 **Checkpoint:** every relevant table is audited.
 
-## Phase 25 — CLI: seed robot user
+## Phase 24 — CLI: seed robot user
 
-57. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 56 lands.
+55. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 54 lands.
 
 **Checkpoint:** the `robot` user exists and is used to attribute system-initiated audit rows.
 
-## Phase 26 — optimistic concurrency with ETags
+## Phase 25 — optimistic concurrency with ETags
 
-58. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
-59. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 58.
+56. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
+57. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 56.
 
 **Checkpoint:** mutable resources use one consistent ETag contract, and stale mutations cannot overwrite newer state.
 
 ## Ongoing / cross-cutting
 
-60. Project-scoped resource isolation: when the first ordinary project-owned resource is introduced, filter every core-layer store method by both resource ID and project ID (`WHERE id = $1 AND project_id = $2`). Add RLS with `FORCE ROW LEVEL SECURITY`, keyed on `app.project_id`, and a real-Postgres test using the runtime app role that proves a row from another project is invisible. Apply the same review checklist to every later project-scoped resource.
-61. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
+58. Project-scoped resource isolation: when the first ordinary project-owned resource is introduced, filter every core-layer store method by both resource ID and project ID (`WHERE id = $1 AND project_id = $2`). Add RLS with `FORCE ROW LEVEL SECURITY`, keyed on `app.project_id`, and a real-Postgres test using the runtime app role that proves a row from another project is invisible. Apply the same review checklist to every later project-scoped resource.
+59. Protected bootstrap identities: when an API first allows deleting or renaming an organization, project, or bootstrap user, add a database backstop that rejects changes to the corresponding protected identities. Test it through that API rather than introducing protection before a mutation path exists.
+60. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
 
 ## Notes
 

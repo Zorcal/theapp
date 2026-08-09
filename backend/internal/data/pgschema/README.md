@@ -10,6 +10,10 @@ Never use `ON DELETE CASCADE` (or `CASCADE` on any other DDL statement) in a mig
 
 Add a short comment above each index explaining why the index is needed.
 
+Every application table must be audited. Call `audit.enable(...)` in the table's migration after
+its primary key has been created, and list every secret-bearing column in `excluded_columns` so its
+value is never copied into the audit log.
+
 ## seed.sql
 
 Seed data — hardcoded rows that need to exist as real data rather than being created through the application. Unlike a migration, it isn't tracked as applied-once, so every statement in it must be idempotent (`ON CONFLICT ... DO NOTHING`), safe to run again unchanged against a database that already has the data.

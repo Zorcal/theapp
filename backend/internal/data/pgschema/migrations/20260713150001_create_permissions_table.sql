@@ -4,6 +4,8 @@ CREATE TABLE rbac.permissions (
     , name TEXT UNIQUE NOT NULL
 );
 
+SELECT audit.enable('rbac.permissions');
+
 -- Resolve a complete API-facing permission-name set to the integer identities used by RBAC
 -- relations. Duplicate names are removed. A NULL or empty input returns one row containing empty
 -- arrays; an unknown name returns no row so callers can reject the complete mutation.

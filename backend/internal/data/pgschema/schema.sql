@@ -16,6 +16,13 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: audit; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA audit;
+
+
+--
 -- Name: org; Type: SCHEMA; Schema: -; Owner: -
 --
 
@@ -55,6 +62,110 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 --
 
 COMMENT ON EXTENSION pg_trgm IS 'text similarity measurement and index searching based on trigrams';
+
+
+--
+-- Name: capture_row(); Type: FUNCTION; Schema: audit; Owner: -
+--
+
+CREATE FUNCTION audit.capture_row() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog', 'audit'
+    AS $$
+DECLARE
+    excluded_columns TEXT[] := TG_ARGV[0]::TEXT[];
+    key_columns TEXT[] := TG_ARGV[1]::TEXT[];
+    raw_row JSONB;
+    old_row JSONB;
+    new_row JSONB;
+    row_key JSONB;
+BEGIN
+    IF TG_OP IN ('UPDATE', 'DELETE') THEN
+        old_row := to_jsonb(OLD) - excluded_columns;
+    END IF;
+    IF TG_OP IN ('INSERT', 'UPDATE') THEN
+        new_row := to_jsonb(NEW) - excluded_columns;
+    END IF;
+
+    raw_row := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+    SELECT jsonb_object_agg(key_column, raw_row -> key_column)
+    INTO row_key
+    FROM unnest(key_columns) AS key_column;
+
+    INSERT INTO audit.audit_log (
+        table_schema,
+        table_name,
+        row_key,
+        action,
+        old_row,
+        new_row,
+        actor_id,
+        trace_id
+    ) VALUES (
+        TG_TABLE_SCHEMA,
+        TG_TABLE_NAME,
+        row_key,
+        TG_OP,
+        old_row,
+        new_row,
+        NULLIF(current_setting('app.user_id', true), '')::UUID,
+        NULLIF(current_setting('app.trace_id', true), '')
+    );
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: enable(regclass, text[]); Type: FUNCTION; Schema: audit; Owner: -
+--
+
+CREATE FUNCTION audit.enable(target_table regclass, excluded_columns text[] DEFAULT '{}'::text[]) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    key_columns TEXT[];
+BEGIN
+    SELECT array_agg(attribute.attname ORDER BY key_column.ordinality)
+    INTO key_columns
+    FROM pg_index AS idx
+    CROSS JOIN LATERAL unnest(idx.indkey) WITH ORDINALITY AS key_column(attnum, ordinality)
+    JOIN pg_attribute AS attribute
+        ON attribute.attrelid = idx.indrelid
+        AND attribute.attnum = key_column.attnum
+    WHERE idx.indrelid = target_table
+        AND idx.indisprimary;
+
+    IF key_columns IS NULL THEN
+        RAISE EXCEPTION 'audited table % must have a primary key', target_table;
+    END IF;
+
+    EXECUTE format(
+        'CREATE TRIGGER audit_row AFTER INSERT OR UPDATE OR DELETE ON %s '
+        'FOR EACH ROW EXECUTE FUNCTION audit.capture_row(%L, %L)',
+        target_table,
+        excluded_columns::TEXT,
+        key_columns::TEXT
+    );
+END;
+$$;
+
+
+--
+-- Name: reject_log_mutation(); Type: FUNCTION; Schema: audit; Owner: -
+--
+
+CREATE FUNCTION audit.reject_log_mutation() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RAISE EXCEPTION 'audit log rows are immutable';
+END;
+$$;
 
 
 --
@@ -201,6 +312,40 @@ $_$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: audit_log; Type: TABLE; Schema: audit; Owner: -
+--
+
+CREATE TABLE audit.audit_log (
+    id bigint NOT NULL,
+    table_schema text NOT NULL,
+    table_name text NOT NULL,
+    row_key jsonb NOT NULL,
+    action text NOT NULL,
+    old_row jsonb,
+    new_row jsonb,
+    actor_id uuid,
+    trace_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT audit_log_action_check CHECK ((action = ANY (ARRAY['INSERT'::text, 'UPDATE'::text, 'DELETE'::text]))),
+    CONSTRAINT audit_log_check CHECK ((((action = 'INSERT'::text) AND (old_row IS NULL) AND (new_row IS NOT NULL)) OR ((action = 'UPDATE'::text) AND (old_row IS NOT NULL) AND (new_row IS NOT NULL)) OR ((action = 'DELETE'::text) AND (old_row IS NOT NULL) AND (new_row IS NULL))))
+);
+
+
+--
+-- Name: audit_log_id_seq; Type: SEQUENCE; Schema: audit; Owner: -
+--
+
+ALTER TABLE audit.audit_log ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME audit.audit_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
 
 --
 -- Name: org_membership; Type: TABLE; Schema: org; Owner: -
@@ -601,6 +746,14 @@ ALTER TABLE ONLY useraccess.users ALTER COLUMN id SET DEFAULT nextval('useracces
 
 
 --
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: audit; Owner: -
+--
+
+ALTER TABLE ONLY audit.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: org_membership org_membership_pkey; Type: CONSTRAINT; Schema: org; Owner: -
 --
 
@@ -959,10 +1112,115 @@ CREATE INDEX users_updated_at_idx ON useraccess.users USING btree (updated_at);
 
 
 --
+-- Name: audit_log reject_log_mutation; Type: TRIGGER; Schema: audit; Owner: -
+--
+
+CREATE TRIGGER reject_log_mutation BEFORE DELETE OR UPDATE ON audit.audit_log FOR EACH ROW EXECUTE FUNCTION audit.reject_log_mutation();
+
+
+--
+-- Name: org_membership audit_row; Type: TRIGGER; Schema: org; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON org.org_membership FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{org_id,user_id}');
+
+
+--
+-- Name: organizations audit_row; Type: TRIGGER; Schema: org; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON org.organizations FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{id}');
+
+
+--
+-- Name: projects audit_row; Type: TRIGGER; Schema: org; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON org.projects FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{id}');
+
+
+--
 -- Name: projects protect_control_project; Type: TRIGGER; Schema: org; Owner: -
 --
 
 CREATE TRIGGER protect_control_project BEFORE DELETE OR UPDATE ON org.projects FOR EACH ROW EXECUTE FUNCTION org.protect_control_project();
+
+
+--
+-- Name: custom_role_permissions audit_row; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON rbac.custom_role_permissions FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{role_id,permission_id}');
+
+
+--
+-- Name: custom_roles audit_row; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON rbac.custom_roles FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{id}');
+
+
+--
+-- Name: org_role_assignments audit_row; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON rbac.org_role_assignments FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{user_id,org_id,role_id}');
+
+
+--
+-- Name: permissions audit_row; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON rbac.permissions FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{id}');
+
+
+--
+-- Name: project_role_assignments audit_row; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON rbac.project_role_assignments FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{user_id,project_id,role_id}');
+
+
+--
+-- Name: system_role_assignments audit_row; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON rbac.system_role_assignments FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{user_id,role_id}');
+
+
+--
+-- Name: system_role_permissions audit_row; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON rbac.system_role_permissions FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{role_id,permission_id}');
+
+
+--
+-- Name: system_roles audit_row; Type: TRIGGER; Schema: rbac; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON rbac.system_roles FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{id}');
+
+
+--
+-- Name: magic_link_tokens audit_row; Type: TRIGGER; Schema: useraccess; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON useraccess.magic_link_tokens FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{token_hash}', '{id}');
+
+
+--
+-- Name: refresh_tokens audit_row; Type: TRIGGER; Schema: useraccess; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON useraccess.refresh_tokens FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{token_hash}', '{id}');
+
+
+--
+-- Name: users audit_row; Type: TRIGGER; Schema: useraccess; Owner: -
+--
+
+CREATE TRIGGER audit_row AFTER INSERT OR DELETE OR UPDATE ON useraccess.users FOR EACH ROW EXECUTE FUNCTION audit.capture_row('{}', '{id}');
 
 
 --
@@ -1113,6 +1371,7 @@ ALTER TABLE ONLY useraccess.refresh_tokens
 --
 
 INSERT INTO public.schema_migrations (version) VALUES
+    ('20260605070400'),
     ('20260605070455'),
     ('20260605070601'),
     ('20260605070602'),

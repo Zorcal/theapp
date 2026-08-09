@@ -8,6 +8,8 @@ CREATE TABLE rbac.system_role_assignments (
     , PRIMARY KEY (user_id, role_id)
 );
 
+SELECT audit.enable('rbac.system_role_assignments');
+
 
 -- migrate:down
 DROP TABLE rbac.system_role_assignments;

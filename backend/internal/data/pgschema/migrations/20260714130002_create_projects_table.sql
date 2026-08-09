@@ -32,6 +32,8 @@ CREATE INDEX projects_org_id_name_idx ON org.projects (org_id, name COLLATE org.
 -- queries; the ordering B-tree cannot serve ILIKE.
 CREATE INDEX projects_name_trgm_idx ON org.projects USING GIN (name gin_trgm_ops);
 
+SELECT audit.enable('org.projects');
+
 
 -- migrate:down
 DROP TABLE org.projects;

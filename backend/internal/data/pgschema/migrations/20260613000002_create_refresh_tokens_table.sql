@@ -11,6 +11,8 @@ CREATE TABLE useraccess.refresh_tokens (
 -- Supports user-scoped refresh-token lookup and bulk revocation (WHERE user_id = $1).
 CREATE INDEX refresh_tokens_user_id_idx ON useraccess.refresh_tokens (user_id);
 
+SELECT audit.enable('useraccess.refresh_tokens', ARRAY['token_hash']);
+
 -- migrate:down
 DROP INDEX useraccess.refresh_tokens_user_id_idx;
 DROP TABLE useraccess.refresh_tokens;

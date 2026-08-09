@@ -47,6 +47,9 @@ CREATE INDEX org_role_assignments_org_id_user_id_idx ON rbac.org_role_assignment
 -- prefix starts with role_id.
 CREATE INDEX org_role_assignments_role_id_idx ON rbac.org_role_assignments (role_id);
 
+SELECT audit.enable('rbac.project_role_assignments');
+SELECT audit.enable('rbac.org_role_assignments');
+
 
 -- migrate:down
 DROP TABLE rbac.org_role_assignments;

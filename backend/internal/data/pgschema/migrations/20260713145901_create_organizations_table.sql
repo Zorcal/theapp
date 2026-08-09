@@ -6,6 +6,8 @@ CREATE TABLE org.organizations (
     , updated_at TIMESTAMPTZ
 );
 
+SELECT audit.enable('org.organizations');
+
 
 -- migrate:down
 DROP TABLE org.organizations;

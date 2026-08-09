@@ -12,6 +12,8 @@ CREATE TABLE useraccess.magic_link_tokens (
 -- (WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) and user-scoped token cleanup.
 CREATE INDEX magic_link_tokens_user_id_created_at_idx ON useraccess.magic_link_tokens (user_id, created_at DESC);
 
+SELECT audit.enable('useraccess.magic_link_tokens', ARRAY['token_hash']);
+
 -- migrate:down
 DROP INDEX useraccess.magic_link_tokens_user_id_created_at_idx;
 DROP TABLE useraccess.magic_link_tokens;

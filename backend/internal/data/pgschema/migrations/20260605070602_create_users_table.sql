@@ -24,6 +24,8 @@ CREATE INDEX users_created_at_idx ON useraccess.users (created_at);
 -- placement of NULL values.
 CREATE INDEX users_updated_at_idx ON useraccess.users (updated_at);
 
+SELECT audit.enable('useraccess.users');
+
 
 -- migrate:down
 DROP INDEX useraccess.users_email_trgm_idx;
