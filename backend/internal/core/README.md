@@ -43,6 +43,16 @@ This is preferred over pointer fields (`*string`) because a pointer cannot disti
 
 The `pgstores` layer mirrors the same struct, and the dynamic SQL is built from the flags at query time.
 
+## ETags
+
+Updates to mutable resources must carry the ETag returned by the last read. Validate it before
+calling the store, then compare it in the same SQL statement that performs the mutation. A
+successful mutation rotates the ETag; a stale ETag returns `pgdb.ErrETagMismatch`, which the core
+translates to `mdl.ErrETagMismatch` for its consumer.
+
+Never read and compare an ETag in a separate query before writing. That introduces a race in which
+another writer can change the resource between the check and the mutation.
+
 ## Conversions
 
 Each core package (e.g. `user/`) owns a `conv.go` that covers all type conversions between `mdl` and `pgstores` types. Define one function per direction — never construct a foreign type inline in a core method:

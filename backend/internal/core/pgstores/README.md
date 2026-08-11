@@ -48,6 +48,42 @@ func (s *Store) GetThing(ctx context.Context, id uuid.UUID) (Thing, error) {
 - The `Expect` field determines which queue method to use: `ExpectOne` → `.Queue()`, `ExpectMany` → `.QueueMany()`. A mismatch panics at runtime.
 - Use `pgx.NamedArgs` for query parameters — `@param_name` placeholders in SQL, collected into a `pgx.NamedArgs` map. Never use positional `$1`, `$2`, etc. Declare the `params` variable before the SQL string.
 
+## ETag-protected updates
+
+Compare the resource ID and ETag in the statement that performs the update, and generate a new
+ETag on success. Never read and compare the ETag before updating; another writer could change the
+resource between those statements.
+
+Use a conditional fallback branch to distinguish a stale ETag from a missing resource in one
+query:
+
+```sql
+WITH updated AS (
+    UPDATE example.resources
+    SET name = @name, etag = gen_random_uuid()
+    WHERE external_id = @external_id
+        AND etag = @etag
+    RETURNING id, name, etag
+)
+SELECT id, name, etag, TRUE AS is_updated
+FROM updated
+
+UNION ALL
+
+SELECT id, name, etag, FALSE AS is_updated
+FROM example.resources
+WHERE external_id = @external_id
+    AND NOT EXISTS (SELECT 1 FROM updated)
+```
+
+The scanner returns `pgdb.ErrETagMismatch` when the fallback row has `is_updated = FALSE`.
+No result means the resource does not exist and therefore remains `sql.ErrNoRows`. Alias every
+synthetic result column, such as `is_updated`, `etag_matches`, or `role_exists`, so the query's
+result contract is clear next to its positional scanner.
+
+When an operation performs related writes, keep the ETag check, mutation, and dependent writes in
+the same statement or transaction so a mismatch cannot leave partial changes.
+
 ## Locking
 
 Prefer transaction-level advisory locks when application operations must be serialized. Advisory

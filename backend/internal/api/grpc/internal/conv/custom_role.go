@@ -1,6 +1,7 @@
 package conv
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -25,7 +26,7 @@ func CustomRoleToPB(customRole mdl.CustomRole) *pb.Role {
 		MinimumAssignmentScope: AssignmentScopeToPB(customRole.MinimumAssignmentScope()),
 		CreateTime:             timestamppb.New(customRole.CreatedAt),
 		UpdateTime:             maybeNewTimestamppb(customRole.UpdatedAt),
-		Etag:                   customRole.ETag,
+		Etag:                   customRole.ETag.String(),
 	}
 }
 
@@ -53,32 +54,42 @@ func CreateCustomRoleFromPB(customRole *pb.Role) (mdl.CreateCustomRole, bool) {
 	}, true
 }
 
-func UpdateCustomRoleFromPB(req *pb.UpdateRoleRequest, customRoleID uuid.UUID) (mdl.UpdateCustomRole, bool) {
+func UpdateCustomRoleFromPB(req *pb.UpdateRoleRequest, customRoleID uuid.UUID) (mdl.UpdateCustomRole, error) {
 	permissions, ok := PermissionsFromPB(req.GetRole().GetPermissions())
 	if !ok {
-		return mdl.UpdateCustomRole{}, false
+		return mdl.UpdateCustomRole{}, errors.New("unknown permission")
+	}
+	etag, err := uuid.Parse(req.GetRole().GetEtag())
+	if err != nil {
+		return mdl.UpdateCustomRole{}, fmt.Errorf("parse etag: %w", err)
 	}
 	paths := req.GetUpdateMask().GetPaths()
 	return mdl.UpdateCustomRole{
 		ID:          customRoleID,
+		ETag:        etag,
 		Name:        req.GetRole().GetName(),
 		Permissions: permissions,
 		Fields: mdl.CustomRoleUpdateFields{
 			Name:        slices.Contains(paths, "name"),
 			Permissions: slices.Contains(paths, "permissions"),
 		},
-	}, true
+	}, nil
 }
 
-func ModifyCustomRolePermissionsFromPB(req *pb.ModifyRolePermissionsRequest, customRoleID uuid.UUID) (mdl.ModifyCustomRolePermissions, bool) {
+func ModifyCustomRolePermissionsFromPB(req *pb.ModifyRolePermissionsRequest, customRoleID uuid.UUID) (mdl.ModifyCustomRolePermissions, error) {
 	addPermissions, addOK := PermissionsFromPB(req.GetAddPermissions())
 	removePermissions, removeOK := PermissionsFromPB(req.GetRemovePermissions())
 	if !addOK || !removeOK {
-		return mdl.ModifyCustomRolePermissions{}, false
+		return mdl.ModifyCustomRolePermissions{}, errors.New("unknown permission")
+	}
+	etag, err := uuid.Parse(req.GetEtag())
+	if err != nil {
+		return mdl.ModifyCustomRolePermissions{}, fmt.Errorf("parse etag: %w", err)
 	}
 	return mdl.ModifyCustomRolePermissions{
 		ID:                customRoleID,
+		ETag:              etag,
 		AddPermissions:    addPermissions,
 		RemovePermissions: removePermissions,
-	}, true
+	}, nil
 }

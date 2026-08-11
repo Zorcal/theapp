@@ -47,7 +47,8 @@ type User struct {
 	// simultaneous updates of a user from overwriting each other ("mid-air
 	// collisions").
 	//
-	// If this is provided on update, it must match the server's ETag.
+	// Updates must provide the last-read value, which must match the server's
+	// current ETag.
 	Etag          string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -181,7 +182,8 @@ func (x *GetUserRequest) GetId() string {
 // Request message for updating a user.
 type UpdateUserRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The user to update. The user's `id` identifies which user to update.
+	// The user to update. The user's `id` identifies which user to update, and
+	// its `etag` must contain the last-read resource version.
 	User *User `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	// The list of fields to update. When omitted, all populated fields are updated.
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
@@ -479,7 +481,7 @@ var File_user_proto protoreflect.FileDescriptor
 const file_user_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"user.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xc3\x02\n" +
+	"user.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xc0\x02\n" +
 	"\x04User\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12@\n" +
@@ -488,8 +490,8 @@ const file_user_proto_rawDesc = "" +
 	"\vupdate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"updateTime\x12O\n" +
 	"\x13email_verified_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x11emailVerifiedTime\x12\x12\n" +
-	"\x04name\x18\a \x01(\tR\x04name\x12\x1f\n" +
-	"\x04etag\x18\x06 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"-\n" +
+	"\x04name\x18\a \x01(\tR\x04name\x12\x1c\n" +
+	"\x04etag\x18\x06 \x01(\tB\b\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"-\n" +
 	"\x0eGetUserRequest\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\"z\n" +
 	"\x11UpdateUserRequest\x12(\n" +
@@ -512,7 +514,7 @@ const file_user_proto_rawDesc = "" +
 	"\x05users\x18\x01 \x03(\v2\x0f.theapp.v1.UserR\x05users\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xeb\v\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xd6\f\n" +
 	"\vUserService\x12\xf3\x02\n" +
 	"\aGetUser\x12\x19.theapp.v1.GetUserRequest\x1a\x0f.theapp.v1.User\"\xbb\x02\x92A\xa1\x02J1\n" +
 	"\x03400\x12*\n" +
@@ -556,9 +558,9 @@ const file_user_proto_rawDesc = "" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +
-	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/users\x12\x94\x03\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/users\x12\xff\x03\n" +
 	"\n" +
-	"UpdateUser\x12\x1c.theapp.v1.UpdateUserRequest\x1a\x0f.theapp.v1.User\"\xd6\x02\x92A\xb4\x02JB\n" +
+	"UpdateUser\x12\x1c.theapp.v1.UpdateUserRequest\x1a\x0f.theapp.v1.User\"\xc1\x03\x92A\x9f\x03JB\n" +
 	"\x03400\x12;\n" +
 	"!Invalid user data or update mask.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
@@ -570,6 +572,9 @@ const file_user_proto_rawDesc = "" +
 	"\x14\x1a\x12.google.rpc.StatusJ0\n" +
 	"\x03404\x12)\n" +
 	"\x0fUser not found.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJi\n" +
+	"\x03409\x12b\n" +
+	"HThe user has changed since it was read. Fetch the latest user and retry.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +

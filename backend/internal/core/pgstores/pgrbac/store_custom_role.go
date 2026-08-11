@@ -61,6 +61,7 @@ func (s *Store) CreateOrganizationAdminRole(ctx context.Context, orgID int, perm
 // Returns [sql.ErrNoRows] if the organization does not own the role or any selected permission
 // does not exist.
 // Returns [pgdb.ErrAlreadyExists] if the organization already has a role with that name.
+// Returns [pgdb.ErrETagMismatch] if the role has changed since it was read.
 func (s *Store) UpdateCustomRole(ctx context.Context, ur UpdateCustomRole) (CustomRole, error) {
 	updateQ := updateCustomRoleQuery(ur)
 	deletePermsQ := deleteCustomRolePermissionsQuery(ur.OrgID, ur.ExternalID)
@@ -104,6 +105,7 @@ func (s *Store) UpdateCustomRole(ctx context.Context, ur UpdateCustomRole) (Cust
 // role. Adding an existing permission or removing an absent permission is a no-op.
 // Returns [sql.ErrNoRows] if the organization does not own the role or any permission does not
 // exist.
+// Returns [pgdb.ErrETagMismatch] if the role's ETag does not match.
 func (s *Store) ModifyCustomRolePermissions(ctx context.Context, mp ModifyCustomRolePermissions) (CustomRole, error) {
 	modifyQ := modifyCustomRolePermissionsQuery(mp)
 	roleQ := customRoleByExternalIDQuery(mp.OrgID, mp.ExternalID)

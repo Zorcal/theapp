@@ -213,6 +213,7 @@ func TestCore_integration_organizationAdminSeedSynchronization(t *testing.T) {
 	staleRole := mustUpdateCustomRole(t, rbacStore, pgrbac.UpdateCustomRole{
 		OrgID:           createdOrg.ID,
 		ExternalID:      roles[0].ExternalID,
+		ETag:            roles[0].ETag,
 		Fields:          pgrbac.CustomRoleUpdateFields{PermissionNames: true},
 		PermissionNames: []string{"custom-role:read", "org:create"},
 	})
@@ -695,13 +696,13 @@ func TestCore_OrganizationByName_error(t *testing.T) {
 func TestCore_CreateOrganizationUser(t *testing.T) {
 	now := time.Now()
 	userID := uuid.New()
-	want := mdl.User{ID: userID, Email: "member@test.com", CreatedAt: now, ETag: uuid.NewString()}
+	want := mdl.User{ID: userID, Email: "member@test.com", CreatedAt: now, ETag: uuid.New()}
 	pgUser := pguser.User{
 		ID:         1,
 		ExternalID: want.ID,
 		Email:      want.Email,
 		CreatedAt:  want.CreatedAt,
-		ETag:       uuid.MustParse(want.ETag),
+		ETag:       want.ETag,
 	}
 
 	orgStorer := &MockedOrgStorer{
@@ -839,7 +840,7 @@ func TestCore_OrganizationUsers(t *testing.T) {
 			EmailVerifiedAt: pgUser.EmailVerifiedAt,
 			CreatedAt:       pgUser.CreatedAt,
 			UpdatedAt:       pgUser.UpdatedAt,
-			ETag:            pgUser.ETag.String(),
+			ETag:            pgUser.ETag,
 		},
 	}
 

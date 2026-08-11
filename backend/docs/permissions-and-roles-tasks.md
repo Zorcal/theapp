@@ -269,10 +269,12 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 
 **Checkpoint:** every relevant table is audited.
 
-## Phase 24 — optimistic concurrency with ETags
+## Phase 24 — optimistic concurrency with ETags — done
 
 55. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
+	**This task is complete.**
 56. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 55.
+	**This task is complete.**
 
 **Checkpoint:** mutable resources use one consistent ETag contract, and stale mutations cannot overwrite newer state.
 

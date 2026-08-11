@@ -102,6 +102,9 @@ func UpdateRole(req *pb.UpdateRoleRequest) error {
 	if err := validUUID(req.GetRole().GetId(), "role.id"); err != nil {
 		return err
 	}
+	if err := validUUID(req.GetRole().GetEtag(), "role.etag"); err != nil {
+		return err
+	}
 
 	maskPaths := req.GetUpdateMask().GetPaths()
 	if len(maskPaths) == 0 {
@@ -152,6 +155,9 @@ func ModifyRolePermissions(req *pb.ModifyRolePermissionsRequest) error {
 		return requiredRequest("id")
 	}
 	if err := validUUID(req.GetId(), "id"); err != nil {
+		return err
+	}
+	if err := validUUID(req.GetEtag(), "etag"); err != nil {
 		return err
 	}
 

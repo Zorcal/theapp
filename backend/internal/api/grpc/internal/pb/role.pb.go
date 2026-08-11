@@ -89,7 +89,8 @@ type Role struct {
 	CreateTime *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	// Timestamp when the role was last updated.
 	UpdateTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
-	// ETag for the current version of the role.
+	// ETag for the current version of the role. Updates must provide the
+	// last-read value, which must match the server's current ETag.
 	Etag string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
 	// Identifies whether the definition is user-managed or application-managed.
 	Kind RoleKind `protobuf:"varint,7,opt,name=kind,proto3,enum=theapp.v1.RoleKind" json:"kind,omitempty"`
@@ -655,7 +656,7 @@ func (x *ListOrganizationRoleAssignmentsResponse) GetNextPageToken() string {
 // Request message for updating a custom role.
 type UpdateRoleRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The role to update.
+	// The role to update. Its `etag` must contain the last-read resource version.
 	Role *Role `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"`
 	// Fields to update.
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
@@ -716,8 +717,10 @@ type ModifyRolePermissionsRequest struct {
 	AddPermissions []Permission `protobuf:"varint,2,rep,packed,name=add_permissions,json=addPermissions,proto3,enum=theapp.v1.Permission" json:"add_permissions,omitempty"`
 	// Permission names to remove from the role.
 	RemovePermissions []Permission `protobuf:"varint,3,rep,packed,name=remove_permissions,json=removePermissions,proto3,enum=theapp.v1.Permission" json:"remove_permissions,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Last-read ETag of the role.
+	Etag          string `protobuf:"bytes,4,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ModifyRolePermissionsRequest) Reset() {
@@ -769,6 +772,13 @@ func (x *ModifyRolePermissionsRequest) GetRemovePermissions() []Permission {
 		return x.RemovePermissions
 	}
 	return nil
+}
+
+func (x *ModifyRolePermissionsRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
 }
 
 // Request message for deleting a custom role.
@@ -1227,7 +1237,7 @@ var File_role_proto protoreflect.FileDescriptor
 const file_role_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a\x10permission.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x9e\x03\n" +
+	"role.proto\x12\ttheapp.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17google/rpc/status.proto\x1a\x10permission.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x9b\x03\n" +
 	"\x04Role\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x127\n" +
@@ -1235,8 +1245,8 @@ const file_role_proto_rawDesc = "" +
 	"\vcreate_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\x12\x1f\n" +
-	"\x04etag\x18\x06 \x01(\tB\v\xe0A\x03\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\x12,\n" +
+	"updateTime\x12\x1c\n" +
+	"\x04etag\x18\x06 \x01(\tB\b\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\x12,\n" +
 	"\x04kind\x18\a \x01(\x0e2\x13.theapp.v1.RoleKindB\x03\xe0A\x03R\x04kind\x12Y\n" +
 	"\x18minimum_assignment_scope\x18\b \x01(\x0e2\x1a.theapp.v1.AssignmentScopeB\x03\xe0A\x03R\x16minimumAssignmentScope\"=\n" +
 	"\x11CreateRoleRequest\x12(\n" +
@@ -1275,11 +1285,12 @@ const file_role_proto_rawDesc = "" +
 	"\x11UpdateRoleRequest\x12(\n" +
 	"\x04role\x18\x01 \x01(\v2\x0f.theapp.v1.RoleB\x03\xe0A\x02R\x04role\x12@\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x02R\n" +
-	"updateMask\"\xc1\x01\n" +
+	"updateMask\"\xe2\x01\n" +
 	"\x1cModifyRolePermissionsRequest\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\x12>\n" +
 	"\x0fadd_permissions\x18\x02 \x03(\x0e2\x15.theapp.v1.PermissionR\x0eaddPermissions\x12D\n" +
-	"\x12remove_permissions\x18\x03 \x03(\x0e2\x15.theapp.v1.PermissionR\x11removePermissions\"0\n" +
+	"\x12remove_permissions\x18\x03 \x03(\x0e2\x15.theapp.v1.PermissionR\x11removePermissions\x12\x1f\n" +
+	"\x04etag\x18\x04 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x04etag\"0\n" +
 	"\x11DeleteRoleRequest\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x02id\"\x14\n" +
 	"\x12DeleteRoleResponse\"h\n" +
@@ -1302,7 +1313,7 @@ const file_role_proto_rawDesc = "" +
 	"\bRoleKind\x12\x19\n" +
 	"\x15ROLE_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10ROLE_KIND_CUSTOM\x10\x01\x12 \n" +
-	"\x1cROLE_KIND_ORGANIZATION_ADMIN\x10\x022\x9a:\n" +
+	"\x1cROLE_KIND_ORGANIZATION_ADMIN\x10\x022\x85;\n" +
 	"\vRoleService\x12\xa5\x04\n" +
 	"\n" +
 	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"\xe7\x03\x92A\xcf\x03Jh\n" +
@@ -1391,9 +1402,9 @@ const file_role_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrT\n" +
 	"R\n" +
-	"\fx-project-id\x12>ID of a project in the organization whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02#\x12!/v1/organization-role-assignments\x12\xc2\x05\n" +
+	"\fx-project-id\x12>ID of a project in the organization whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02#\x12!/v1/organization-role-assignments\x12\xad\x06\n" +
 	"\n" +
-	"UpdateRole\x12\x1c.theapp.v1.UpdateRoleRequest\x1a\x0f.theapp.v1.Role\"\x84\x05\x92A\xe2\x04J\xe7\x01\n" +
+	"UpdateRole\x12\x1c.theapp.v1.UpdateRoleRequest\x1a\x0f.theapp.v1.Role\"\xef\x05\x92A\xcd\x05J\xe7\x01\n" +
 	"\x03400\x12\xdf\x01\n" +
 	"\xc4\x01Invalid role data, update mask, or project metadata; the role name already exists; managed role permissions cannot be updated; or project assignments conflict with organization-scoped permissions.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
@@ -1405,6 +1416,9 @@ const file_role_proto_rawDesc = "" +
 	"\x14\x1a\x12.google.rpc.StatusJ[\n" +
 	"\x03404\x12T\n" +
 	":Role or permission not found in the selected organization.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJi\n" +
+	"\x03409\x12b\n" +
+	"HThe role has changed since it was read. Fetch the latest role and retry.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +

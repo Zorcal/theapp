@@ -27,9 +27,7 @@ Any deviation must be documented on the relevant List RPC with a comment that na
 
 ### ETags
 
-Resources may expose an output-only `etag` before optimistic concurrency is enforced. Mutation requests do not require an ETag until the service implements that check.
-
-When optimistic concurrency is added, apply it consistently to resources with concurrent mutation risks. Follow [AIP-154](https://google.aip.dev/154): carry the ETag in the resource or request message rather than request metadata, and return `ABORTED` when it does not match the current resource version.
+Mutable resources follow [AIP-154](https://google.aip.dev/154): update requests carry the last-read ETag in the resource or request message rather than request metadata. A stale ETag returns `ABORTED`, and every successful update returns a new ETag.
 
 ## Swagger / OpenAPI
 

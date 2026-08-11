@@ -13,15 +13,21 @@ import (
 	"github.com/zorcal/theapp/backend/pkg/x/slicesx"
 )
 
-func UpdateUserFromPB(req *pb.UpdateUserRequest, id uuid.UUID) mdl.UpdateUser {
+func UpdateUserFromPB(req *pb.UpdateUserRequest, id uuid.UUID) (mdl.UpdateUser, error) {
+	etag, err := uuid.Parse(req.GetUser().GetEtag())
+	if err != nil {
+		return mdl.UpdateUser{}, fmt.Errorf("parse etag: %w", err)
+	}
+
 	paths := req.GetUpdateMask().GetPaths()
 	return mdl.UpdateUser{
 		ID:   id,
+		ETag: etag,
 		Name: req.GetUser().GetName(),
 		Fields: mdl.UserUpdateFields{
 			Name: slices.Contains(paths, "name"),
 		},
-	}
+	}, nil
 }
 
 func CreateUserFromPB(u *pb.User) mdl.CreateUser {
@@ -40,7 +46,7 @@ func UserToPB(usr mdl.User) *pb.User {
 		UpdateTime:        maybeNewTimestamppb(usr.UpdatedAt),
 		CreateTime:        timestamppb.New(usr.CreatedAt),
 		EmailVerifiedTime: maybeNewTimestamppb(usr.EmailVerifiedAt),
-		Etag:              usr.ETag,
+		Etag:              usr.ETag.String(),
 	}
 }
 

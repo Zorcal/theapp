@@ -38,6 +38,7 @@ type CreateUser struct {
 // Fields controls which fields are applied; fields not listed are left unchanged.
 type UpdateUser struct {
 	ExternalID uuid.UUID
+	ETag       uuid.UUID
 	Fields     UserUpdateFields
 	Name       string
 }

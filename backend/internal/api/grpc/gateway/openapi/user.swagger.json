@@ -254,6 +254,12 @@
               "$ref": "#/definitions/rpcStatus"
             }
           },
+          "409": {
+            "description": "The user has changed since it was read. Fetch the latest user and retry.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
           "500": {
             "description": "Unexpected server error.",
             "schema": {
@@ -325,12 +331,10 @@
             },
             "etag": {
               "type": "string",
-              "description": "The ETag for the current version of the user. Helps to prevent\nsimultaneous updates of a user from overwriting each other (\"mid-air\ncollisions\").\n\nIf this is provided on update, it must match the server's ETag.",
-              "readOnly": true
+              "description": "The ETag for the current version of the user. Helps to prevent\nsimultaneous updates of a user from overwriting each other (\"mid-air\ncollisions\").\n\nUpdates must provide the last-read value, which must match the server's\ncurrent ETag."
             }
           },
-          "description": "The user to update. The user's `id` identifies which user to update.",
-          "title": "The user to update. The user's `id` identifies which user to update."
+          "description": "The user to update. The user's `id` identifies which user to update, and\nits `etag` must contain the last-read resource version."
         },
         "updateMask": {
           "type": "string",
@@ -448,8 +452,7 @@
         },
         "etag": {
           "type": "string",
-          "description": "The ETag for the current version of the user. Helps to prevent\nsimultaneous updates of a user from overwriting each other (\"mid-air\ncollisions\").\n\nIf this is provided on update, it must match the server's ETag.",
-          "readOnly": true
+          "description": "The ETag for the current version of the user. Helps to prevent\nsimultaneous updates of a user from overwriting each other (\"mid-air\ncollisions\").\n\nUpdates must provide the last-read value, which must match the server's\ncurrent ETag."
         }
       },
       "description": "User represents a user in the system."

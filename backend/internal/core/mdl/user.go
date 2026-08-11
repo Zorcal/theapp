@@ -14,7 +14,7 @@ type User struct {
 	EmailVerifiedAt *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       *time.Time
-	ETag            string
+	ETag            uuid.UUID
 }
 
 // CreateUser holds the fields needed to create a new user.
@@ -41,11 +41,15 @@ func (cu CreateUser) Validate() error {
 // Fields controls which fields are applied; fields not listed are left unchanged.
 type UpdateUser struct {
 	ID     uuid.UUID
+	ETag   uuid.UUID
 	Fields UserUpdateFields
 	Name   string
 }
 
 func (uu UpdateUser) Validate() error {
+	if uu.ETag == uuid.Nil {
+		return validationError("etag invalid")
+	}
 	if uu.Fields.Name && uu.Name == "" {
 		return validationError("name required")
 	}

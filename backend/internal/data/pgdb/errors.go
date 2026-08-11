@@ -15,6 +15,9 @@ const (
 // ErrAlreadyExists is returned when an insert violates a unique constraint.
 var ErrAlreadyExists = errors.New("already exists")
 
+// ErrETagMismatch is returned when an update's expected ETag is no longer current.
+var ErrETagMismatch = errors.New("etag mismatch")
+
 // ErrCheckConstraintViolated is returned when a database check constraint rejects input.
 var ErrCheckConstraintViolated = errors.New("check constraint violated")
 

@@ -108,6 +108,7 @@ func (s *Store) Users(ctx context.Context, filter Filter, orderBys []order.By[Or
 
 // UpdateUser updates the user with the given external ID and returns the updated user.
 // Returns [sql.ErrNoRows] if no such user exists.
+// Returns [pgdb.ErrETagMismatch] if the user has changed since it was read.
 func (s *Store) UpdateUser(ctx context.Context, uu UpdateUser) (User, error) {
 	updateQ := updateUserQuery(uu)
 

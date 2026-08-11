@@ -26,7 +26,7 @@ type CustomRole struct {
 	Permissions []Permission
 	CreatedAt   time.Time
 	UpdatedAt   *time.Time
-	ETag        string
+	ETag        uuid.UUID
 }
 
 // RoleKind identifies who owns an organization role's definition.
@@ -79,12 +79,16 @@ func (cr CreateCustomRole) Validate() error {
 // Fields controls which fields are applied; fields not listed are left unchanged.
 type UpdateCustomRole struct {
 	ID          uuid.UUID
+	ETag        uuid.UUID
 	Fields      CustomRoleUpdateFields
 	Name        string
 	Permissions []Permission
 }
 
 func (ur UpdateCustomRole) Validate() error {
+	if ur.ETag == uuid.Nil {
+		return validationError("etag invalid")
+	}
 	if ur.Fields.Name {
 		trimmedName := strings.TrimSpace(ur.Name)
 		if trimmedName == "" {
@@ -111,11 +115,15 @@ type CustomRoleUpdateFields struct {
 // ModifyCustomRolePermissions holds permission-set changes for a custom role.
 type ModifyCustomRolePermissions struct {
 	ID                uuid.UUID
+	ETag              uuid.UUID
 	AddPermissions    []Permission
 	RemovePermissions []Permission
 }
 
 func (mrp ModifyCustomRolePermissions) Validate() error {
+	if mrp.ETag == uuid.Nil {
+		return validationError("etag must be a valid UUID")
+	}
 	if set.FromSlice(mrp.AddPermissions).Intersection(set.FromSlice(mrp.RemovePermissions)).Len() != 0 {
 		return validationError("permission cannot be both added and removed")
 	}

@@ -3,6 +3,8 @@ package mdl
 import (
 	"errors"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestCreateUser_Validate(t *testing.T) {
@@ -58,11 +60,11 @@ func TestUpdateUser_Validate(t *testing.T) {
 	}{
 		{
 			name: "name set and non-empty",
-			in:   UpdateUser{Name: "Alice Jones", Fields: UserUpdateFields{Name: true}},
+			in:   UpdateUser{ETag: uuid.New(), Name: "Alice Jones", Fields: UserUpdateFields{Name: true}},
 		},
 		{
 			name: "name not set",
-			in:   UpdateUser{Fields: UserUpdateFields{Name: false}},
+			in:   UpdateUser{ETag: uuid.New(), Fields: UserUpdateFields{Name: false}},
 		},
 	}
 	for _, tt := range tests {
@@ -81,7 +83,11 @@ func TestUpdateUser_Validate_error(t *testing.T) {
 	}{
 		{
 			name: "name set but empty",
-			in:   UpdateUser{Name: "", Fields: UserUpdateFields{Name: true}},
+			in:   UpdateUser{ETag: uuid.New(), Name: "", Fields: UserUpdateFields{Name: true}},
+		},
+		{
+			name: "etag missing",
+			in:   UpdateUser{Fields: UserUpdateFields{Name: false}},
 		},
 	}
 	for _, tt := range tests {

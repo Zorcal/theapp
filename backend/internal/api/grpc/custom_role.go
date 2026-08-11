@@ -50,6 +50,7 @@ type CustomRoleCore interface {
 	// does not exist or is owned by another organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
 	// Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
+	// Returns [mdl.ErrETagMismatch] if the role has changed since it was read.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
 	// Returns [mdl.ErrManagedRole] if the role is application-managed.
 	// Returns [mdl.ErrInvalidAssignmentScope] if the update would make a role with project
@@ -59,6 +60,7 @@ type CustomRoleCore interface {
 	// Returns [mdl.ErrNotFound] if the caller or selected project no longer exists, or the role
 	// does not exist or is owned by another organization.
 	// Returns [mdl.ErrValidation] if the input is invalid.
+	// Returns [mdl.ErrETagMismatch] if the role has changed since it was read.
 	// Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or removed from the role.
 	// Returns [mdl.ErrManagedRole] if the role is application-managed.
 	// Returns [mdl.ErrInvalidAssignmentScope] if the change would make a role with project
@@ -266,9 +268,9 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 
 	roleID := uuid.MustParse(req.GetRole().GetId())
 
-	updateRole, ok := conv.UpdateCustomRoleFromPB(req, roleID)
-	if !ok {
-		return nil, errors.New("validated role contains an unknown permission")
+	updateRole, err := conv.UpdateCustomRoleFromPB(req, roleID)
+	if err != nil {
+		return nil, fmt.Errorf("convert validated update role request: %w", err)
 	}
 
 	role, err := s.customRoleCore.UpdateCustomRole(ctx, updateRole)
@@ -282,6 +284,8 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 			return nil, invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "role.name", Description: "a role with this name already exists"},
 			})
+		case errors.Is(err, mdl.ErrETagMismatch):
+			return nil, status.Error(codes.Aborted, "role has changed since it was read")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
 		case errors.Is(err, mdl.ErrManagedRole):
@@ -303,9 +307,9 @@ func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.M
 
 	roleID := uuid.MustParse(req.GetId())
 
-	modifyPermissions, ok := conv.ModifyCustomRolePermissionsFromPB(req, roleID)
-	if !ok {
-		return nil, errors.New("validated permission changes contain an unknown permission")
+	modifyPermissions, err := conv.ModifyCustomRolePermissionsFromPB(req, roleID)
+	if err != nil {
+		return nil, fmt.Errorf("convert validated modify role permissions request: %w", err)
 	}
 
 	role, err := s.customRoleCore.ModifyCustomRolePermissions(ctx, modifyPermissions)
@@ -315,6 +319,8 @@ func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.M
 			return nil, status.Errorf(codes.NotFound, "role %q or permission not found", req.GetId())
 		case errors.Is(err, mdl.ErrValidation):
 			return nil, status.Error(codes.InvalidArgument, "invalid permission changes")
+		case errors.Is(err, mdl.ErrETagMismatch):
+			return nil, status.Error(codes.Aborted, "role has changed since it was read")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
 		case errors.Is(err, mdl.ErrManagedRole):

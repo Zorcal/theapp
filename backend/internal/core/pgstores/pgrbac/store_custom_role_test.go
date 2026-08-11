@@ -227,6 +227,7 @@ func TestStore_UpdateCustomRole(t *testing.T) {
 	in := pgrbac.UpdateCustomRole{
 		OrgID:           org.ID,
 		ExternalID:      seeded.ExternalID,
+		ETag:            seeded.ETag,
 		Fields:          pgrbac.CustomRoleUpdateFields{Name: true, PermissionNames: true},
 		Name:            "editor",
 		PermissionNames: []string{"custom-role:delete", "custom-role:update"},
@@ -254,6 +255,7 @@ func TestStore_UpdateCustomRole(t *testing.T) {
 	gotIgnored, err := rbacStore.UpdateCustomRole(ctx, pgrbac.UpdateCustomRole{
 		OrgID:           org.ID,
 		ExternalID:      seeded.ExternalID,
+		ETag:            got.ETag,
 		Name:            "ignored",
 		PermissionNames: []string{"permission:unknown"},
 	})
@@ -287,6 +289,7 @@ func TestStore_UpdateCustomRole_error(t *testing.T) {
 			in: pgrbac.UpdateCustomRole{
 				OrgID:      secondOrg.ID,
 				ExternalID: role.ExternalID,
+				ETag:       role.ETag,
 				Fields:     pgrbac.CustomRoleUpdateFields{Name: true},
 				Name:       "renamed",
 			},
@@ -297,6 +300,7 @@ func TestStore_UpdateCustomRole_error(t *testing.T) {
 			in: pgrbac.UpdateCustomRole{
 				OrgID:           firstOrg.ID,
 				ExternalID:      role.ExternalID,
+				ETag:            role.ETag,
 				Fields:          pgrbac.CustomRoleUpdateFields{PermissionNames: true},
 				Name:            "renamed",
 				PermissionNames: []string{"permission:unknown"},
@@ -308,6 +312,7 @@ func TestStore_UpdateCustomRole_error(t *testing.T) {
 			in: pgrbac.UpdateCustomRole{
 				OrgID:      firstOrg.ID,
 				ExternalID: role.ExternalID,
+				ETag:       role.ETag,
 				Fields:     pgrbac.CustomRoleUpdateFields{Name: true},
 				Name:       "EDITOR",
 			},
@@ -318,6 +323,7 @@ func TestStore_UpdateCustomRole_error(t *testing.T) {
 			in: pgrbac.UpdateCustomRole{
 				OrgID:      firstOrg.ID,
 				ExternalID: role.ExternalID,
+				ETag:       role.ETag,
 				Fields:     pgrbac.CustomRoleUpdateFields{Name: true},
 			},
 			want: pgdb.ErrCheckConstraintViolated,
@@ -327,6 +333,7 @@ func TestStore_UpdateCustomRole_error(t *testing.T) {
 			in: pgrbac.UpdateCustomRole{
 				OrgID:      firstOrg.ID,
 				ExternalID: role.ExternalID,
+				ETag:       role.ETag,
 				Fields:     pgrbac.CustomRoleUpdateFields{Name: true},
 				Name:       " renamed",
 			},
@@ -337,10 +344,22 @@ func TestStore_UpdateCustomRole_error(t *testing.T) {
 			in: pgrbac.UpdateCustomRole{
 				OrgID:      firstOrg.ID,
 				ExternalID: role.ExternalID,
+				ETag:       role.ETag,
 				Fields:     pgrbac.CustomRoleUpdateFields{Name: true},
 				Name:       "renamed ",
 			},
 			want: pgdb.ErrCheckConstraintViolated,
+		},
+		{
+			name: "etag mismatch",
+			in: pgrbac.UpdateCustomRole{
+				OrgID:      firstOrg.ID,
+				ExternalID: role.ExternalID,
+				ETag:       uuid.New(),
+				Fields:     pgrbac.CustomRoleUpdateFields{Name: true},
+				Name:       "renamed",
+			},
+			want: pgdb.ErrETagMismatch,
 		},
 	}
 	for _, tt := range tests {
@@ -364,6 +383,7 @@ func TestStore_ModifyCustomRolePermissions(t *testing.T) {
 	in := pgrbac.ModifyCustomRolePermissions{
 		OrgID:                 org.ID,
 		ExternalID:            seeded.ExternalID,
+		ETag:                  seeded.ETag,
 		AddPermissionNames:    []string{"custom-role:delete"},
 		RemovePermissionNames: []string{"custom-role:read"},
 	}
@@ -386,6 +406,7 @@ func TestStore_ModifyCustomRolePermissions(t *testing.T) {
 		t.Error("ModifyCustomRolePermissions() ETag unchanged, want new ETag")
 	}
 
+	in.ETag = got.ETag
 	gotNoOp, err := rbacStore.ModifyCustomRolePermissions(ctx, in)
 	if err != nil {
 		t.Fatalf("ModifyCustomRolePermissions() no-op error = %v", err)
@@ -407,44 +428,63 @@ func TestStore_ModifyCustomRolePermissions_error(t *testing.T) {
 	tests := []struct {
 		name string
 		in   pgrbac.ModifyCustomRolePermissions
+		want error
 	}{
 		{
 			name: "role belongs to another organization",
 			in: pgrbac.ModifyCustomRolePermissions{
 				OrgID:              secondOrg.ID,
 				ExternalID:         role.ExternalID,
+				ETag:               role.ETag,
 				AddPermissionNames: []string{"custom-role:read"},
 			},
+			want: sql.ErrNoRows,
 		},
 		{
 			name: "unknown permission",
 			in: pgrbac.ModifyCustomRolePermissions{
 				OrgID:              firstOrg.ID,
 				ExternalID:         role.ExternalID,
+				ETag:               role.ETag,
 				AddPermissionNames: []string{"permission:unknown"},
 			},
+			want: sql.ErrNoRows,
 		},
 		{
 			name: "unknown permission to remove",
 			in: pgrbac.ModifyCustomRolePermissions{
 				OrgID:                 firstOrg.ID,
 				ExternalID:            role.ExternalID,
+				ETag:                  role.ETag,
 				RemovePermissionNames: []string{"permission:unknown"},
 			},
+			want: sql.ErrNoRows,
 		},
 		{
 			name: "role not found",
 			in: pgrbac.ModifyCustomRolePermissions{
 				OrgID:              firstOrg.ID,
 				ExternalID:         uuid.New(),
+				ETag:               uuid.New(),
 				AddPermissionNames: []string{"custom-role:read"},
 			},
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "etag mismatch",
+			in: pgrbac.ModifyCustomRolePermissions{
+				OrgID:              firstOrg.ID,
+				ExternalID:         role.ExternalID,
+				ETag:               uuid.New(),
+				AddPermissionNames: []string{"custom-role:read"},
+			},
+			want: pgdb.ErrETagMismatch,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := rbacStore.ModifyCustomRolePermissions(ctx, tt.in); !errors.Is(err, sql.ErrNoRows) {
-				t.Errorf("ModifyCustomRolePermissions(%+v) error = %v, want sql.ErrNoRows", tt.in, err)
+			if _, err := rbacStore.ModifyCustomRolePermissions(ctx, tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("ModifyCustomRolePermissions(%+v) error = %v, want %v", tt.in, err, tt.want)
 			}
 		})
 	}

@@ -25,7 +25,7 @@ func customRoleFromPg(r pgrbac.CustomRole) mdl.CustomRole {
 		Permissions: permissionsFromPg(r.PermissionNames),
 		CreatedAt:   r.CreatedAt,
 		UpdatedAt:   r.UpdatedAt,
-		ETag:        r.ETag.String(),
+		ETag:        r.ETag,
 	}
 }
 
@@ -45,6 +45,7 @@ func updateCustomRoleToPg(ur mdl.UpdateCustomRole, orgID int) pgrbac.UpdateCusto
 	return pgrbac.UpdateCustomRole{
 		OrgID:      orgID,
 		ExternalID: ur.ID,
+		ETag:       ur.ETag,
 		Fields: pgrbac.CustomRoleUpdateFields{
 			Name:            ur.Fields.Name,
 			PermissionNames: ur.Fields.Permissions,
@@ -58,6 +59,7 @@ func modifyCustomRolePermissionsToPg(mrp mdl.ModifyCustomRolePermissions, orgID 
 	return pgrbac.ModifyCustomRolePermissions{
 		OrgID:                 orgID,
 		ExternalID:            mrp.ID,
+		ETag:                  mrp.ETag,
 		AddPermissionNames:    permissionsToPg(mrp.AddPermissions),
 		RemovePermissionNames: permissionsToPg(mrp.RemovePermissions),
 	}

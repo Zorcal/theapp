@@ -196,7 +196,7 @@ func TestOrganizationService_CreateOrganizationUser(t *testing.T) {
 		Email:     "member@test.com",
 		CreatedAt: now.Add(time.Hour * -3),
 		UpdatedAt: new(now),
-		ETag:      uuid.NewString(),
+		ETag:      uuid.New(),
 	}
 	orgCore := &MockedOrganizationCore{
 		CreateOrganizationUserFunc: func(_ context.Context, _ mdl.CreateOrganizationUser) (mdl.User, error) {
@@ -218,7 +218,7 @@ func TestOrganizationService_CreateOrganizationUser(t *testing.T) {
 		Email:      mockedUser.Email,
 		CreateTime: timestamppb.New(mockedUser.CreatedAt),
 		UpdateTime: timestamppb.New(*mockedUser.UpdatedAt),
-		Etag:       mockedUser.ETag,
+		Etag:       mockedUser.ETag.String(),
 	}
 	testingx.AssertDiff(t, got, want, defaultDiffOpts())
 }
@@ -277,21 +277,21 @@ func TestOrganizationService_ListOrganizationUsers(t *testing.T) {
 		EmailVerifiedAt: new(now.Add(-2 * time.Hour)),
 		CreatedAt:       now.Add(-24 * time.Hour),
 		UpdatedAt:       new(now.Add(-time.Hour)),
-		ETag:            uuid.NewString(),
+		ETag:            uuid.New(),
 	}
 	secondUser := mdl.User{
 		ID:        uuid.New(),
 		Email:     "b-member@test.com",
 		Name:      "Second Member",
 		CreatedAt: now.Add(-12 * time.Hour),
-		ETag:      uuid.NewString(),
+		ETag:      uuid.New(),
 	}
 	thirdUser := mdl.User{
 		ID:        uuid.New(),
 		Email:     "c-member@test.com",
 		Name:      "Third Member",
 		CreatedAt: now.Add(-6 * time.Hour),
-		ETag:      uuid.NewString(),
+		ETag:      uuid.New(),
 	}
 	pbFirstUser := &pb.User{
 		Id:                firstUser.ID.String(),
@@ -300,21 +300,21 @@ func TestOrganizationService_ListOrganizationUsers(t *testing.T) {
 		EmailVerifiedTime: timestamppb.New(*firstUser.EmailVerifiedAt),
 		CreateTime:        timestamppb.New(firstUser.CreatedAt),
 		UpdateTime:        timestamppb.New(*firstUser.UpdatedAt),
-		Etag:              firstUser.ETag,
+		Etag:              firstUser.ETag.String(),
 	}
 	pbSecondUser := &pb.User{
 		Id:         secondUser.ID.String(),
 		Email:      secondUser.Email,
 		Name:       secondUser.Name,
 		CreateTime: timestamppb.New(secondUser.CreatedAt),
-		Etag:       secondUser.ETag,
+		Etag:       secondUser.ETag.String(),
 	}
 	pbThirdUser := &pb.User{
 		Id:         thirdUser.ID.String(),
 		Email:      thirdUser.Email,
 		Name:       thirdUser.Name,
 		CreateTime: timestamppb.New(thirdUser.CreatedAt),
-		Etag:       thirdUser.ETag,
+		Etag:       thirdUser.ETag.String(),
 	}
 
 	tests := []struct {

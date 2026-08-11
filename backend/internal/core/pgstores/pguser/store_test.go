@@ -336,6 +336,7 @@ func TestStore_UpdateUser(t *testing.T) {
 			in: func(seeded pguser.User) pguser.UpdateUser {
 				return pguser.UpdateUser{
 					ExternalID: seeded.ExternalID,
+					ETag:       seeded.ETag,
 					Name:       "Alice Jones",
 					Fields:     pguser.UserUpdateFields{Name: true},
 				}
@@ -359,6 +360,7 @@ func TestStore_UpdateUser(t *testing.T) {
 			in: func(seeded pguser.User) pguser.UpdateUser {
 				return pguser.UpdateUser{
 					ExternalID: seeded.ExternalID,
+					ETag:       seeded.ETag,
 					Name:       "ignored",
 					Fields:     pguser.UserUpdateFields{Name: false},
 				}
@@ -400,17 +402,41 @@ func TestStore_UpdateUser_error(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	store := pguser.NewStore(pool)
 
-	t.Run("not found", func(t *testing.T) {
-		id := uuid.New()
-		_, err := store.UpdateUser(ctx, pguser.UpdateUser{
-			ExternalID: id,
-			Name:       "Alice Jones",
-			Fields:     pguser.UserUpdateFields{Name: true},
+	seeded := seedUser(t, store, "etag-mismatch@test.com", "Before")
+
+	tests := []struct {
+		name string
+		in   pguser.UpdateUser
+		want error
+	}{
+		{
+			name: "not found",
+			in: pguser.UpdateUser{
+				ExternalID: uuid.New(),
+				ETag:       uuid.New(),
+				Name:       "Alice Jones",
+				Fields:     pguser.UserUpdateFields{Name: true},
+			},
+			want: sql.ErrNoRows,
+		},
+		{
+			name: "etag mismatch",
+			in: pguser.UpdateUser{
+				ExternalID: seeded.ExternalID,
+				ETag:       uuid.New(),
+				Name:       "After",
+				Fields:     pguser.UserUpdateFields{Name: true},
+			},
+			want: pgdb.ErrETagMismatch,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := store.UpdateUser(ctx, tt.in); !errors.Is(err, tt.want) {
+				t.Errorf("UpdateUser(%+v) error = %v, want %v", tt.in, err, tt.want)
+			}
 		})
-		if !errors.Is(err, sql.ErrNoRows) {
-			t.Errorf("UpdateUser(%v) error = %v, want sql.ErrNoRows", id, err)
-		}
-	})
+	}
 }
 
 func TestStore_GetOrCreateUserByEmail(t *testing.T) {

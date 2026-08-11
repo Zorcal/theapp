@@ -12,6 +12,9 @@ var ErrNotFound = errors.New("not found")
 // conflicts with an existing one (e.g. duplicate email).
 var ErrAlreadyExists = errors.New("already exists")
 
+// ErrETagMismatch is returned when a mutation targets an outdated resource version.
+var ErrETagMismatch = errors.New("etag mismatch")
+
 // ErrPermissionDenied is returned when the actor is not authorized to perform an operation.
 var ErrPermissionDenied = errors.New("permission denied")
 

@@ -71,6 +71,9 @@ func UpdateUser(req *pb.UpdateUserRequest) error {
 	if err := validUUID(req.GetUser().GetId(), "user.id"); err != nil {
 		return err
 	}
+	if err := validUUID(req.GetUser().GetEtag(), "user.etag"); err != nil {
+		return err
+	}
 
 	maskPaths := req.GetUpdateMask().GetPaths()
 	if len(maskPaths) == 0 {

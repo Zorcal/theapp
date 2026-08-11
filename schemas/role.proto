@@ -376,6 +376,24 @@ service RoleService {
         }
       }
       responses: {
+        key: "409"
+        value: {
+          description: "The role changed after it was read."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "The role has changed since it was read. Fetch the latest role and retry."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
         key: "500"
         value: {
           description: "Unexpected server error."
@@ -816,11 +834,9 @@ message Role {
   // Timestamp when the role was last updated.
   google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // ETag for the current version of the role.
-  string etag = 6 [
-    (google.api.field_behavior) = OUTPUT_ONLY,
-    (google.api.field_info).format = UUID4
-  ];
+  // ETag for the current version of the role. Updates must provide the
+  // last-read value, which must match the server's current ETag.
+  string etag = 6 [(google.api.field_info).format = UUID4];
 
   // Identifies whether the definition is user-managed or application-managed.
   RoleKind kind = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -921,7 +937,7 @@ message ListOrganizationRoleAssignmentsResponse {
 
 // Request message for updating a custom role.
 message UpdateRoleRequest {
-  // The role to update.
+  // The role to update. Its `etag` must contain the last-read resource version.
   Role role = 1 [(google.api.field_behavior) = REQUIRED];
 
   // Fields to update.
@@ -941,6 +957,12 @@ message ModifyRolePermissionsRequest {
 
   // Permission names to remove from the role.
   repeated Permission remove_permissions = 3;
+
+  // Last-read ETag of the role.
+  string etag = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
 }
 
 // Request message for deleting a custom role.

@@ -223,6 +223,15 @@ service UserService {
         }
       }
       responses: {
+        key: "409"
+        value: {
+          description: "The user has changed since it was read. Fetch the latest user and retry."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
         key: "500"
         value: {
           description: "Unexpected server error."
@@ -263,11 +272,9 @@ message User {
   // simultaneous updates of a user from overwriting each other ("mid-air
   // collisions").
   //
-  // If this is provided on update, it must match the server's ETag.
-  string etag = 6 [
-    (google.api.field_behavior) = OUTPUT_ONLY,
-    (google.api.field_info).format = UUID4
-  ];
+  // Updates must provide the last-read value, which must match the server's
+  // current ETag.
+  string etag = 6 [(google.api.field_info).format = UUID4];
 }
 
 // Request message for getting a user by ID.
@@ -281,7 +288,8 @@ message GetUserRequest {
 
 // Request message for updating a user.
 message UpdateUserRequest {
-  // The user to update. The user's `id` identifies which user to update.
+  // The user to update. The user's `id` identifies which user to update, and
+  // its `etag` must contain the last-read resource version.
   User user = 1 [(google.api.field_behavior) = REQUIRED];
 
   // The list of fields to update. When omitted, all populated fields are updated.

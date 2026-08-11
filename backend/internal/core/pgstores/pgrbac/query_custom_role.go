@@ -69,6 +69,7 @@ func updateCustomRoleQuery(ur UpdateCustomRole) pgdb.TypedQuery[int] {
 	params := pgx.NamedArgs{
 		"org_id":  ur.OrgID,
 		"role_id": ur.ExternalID,
+		"etag":    ur.ETag,
 	}
 
 	var (
@@ -89,15 +90,34 @@ func updateCustomRoleQuery(ur UpdateCustomRole) pgdb.TypedQuery[int] {
 	setClauses = append(setClauses, "updated_at = NOW()", "etag = gen_random_uuid()")
 
 	// Execution returns sql.ErrNoRows when the organization does not own the role or any requested
-	// permission does not exist, and pgdb.ErrAlreadyExists when the organization already has the
-	// role name.
+	// permission does not exist, pgdb.ErrETagMismatch when the role has changed, and
+	// pgdb.ErrAlreadyExists when the organization already has the role name.
 	sql := fmt.Sprintf(
-		`UPDATE rbac.custom_roles
-		SET %[1]s
-		%[2]s
-		WHERE org_id = @org_id
-			AND external_id = @role_id
-		RETURNING id`,
+		`WITH updated AS (
+			UPDATE rbac.custom_roles
+			SET %[1]s
+			%[2]s
+			WHERE org_id = @org_id
+				AND external_id = @role_id
+				AND etag = @etag
+			RETURNING id
+		)
+		SELECT
+			id AS role_id,
+			TRUE AS is_updated,
+			TRUE AS etag_matches
+		FROM updated
+
+		UNION ALL
+
+		SELECT
+			role.id AS role_id,
+			FALSE AS is_updated,
+			role.etag = @etag AS etag_matches
+		FROM rbac.custom_roles AS role
+		WHERE role.org_id = @org_id
+			AND role.external_id = @role_id
+			AND NOT EXISTS (SELECT 1 FROM updated)`,
 		strings.Join(setClauses, ", "),
 		fromClause,
 	)
@@ -106,8 +126,21 @@ func updateCustomRoleQuery(ur UpdateCustomRole) pgdb.TypedQuery[int] {
 		SQL:  sql,
 		Args: params,
 		Scan: func(row pgx.CollectableRow) (int, error) {
-			var id int
-			return id, row.Scan(&id)
+			var (
+				id            int
+				isUpdated     bool
+				isETagMatched bool
+			)
+			if err := row.Scan(&id, &isUpdated, &isETagMatched); err != nil {
+				return 0, err
+			}
+			if !isETagMatched {
+				return 0, pgdb.ErrETagMismatch
+			}
+			if !isUpdated {
+				return 0, pgx.ErrNoRows
+			}
+			return id, nil
 		},
 		Expect: pgdb.ExpectOne,
 	}
@@ -139,6 +172,7 @@ func modifyCustomRolePermissionsQuery(mp ModifyCustomRolePermissions) pgdb.Typed
 	params := pgx.NamedArgs{
 		"org_id":                  mp.OrgID,
 		"role_id":                 mp.ExternalID,
+		"etag":                    mp.ETag,
 		"add_permission_names":    mp.AddPermissionNames,
 		"remove_permission_names": mp.RemovePermissionNames,
 	}
@@ -169,6 +203,7 @@ func modifyCustomRolePermissionsQuery(mp ModifyCustomRolePermissions) pgdb.Typed
 				CROSS JOIN resolved_permissions
 				WHERE r.org_id = @org_id
 					AND r.external_id = @role_id
+					AND r.etag = @etag
 			),
 			-- Removing a permission the role does not hold produces no row.
 			removed_permissions AS (
@@ -204,16 +239,37 @@ func modifyCustomRolePermissionsQuery(mp ModifyCustomRolePermissions) pgdb.Typed
 				)
 				RETURNING id
 			)
-		-- Returning the target ID makes a missing role or permission surface as sql.ErrNoRows.
-		SELECT id
-		FROM target_role`
+		-- Return enough state to distinguish a missing role, stale ETag, and invalid permissions.
+		SELECT
+			(SELECT id FROM target_role) AS role_id,
+			EXISTS (
+				SELECT 1 FROM rbac.custom_roles
+				WHERE org_id = @org_id AND external_id = @role_id
+			) AS role_exists,
+			EXISTS (SELECT 1 FROM resolved_permissions) AS permissions_valid`
 
 	return pgdb.TypedQuery[int]{
 		SQL:  sql,
 		Args: params,
 		Scan: func(row pgx.CollectableRow) (int, error) {
-			var id int
-			return id, row.Scan(&id)
+			var (
+				id                  *int
+				isExists            bool
+				arePermissionsValid bool
+			)
+			if err := row.Scan(&id, &isExists, &arePermissionsValid); err != nil {
+				return 0, err
+			}
+			if id == nil {
+				if !arePermissionsValid {
+					return 0, pgx.ErrNoRows
+				}
+				if isExists {
+					return 0, pgdb.ErrETagMismatch
+				}
+				return 0, pgx.ErrNoRows
+			}
+			return *id, nil
 		},
 		Expect: pgdb.ExpectOne,
 	}

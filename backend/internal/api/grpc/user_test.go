@@ -23,7 +23,7 @@ import (
 func TestUserService_GetUser(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
-	id, etag, now := uuid.New(), uuid.NewString(), time.Now()
+	id, etag, now := uuid.New(), uuid.New(), time.Now()
 
 	tests := []struct {
 		name     string
@@ -50,7 +50,7 @@ func TestUserService_GetUser(t *testing.T) {
 				Email:      "alice@test.com",
 				Name:       "Alice Smith",
 				CreateTime: timestamppb.New(now),
-				Etag:       etag,
+				Etag:       etag.String(),
 			},
 		},
 	}
@@ -130,7 +130,7 @@ func TestUserService_GetUser_error(t *testing.T) {
 func TestUserService_CreateUser(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
-	id, etag, now := uuid.New(), uuid.NewString(), time.Now()
+	id, etag, now := uuid.New(), uuid.New(), time.Now()
 
 	tests := []struct {
 		name     string
@@ -160,7 +160,7 @@ func TestUserService_CreateUser(t *testing.T) {
 				Email:      "alice@test.com",
 				Name:       "Alice Smith",
 				CreateTime: timestamppb.New(now),
-				Etag:       etag,
+				Etag:       etag.String(),
 			},
 		},
 	}
@@ -261,7 +261,7 @@ func TestUserService_CreateUser_error(t *testing.T) {
 func TestUserService_UpdateUser(t *testing.T) {
 	diffOpts := defaultDiffOpts()
 
-	id, etag, now := uuid.New(), uuid.NewString(), time.Now()
+	id, etag, now := uuid.New(), uuid.New(), time.Now()
 
 	tests := []struct {
 		name     string
@@ -286,6 +286,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 				User: &pb.User{
 					Id:   id.String(),
 					Name: "Alice Updated",
+					Etag: etag.String(),
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
@@ -294,7 +295,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 				Email:      "alice@test.com",
 				Name:       "Alice Updated",
 				CreateTime: timestamppb.New(now),
-				Etag:       etag,
+				Etag:       etag.String(),
 			},
 		},
 	}
@@ -339,10 +340,28 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 				User: &pb.User{
 					Id:   uuid.NewString(),
 					Name: "Alice Updated",
+					Etag: uuid.NewString(),
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: status.New(codes.NotFound, "user \""+uuid.Nil.String()+"\" not found"),
+		},
+		{
+			name: "etag mismatch",
+			userCore: &MockedUserCore{
+				UpdateUserFunc: func(_ context.Context, _ mdl.UpdateUser) (mdl.User, error) {
+					return mdl.User{}, mdl.ErrETagMismatch
+				},
+			},
+			in: &pb.UpdateUserRequest{
+				User: &pb.User{
+					Id:   uuid.NewString(),
+					Name: "Alice Updated",
+					Etag: uuid.NewString(),
+				},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.Aborted, "user has changed since it was read"),
 		},
 		{
 			name: "core error",
@@ -355,6 +374,7 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 				User: &pb.User{
 					Id:   uuid.NewString(),
 					Name: "Alice Updated",
+					Etag: uuid.NewString(),
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
@@ -393,7 +413,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		Email:     "john.doe@test.com",
 		Name:      "John Doe",
 		CreatedAt: now.AddDate(0, 0, -15),
-		ETag:      uuid.NewString(),
+		ETag:      uuid.New(),
 	}
 	maryDoe := mdl.User{
 		ID:        uuid.New(),
@@ -401,7 +421,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		Name:      "Mary Doe",
 		CreatedAt: now.AddDate(0, 0, -12),
 		UpdatedAt: new(now.AddDate(0, 0, -3)),
-		ETag:      uuid.NewString(),
+		ETag:      uuid.New(),
 	}
 	smithBrown := mdl.User{
 		ID:        uuid.New(),
@@ -409,7 +429,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		Name:      "Smith Brown",
 		CreatedAt: now.AddDate(0, 0, -10),
 		UpdatedAt: new(now.AddDate(0, 0, -1)),
-		ETag:      uuid.NewString(),
+		ETag:      uuid.New(),
 	}
 
 	pbJohnDoe := &pb.User{
@@ -417,7 +437,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		Email:      "john.doe@test.com",
 		Name:       "John Doe",
 		CreateTime: timestamppb.New(now.AddDate(0, 0, -15)),
-		Etag:       johnDoe.ETag,
+		Etag:       johnDoe.ETag.String(),
 	}
 	pbMaryDoe := &pb.User{
 		Id:         maryDoe.ID.String(),
@@ -425,7 +445,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		Name:       "Mary Doe",
 		CreateTime: timestamppb.New(now.AddDate(0, 0, -12)),
 		UpdateTime: timestamppb.New(now.AddDate(0, 0, -3)),
-		Etag:       maryDoe.ETag,
+		Etag:       maryDoe.ETag.String(),
 	}
 	pbSmithBrown := &pb.User{
 		Id:         smithBrown.ID.String(),
@@ -433,7 +453,7 @@ func TestUserService_ListUsers(t *testing.T) {
 		Name:       "Smith Brown",
 		CreateTime: timestamppb.New(now.AddDate(0, 0, -10)),
 		UpdateTime: timestamppb.New(now.AddDate(0, 0, -1)),
-		Etag:       smithBrown.ETag,
+		Etag:       smithBrown.ETag.String(),
 	}
 
 	tests := []struct {

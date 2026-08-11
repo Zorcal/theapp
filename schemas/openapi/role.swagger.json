@@ -572,6 +572,12 @@
               "$ref": "#/definitions/rpcStatus"
             }
           },
+          "409": {
+            "description": "The role has changed since it was read. Fetch the latest role and retry.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
           "500": {
             "description": "Unexpected server error.",
             "schema": {
@@ -928,9 +934,16 @@
             "$ref": "#/definitions/v1Permission"
           },
           "description": "Permission names to remove from the role."
+        },
+        "etag": {
+          "type": "string",
+          "description": "Last-read ETag of the role."
         }
       },
-      "description": "Request message for modifying a custom role's permissions."
+      "description": "Request message for modifying a custom role's permissions.",
+      "required": [
+        "etag"
+      ]
     },
     "RoleServiceUpdateRoleBody": {
       "type": "object",
@@ -963,8 +976,7 @@
             },
             "etag": {
               "type": "string",
-              "description": "ETag for the current version of the role.",
-              "readOnly": true
+              "description": "ETag for the current version of the role. Updates must provide the\nlast-read value, which must match the server's current ETag."
             },
             "kind": {
               "$ref": "#/definitions/v1RoleKind",
@@ -977,8 +989,8 @@
               "readOnly": true
             }
           },
-          "description": "The role to update.",
-          "title": "The role to update."
+          "description": "The role to update. Its `etag` must contain the last-read resource version.",
+          "title": "The role to update. Its `etag` must contain the last-read resource version."
         },
         "updateMask": {
           "type": "string",
@@ -1228,8 +1240,7 @@
         },
         "etag": {
           "type": "string",
-          "description": "ETag for the current version of the role.",
-          "readOnly": true
+          "description": "ETag for the current version of the role. Updates must provide the\nlast-read value, which must match the server's current ETag."
         },
         "kind": {
           "$ref": "#/definitions/v1RoleKind",

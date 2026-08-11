@@ -12,6 +12,7 @@ import (
 func updateUserToPg(uu mdl.UpdateUser) pguser.UpdateUser {
 	return pguser.UpdateUser{
 		ExternalID: uu.ID,
+		ETag:       uu.ETag,
 		Fields: pguser.UserUpdateFields{
 			Name: uu.Fields.Name,
 		},
@@ -34,7 +35,7 @@ func userFromPg(u pguser.User) mdl.User {
 		EmailVerifiedAt: u.EmailVerifiedAt,
 		CreatedAt:       u.CreatedAt,
 		UpdatedAt:       u.UpdatedAt,
-		ETag:            u.ETag.String(),
+		ETag:            u.ETag,
 	}
 }
 

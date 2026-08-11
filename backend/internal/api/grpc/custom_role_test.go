@@ -116,6 +116,7 @@ func TestRoleService_Integration(t *testing.T) {
 	updated, err := srv.customRoleServiceClient.UpdateRole(authCtx, &pb.UpdateRoleRequest{
 		Role: &pb.Role{
 			Id:          created.GetId(),
+			Etag:        created.GetEtag(),
 			Name:        "custom role manager",
 			Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT},
 		},
@@ -137,6 +138,7 @@ func TestRoleService_Integration(t *testing.T) {
 
 	modified, err := srv.customRoleServiceClient.ModifyRolePermissions(authCtx, &pb.ModifyRolePermissionsRequest{
 		Id:                created.GetId(),
+		Etag:              updated.GetEtag(),
 		AddPermissions:    []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT},
 		RemovePermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT},
 	})
@@ -251,7 +253,7 @@ func TestRoleService_Integration(t *testing.T) {
 	// Verify the role is inaccessible through another organization.
 
 	if _, err := srv.customRoleServiceClient.UpdateRole(otherAuthCtx, &pb.UpdateRoleRequest{
-		Role:       &pb.Role{Id: created.GetId(), Name: "other role manager"},
+		Role:       &pb.Role{Id: created.GetId(), Name: "other role manager", Etag: created.GetEtag()},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 	}); status.Code(err) != codes.NotFound {
 		t.Errorf("UpdateRole() through another organization code = %v, want %v", status.Code(err), codes.NotFound)
@@ -286,7 +288,7 @@ func TestRoleService_CreateRole(t *testing.T) {
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
 		CreatedAt:   time.Now(),
 		UpdatedAt:   new(time.Now().Add(time.Minute)),
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 	customRoleCore := &MockedCustomRoleCore{
 		CreateCustomRoleFunc: func(_ context.Context, _ mdl.CreateCustomRole) (mdl.CustomRole, error) {
@@ -314,7 +316,7 @@ func TestRoleService_CreateRole(t *testing.T) {
 		Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 		CreateTime:             timestamppb.New(mockedRole.CreatedAt),
 		UpdateTime:             timestamppb.New(*mockedRole.UpdatedAt),
-		Etag:                   mockedRole.ETag,
+		Etag:                   mockedRole.ETag.String(),
 		Kind:                   pb.RoleKind_ROLE_KIND_CUSTOM,
 		MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION,
 	}
@@ -427,7 +429,7 @@ func TestRoleService_GetRole(t *testing.T) {
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
 		CreatedAt:   time.Now(),
 		UpdatedAt:   new(time.Now().Add(time.Minute)),
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 	customRoleCore := &MockedCustomRoleCore{
 		CustomRoleByIDFunc: func(_ context.Context, _ uuid.UUID) (mdl.CustomRole, error) {
@@ -453,7 +455,7 @@ func TestRoleService_GetRole(t *testing.T) {
 		Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 		CreateTime:             timestamppb.New(mockedRole.CreatedAt),
 		UpdateTime:             timestamppb.New(*mockedRole.UpdatedAt),
-		Etag:                   mockedRole.ETag,
+		Etag:                   mockedRole.ETag.String(),
 		Kind:                   pb.RoleKind_ROLE_KIND_CUSTOM,
 		MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION,
 	}
@@ -541,7 +543,7 @@ func TestRoleService_ListRoles(t *testing.T) {
 		Name:        "role reader",
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleReadProjectAssignments},
 		CreatedAt:   now.Add(-3 * time.Hour),
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 	secondRole := mdl.CustomRole{
 		ID:          uuid.New(),
@@ -549,7 +551,7 @@ func TestRoleService_ListRoles(t *testing.T) {
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead, mdl.PermissionCustomRoleUpdate},
 		CreatedAt:   now.Add(-2 * time.Hour),
 		UpdatedAt:   new(now.Add(-time.Hour)),
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 	thirdRole := mdl.CustomRole{
 		ID:          uuid.New(),
@@ -557,7 +559,7 @@ func TestRoleService_ListRoles(t *testing.T) {
 		Kind:        mdl.RoleKindOrganizationAdmin,
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleCreate, mdl.PermissionCustomRoleDelete},
 		CreatedAt:   now,
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 
 	pbFirstRole := &pb.Role{
@@ -565,7 +567,7 @@ func TestRoleService_ListRoles(t *testing.T) {
 		Name:                   firstRole.Name,
 		Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS},
 		CreateTime:             timestamppb.New(firstRole.CreatedAt),
-		Etag:                   firstRole.ETag,
+		Etag:                   firstRole.ETag.String(),
 		Kind:                   pb.RoleKind_ROLE_KIND_CUSTOM,
 		MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_PROJECT,
 	}
@@ -575,7 +577,7 @@ func TestRoleService_ListRoles(t *testing.T) {
 		Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ, pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		CreateTime:             timestamppb.New(secondRole.CreatedAt),
 		UpdateTime:             timestamppb.New(*secondRole.UpdatedAt),
-		Etag:                   secondRole.ETag,
+		Etag:                   secondRole.ETag.String(),
 		Kind:                   pb.RoleKind_ROLE_KIND_CUSTOM,
 		MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION,
 	}
@@ -584,7 +586,7 @@ func TestRoleService_ListRoles(t *testing.T) {
 		Name:                   thirdRole.Name,
 		Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_CREATE, pb.Permission_PERMISSION_CUSTOM_ROLE_DELETE},
 		CreateTime:             timestamppb.New(thirdRole.CreatedAt),
-		Etag:                   thirdRole.ETag,
+		Etag:                   thirdRole.ETag.String(),
 		Kind:                   pb.RoleKind_ROLE_KIND_ORGANIZATION_ADMIN,
 		MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION,
 	}
@@ -754,7 +756,7 @@ func TestRoleService_ListProjectRoleAssignments(t *testing.T) {
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
 		CreatedAt:   time.Now(),
 		UpdatedAt:   new(time.Now().Add(time.Minute)),
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 	customRoleCore := &MockedCustomRoleCore{
 		UserProjectCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.CustomRole, int, error) {
@@ -778,7 +780,7 @@ func TestRoleService_ListProjectRoleAssignments(t *testing.T) {
 			Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 			CreateTime:             timestamppb.New(mockedRole.CreatedAt),
 			UpdateTime:             timestamppb.New(*mockedRole.UpdatedAt),
-			Etag:                   mockedRole.ETag,
+			Etag:                   mockedRole.ETag.String(),
 			Kind:                   pb.RoleKind_ROLE_KIND_CUSTOM,
 			MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION,
 		}},
@@ -851,7 +853,7 @@ func TestRoleService_ListOrganizationRoleAssignments(t *testing.T) {
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
 		CreatedAt:   time.Now(),
 		UpdatedAt:   new(time.Now().Add(time.Minute)),
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 	customRoleCore := &MockedCustomRoleCore{
 		UserOrgCustomRolesFunc: func(_ context.Context, _ uuid.UUID, _, _ int) ([]mdl.CustomRole, int, error) {
@@ -875,7 +877,7 @@ func TestRoleService_ListOrganizationRoleAssignments(t *testing.T) {
 			Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 			CreateTime:             timestamppb.New(mockedRole.CreatedAt),
 			UpdateTime:             timestamppb.New(*mockedRole.UpdatedAt),
-			Etag:                   mockedRole.ETag,
+			Etag:                   mockedRole.ETag.String(),
 			Kind:                   pb.RoleKind_ROLE_KIND_CUSTOM,
 			MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION,
 		}},
@@ -948,7 +950,7 @@ func TestRoleService_UpdateRole(t *testing.T) {
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleUpdate},
 		CreatedAt:   time.Now(),
 		UpdatedAt:   new(time.Now().Add(time.Minute)),
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 	customRoleCore := &MockedCustomRoleCore{
 		UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
@@ -963,7 +965,7 @@ func TestRoleService_UpdateRole(t *testing.T) {
 	got, err := srvTest.customRoleServiceClient.UpdateRole(
 		authCtxForTestUser(t, t.Context()),
 		&pb.UpdateRoleRequest{
-			Role:       &pb.Role{Id: mockedRole.ID.String(), Name: mockedRole.Name},
+			Role:       &pb.Role{Id: mockedRole.ID.String(), Name: mockedRole.Name, Etag: mockedRole.ETag.String()},
 			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 		},
 	)
@@ -977,7 +979,7 @@ func TestRoleService_UpdateRole(t *testing.T) {
 		Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		CreateTime:             timestamppb.New(mockedRole.CreatedAt),
 		UpdateTime:             timestamppb.New(*mockedRole.UpdatedAt),
-		Etag:                   mockedRole.ETag,
+		Etag:                   mockedRole.ETag.String(),
 		Kind:                   pb.RoleKind_ROLE_KIND_CUSTOM,
 		MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION,
 	}
@@ -999,6 +1001,7 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 	}
 
 	roleID := uuid.New()
+	etag := uuid.NewString()
 
 	tests := []struct {
 		name           string
@@ -1022,6 +1025,7 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 			in: &pb.UpdateRoleRequest{
 				Role: &pb.Role{
 					Id:          roleID.String(),
+					Etag:        etag,
 					Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"permissions"}},
@@ -1036,7 +1040,7 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 				},
 			},
 			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: status.New(codes.InvalidArgument, "invalid role"),
@@ -1049,7 +1053,7 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 				},
 			},
 			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: invalidArgWithViolation("role.name", "a role with this name already exists"),
@@ -1062,7 +1066,7 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 				},
 			},
 			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: status.New(codes.PermissionDenied, "caller cannot change role permissions"),
@@ -1075,7 +1079,7 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 				},
 			},
 			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: status.New(codes.FailedPrecondition, "managed role definitions cannot be updated"),
@@ -1090,6 +1094,7 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 			in: &pb.UpdateRoleRequest{
 				Role: &pb.Role{
 					Id:          roleID.String(),
+					Etag:        etag,
 					Permissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"permissions"}},
@@ -1104,10 +1109,23 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 				},
 			},
 			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID.String(), Name: "updated role"},
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: status.New(codes.Internal, codes.Internal.String()),
+		},
+		{
+			name: "etag mismatch",
+			customRoleCore: &MockedCustomRoleCore{
+				UpdateCustomRoleFunc: func(_ context.Context, _ mdl.UpdateCustomRole) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrETagMismatch
+				},
+			},
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID.String(), Name: "updated role", Etag: etag},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: status.New(codes.Aborted, "role has changed since it was read"),
 		},
 	}
 	for _, tt := range tests {
@@ -1139,7 +1157,7 @@ func TestRoleService_ModifyRolePermissions(t *testing.T) {
 		Permissions: []mdl.Permission{mdl.PermissionCustomRoleUpdate},
 		CreatedAt:   time.Now(),
 		UpdatedAt:   new(time.Now().Add(time.Minute)),
-		ETag:        uuid.NewString(),
+		ETag:        uuid.New(),
 	}
 	customRoleCore := &MockedCustomRoleCore{
 		ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
@@ -1155,6 +1173,7 @@ func TestRoleService_ModifyRolePermissions(t *testing.T) {
 		authCtxForTestUser(t, t.Context()),
 		&pb.ModifyRolePermissionsRequest{
 			Id:             mockedRole.ID.String(),
+			Etag:           uuid.NewString(),
 			AddPermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		},
 	)
@@ -1168,7 +1187,7 @@ func TestRoleService_ModifyRolePermissions(t *testing.T) {
 		Permissions:            []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		CreateTime:             timestamppb.New(mockedRole.CreatedAt),
 		UpdateTime:             timestamppb.New(*mockedRole.UpdatedAt),
-		Etag:                   mockedRole.ETag,
+		Etag:                   mockedRole.ETag.String(),
 		Kind:                   pb.RoleKind_ROLE_KIND_CUSTOM,
 		MinimumAssignmentScope: pb.AssignmentScope_ASSIGNMENT_SCOPE_ORGANIZATION,
 	}
@@ -1190,6 +1209,7 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 	}
 
 	roleID := uuid.New()
+	etag := uuid.NewString()
 
 	tests := []struct {
 		name           string
@@ -1212,6 +1232,7 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 			},
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:             roleID.String(),
+				Etag:           etag,
 				AddPermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 			},
 			want: status.New(codes.NotFound, `role "`+roleID.String()+`" or permission not found`),
@@ -1223,8 +1244,18 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 					return mdl.CustomRole{}, mdl.ErrValidation
 				},
 			},
-			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
 			want: status.New(codes.InvalidArgument, "invalid permission changes"),
+		},
+		{
+			name: "etag mismatch",
+			customRoleCore: &MockedCustomRoleCore{
+				ModifyCustomRolePermissionsFunc: func(_ context.Context, _ mdl.ModifyCustomRolePermissions) (mdl.CustomRole, error) {
+					return mdl.CustomRole{}, mdl.ErrETagMismatch
+				},
+			},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
+			want: status.New(codes.Aborted, "role has changed since it was read"),
 		},
 		{
 			name: "permission denied",
@@ -1233,7 +1264,7 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 					return mdl.CustomRole{}, mdl.ErrPermissionDenied
 				},
 			},
-			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
 			want: status.New(codes.PermissionDenied, "caller cannot change role permissions"),
 		},
 		{
@@ -1243,7 +1274,7 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 					return mdl.CustomRole{}, mdl.ErrManagedRole
 				},
 			},
-			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
 			want: status.New(codes.FailedPrecondition, "managed role definitions cannot be modified"),
 		},
 		{
@@ -1255,6 +1286,7 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 			},
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:             roleID.String(),
+				Etag:           etag,
 				AddPermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 			},
 			want: status.New(codes.FailedPrecondition, "role with project assignments cannot require organization scope"),
@@ -1266,7 +1298,7 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 					return mdl.CustomRole{}, errors.New("boom")
 				},
 			},
-			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String()},
+			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}

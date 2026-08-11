@@ -38,6 +38,7 @@ type UserCore interface {
 	CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, error)
 	// UpdateUser updates the name of the user with the given ID and returns the updated user.
 	// Returns [mdl.ErrNotFound] if no user with that ID exists.
+	// Returns [mdl.ErrETagMismatch] if the user has changed since it was read.
 	// Returns [mdl.ErrValidation] if uu is invalid.
 	UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error)
 }
@@ -87,12 +88,21 @@ func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 
 	id := uuid.MustParse(req.GetUser().GetId())
 
-	usr, err := s.userCore.UpdateUser(ctx, conv.UpdateUserFromPB(req, id))
+	updateUser, err := conv.UpdateUserFromPB(req, id)
 	if err != nil {
-		if errors.Is(err, mdl.ErrNotFound) {
+		return nil, fmt.Errorf("convert validated update user request: %w", err)
+	}
+
+	usr, err := s.userCore.UpdateUser(ctx, updateUser)
+	if err != nil {
+		switch {
+		case errors.Is(err, mdl.ErrNotFound):
 			return nil, status.Errorf(codes.NotFound, "user %q not found", req.GetUser().GetId())
+		case errors.Is(err, mdl.ErrETagMismatch):
+			return nil, status.Error(codes.Aborted, "user has changed since it was read")
+		default:
+			return nil, fmt.Errorf("update user: %w", err)
 		}
-		return nil, fmt.Errorf("update user: %w", err)
 	}
 
 	return conv.UserToPB(usr), nil

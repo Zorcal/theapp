@@ -32,6 +32,7 @@ type UserStorer interface {
 	CreateUser(ctx context.Context, cu pguser.CreateUser) (pguser.User, error)
 	// UpdateUser updates the user with the given external ID and returns the updated user.
 	// Returns [sql.ErrNoRows] if no such user exists.
+	// Returns [pgdb.ErrETagMismatch] if the user has changed since it was read.
 	UpdateUser(ctx context.Context, uu pguser.UpdateUser) (pguser.User, error)
 }
 
@@ -98,6 +99,7 @@ func (c *Core) CreateUser(ctx context.Context, cu mdl.CreateUser) (mdl.User, err
 
 // UpdateUser updates the name of the user with the given ID and returns the updated user.
 // Returns [mdl.ErrNotFound] if no user with that ID exists.
+// Returns [mdl.ErrETagMismatch] if the user has changed since it was read.
 // Returns [mdl.ErrValidation] if uu is invalid.
 func (c *Core) UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, error) {
 	if err := uu.Validate(); err != nil {
@@ -108,10 +110,14 @@ func (c *Core) UpdateUser(ctx context.Context, uu mdl.UpdateUser) (mdl.User, err
 
 	pgUser, err := c.userStorer.UpdateUser(ctx, pgUpdateUser)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
 			return mdl.User{}, mdl.ErrNotFound
+		case errors.Is(err, pgdb.ErrETagMismatch):
+			return mdl.User{}, mdl.ErrETagMismatch
+		default:
+			return mdl.User{}, fmt.Errorf("update user: %w", err)
 		}
-		return mdl.User{}, fmt.Errorf("update user: %w", err)
 	}
 
 	return userFromPg(pgUser), nil

@@ -30,6 +30,7 @@ type CreateCustomRole struct {
 type UpdateCustomRole struct {
 	OrgID           int
 	ExternalID      uuid.UUID
+	ETag            uuid.UUID
 	Fields          CustomRoleUpdateFields
 	Name            string
 	PermissionNames []string
@@ -46,6 +47,7 @@ type CustomRoleUpdateFields struct {
 type ModifyCustomRolePermissions struct {
 	OrgID                 int
 	ExternalID            uuid.UUID
+	ETag                  uuid.UUID
 	AddPermissionNames    []string
 	RemovePermissionNames []string
 }

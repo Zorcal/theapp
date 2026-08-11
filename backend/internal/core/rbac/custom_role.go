@@ -102,6 +102,7 @@ func (c *Core) CustomRoleByID(ctx context.Context, roleID uuid.UUID) (mdl.Custom
 // Returns [mdl.ErrValidation] if the input is invalid or contains a system-only permission.
 // Returns [mdl.ErrNotFound] if the authenticated actor or selected project no longer exists.
 // Returns [mdl.ErrAlreadyExists] if the organization already has a role with that name.
+// Returns [mdl.ErrETagMismatch] if the role has changed since it was read.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to the role at the project scope.
 func (c *Core) CreateCustomRole(ctx context.Context, cr mdl.CreateCustomRole) (mdl.CustomRole, error) {
 	sess, ok := mdl.AuthSessionFromContext(ctx)
@@ -203,6 +204,8 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 				switch {
 				case errors.Is(err, pgdb.ErrAlreadyExists):
 					return fmt.Errorf("update custom role with permission changes: %w", mdl.ErrAlreadyExists)
+				case errors.Is(err, pgdb.ErrETagMismatch):
+					return fmt.Errorf("update custom role with permission changes: %w", mdl.ErrETagMismatch)
 				case errors.Is(err, pgdb.ErrCheckConstraintViolated):
 					return fmt.Errorf("update custom role with permission changes: %w", mdl.ErrValidation)
 				default:
@@ -227,6 +230,8 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 			return mdl.CustomRole{}, fmt.Errorf("update custom role: %w", mdl.ErrNotFound)
 		case errors.Is(err, pgdb.ErrAlreadyExists):
 			return mdl.CustomRole{}, fmt.Errorf("update custom role: %w", mdl.ErrAlreadyExists)
+		case errors.Is(err, pgdb.ErrETagMismatch):
+			return mdl.CustomRole{}, fmt.Errorf("update custom role: %w", mdl.ErrETagMismatch)
 		case errors.Is(err, pgdb.ErrCheckConstraintViolated):
 			return mdl.CustomRole{}, fmt.Errorf("update custom role: %w", mdl.ErrValidation)
 		default:
@@ -241,6 +246,7 @@ func (c *Core) UpdateCustomRole(ctx context.Context, ur mdl.UpdateCustomRole) (m
 // Returns [mdl.ErrNotFound] if the caller or selected project no longer exists, or the role is not
 // owned by the caller's organization.
 // Returns [mdl.ErrValidation] if the input contains overlapping or system-only permissions.
+// Returns [mdl.ErrETagMismatch] if the role has changed since it was read.
 // Returns [mdl.ErrPermissionDenied] if the caller does not hold every permission added to or
 // removed from the role at the org scope.
 // Returns [mdl.ErrInvalidAssignmentScope] if the change would make a role with project assignments
@@ -286,6 +292,9 @@ func (c *Core) ModifyCustomRolePermissions(ctx context.Context, mrp mdl.ModifyCu
 
 		role, err = c.roleStorer.ModifyCustomRolePermissions(ctx, modifyCustomRolePermissionsToPg(mrp, userOrgPerms.OrgID))
 		if err != nil {
+			if errors.Is(err, pgdb.ErrETagMismatch) {
+				return fmt.Errorf("modify custom role permissions: %w", mdl.ErrETagMismatch)
+			}
 			// The role is locked, and every application-known permission must exist in the
 			// registry, so sql.ErrNoRows is an impossible state that must remain an internal error.
 			return fmt.Errorf("modify custom role permissions: %w", err)

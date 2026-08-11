@@ -71,7 +71,7 @@ func TestCreateUser_error(t *testing.T) {
 
 func TestUpdateUser(t *testing.T) {
 	err := UpdateUser(&pb.UpdateUserRequest{
-		User:       &pb.User{Id: uuid.NewString(), Name: "Alice"},
+		User:       &pb.User{Id: uuid.NewString(), Name: "Alice", Etag: uuid.NewString()},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 	})
 	if err != nil {
@@ -81,6 +81,7 @@ func TestUpdateUser(t *testing.T) {
 
 func TestUpdateUser_error(t *testing.T) {
 	userID := uuid.NewString()
+	etag := uuid.NewString()
 
 	tests := []validationTest[*pb.UpdateUserRequest]{
 		{
@@ -100,13 +101,13 @@ func TestUpdateUser_error(t *testing.T) {
 		},
 		{
 			name: "missing update mask",
-			in:   &pb.UpdateUserRequest{User: &pb.User{Id: userID}},
+			in:   &pb.UpdateUserRequest{User: &pb.User{Id: userID, Etag: etag}},
 			want: wantInvalidArgument("update_mask is required"),
 		},
 		{
 			name: "unknown update field",
 			in: &pb.UpdateUserRequest{
-				User:       &pb.User{Id: userID},
+				User:       &pb.User{Id: userID, Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"email"}},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -117,10 +118,18 @@ func TestUpdateUser_error(t *testing.T) {
 		{
 			name: "missing updated name",
 			in: &pb.UpdateUserRequest{
-				User:       &pb.User{Id: userID},
+				User:       &pb.User{Id: userID, Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "user.name", description: "required"}),
+		},
+		{
+			name: "missing etag",
+			in: &pb.UpdateUserRequest{
+				User:       &pb.User{Id: userID, Name: "Alice"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "user.etag", description: "must be a valid UUID"}),
 		},
 	}
 	runValidationErrorTests(t, "UpdateUser", UpdateUser, tests)

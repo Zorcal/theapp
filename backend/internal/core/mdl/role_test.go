@@ -3,6 +3,8 @@ package mdl
 import (
 	"errors"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestCreateCustomRole_Validate(t *testing.T) {
@@ -76,11 +78,12 @@ func TestUpdateCustomRole_Validate(t *testing.T) {
 	}{
 		{
 			name: "name not selected",
-			in:   UpdateCustomRole{Fields: CustomRoleUpdateFields{}},
+			in:   UpdateCustomRole{ETag: uuid.New(), Fields: CustomRoleUpdateFields{}},
 		},
 		{
 			name: "name selected",
 			in: UpdateCustomRole{
+				ETag:   uuid.New(),
 				Fields: CustomRoleUpdateFields{Name: true},
 				Name:   "project lead",
 			},
@@ -88,6 +91,7 @@ func TestUpdateCustomRole_Validate(t *testing.T) {
 		{
 			name: "permission selected",
 			in: UpdateCustomRole{
+				ETag:        uuid.New(),
 				Fields:      CustomRoleUpdateFields{Permissions: true},
 				Permissions: []Permission{PermissionCustomRoleUpdate},
 			},
@@ -110,12 +114,14 @@ func TestUpdateCustomRole_Validate_error(t *testing.T) {
 		{
 			name: "empty selected name",
 			in: UpdateCustomRole{
+				ETag:   uuid.New(),
 				Fields: CustomRoleUpdateFields{Name: true},
 			},
 		},
 		{
 			name: "leading whitespace in selected name",
 			in: UpdateCustomRole{
+				ETag:   uuid.New(),
 				Fields: CustomRoleUpdateFields{Name: true},
 				Name:   " project lead",
 			},
@@ -123,9 +129,14 @@ func TestUpdateCustomRole_Validate_error(t *testing.T) {
 		{
 			name: "system-only permission",
 			in: UpdateCustomRole{
+				ETag:        uuid.New(),
 				Fields:      CustomRoleUpdateFields{Permissions: true},
 				Permissions: []Permission{PermissionSystemRoleRead},
 			},
+		},
+		{
+			name: "etag missing",
+			in:   UpdateCustomRole{},
 		},
 	}
 	for _, tt := range tests {
@@ -145,13 +156,14 @@ func TestModifyCustomRolePermissions_Validate(t *testing.T) {
 		{
 			name: "disjoint permissions",
 			in: ModifyCustomRolePermissions{
+				ETag:              uuid.New(),
 				AddPermissions:    []Permission{PermissionCustomRoleRead},
 				RemovePermissions: []Permission{PermissionCustomRoleUpdate},
 			},
 		},
 		{
 			name: "empty changes",
-			in:   ModifyCustomRolePermissions{},
+			in:   ModifyCustomRolePermissions{ETag: uuid.New()},
 		},
 	}
 	for _, tt := range tests {
@@ -171,6 +183,7 @@ func TestModifyCustomRolePermissions_Validate_error(t *testing.T) {
 		{
 			name: "permission in both sets",
 			in: ModifyCustomRolePermissions{
+				ETag:              uuid.New(),
 				AddPermissions:    []Permission{PermissionCustomRoleRead},
 				RemovePermissions: []Permission{PermissionCustomRoleRead},
 			},
@@ -178,12 +191,14 @@ func TestModifyCustomRolePermissions_Validate_error(t *testing.T) {
 		{
 			name: "system-only permission to add",
 			in: ModifyCustomRolePermissions{
+				ETag:           uuid.New(),
 				AddPermissions: []Permission{PermissionUserCreate},
 			},
 		},
 		{
 			name: "system-only permission to remove",
 			in: ModifyCustomRolePermissions{
+				ETag:              uuid.New(),
 				RemovePermissions: []Permission{PermissionSystemRoleUnassign},
 			},
 		},

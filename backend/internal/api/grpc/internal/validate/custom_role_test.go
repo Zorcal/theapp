@@ -170,7 +170,7 @@ func TestListOrganizationRoleAssignments_error(t *testing.T) {
 
 func TestUpdateRole(t *testing.T) {
 	err := UpdateRole(&pb.UpdateRoleRequest{
-		Role:       &pb.Role{Id: uuid.NewString(), Name: "role manager"},
+		Role:       &pb.Role{Id: uuid.NewString(), Name: "role manager", Etag: uuid.NewString()},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 	})
 	if err != nil {
@@ -180,6 +180,7 @@ func TestUpdateRole(t *testing.T) {
 
 func TestUpdateRole_error(t *testing.T) {
 	roleID := uuid.NewString()
+	etag := uuid.NewString()
 
 	tests := []validationTest[*pb.UpdateRoleRequest]{
 		{
@@ -199,13 +200,13 @@ func TestUpdateRole_error(t *testing.T) {
 		},
 		{
 			name: "missing update mask",
-			in:   &pb.UpdateRoleRequest{Role: &pb.Role{Id: roleID}},
+			in:   &pb.UpdateRoleRequest{Role: &pb.Role{Id: roleID, Etag: etag}},
 			want: wantInvalidArgument("update_mask is required"),
 		},
 		{
 			name: "unknown update field",
 			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID},
+				Role:       &pb.Role{Id: roleID, Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"etag"}},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -216,7 +217,7 @@ func TestUpdateRole_error(t *testing.T) {
 		{
 			name: "whitespace-only name",
 			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID, Name: " \t"},
+				Role:       &pb.Role{Id: roleID, Name: " \t", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "role.name", description: "required"}),
@@ -224,7 +225,7 @@ func TestUpdateRole_error(t *testing.T) {
 		{
 			name: "surrounding whitespace",
 			in: &pb.UpdateRoleRequest{
-				Role:       &pb.Role{Id: roleID, Name: " role manager"},
+				Role:       &pb.Role{Id: roleID, Name: " role manager", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -237,6 +238,7 @@ func TestUpdateRole_error(t *testing.T) {
 			in: &pb.UpdateRoleRequest{
 				Role: &pb.Role{
 					Id:          roleID,
+					Etag:        etag,
 					Permissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"permissions"}},
@@ -246,12 +248,20 @@ func TestUpdateRole_error(t *testing.T) {
 				description: `"PERMISSION_USER_READ" is system-only`,
 			}),
 		},
+		{
+			name: "missing etag",
+			in: &pb.UpdateRoleRequest{
+				Role:       &pb.Role{Id: roleID, Name: "role manager"},
+				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
+			},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "role.etag", description: "must be a valid UUID"}),
+		},
 	}
 	runValidationErrorTests(t, "UpdateRole", UpdateRole, tests)
 }
 
 func TestModifyRolePermissions(t *testing.T) {
-	if err := ModifyRolePermissions(&pb.ModifyRolePermissionsRequest{Id: uuid.NewString()}); err != nil {
+	if err := ModifyRolePermissions(&pb.ModifyRolePermissionsRequest{Id: uuid.NewString(), Etag: uuid.NewString()}); err != nil {
 		t.Errorf("ModifyRolePermissions() error = %v, want nil", err)
 	}
 }
@@ -274,6 +284,7 @@ func TestModifyRolePermissions_error(t *testing.T) {
 			name: "overlapping permission",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:                roleID,
+				Etag:              uuid.NewString(),
 				AddPermissions:    []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 				RemovePermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 			},
@@ -286,6 +297,7 @@ func TestModifyRolePermissions_error(t *testing.T) {
 			name: "system-only permission addition",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:             roleID,
+				Etag:           uuid.NewString(),
 				AddPermissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -297,6 +309,7 @@ func TestModifyRolePermissions_error(t *testing.T) {
 			name: "system-only permission removal",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:                roleID,
+				Etag:              uuid.NewString(),
 				RemovePermissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{

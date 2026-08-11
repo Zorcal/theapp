@@ -24,6 +24,7 @@ type RoleStorer interface {
 	UpdateCustomRole(ctx context.Context, ur pgrbac.UpdateCustomRole) (pgrbac.CustomRole, error)
 	// ModifyCustomRolePermissions atomically changes selected permissions on an organization-owned role.
 	// Returns [sql.ErrNoRows] if the organization does not own the role or any permission does not exist.
+	// Returns [pgdb.ErrETagMismatch] if the role's ETag does not match.
 	ModifyCustomRolePermissions(ctx context.Context, mp pgrbac.ModifyCustomRolePermissions) (pgrbac.CustomRole, error)
 	// DeleteCustomRole deletes an organization-owned role and its assignments.
 	// Returns [sql.ErrNoRows] if the organization does not own the role.

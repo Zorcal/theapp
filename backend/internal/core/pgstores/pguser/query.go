@@ -78,7 +78,7 @@ func createUserQuery(cu CreateUser) pgdb.TypedQuery[User] {
 }
 
 func updateUserQuery(uu UpdateUser) pgdb.TypedQuery[User] {
-	params := pgx.NamedArgs{"external_id": uu.ExternalID}
+	params := pgx.NamedArgs{"external_id": uu.ExternalID, "etag": uu.ETag}
 	var setClauses []string
 
 	if uu.Fields.Name {
@@ -89,16 +89,41 @@ func updateUserQuery(uu UpdateUser) pgdb.TypedQuery[User] {
 	setClauses = append(setClauses, "updated_at = NOW()", "etag = gen_random_uuid()")
 
 	sql := fmt.Sprintf(`
-		UPDATE useraccess.users
-		SET %s
+		WITH updated AS (
+			UPDATE useraccess.users
+			SET %s
+			WHERE external_id = @external_id
+				AND etag = @etag
+			RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, etag
+		)
+		SELECT id, external_id, email, name, email_verified_at, created_at, updated_at, etag, TRUE AS is_updated
+		FROM updated
+
+		UNION ALL
+
+		SELECT id, external_id, email, name, email_verified_at, created_at, updated_at, etag, FALSE AS is_updated
+		FROM useraccess.users
 		WHERE external_id = @external_id
-		RETURNING id, external_id, email, name, email_verified_at, created_at, updated_at, etag`,
+			AND NOT EXISTS (SELECT 1 FROM updated)`,
 		strings.Join(setClauses, ", "))
 
 	return pgdb.TypedQuery[User]{
-		SQL:    sql,
-		Args:   params,
-		Scan:   pgx.RowToStructByName[User],
+		SQL:  sql,
+		Args: params,
+		Scan: func(row pgx.CollectableRow) (User, error) {
+			var (
+				user      User
+				isUpdated bool
+			)
+			if err := row.Scan(&user.ID, &user.ExternalID, &user.Email, &user.Name, &user.EmailVerifiedAt,
+				&user.CreatedAt, &user.UpdatedAt, &user.ETag, &isUpdated); err != nil {
+				return User{}, err
+			}
+			if !isUpdated {
+				return User{}, pgdb.ErrETagMismatch
+			}
+			return user, nil
+		},
 		Expect: pgdb.ExpectOne,
 	}
 }

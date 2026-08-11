@@ -50,13 +50,14 @@ func TestCore_integration(t *testing.T) {
 	if usr.ID == (uuid.UUID{}) {
 		t.Error("CreateUser() ID is zero UUID, want non-zero")
 	}
-	if usr.ETag == "" {
-		t.Error("CreateUser() ETag is empty, want non-empty")
+	if usr.ETag == uuid.Nil {
+		t.Error("CreateUser() ETag is zero UUID, want non-zero")
 	}
 
 	// UpdateUser — name is changed, updated_at is set
 	updated, err := core.UpdateUser(ctx, mdl.UpdateUser{
 		ID:     usr.ID,
+		ETag:   usr.ETag,
 		Name:   "Alice Jones",
 		Fields: mdl.UserUpdateFields{Name: true},
 	})
@@ -125,7 +126,7 @@ func TestCore_UserByID(t *testing.T) {
 				Email:     "alice@test.com",
 				Name:      "Alice Smith",
 				CreatedAt: now,
-				ETag:      etag.String(),
+				ETag:      etag,
 			},
 		},
 	}
@@ -205,7 +206,7 @@ func TestCore_UserByEmail(t *testing.T) {
 				Email:     "alice@test.com",
 				Name:      "Alice Smith",
 				CreatedAt: now,
-				ETag:      etag.String(),
+				ETag:      etag,
 			},
 		},
 		{
@@ -227,7 +228,7 @@ func TestCore_UserByEmail(t *testing.T) {
 				Email:     "alice@test.com",
 				Name:      "Alice Smith",
 				CreatedAt: now,
-				ETag:      etag.String(),
+				ETag:      etag,
 			},
 		},
 	}
@@ -303,6 +304,7 @@ func TestCore_UpdateUser(t *testing.T) {
 			},
 			in: mdl.UpdateUser{
 				ID:     id,
+				ETag:   uuid.New(),
 				Name:   "Alice Updated",
 				Fields: mdl.UserUpdateFields{Name: true},
 			},
@@ -311,7 +313,7 @@ func TestCore_UpdateUser(t *testing.T) {
 				Email:     "alice@test.com",
 				Name:      "Alice Updated",
 				CreatedAt: now,
-				ETag:      etag.String(),
+				ETag:      etag,
 			},
 		},
 	}
@@ -341,6 +343,7 @@ func TestCore_UpdateUser_error(t *testing.T) {
 			userStorer: &MockedUserStorer{},
 			in: mdl.UpdateUser{
 				ID:     uuid.New(),
+				ETag:   uuid.New(),
 				Name:   "",
 				Fields: mdl.UserUpdateFields{Name: true},
 			},
@@ -355,10 +358,26 @@ func TestCore_UpdateUser_error(t *testing.T) {
 			},
 			in: mdl.UpdateUser{
 				ID:     uuid.New(),
+				ETag:   uuid.New(),
 				Name:   "Alice Updated",
 				Fields: mdl.UserUpdateFields{Name: true},
 			},
 			want: mdl.ErrNotFound,
+		},
+		{
+			name: "etag mismatch",
+			userStorer: &MockedUserStorer{
+				UpdateUserFunc: func(_ context.Context, _ pguser.UpdateUser) (pguser.User, error) {
+					return pguser.User{}, pgdb.ErrETagMismatch
+				},
+			},
+			in: mdl.UpdateUser{
+				ID:     uuid.New(),
+				ETag:   uuid.New(),
+				Name:   "Alice Updated",
+				Fields: mdl.UserUpdateFields{Name: true},
+			},
+			want: mdl.ErrETagMismatch,
 		},
 	}
 	for _, tt := range tests {
@@ -379,6 +398,7 @@ func TestCore_UpdateUser_error(t *testing.T) {
 		})
 		_, err := core.UpdateUser(t.Context(), mdl.UpdateUser{
 			ID:     uuid.New(),
+			ETag:   uuid.New(),
 			Name:   "Alice Updated",
 			Fields: mdl.UserUpdateFields{Name: true},
 		})
@@ -420,7 +440,7 @@ func TestCore_CreateUser(t *testing.T) {
 				Email:     "alice@test.com",
 				Name:      "Alice Smith",
 				CreatedAt: now,
-				ETag:      etag.String(),
+				ETag:      etag,
 			},
 		},
 		{
@@ -445,7 +465,7 @@ func TestCore_CreateUser(t *testing.T) {
 				Email:     "alice@test.com",
 				Name:      "Alice Smith",
 				CreatedAt: now,
-				ETag:      etag.String(),
+				ETag:      etag,
 			},
 		},
 	}
@@ -559,7 +579,7 @@ func TestCore_Users(t *testing.T) {
 					Email:     "alice@test.com",
 					Name:      "Alice Smith",
 					CreatedAt: now,
-					ETag:      aliceETag.String(),
+					ETag:      aliceETag,
 				},
 				{
 					ID:        bobID,
@@ -567,7 +587,7 @@ func TestCore_Users(t *testing.T) {
 					Name:      "Bob Jones",
 					CreatedAt: now,
 					UpdatedAt: &updatedAt,
-					ETag:      bobETag.String(),
+					ETag:      bobETag,
 				},
 			},
 			wantCount: 42,
