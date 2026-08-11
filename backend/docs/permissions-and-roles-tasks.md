@@ -27,8 +27,8 @@ a later phase's schema up front — which matters because that shape may still c
 The CLI (`cmd/cli`) grows the same way, in its own dedicated phases rather than as tasks
 folded into whichever feature phase happens to need a new command: phase 1 stands the tool up with
 a `user create` command; phase 5 adds granting `superadmin`; phase 9 adds bootstrapping `theapp`/
-`dev`/`control`; phase 24 adds seeding the `robot` user. Each CLI phase depends only on the scaffold
-(phase 1) plus whatever core-layer function it wires up, never on another CLI phase.
+`dev`/`control`. Each CLI phase depends only on the scaffold (phase 1) plus whatever core-layer
+function it wires up, never on another CLI phase.
 
 ## Phase 1 — CLI tool scaffold and user creation — done
 
@@ -269,24 +269,18 @@ rejected structurally, and all effective-access consumers use the canonical SQL 
 
 **Checkpoint:** every relevant table is audited.
 
-## Phase 24 — CLI: seed robot user
+## Phase 24 — optimistic concurrency with ETags
 
-55. CLI command (or extension of phase 9's bootstrap command) seeding the `robot` user, guaranteed to exist for actor-less audit attribution on system-initiated writes. Depends on 1; only functionally relevant once 54 lands.
-
-**Checkpoint:** the `robot` user exists and is used to attribute system-initiated audit rows.
-
-## Phase 25 — optimistic concurrency with ETags
-
-56. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
-57. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 56.
+55. Audit mutable resources and add `etag` fields to their resource messages and relevant mutation requests, including `User` and `Role`. Follow AIP-154 consistently: ETags are part of typed payloads rather than request metadata, and generated artifacts are updated together.
+56. Enforce ETag checks atomically with mutations and return `ABORTED` for stale values. Add core, store, and transport coverage for successful and conflicting concurrent updates. Depends on 55.
 
 **Checkpoint:** mutable resources use one consistent ETag contract, and stale mutations cannot overwrite newer state.
 
 ## Ongoing / cross-cutting
 
-58. Project-scoped resource isolation: when the first ordinary project-owned resource is introduced, filter every core-layer store method by both resource ID and project ID (`WHERE id = $1 AND project_id = $2`). Add RLS with `FORCE ROW LEVEL SECURITY`, keyed on `app.project_id`, and a real-Postgres test using the runtime app role that proves a row from another project is invisible. Apply the same review checklist to every later project-scoped resource.
-59. Protected bootstrap identities: when an API first allows deleting or renaming an organization, project, or bootstrap user, add a database backstop that rejects changes to the corresponding protected identities. Test it through that API rather than introducing protection before a mutation path exists.
-60. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
+57. Project-scoped resource isolation: when the first ordinary project-owned resource is introduced, filter every core-layer store method by both resource ID and project ID (`WHERE id = $1 AND project_id = $2`). Add RLS with `FORCE ROW LEVEL SECURITY`, keyed on `app.project_id`, and a real-Postgres test using the runtime app role that proves a row from another project is invisible. Apply the same review checklist to every later project-scoped resource.
+58. Protected bootstrap identities: when an API first allows deleting or renaming an organization or project, add a database backstop that rejects changes to the corresponding protected identities. Test it through that API rather than introducing protection before a mutation path exists.
+59. API publication: generate separate customer and internal Swagger bundles from the shared protobuf schemas. Omit internal services such as `UserService` and `SystemRoleService` from customer Swagger and customer SDK generation without changing their runtime authorization requirements.
 
 ## Notes
 
