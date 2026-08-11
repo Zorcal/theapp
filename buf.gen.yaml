@@ -20,15 +20,42 @@ plugins:
     opt:
       - paths=source_relative
   - local: scripts/protoc-gen-openapiv2
-    out: schemas/openapi/
+    out: schemas/openapi/internal/
+    strategy: all
     opt:
       - output_format=json
+      - allow_merge=true
+      - merge_file_name=theapp
   # Second output for Go embed — backend/ is a separate Go module and //go:embed cannot
   # reach outside its root, so the spec is also written here for use by the gateway server.
   - local: scripts/protoc-gen-openapiv2
-    out: backend/internal/api/grpc/gateway/openapi/
+    out: backend/internal/api/grpc/gateway/openapi/internal/
+    strategy: all
     opt:
       - output_format=json
+      - allow_merge=true
+      - merge_file_name=theapp
+
+  # Customer API publication explicitly excludes internal services. Reuse this list for customer
+  # SDK plugins so those services cannot enter customer artifacts by accident.
+  - local: scripts/protoc-gen-openapiv2
+    out: schemas/openapi/customer/
+    strategy: all
+    exclude_types: &internal_api_types
+      - theapp.v1.SystemRoleService
+      - theapp.v1.UserService
+    opt:
+      - output_format=json
+      - allow_merge=true
+      - merge_file_name=theapp
+  - local: scripts/protoc-gen-openapiv2
+    out: backend/internal/api/grpc/gateway/openapi/customer/
+    strategy: all
+    exclude_types: *internal_api_types
+    opt:
+      - output_format=json
+      - allow_merge=true
+      - merge_file_name=theapp
 
   # TypeScript plugins
   # - local: frontend/node_modules/.bin/protoc-gen-es

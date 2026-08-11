@@ -4,6 +4,7 @@ package gateway
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,13 +16,17 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 )
 
-//go:embed openapi/auth.swagger.json openapi/permission.swagger.json openapi/project.swagger.json openapi/role.swagger.json openapi/system_role.swagger.json openapi/user.swagger.json
+//go:embed openapi/customer/theapp.swagger.json openapi/internal/theapp.swagger.json
 var openapiFiles embed.FS
 
 // ServerConfig contains the dependencies for the HTTP gateway server.
 type ServerConfig struct {
 	Log      *slog.Logger
 	GRPCAddr string
+	// InternalAPIDocsUsername is the username for HTTP Basic Auth protecting the internal Swagger UI and OpenAPI spec.
+	InternalAPIDocsUsername string
+	// InternalAPIDocsPassword is the password for HTTP Basic Auth protecting the internal Swagger UI and OpenAPI spec.
+	InternalAPIDocsPassword string
 	// GRPCDialOptions are appended to the default dial options. Used in tests to
 	// inject an in-memory dialer (bufconn) without opening a real TCP port.
 	GRPCDialOptions []grpc.DialOption
@@ -29,6 +34,13 @@ type ServerConfig struct {
 
 // NewServer constructs the HTTP gateway handler and a cleanup function that must be called on shutdown.
 func NewServer(cfg ServerConfig) (h http.Handler, teardown func(), retErr error) {
+	if cfg.InternalAPIDocsUsername == "" {
+		return nil, nil, errors.New("internal API docs username missing")
+	}
+	if cfg.InternalAPIDocsPassword == "" {
+		return nil, nil, errors.New("internal API docs password missing")
+	}
+
 	dialOpts := append([]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}, cfg.GRPCDialOptions...)
 	conn, err := grpc.NewClient(cfg.GRPCAddr, dialOpts...)
 	if err != nil {
@@ -72,26 +84,19 @@ func NewServer(cfg ServerConfig) (h http.Handler, teardown func(), retErr error)
 		return nil, nil, fmt.Errorf("register organization service handler: %w", err)
 	}
 
-	allSpecs := []swaggerUISpec{
-		{Name: "Auth API", URL: "/v1/openapi/auth.json"},
-		{Name: "Permission API", URL: "/v1/openapi/permission.json"},
-		{Name: "Organization API", URL: "/v1/openapi/organization.json"},
-		{Name: "Project API", URL: "/v1/openapi/project.json"},
-		{Name: "Role API", URL: "/v1/openapi/role.json"},
-		{Name: "System Role API", URL: "/v1/openapi/system-role.json"},
-		{Name: "User API", URL: "/v1/openapi/user.json"},
-	}
-
 	httpMux := http.NewServeMux()
 	httpMux.Handle("/", mux)
-	httpMux.HandleFunc("/v1/openapi/auth.json", openapiHandler("openapi/auth.swagger.json"))
-	httpMux.HandleFunc("/v1/openapi/permission.json", openapiHandler("openapi/permission.swagger.json"))
-	httpMux.HandleFunc("/v1/openapi/organization.json", openapiHandler("openapi/organization.swagger.json"))
-	httpMux.HandleFunc("/v1/openapi/project.json", openapiHandler("openapi/project.swagger.json"))
-	httpMux.HandleFunc("/v1/openapi/role.json", openapiHandler("openapi/role.swagger.json"))
-	httpMux.HandleFunc("/v1/openapi/system-role.json", openapiHandler("openapi/system_role.swagger.json"))
-	httpMux.HandleFunc("/v1/openapi/user.json", openapiHandler("openapi/user.swagger.json"))
-	httpMux.HandleFunc("/docs", swaggerUIHandler("theapp API", "Auth API", allSpecs))
+	httpMux.HandleFunc("/v1/openapi.json", openapiHandler("openapi/customer/theapp.swagger.json"))
+	httpMux.HandleFunc("/docs", swaggerUIHandler("theapp API", "theapp API", []swaggerUISpec{{Name: "theapp API", URL: "/v1/openapi.json"}}))
+
+	httpMux.Handle("/internal/docs", wrapMiddleware(
+		swaggerUIHandler("theapp Internal API", "theapp Internal API", []swaggerUISpec{{Name: "theapp Internal API", URL: "/v1/openapi/internal.json"}}),
+		basicAuth(cfg.InternalAPIDocsUsername, cfg.InternalAPIDocsPassword),
+	))
+	httpMux.Handle("/v1/openapi/internal.json", wrapMiddleware(
+		openapiHandler("openapi/internal/theapp.swagger.json"),
+		basicAuth(cfg.InternalAPIDocsUsername, cfg.InternalAPIDocsPassword),
+	))
 
 	return loggingMiddleware(cfg.Log, httpMux), teardown, nil
 }

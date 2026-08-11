@@ -31,7 +31,16 @@ Mutable resources follow [AIP-154](https://google.aip.dev/154): update requests 
 
 ## Swagger / OpenAPI
 
-`openapi/*.json` specs is generated from the proto schemas by `protoc-gen-openapiv2`. Do not edit it by hand — run `make generate` to regenerate it after changing any `.proto` file.
+`openapi/customer/theapp.swagger.json` and `openapi/internal/theapp.swagger.json` are generated from
+the same proto schemas by `protoc-gen-openapiv2`. The customer bundle contains the customer-facing
+API surface, while the internal bundle contains the complete API surface. Reuse the
+`internal_api_types` exclusion list in `buf.gen.yaml` for future customer SDK plugins. Do not edit
+generated artifacts by hand—run `make generate` after changing a proto or generation configuration.
+
+The gateway publishes the customer bundle at `/docs` and `/v1/openapi.json`. The internal bundle
+is available at `/internal/docs` and `/v1/openapi/internal.json`, protected by HTTP Basic Auth.
+Configure its credentials with `--gateway-internal-api-docs-username` and
+`--gateway-internal-api-docs-password`; local defaults are `username` and `supersecret`.
 
 ### HTTP headers
 

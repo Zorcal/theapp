@@ -23,12 +23,8 @@ import (
 
 func TestOpenAPISpecs_documentErrors(t *testing.T) {
 	specPaths := []string{
-		"openapi/auth.swagger.json",
-		"openapi/permission.swagger.json",
-		"openapi/project.swagger.json",
-		"openapi/role.swagger.json",
-		"openapi/system_role.swagger.json",
-		"openapi/user.swagger.json",
+		"openapi/customer/theapp.swagger.json",
+		"openapi/internal/theapp.swagger.json",
 	}
 
 	for _, specPath := range specPaths {
@@ -71,6 +67,49 @@ func TestOpenAPISpecs_documentErrors(t *testing.T) {
 	}
 }
 
+func TestOpenAPISpecs_serviceVisibility(t *testing.T) {
+	specJSON, err := openapiFiles.ReadFile("openapi/customer/theapp.swagger.json")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	var spec struct {
+		Paths map[string]json.RawMessage `json:"paths"`
+	}
+	if err := json.Unmarshal(specJSON, &spec); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+
+	for path := range spec.Paths {
+		if strings.HasPrefix(path, "/v1/users") || strings.HasPrefix(path, "/v1/system-role") {
+			t.Errorf("customer OpenAPI paths contains internal path %q", path)
+		}
+	}
+
+	internalSpecJSON, err := openapiFiles.ReadFile("openapi/internal/theapp.swagger.json")
+	if err != nil {
+		t.Fatalf("ReadFile() internal spec error = %v", err)
+	}
+	if err := json.Unmarshal(internalSpecJSON, &spec); err != nil {
+		t.Fatalf("Unmarshal() internal spec error = %v", err)
+	}
+
+	var (
+		hasUserService       bool
+		hasSystemRoleService bool
+	)
+	for path := range spec.Paths {
+		hasUserService = hasUserService || strings.HasPrefix(path, "/v1/users")
+		hasSystemRoleService = hasSystemRoleService || strings.HasPrefix(path, "/v1/system-role")
+	}
+	if !hasUserService {
+		t.Error("internal OpenAPI paths missing UserService")
+	}
+	if !hasSystemRoleService {
+		t.Error("internal OpenAPI paths missing SystemRoleService")
+	}
+}
+
 func TestNewServer(t *testing.T) {
 	ts := newTestGateway(t)
 	tests := []struct {
@@ -81,60 +120,59 @@ func TestNewServer(t *testing.T) {
 		contentType string
 		wantStatus  int
 		wantHeaders map[string]string
+		username    string
+		password    string
 	}{
 		{
-			name:       "auth openapi spec",
+			name:       "customer openapi bundle",
 			method:     http.MethodGet,
-			path:       "/v1/openapi/auth.json",
+			path:       "/v1/openapi.json",
 			wantStatus: http.StatusOK,
 			wantHeaders: map[string]string{
 				"Content-Type": "application/json",
 			},
 		},
 		{
-			name:       "user openapi spec",
+			name:       "old per-service customer spec omitted",
 			method:     http.MethodGet,
 			path:       "/v1/openapi/user.json",
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "internal spec requires basic auth",
+			method:     http.MethodGet,
+			path:       "/v1/openapi/internal.json",
+			wantStatus: http.StatusUnauthorized,
 			wantHeaders: map[string]string{
-				"Content-Type": "application/json",
+				"WWW-Authenticate": `Basic realm="internal API docs", charset="UTF-8"`,
 			},
 		},
 		{
-			name:       "system role openapi spec",
+			name:       "internal spec rejects invalid basic auth",
 			method:     http.MethodGet,
-			path:       "/v1/openapi/system-role.json",
-			wantStatus: http.StatusOK,
-			wantHeaders: map[string]string{
-				"Content-Type": "application/json",
-			},
+			path:       "/v1/openapi/internal.json",
+			wantStatus: http.StatusUnauthorized,
+			username:   "test-user",
+			password:   "wrong-password",
 		},
 		{
-			name:       "role openapi spec",
+			name:       "internal spec with basic auth",
 			method:     http.MethodGet,
-			path:       "/v1/openapi/role.json",
+			path:       "/v1/openapi/internal.json",
 			wantStatus: http.StatusOK,
 			wantHeaders: map[string]string{
 				"Content-Type": "application/json",
 			},
+			username: "test-user",
+			password: "test-password",
 		},
 		{
-			name:       "permission openapi spec",
+			name:       "internal API docs with basic auth",
 			method:     http.MethodGet,
-			path:       "/v1/openapi/permission.json",
+			path:       "/internal/docs",
 			wantStatus: http.StatusOK,
-			wantHeaders: map[string]string{
-				"Content-Type": "application/json",
-			},
-		},
-		{
-			name:       "project openapi spec",
-			method:     http.MethodGet,
-			path:       "/v1/openapi/project.json",
-			wantStatus: http.StatusOK,
-			wantHeaders: map[string]string{
-				"Content-Type": "application/json",
-			},
+			username:   "test-user",
+			password:   "test-password",
 		},
 		{
 			name:       "unknown route",
@@ -170,6 +208,9 @@ func TestNewServer(t *testing.T) {
 			if tt.contentType != "" {
 				req.Header.Set("Content-Type", tt.contentType)
 			}
+			if tt.username != "" || tt.password != "" {
+				req.SetBasicAuth(tt.username, tt.password)
+			}
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -189,13 +230,38 @@ func TestNewServer(t *testing.T) {
 	}
 }
 
+func TestNewServer_error(t *testing.T) {
+	tests := []struct {
+		name string
+		in   ServerConfig
+	}{
+		{
+			name: "internal API docs username missing",
+			in:   ServerConfig{InternalAPIDocsPassword: "password"},
+		},
+		{
+			name: "internal API docs password missing",
+			in:   ServerConfig{InternalAPIDocsUsername: "username"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, _, err := NewServer(tt.in); err == nil {
+				t.Errorf("NewServer() error = nil, want error")
+			}
+		})
+	}
+}
+
 func newTestGateway(t *testing.T) *httptest.Server {
 	t.Helper()
 
 	lis := newTestGRPCBufconn(t)
 	handler, teardown, err := NewServer(ServerConfig{
-		Log:      testingx.NewLogger(t),
-		GRPCAddr: "passthrough://bufnet",
+		Log:                     testingx.NewLogger(t),
+		GRPCAddr:                "passthrough://bufnet",
+		InternalAPIDocsUsername: "test-user",
+		InternalAPIDocsPassword: "test-password",
 		GRPCDialOptions: []grpc.DialOption{
 			grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
 				return lis.DialContext(ctx)

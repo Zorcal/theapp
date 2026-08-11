@@ -1,0 +1,3141 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "theapp Permission API",
+    "version": "v1"
+  },
+  "tags": [
+    {
+      "name": "PermissionService"
+    },
+    {
+      "name": "AuthService"
+    },
+    {
+      "name": "UserService"
+    },
+    {
+      "name": "OrgService"
+    },
+    {
+      "name": "ProjectService"
+    },
+    {
+      "name": "RoleService"
+    },
+    {
+      "name": "SystemRoleService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/auth/context": {
+      "get": {
+        "summary": "GetAuthContext returns authorization context for the authenticated caller and selected\nproject.",
+        "operationId": "AuthService_GetAuthContext",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AuthContext"
+            }
+          },
+          "400": {
+            "description": "Missing or invalid project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Caller or project no longer exists.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "x-project-id",
+            "description": "ID of the project for which authorization context is resolved.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/magic-link": {
+      "post": {
+        "summary": "RequestMagicLink sends a sign-in link when the given email address belongs to a provisioned\nuser and is not rate-limited. An unknown address is not provisioned and receives no email.\nBoth cases return success so callers cannot determine whether the address is registered.",
+        "operationId": "AuthService_RequestMagicLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "400": {
+            "description": "Invalid email address.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for RequestMagicLink.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RequestMagicLinkRequest"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "description": "A client-generated UUID. Retrying the same request with the same key returns the original result instead of sending a second sign-in email.",
+            "in": "header",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ],
+        "security": []
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "summary": "RefreshAccessToken rotates the refresh token and issues a new token pair.\nThe supplied refresh token is revoked upon success.",
+        "operationId": "AuthService_RefreshAccessToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TokenPair"
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Refresh token is invalid, expired, or revoked.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for RefreshAccessToken.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RefreshAccessTokenRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ],
+        "security": []
+      }
+    },
+    "/v1/auth/revoke": {
+      "post": {
+        "summary": "RevokeRefreshToken invalidates a refresh token, ending the session.",
+        "operationId": "AuthService_RevokeRefreshToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Refresh token does not exist or was already revoked.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for RevokeRefreshToken.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RevokeRefreshTokenRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ],
+        "security": []
+      }
+    },
+    "/v1/auth/sessions/revoke-all": {
+      "post": {
+        "summary": "RevokeAllSessions revokes all active refresh tokens for the authenticated user, ending all sessions.\nRequires a valid access token.",
+        "operationId": "AuthService_RevokeAllSessions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "400": {
+            "description": "Invalid idempotency key.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/verify": {
+      "post": {
+        "summary": "VerifyMagicLink exchanges a magic-link token for an access/refresh token pair.",
+        "operationId": "AuthService_VerifyMagicLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TokenPair"
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Magic-link token is invalid or expired.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for VerifyMagicLink.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1VerifyMagicLinkRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ],
+        "security": []
+      }
+    },
+    "/v1/organization-role-assignments": {
+      "get": {
+        "summary": "Lists a user's organization-scoped custom-role assignments.",
+        "operationId": "RoleService_ListOrganizationRoleAssignments",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListOrganizationRoleAssignmentsResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid user ID, pagination, or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization-assignment read access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "User or organization membership not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "ID of the user whose assignments to list.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Maximum number of assignments to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the organization whose assignments to list.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/organizations": {
+      "post": {
+        "summary": "Creates an organization with a control project and a named default project.",
+        "operationId": "OrgService_CreateOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Organization"
+            }
+          },
+          "400": {
+            "description": "Invalid organization data, default project data, or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization creation authority or system-organization membership is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Authenticated creator not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "409": {
+            "description": "Organization name already exists.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for creating an organization.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateOrganizationRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the system organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      }
+    },
+    "/v1/organizations/users": {
+      "get": {
+        "summary": "Lists users belonging to the organization selected through its control project.",
+        "operationId": "OrgService_ListOrganizationUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListOrganizationUsersResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination, filtering, or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization-user read access is missing or the selected project is not the organization's control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Filtered project not found in the organization.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of users to return. Defaults to 50 and is capped at 100.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Opaque token returned by the previous page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter.projectId",
+            "description": "Restrict results to organization members with effective access to this project.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the organization control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      },
+      "post": {
+        "summary": "Creates a system user when needed and adds that user to the organization selected through\nits control project.",
+        "operationId": "OrgService_CreateOrganizationUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1User"
+            }
+          },
+          "400": {
+            "description": "Invalid email or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization-user creation access is missing or the selected project is not the organization's control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for creating or assigning an organization user.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateOrganizationUserRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the organization control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      }
+    },
+    "/v1/permissions": {
+      "get": {
+        "summary": "Lists permissions that may be granted through a custom role.",
+        "operationId": "PermissionService_ListPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListPermissionsResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Custom-role read access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "PermissionService"
+        ]
+      }
+    },
+    "/v1/project-role-assignments": {
+      "get": {
+        "summary": "Lists a user's custom-role assignments in the request's project.",
+        "operationId": "RoleService_ListProjectRoleAssignments",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListProjectRoleAssignmentsResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid user ID, pagination, or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Project-assignment read access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "User, project, or organization membership not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "ID of the user whose assignments to list.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Maximum number of assignments to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the project whose assignments to list.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/projects": {
+      "get": {
+        "summary": "Lists the projects accessible to the authenticated caller.",
+        "operationId": "ProjectService_ListProjects",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListProjectsResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Authenticated user not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of projects to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter.name",
+            "description": "Match projects whose name starts with this prefix.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ProjectService"
+        ]
+      }
+    },
+    "/v1/roles": {
+      "get": {
+        "summary": "Lists custom roles owned by the caller's organization.",
+        "operationId": "RoleService_ListRoles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListRolesResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Custom-role read access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of roles to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      },
+      "post": {
+        "summary": "Creates a custom role.",
+        "operationId": "RoleService_CreateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "400": {
+            "description": "Invalid role data or project metadata, or the role name already exists.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Role creation or permission-superset authority is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Organization or permission not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for creating a custom role.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateRoleRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles/{id}": {
+      "get": {
+        "summary": "Gets a custom role owned by the caller's organization.",
+        "operationId": "RoleService_GetRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "400": {
+            "description": "Invalid role ID or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Custom-role read access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Role not found in the selected organization.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "ID of the role to get.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a custom role.",
+        "operationId": "RoleService_DeleteRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DeleteRoleResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid role ID or project metadata, or the role is managed and cannot be deleted.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Role deletion or permission-superset authority is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Role not found in the selected organization.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "ID of the role to delete.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles/{id}:modifyPermissions": {
+      "post": {
+        "summary": "Modifies a custom role's permissions.",
+        "operationId": "RoleService_ModifyRolePermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "400": {
+            "description": "Invalid or conflicting permission changes or project metadata; managed role permissions cannot be modified; or project assignments conflict with organization-scoped permissions.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Role update or permission-superset authority is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Role or permission not found in the selected organization.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "ID of the role to modify.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RoleServiceModifyRolePermissionsBody"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles/{role.id}": {
+      "patch": {
+        "summary": "Updates a custom role.",
+        "operationId": "RoleService_UpdateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Role"
+            }
+          },
+          "400": {
+            "description": "Invalid role data, update mask, or project metadata; the role name already exists; managed role permissions cannot be updated; or project assignments conflict with organization-scoped permissions.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Role update or permission-superset authority is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Role or permission not found in the selected organization.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "409": {
+            "description": "The role has changed since it was read. Fetch the latest role and retry.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "role.id",
+            "description": "Unique identifier for the role.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RoleServiceUpdateRoleBody"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the role's organization.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles:assignToOrganization": {
+      "post": {
+        "summary": "Assigns a custom role to a user across the request project's organization.",
+        "operationId": "RoleService_AssignRoleToOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AssignRoleToOrganizationResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid IDs or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization assignment or permission-superset authority is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "User, role, organization, or membership not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "409": {
+            "description": "Organization role assignment already exists.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for assigning a custom role across the request project's organization.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1AssignRoleToOrganizationRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the organization where the role is assigned.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles:assignToProject": {
+      "post": {
+        "summary": "Assigns a custom role to a user in the request's project.",
+        "operationId": "RoleService_AssignRoleToProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AssignRoleToProjectResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid IDs or project metadata, or the role requires organization scope.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Assignment or permission-superset authority is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "User, role, project, or organization membership not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "409": {
+            "description": "Project role assignment already exists.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for assigning a custom role in the request's project.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1AssignRoleToProjectRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the project where the role is assigned.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles:unassignFromOrganization": {
+      "post": {
+        "summary": "Unassigns a custom role from a user across the request project's organization.",
+        "operationId": "RoleService_UnassignRoleFromOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UnassignRoleFromOrganizationResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid IDs or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization unassignment or permission-superset authority is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Organization role assignment or membership not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for unassigning a custom role across the request project's organization.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1UnassignRoleFromOrganizationRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of a project in the organization where the role is unassigned.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/roles:unassignFromProject": {
+      "post": {
+        "summary": "Unassigns a custom role from a user in the request's project.",
+        "operationId": "RoleService_UnassignRoleFromProject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UnassignRoleFromProjectResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid IDs or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Unassignment or permission-superset authority is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Project role assignment or organization membership not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for unassigning a custom role in the request's project.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1UnassignRoleFromProjectRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the project where the role is unassigned.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "RoleService"
+        ]
+      }
+    },
+    "/v1/system-role-assignments": {
+      "get": {
+        "summary": "Lists the system roles a user holds.",
+        "operationId": "SystemRoleService_ListSystemRoleAssignments",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListSystemRoleAssignmentsResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input, pagination, or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "System-role read access or system-organization membership is missing, or the project is not the system control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "description": "The ID of the user whose system role assignments to list.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "pageSize",
+            "description": "Maximum number of assignments to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    },
+    "/v1/system-roles": {
+      "get": {
+        "summary": "Lists the system roles available to assign.",
+        "operationId": "SystemRoleService_ListSystemRoles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListSystemRolesResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "System-role read access or system-organization membership is missing, or the project is not the system control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of roles to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    },
+    "/v1/system-roles:assign": {
+      "post": {
+        "summary": "Assigns a system role to a user.",
+        "operationId": "SystemRoleService_AssignSystemRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AssignSystemRoleResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Assignment authority or system-organization membership is missing, or the project is not the system control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "User or system role not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "409": {
+            "description": "System-role assignment already exists.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for assigning a system role to a user.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1AssignSystemRoleRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    },
+    "/v1/system-roles:unassign": {
+      "post": {
+        "summary": "Unassigns a system role from a user.",
+        "operationId": "SystemRoleService_UnassignSystemRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UnassignSystemRoleResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid input or project metadata, or unassignment would remove the last fully privileged system administrator.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Unassignment authority or system-organization membership is missing, or the project is not the system control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "System-role assignment not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for unassigning a system role from a user.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1UnassignSystemRoleRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the \"theapp\" organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "SystemRoleService"
+        ]
+      }
+    },
+    "/v1/users": {
+      "get": {
+        "summary": "Lists users, optionally filtered and paginated.",
+        "operationId": "UserService_ListUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListUsersResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination, ordering, or filtering.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "User read access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of users to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "orderBy",
+            "description": "Field to order the results by, e.g., \"create_time\" or \"update_time\".",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter.email",
+            "description": "Match users whose email starts with this prefix.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter.name",
+            "description": "Match users whose name starts with this prefix.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new user.",
+        "operationId": "UserService_CreateUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1User"
+            }
+          },
+          "400": {
+            "description": "Invalid user data or email already in use.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "User creation access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for creating a user.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateUserRequest"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/v1/users/{id}": {
+      "get": {
+        "summary": "Gets a user by ID.",
+        "operationId": "UserService_GetUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1User"
+            }
+          },
+          "400": {
+            "description": "Invalid user ID.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "User read access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "The ID of the user to retrieve.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/v1/users/{user.id}": {
+      "patch": {
+        "summary": "Updates a user.",
+        "operationId": "UserService_UpdateUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1User"
+            }
+          },
+          "400": {
+            "description": "Invalid user data or update mask.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "User update access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "409": {
+            "description": "The user has changed since it was read. Fetch the latest user and retry.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "user.id",
+            "description": "Unique identifier for the user. Output only.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UserServiceUpdateUserBody"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "RoleServiceModifyRolePermissionsBody": {
+      "type": "object",
+      "properties": {
+        "addPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permission names to add to the role."
+        },
+        "removePermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permission names to remove from the role."
+        },
+        "etag": {
+          "type": "string",
+          "description": "Last-read ETag of the role."
+        }
+      },
+      "description": "Request message for modifying a custom role's permissions.",
+      "required": [
+        "etag"
+      ]
+    },
+    "RoleServiceUpdateRoleBody": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the role."
+            },
+            "permissions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/v1Permission"
+              },
+              "description": "Permissions granted to the role."
+            },
+            "createTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the role was created.",
+              "readOnly": true
+            },
+            "updateTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the role was last updated.",
+              "readOnly": true
+            },
+            "etag": {
+              "type": "string",
+              "description": "ETag for the current version of the role. Updates must provide the\nlast-read value, which must match the server's current ETag."
+            },
+            "kind": {
+              "$ref": "#/definitions/v1RoleKind",
+              "description": "Identifies whether the definition is user-managed or application-managed.",
+              "readOnly": true
+            },
+            "minimumAssignmentScope": {
+              "$ref": "#/definitions/v1AssignmentScope",
+              "description": "Narrowest scope at which this role may be assigned.",
+              "readOnly": true
+            }
+          },
+          "description": "The role to update. Its `etag` must contain the last-read resource version.",
+          "title": "The role to update. Its `etag` must contain the last-read resource version."
+        },
+        "updateMask": {
+          "type": "string",
+          "description": "Fields to update."
+        }
+      },
+      "description": "Request message for updating a custom role.",
+      "required": [
+        "role",
+        "updateMask"
+      ]
+    },
+    "UserServiceUpdateUserBody": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "description": "Email address of the user."
+            },
+            "createTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the user was created. Output only.",
+              "readOnly": true
+            },
+            "updateTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the user was last updated. Output only.",
+              "readOnly": true
+            },
+            "emailVerifiedTime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Timestamp when the user's email address was verified. Null until the user\ncompletes their first magic-link sign-in. Output only.",
+              "readOnly": true
+            },
+            "name": {
+              "type": "string",
+              "description": "Name of the user (first and last name)."
+            },
+            "etag": {
+              "type": "string",
+              "description": "The ETag for the current version of the user. Helps to prevent\nsimultaneous updates of a user from overwriting each other (\"mid-air\ncollisions\").\n\nUpdates must provide the last-read value, which must match the server's\ncurrent ETag."
+            }
+          },
+          "description": "The user to update. The user's `id` identifies which user to update, and\nits `etag` must contain the last-read resource version."
+        },
+        "updateMask": {
+          "type": "string",
+          "description": "The list of fields to update. When omitted, all populated fields are updated."
+        }
+      },
+      "description": "Request message for updating a user.",
+      "required": [
+        "user"
+      ]
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+        }
+      },
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+        },
+        "message": {
+          "type": "string",
+          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          },
+          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+        }
+      },
+      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+    },
+    "v1AssignRoleToOrganizationRequest": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "description": "ID of the role to assign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user to assign the role to."
+        }
+      },
+      "description": "Request message for assigning a custom role across the request project's organization.",
+      "required": [
+        "roleId",
+        "userId"
+      ]
+    },
+    "v1AssignRoleToOrganizationResponse": {
+      "type": "object",
+      "description": "Response message for assigning a custom role across an organization."
+    },
+    "v1AssignRoleToProjectRequest": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "description": "ID of the role to assign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user to assign the role to."
+        }
+      },
+      "description": "Request message for assigning a custom role in the request's project.",
+      "required": [
+        "roleId",
+        "userId"
+      ]
+    },
+    "v1AssignRoleToProjectResponse": {
+      "type": "object",
+      "description": "Response message for assigning a custom role in a project."
+    },
+    "v1AssignSystemRoleRequest": {
+      "type": "object",
+      "properties": {
+        "roleName": {
+          "type": "string",
+          "description": "Name of the system role to assign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user to assign the role to."
+        }
+      },
+      "description": "Request message for assigning a system role to a user.",
+      "required": [
+        "roleName",
+        "userId"
+      ]
+    },
+    "v1AssignSystemRoleResponse": {
+      "type": "object",
+      "description": "Response message for assigning a system role."
+    },
+    "v1AssignmentScope": {
+      "type": "string",
+      "enum": [
+        "ASSIGNMENT_SCOPE_UNSPECIFIED",
+        "ASSIGNMENT_SCOPE_PROJECT",
+        "ASSIGNMENT_SCOPE_ORGANIZATION",
+        "ASSIGNMENT_SCOPE_SYSTEM"
+      ],
+      "default": "ASSIGNMENT_SCOPE_UNSPECIFIED",
+      "description": "AssignmentScope is the narrowest scope at which a permission or role is meaningful."
+    },
+    "v1AuthContext": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The caller's user ID.",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "The caller's email address.",
+          "readOnly": true
+        },
+        "projectPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective in the selected project.",
+          "readOnly": true
+        },
+        "organizationPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective in the selected project's organization.",
+          "readOnly": true
+        },
+        "systemPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective system-wide.",
+          "readOnly": true
+        }
+      },
+      "description": "AuthContext contains authorization data for the authenticated caller and selected project."
+    },
+    "v1CreateOrganizationRequest": {
+      "type": "object",
+      "properties": {
+        "organization": {
+          "$ref": "#/definitions/v1Organization",
+          "description": "Organization to create. Only name is accepted as input."
+        },
+        "projectName": {
+          "type": "string",
+          "description": "Display name for the organization's initial non-control project."
+        }
+      },
+      "description": "Request message for creating an organization.",
+      "required": [
+        "organization",
+        "projectName"
+      ]
+    },
+    "v1CreateOrganizationUserRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address identifying the system user."
+        }
+      },
+      "description": "Request message for creating or assigning an organization user.",
+      "required": [
+        "email"
+      ]
+    },
+    "v1CreateRoleRequest": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "$ref": "#/definitions/v1Role",
+          "description": "The role to create."
+        }
+      },
+      "description": "Request message for creating a custom role.",
+      "required": [
+        "role"
+      ]
+    },
+    "v1CreateUserRequest": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1User",
+          "description": "The user to create."
+        }
+      },
+      "description": "Request message for creating a user.",
+      "required": [
+        "user"
+      ]
+    },
+    "v1DeleteRoleResponse": {
+      "type": "object",
+      "description": "Response message for deleting a custom role."
+    },
+    "v1ListOrganizationRoleAssignmentsResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Role"
+          },
+          "description": "Custom roles assigned across the request project's organization."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of matching assignments."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page."
+        }
+      },
+      "description": "Response message for listing a user's organization-scoped custom-role assignments."
+    },
+    "v1ListOrganizationUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1User"
+          },
+          "description": "Organization users in email order."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of users matching the filter, independent of pagination."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Opaque token for the next page, or empty when this is the final page."
+        }
+      }
+    },
+    "v1ListPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1PermissionDescriptor"
+          },
+          "description": "Permissions that may be granted through a custom role."
+        }
+      },
+      "description": "Response message for listing custom-role-assignable permissions."
+    },
+    "v1ListProjectRoleAssignmentsResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Role"
+          },
+          "description": "Custom roles assigned directly in the request's project."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of matching assignments."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page."
+        }
+      },
+      "description": "Response message for listing a user's project-scoped custom-role assignments."
+    },
+    "v1ListProjectsResponse": {
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Project"
+          },
+          "description": "Projects accessible to the authenticated caller."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of accessible projects."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing accessible projects."
+    },
+    "v1ListRolesResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Role"
+          },
+          "description": "Custom roles owned by the caller's organization."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of matching roles."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page."
+        }
+      },
+      "description": "Response message for listing custom roles."
+    },
+    "v1ListSystemRoleAssignmentsResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1SystemRole"
+          },
+          "description": "System roles assigned to the user."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of system roles assigned to the user."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing a user's system role assignments."
+    },
+    "v1ListSystemRolesResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1SystemRole"
+          },
+          "description": "The system roles available to assign."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of system roles."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing system roles."
+    },
+    "v1ListUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1User"
+          },
+          "description": "List of users returned in the response."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of users in the system."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing users."
+    },
+    "v1Organization": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the organization.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the organization."
+        },
+        "controlProjectId": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the project anchoring organization-level administration.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the organization was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the organization was last updated.",
+          "readOnly": true
+        }
+      },
+      "description": "Organization represents a tenant."
+    },
+    "v1OrganizationUserFilter": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Restrict results to organization members with effective access to this project."
+        }
+      }
+    },
+    "v1Permission": {
+      "type": "string",
+      "enum": [
+        "PERMISSION_UNSPECIFIED",
+        "PERMISSION_USER_READ",
+        "PERMISSION_USER_CREATE",
+        "PERMISSION_USER_UPDATE",
+        "PERMISSION_SYSTEM_ROLE_READ",
+        "PERMISSION_SYSTEM_ROLE_ASSIGN",
+        "PERMISSION_SYSTEM_ROLE_UNASSIGN",
+        "PERMISSION_CUSTOM_ROLE_CREATE",
+        "PERMISSION_CUSTOM_ROLE_READ",
+        "PERMISSION_CUSTOM_ROLE_UPDATE",
+        "PERMISSION_CUSTOM_ROLE_DELETE",
+        "PERMISSION_CUSTOM_ROLE_ASSIGN_PROJECT",
+        "PERMISSION_CUSTOM_ROLE_UNASSIGN_PROJECT",
+        "PERMISSION_CUSTOM_ROLE_ASSIGN_ORGANIZATION",
+        "PERMISSION_CUSTOM_ROLE_UNASSIGN_ORGANIZATION",
+        "PERMISSION_CUSTOM_ROLE_READ_PROJECT_ASSIGNMENTS",
+        "PERMISSION_CUSTOM_ROLE_READ_ORGANIZATION_ASSIGNMENTS",
+        "PERMISSION_PROJECT_DISCOVER_ALL",
+        "PERMISSION_ORGANIZATION_CREATE",
+        "PERMISSION_PROJECT_CREATE",
+        "PERMISSION_ORGANIZATION_USER_CREATE",
+        "PERMISSION_ORGANIZATION_USER_READ"
+      ],
+      "default": "PERMISSION_UNSPECIFIED",
+      "description": "Permission is a capability that can be granted through a role."
+    },
+    "v1PermissionDescriptor": {
+      "type": "object",
+      "properties": {
+        "permission": {
+          "$ref": "#/definitions/v1Permission"
+        },
+        "minimumAssignmentScope": {
+          "$ref": "#/definitions/v1AssignmentScope"
+        }
+      },
+      "description": "PermissionDescriptor describes a custom-role-assignable permission."
+    },
+    "v1Project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the project.",
+          "readOnly": true
+        },
+        "organizationId": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the organization that owns the project.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the project."
+        },
+        "isControl": {
+          "type": "boolean",
+          "description": "Whether the project anchors organization-level administrative operations.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the project was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the project was last updated.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "The ETag for the current version of the project. Helps to prevent\nsimultaneous updates of a project from overwriting each other (\"mid-air\ncollisions\").\n\nIf this is provided on update, it must match the server's ETag.",
+          "readOnly": true
+        }
+      },
+      "description": "Project represents a project within an organization."
+    },
+    "v1ProjectFilter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Match projects whose name starts with this prefix."
+        }
+      },
+      "description": "Filter criteria for listing projects."
+    },
+    "v1RefreshAccessTokenRequest": {
+      "type": "object",
+      "properties": {
+        "refreshToken": {
+          "type": "string",
+          "description": "The refresh token issued by a previous VerifyMagicLink or RefreshAccessToken call."
+        }
+      },
+      "description": "Request message for RefreshAccessToken."
+    },
+    "v1RequestMagicLinkRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address to send the sign-in link to."
+        }
+      },
+      "description": "Request message for RequestMagicLink."
+    },
+    "v1RevokeRefreshTokenRequest": {
+      "type": "object",
+      "properties": {
+        "refreshToken": {
+          "type": "string",
+          "description": "The refresh token to revoke."
+        }
+      },
+      "description": "Request message for RevokeRefreshToken."
+    },
+    "v1Role": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the role.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the role."
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions granted to the role."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the role was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the role was last updated.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "ETag for the current version of the role. Updates must provide the\nlast-read value, which must match the server's current ETag."
+        },
+        "kind": {
+          "$ref": "#/definitions/v1RoleKind",
+          "description": "Identifies whether the definition is user-managed or application-managed.",
+          "readOnly": true
+        },
+        "minimumAssignmentScope": {
+          "$ref": "#/definitions/v1AssignmentScope",
+          "description": "Narrowest scope at which this role may be assigned.",
+          "readOnly": true
+        }
+      },
+      "description": "Role is an organization-owned role."
+    },
+    "v1RoleKind": {
+      "type": "string",
+      "enum": [
+        "ROLE_KIND_UNSPECIFIED",
+        "ROLE_KIND_CUSTOM",
+        "ROLE_KIND_ORGANIZATION_ADMIN"
+      ],
+      "default": "ROLE_KIND_UNSPECIFIED",
+      "description": "RoleKind identifies who owns an organization role's definition."
+    },
+    "v1SystemRole": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique name of the system role.",
+          "readOnly": true
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions granted to the system role.",
+          "readOnly": true
+        }
+      },
+      "description": "SystemRole represents a seeded, system-wide role."
+    },
+    "v1TokenPair": {
+      "type": "object",
+      "properties": {
+        "accessToken": {
+          "type": "string",
+          "description": "JWT bearer token. Include as: Authorization: Bearer \u003caccess_token\u003e."
+        },
+        "refreshToken": {
+          "type": "string",
+          "description": "Opaque refresh token. Use with RefreshAccessToken to obtain a new pair."
+        },
+        "expiresIn": {
+          "type": "string",
+          "format": "int64",
+          "description": "Remaining lifetime of access_token in seconds."
+        }
+      },
+      "description": "TokenPair holds a short-lived JWT access token and a long-lived refresh token."
+    },
+    "v1UnassignRoleFromOrganizationRequest": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "description": "ID of the role to unassign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user to unassign the role from."
+        }
+      },
+      "description": "Request message for unassigning a custom role across the request project's organization.",
+      "required": [
+        "roleId",
+        "userId"
+      ]
+    },
+    "v1UnassignRoleFromOrganizationResponse": {
+      "type": "object",
+      "description": "Response message for unassigning a custom role from an organization."
+    },
+    "v1UnassignRoleFromProjectRequest": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "description": "ID of the role to unassign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user to unassign the role from."
+        }
+      },
+      "description": "Request message for unassigning a custom role in the request's project.",
+      "required": [
+        "roleId",
+        "userId"
+      ]
+    },
+    "v1UnassignRoleFromProjectResponse": {
+      "type": "object",
+      "description": "Response message for unassigning a custom role from a project."
+    },
+    "v1UnassignSystemRoleRequest": {
+      "type": "object",
+      "properties": {
+        "roleName": {
+          "type": "string",
+          "description": "Name of the system role to unassign."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user to unassign the role from."
+        }
+      },
+      "description": "Request message for unassigning a system role from a user.",
+      "required": [
+        "roleName",
+        "userId"
+      ]
+    },
+    "v1UnassignSystemRoleResponse": {
+      "type": "object",
+      "description": "Response message for unassigning a system role."
+    },
+    "v1User": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user. Output only.",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user was created. Output only.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user was last updated. Output only.",
+          "readOnly": true
+        },
+        "emailVerifiedTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user's email address was verified. Null until the user\ncompletes their first magic-link sign-in. Output only.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the user (first and last name)."
+        },
+        "etag": {
+          "type": "string",
+          "description": "The ETag for the current version of the user. Helps to prevent\nsimultaneous updates of a user from overwriting each other (\"mid-air\ncollisions\").\n\nUpdates must provide the last-read value, which must match the server's\ncurrent ETag."
+        }
+      },
+      "description": "User represents a user in the system."
+    },
+    "v1UserFilter": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Match users whose email starts with this prefix."
+        },
+        "name": {
+          "type": "string",
+          "description": "Match users whose name starts with this prefix."
+        }
+      },
+      "description": "UserFilter specifies criteria for filtering users in a ListUsers request.\nThis is a typed filter — a deliberate deviation from AIP-160 to avoid the\ncomplexity of a free-form filter parser; see schemas/README.md.\nAll fields are optional; omitted fields match all users."
+    },
+    "v1VerifyMagicLinkRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "The token from the magic-link URL query parameter."
+        }
+      },
+      "description": "Request message for VerifyMagicLink."
+    }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "description": "Access token from VerifyMagicLink or RefreshAccessToken. Format: 'Bearer {token}'",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ]
+}

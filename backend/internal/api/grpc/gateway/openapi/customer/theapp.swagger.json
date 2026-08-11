@@ -1,10 +1,22 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "theapp Role API",
+    "title": "theapp Permission API",
     "version": "v1"
   },
   "tags": [
+    {
+      "name": "PermissionService"
+    },
+    {
+      "name": "AuthService"
+    },
+    {
+      "name": "OrgService"
+    },
+    {
+      "name": "ProjectService"
+    },
     {
       "name": "RoleService"
     }
@@ -16,6 +28,330 @@
     "application/json"
   ],
   "paths": {
+    "/v1/auth/context": {
+      "get": {
+        "summary": "GetAuthContext returns authorization context for the authenticated caller and selected\nproject.",
+        "operationId": "AuthService_GetAuthContext",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1AuthContext"
+            }
+          },
+          "400": {
+            "description": "Missing or invalid project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Caller or project no longer exists.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "x-project-id",
+            "description": "ID of the project for which authorization context is resolved.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/magic-link": {
+      "post": {
+        "summary": "RequestMagicLink sends a sign-in link when the given email address belongs to a provisioned\nuser and is not rate-limited. An unknown address is not provisioned and receives no email.\nBoth cases return success so callers cannot determine whether the address is registered.",
+        "operationId": "AuthService_RequestMagicLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "400": {
+            "description": "Invalid email address.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for RequestMagicLink.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RequestMagicLinkRequest"
+            }
+          },
+          {
+            "name": "x-idempotency-key",
+            "description": "A client-generated UUID. Retrying the same request with the same key returns the original result instead of sending a second sign-in email.",
+            "in": "header",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ],
+        "security": []
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "summary": "RefreshAccessToken rotates the refresh token and issues a new token pair.\nThe supplied refresh token is revoked upon success.",
+        "operationId": "AuthService_RefreshAccessToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TokenPair"
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Refresh token is invalid, expired, or revoked.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for RefreshAccessToken.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RefreshAccessTokenRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ],
+        "security": []
+      }
+    },
+    "/v1/auth/revoke": {
+      "post": {
+        "summary": "RevokeRefreshToken invalidates a refresh token, ending the session.",
+        "operationId": "AuthService_RevokeRefreshToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Refresh token does not exist or was already revoked.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for RevokeRefreshToken.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RevokeRefreshTokenRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ],
+        "security": []
+      }
+    },
+    "/v1/auth/sessions/revoke-all": {
+      "post": {
+        "summary": "RevokeAllSessions revokes all active refresh tokens for the authenticated user, ending all sessions.\nRequires a valid access token.",
+        "operationId": "AuthService_RevokeAllSessions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "400": {
+            "description": "Invalid idempotency key.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/verify": {
+      "post": {
+        "summary": "VerifyMagicLink exchanges a magic-link token for an access/refresh token pair.",
+        "operationId": "AuthService_VerifyMagicLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TokenPair"
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Magic-link token is invalid or expired.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for VerifyMagicLink.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1VerifyMagicLinkRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ],
+        "security": []
+      }
+    },
     "/v1/organization-role-assignments": {
       "get": {
         "summary": "Lists a user's organization-scoped custom-role assignments.",
@@ -100,6 +436,278 @@
         ]
       }
     },
+    "/v1/organizations": {
+      "post": {
+        "summary": "Creates an organization with a control project and a named default project.",
+        "operationId": "OrgService_CreateOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1Organization"
+            }
+          },
+          "400": {
+            "description": "Invalid organization data, default project data, or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization creation authority or system-organization membership is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Authenticated creator not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "409": {
+            "description": "Organization name already exists.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for creating an organization.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateOrganizationRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the system organization's control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      }
+    },
+    "/v1/organizations/users": {
+      "get": {
+        "summary": "Lists users belonging to the organization selected through its control project.",
+        "operationId": "OrgService_ListOrganizationUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListOrganizationUsersResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination, filtering, or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization-user read access is missing or the selected project is not the organization's control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Filtered project not found in the organization.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of users to return. Defaults to 50 and is capped at 100.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Opaque token returned by the previous page.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter.projectId",
+            "description": "Restrict results to organization members with effective access to this project.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the organization control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      },
+      "post": {
+        "summary": "Creates a system user when needed and adds that user to the organization selected through\nits control project.",
+        "operationId": "OrgService_CreateOrganizationUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1User"
+            }
+          },
+          "400": {
+            "description": "Invalid email or project metadata.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Organization-user creation access is missing or the selected project is not the organization's control project.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "Request message for creating or assigning an organization user.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateOrganizationUserRequest"
+            }
+          },
+          {
+            "name": "x-project-id",
+            "description": "ID of the organization control project.",
+            "in": "header",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "tags": [
+          "OrgService"
+        ]
+      }
+    },
+    "/v1/permissions": {
+      "get": {
+        "summary": "Lists permissions that may be granted through a custom role.",
+        "operationId": "PermissionService_ListPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListPermissionsResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "403": {
+            "description": "Custom-role read access is missing.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "PermissionService"
+        ]
+      }
+    },
     "/v1/project-role-assignments": {
       "get": {
         "summary": "Lists a user's custom-role assignments in the request's project.",
@@ -181,6 +789,77 @@
         ],
         "tags": [
           "RoleService"
+        ]
+      }
+    },
+    "/v1/projects": {
+      "get": {
+        "summary": "Lists the projects accessible to the authenticated caller.",
+        "operationId": "ProjectService_ListProjects",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListProjectsResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid pagination.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "404": {
+            "description": "Authenticated user not found.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pageSize",
+            "description": "Maximum number of projects to return.",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageToken",
+            "description": "Token for fetching the next page of results.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "filter.name",
+            "description": "Match projects whose name starts with this prefix.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ProjectService"
         ]
       }
     },
@@ -1007,35 +1686,29 @@
       "type": "object",
       "properties": {
         "@type": {
-          "type": "string",
-          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
+          "type": "string"
         }
       },
-      "additionalProperties": {},
-      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
+      "additionalProperties": {}
     },
     "rpcStatus": {
       "type": "object",
       "properties": {
         "code": {
           "type": "integer",
-          "format": "int32",
-          "description": "The status code, which should be an enum value of\n[google.rpc.Code][google.rpc.Code]."
+          "format": "int32"
         },
         "message": {
-          "type": "string",
-          "description": "A developer-facing error message, which should be in English. Any\nuser-facing error message should be localized and sent in the\n[google.rpc.Status.details][google.rpc.Status.details] field, or localized\nby the client."
+          "type": "string"
         },
         "details": {
           "type": "array",
           "items": {
             "type": "object",
             "$ref": "#/definitions/protobufAny"
-          },
-          "description": "A list of messages that carry the error details.  There is a common set of\nmessage types for APIs to use."
+          }
         }
-      },
-      "description": "The `Status` type defines a logical error model that is suitable for\ndifferent programming environments, including REST APIs and RPC APIs. It is\nused by [gRPC](https://github.com/grpc). Each `Status` message contains\nthree pieces of data: error code, error message, and error details.\n\nYou can find out more about this error model and how to work with it in the\n[API Design Guide](https://cloud.google.com/apis/design/errors)."
+      }
     },
     "v1AssignRoleToOrganizationRequest": {
       "type": "object",
@@ -1092,6 +1765,77 @@
       "default": "ASSIGNMENT_SCOPE_UNSPECIFIED",
       "description": "AssignmentScope is the narrowest scope at which a permission or role is meaningful."
     },
+    "v1AuthContext": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The caller's user ID.",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "The caller's email address.",
+          "readOnly": true
+        },
+        "projectPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective in the selected project.",
+          "readOnly": true
+        },
+        "organizationPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective in the selected project's organization.",
+          "readOnly": true
+        },
+        "systemPermissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Permission"
+          },
+          "description": "Permissions effective system-wide.",
+          "readOnly": true
+        }
+      },
+      "description": "AuthContext contains authorization data for the authenticated caller and selected project."
+    },
+    "v1CreateOrganizationRequest": {
+      "type": "object",
+      "properties": {
+        "organization": {
+          "$ref": "#/definitions/v1Organization",
+          "description": "Organization to create. Only name is accepted as input."
+        },
+        "projectName": {
+          "type": "string",
+          "description": "Display name for the organization's initial non-control project."
+        }
+      },
+      "description": "Request message for creating an organization.",
+      "required": [
+        "organization",
+        "projectName"
+      ]
+    },
+    "v1CreateOrganizationUserRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address identifying the system user."
+        }
+      },
+      "description": "Request message for creating or assigning an organization user.",
+      "required": [
+        "email"
+      ]
+    },
     "v1CreateRoleRequest": {
       "type": "object",
       "properties": {
@@ -1132,6 +1876,42 @@
       },
       "description": "Response message for listing a user's organization-scoped custom-role assignments."
     },
+    "v1ListOrganizationUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1User"
+          },
+          "description": "Organization users in email order."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of users matching the filter, independent of pagination."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Opaque token for the next page, or empty when this is the final page."
+        }
+      }
+    },
+    "v1ListPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1PermissionDescriptor"
+          },
+          "description": "Permissions that may be granted through a custom role."
+        }
+      },
+      "description": "Response message for listing custom-role-assignable permissions."
+    },
     "v1ListProjectRoleAssignmentsResponse": {
       "type": "object",
       "properties": {
@@ -1155,6 +1935,29 @@
       },
       "description": "Response message for listing a user's project-scoped custom-role assignments."
     },
+    "v1ListProjectsResponse": {
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Project"
+          },
+          "description": "Projects accessible to the authenticated caller."
+        },
+        "totalSize": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Total number of accessible projects."
+        },
+        "nextPageToken": {
+          "type": "string",
+          "description": "Token for fetching the next page of results, if applicable."
+        }
+      },
+      "description": "Response message for listing accessible projects."
+    },
     "v1ListRolesResponse": {
       "type": "object",
       "properties": {
@@ -1177,6 +1980,50 @@
         }
       },
       "description": "Response message for listing custom roles."
+    },
+    "v1Organization": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the organization.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the organization."
+        },
+        "controlProjectId": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the project anchoring organization-level administration.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the organization was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the organization was last updated.",
+          "readOnly": true
+        }
+      },
+      "description": "Organization represents a tenant."
+    },
+    "v1OrganizationUserFilter": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Restrict results to organization members with effective access to this project."
+        }
+      }
     },
     "v1Permission": {
       "type": "string",
@@ -1206,6 +2053,102 @@
       ],
       "default": "PERMISSION_UNSPECIFIED",
       "description": "Permission is a capability that can be granted through a role."
+    },
+    "v1PermissionDescriptor": {
+      "type": "object",
+      "properties": {
+        "permission": {
+          "$ref": "#/definitions/v1Permission"
+        },
+        "minimumAssignmentScope": {
+          "$ref": "#/definitions/v1AssignmentScope"
+        }
+      },
+      "description": "PermissionDescriptor describes a custom-role-assignable permission."
+    },
+    "v1Project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the project.",
+          "readOnly": true
+        },
+        "organizationId": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Unique identifier for the organization that owns the project.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the project."
+        },
+        "isControl": {
+          "type": "boolean",
+          "description": "Whether the project anchors organization-level administrative operations.",
+          "readOnly": true
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the project was created.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the project was last updated.",
+          "readOnly": true
+        },
+        "etag": {
+          "type": "string",
+          "description": "The ETag for the current version of the project. Helps to prevent\nsimultaneous updates of a project from overwriting each other (\"mid-air\ncollisions\").\n\nIf this is provided on update, it must match the server's ETag.",
+          "readOnly": true
+        }
+      },
+      "description": "Project represents a project within an organization."
+    },
+    "v1ProjectFilter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Match projects whose name starts with this prefix."
+        }
+      },
+      "description": "Filter criteria for listing projects."
+    },
+    "v1RefreshAccessTokenRequest": {
+      "type": "object",
+      "properties": {
+        "refreshToken": {
+          "type": "string",
+          "description": "The refresh token issued by a previous VerifyMagicLink or RefreshAccessToken call."
+        }
+      },
+      "description": "Request message for RefreshAccessToken."
+    },
+    "v1RequestMagicLinkRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address to send the sign-in link to."
+        }
+      },
+      "description": "Request message for RequestMagicLink."
+    },
+    "v1RevokeRefreshTokenRequest": {
+      "type": "object",
+      "properties": {
+        "refreshToken": {
+          "type": "string",
+          "description": "The refresh token to revoke."
+        }
+      },
+      "description": "Request message for RevokeRefreshToken."
     },
     "v1Role": {
       "type": "object",
@@ -1265,6 +2208,25 @@
       "default": "ROLE_KIND_UNSPECIFIED",
       "description": "RoleKind identifies who owns an organization role's definition."
     },
+    "v1TokenPair": {
+      "type": "object",
+      "properties": {
+        "accessToken": {
+          "type": "string",
+          "description": "JWT bearer token. Include as: Authorization: Bearer \u003caccess_token\u003e."
+        },
+        "refreshToken": {
+          "type": "string",
+          "description": "Opaque refresh token. Use with RefreshAccessToken to obtain a new pair."
+        },
+        "expiresIn": {
+          "type": "string",
+          "format": "int64",
+          "description": "Remaining lifetime of access_token in seconds."
+        }
+      },
+      "description": "TokenPair holds a short-lived JWT access token and a long-lived refresh token."
+    },
     "v1UnassignRoleFromOrganizationRequest": {
       "type": "object",
       "properties": {
@@ -1308,6 +2270,57 @@
     "v1UnassignRoleFromProjectResponse": {
       "type": "object",
       "description": "Response message for unassigning a custom role from a project."
+    },
+    "v1User": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user. Output only.",
+          "readOnly": true
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user."
+        },
+        "createTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user was created. Output only.",
+          "readOnly": true
+        },
+        "updateTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user was last updated. Output only.",
+          "readOnly": true
+        },
+        "emailVerifiedTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the user's email address was verified. Null until the user\ncompletes their first magic-link sign-in. Output only.",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the user (first and last name)."
+        },
+        "etag": {
+          "type": "string",
+          "description": "The ETag for the current version of the user. Helps to prevent\nsimultaneous updates of a user from overwriting each other (\"mid-air\ncollisions\").\n\nUpdates must provide the last-read value, which must match the server's\ncurrent ETag."
+        }
+      },
+      "description": "User represents a user in the system."
+    },
+    "v1VerifyMagicLinkRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "The token from the magic-link URL query parameter."
+        }
+      },
+      "description": "Request message for VerifyMagicLink."
     }
   },
   "securityDefinitions": {

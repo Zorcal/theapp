@@ -56,8 +56,12 @@ type Config struct {
 		ReadTimeout       time.Duration `conf:"default:30s"`
 		// WriteTimeout must cover the full gRPC round trip — set it shorter than the slowest expected RPC and the
 		// gateway will cut off in-flight responses before they complete.
-		WriteTimeout time.Duration `conf:"default:30s"`
-		IdleTimeout  time.Duration `conf:"default:120s"`
+		WriteTimeout    time.Duration `conf:"default:30s"`
+		IdleTimeout     time.Duration `conf:"default:120s"`
+		InternalAPIDocs struct {
+			Username string `conf:"default:username"`
+			Password string `conf:"default:supersecret,mask"`
+		}
 	}
 	Environment string `conf:"default:local"`
 	Telemetry   struct {
@@ -323,8 +327,10 @@ func run(ctx context.Context, cfg Config) error {
 	defer log.InfoContext(ctx, "HTTP gateway server stopped")
 
 	gatewayHandler, teardownGateway, err := gateway.NewServer(gateway.ServerConfig{
-		Log:      log,
-		GRPCAddr: cfg.GRPC.Address,
+		Log:                     log,
+		GRPCAddr:                cfg.GRPC.Address,
+		InternalAPIDocsUsername: cfg.Gateway.InternalAPIDocs.Username,
+		InternalAPIDocsPassword: cfg.Gateway.InternalAPIDocs.Password,
 	})
 	if err != nil {
 		return fmt.Errorf("new gateway server: %w", err)
