@@ -135,6 +135,16 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 			want:    status.New(codes.InvalidArgument, codes.InvalidArgument.String()),
 		},
 		{
+			name: "core validation",
+			orgCore: &MockedOrganizationCore{
+				CreateOrganizationFunc: func(_ context.Context, _ mdl.CreateOrganization) (mdl.Organization, error) {
+					return mdl.Organization{}, mdl.ErrValidation
+				},
+			},
+			in:   &pb.CreateOrganizationRequest{Organization: &pb.Organization{Name: "acme"}, ProjectName: "widgets"},
+			want: status.New(codes.InvalidArgument, "invalid organization"),
+		},
+		{
 			name: "already exists",
 			orgCore: &MockedOrganizationCore{
 				CreateOrganizationFunc: func(_ context.Context, _ mdl.CreateOrganization) (mdl.Organization, error) {
@@ -153,6 +163,16 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 			},
 			in:   &pb.CreateOrganizationRequest{Organization: &pb.Organization{Name: "acme"}, ProjectName: "control"},
 			want: status.New(codes.InvalidArgument, "project_name conflicts with the control project"),
+		},
+		{
+			name: "creator not found",
+			orgCore: &MockedOrganizationCore{
+				CreateOrganizationFunc: func(_ context.Context, _ mdl.CreateOrganization) (mdl.Organization, error) {
+					return mdl.Organization{}, mdl.ErrNotFound
+				},
+			},
+			in:   &pb.CreateOrganizationRequest{Organization: &pb.Organization{Name: "acme"}, ProjectName: "widgets"},
+			want: status.New(codes.NotFound, "authenticated creator not found"),
 		},
 		{
 			name: "internal",
@@ -237,6 +257,16 @@ func TestOrganizationService_CreateOrganizationUser_error(t *testing.T) {
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "email", Description: "required"},
 			})),
+		},
+		{
+			name: "core validation",
+			orgCore: &MockedOrganizationCore{
+				CreateOrganizationUserFunc: func(_ context.Context, _ mdl.CreateOrganizationUser) (mdl.User, error) {
+					return mdl.User{}, mdl.ErrValidation
+				},
+			},
+			in:   &pb.CreateOrganizationUserRequest{Email: "member@test.com"},
+			want: status.New(codes.InvalidArgument, "invalid organization user"),
 		},
 		{
 			name: "core",

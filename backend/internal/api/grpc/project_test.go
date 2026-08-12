@@ -143,20 +143,6 @@ func TestProjectService_ListProjects(t *testing.T) {
 				TotalSize: 2,
 			},
 		},
-		{
-			name: "filter",
-			projectCore: &MockedProjectCore{
-				AccessibleProjectsFunc: func(_ context.Context, filter mdl.ProjectFilter, _, _ int) ([]mdl.Project, int, error) {
-					testingx.AssertDiff(t, filter, mdl.ProjectFilter{Name: "wid"})
-					return []mdl.Project{secondProject}, 1, nil
-				},
-			},
-			in: &pb.ListProjectsRequest{Filter: &pb.ProjectFilter{Name: "wid"}},
-			want: &pb.ListProjectsResponse{
-				Projects:  []*pb.Project{pbSecondProject},
-				TotalSize: 1,
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

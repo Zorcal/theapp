@@ -272,6 +272,27 @@ func TestCore_CreateOrganization(t *testing.T) {
 	testingx.AssertDiff(t, got, want)
 }
 
+func TestCore_BootstrapOrganization(t *testing.T) {
+	orgStorer := &MockedOrgStorer{
+		CreateOrganizationFunc: func(_ context.Context, co pgorg.CreateOrganization) (pgorg.Organization, error) {
+			return pgorg.Organization{ID: 1, Name: co.Name}, nil
+		},
+		CreateProjectFunc: func(_ context.Context, cp pgorg.CreateProject) (pgorg.Project, error) {
+			return pgorg.Project{ID: 1, OrgID: cp.OrgID, Name: cp.Name}, nil
+		},
+	}
+	core := NewCore(orgStorer, nil, nil, immediateTransactor{})
+
+	got, err := core.BootstrapOrganization(t.Context(), mdl.CreateOrganization{Name: "theapp", ProjectName: "theapp"})
+	if err != nil {
+		t.Fatalf("BootstrapOrganization() error = %v", err)
+	}
+
+	want := mdl.Organization{ID: 1, Name: "theapp"}
+
+	testingx.AssertDiff(t, got, want)
+}
+
 func TestCore_BootstrapOrganization_error(t *testing.T) {
 	dbErr := errors.New("db error")
 

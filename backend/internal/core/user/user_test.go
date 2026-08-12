@@ -83,7 +83,17 @@ func TestCore_integration(t *testing.T) {
 	testingx.AssertDiff(t, got, updated)
 
 	// Users — updated user appears in filtered results
-	usrs, count, err := core.Users(ctx, mdl.UserFilter{Name: " Alice "}, nil, 10, 0)
+	usrs, count, err := core.Users(
+		ctx,
+		mdl.UserFilter{Email: " ALICE@TEST.COM ", Name: " Alice "},
+		[]order.By[mdl.UserOrderByField]{
+			order.NewBy(mdl.UserOrderByFieldEmail, order.DirectionAsc),
+			order.NewBy(mdl.UserOrderByFieldCreatedAt, order.DirectionAsc),
+			order.NewBy(mdl.UserOrderByFieldUpdatedAt, order.DirectionAsc),
+		},
+		10,
+		0,
+	)
 	if err != nil {
 		t.Fatalf("Users() error = %v", err)
 	}

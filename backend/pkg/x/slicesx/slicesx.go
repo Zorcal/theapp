@@ -10,3 +10,14 @@ func Map[T, U any](s []T, f func(T) U) []U {
 	}
 	return out
 }
+
+// CountFunc returns the number of elements for which f returns true.
+func CountFunc[S ~[]E, E any](s S, f func(E) bool) int {
+	var count int
+	for _, e := range s {
+		if f(e) {
+			count++
+		}
+	}
+	return count
+}

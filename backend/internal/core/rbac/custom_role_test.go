@@ -1104,6 +1104,32 @@ func TestCore_UpdateCustomRole_error(t *testing.T) {
 			want: dbErr,
 		},
 		{
+			name: "role disappears while checking project assignments",
+			in: mdl.UpdateCustomRole{
+				ETag:        etag,
+				Fields:      mdl.CustomRoleUpdateFields{Permissions: true},
+				Permissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:read"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				CustomRoleHasProjectAssignmentsFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, sql.ErrNoRows
+				},
+			},
+			// The role was resolved earlier in the transaction, so sql.ErrNoRows must remain
+			// an internal error.
+			want: sql.ErrNoRows,
+		},
+		{
 			name: "permission update role disappears",
 			in: mdl.UpdateCustomRole{
 				ETag:        etag,
@@ -1548,6 +1574,31 @@ func TestCore_ModifyCustomRolePermissions_error(t *testing.T) {
 				},
 			},
 			want: dbErr,
+		},
+		{
+			name: "role disappears while checking project assignments",
+			in: mdl.ModifyCustomRolePermissions{
+				ETag:           etag,
+				AddPermissions: []mdl.Permission{mdl.PermissionCustomRoleRead},
+			},
+			roleStorer: &MockedRoleStorer{
+				OrgPermissionsByProjectIDFunc: func(_ context.Context, _ uuid.UUID, _ int) (pgrbac.OrgPermissions, error) {
+					return pgrbac.OrgPermissions{
+						OrgID:           42,
+						PermissionNames: []string{"custom-role:read"},
+					}, nil
+				},
+				LockCustomRoleFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+				CustomRoleByExternalIDFunc: func(_ context.Context, _ int, _ uuid.UUID) (pgrbac.CustomRole, error) {
+					return pgrbac.CustomRole{}, nil
+				},
+				CustomRoleHasProjectAssignmentsFunc: func(_ context.Context, _ uuid.UUID) (bool, error) {
+					return false, sql.ErrNoRows
+				},
+			},
+			// The role was resolved earlier in the transaction, so sql.ErrNoRows must remain
+			// an internal error.
+			want: sql.ErrNoRows,
 		},
 		{
 			name: "permission missing during update",

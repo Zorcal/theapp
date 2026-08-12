@@ -181,6 +181,10 @@ func TestModifyCustomRolePermissions_Validate_error(t *testing.T) {
 		in   ModifyCustomRolePermissions
 	}{
 		{
+			name: "etag missing",
+			in:   ModifyCustomRolePermissions{},
+		},
+		{
 			name: "permission in both sets",
 			in: ModifyCustomRolePermissions{
 				ETag:              uuid.New(),

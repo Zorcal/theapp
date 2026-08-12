@@ -216,8 +216,8 @@ func (s *Store) CustomRoleByExternalID(ctx context.Context, orgID int, roleID uu
 	return role, nil
 }
 
-// CustomRoleHasProjectAssignments reports whether a custom role has any project-scope
-// assignments.
+// CustomRoleHasProjectAssignments reports whether a custom role has any project-scope assignments.
+// Returns [sql.ErrNoRows] if the role does not exist.
 func (s *Store) CustomRoleHasProjectAssignments(ctx context.Context, roleID uuid.UUID) (bool, error) {
 	q := customRoleHasProjectAssignmentsQuery(roleID)
 

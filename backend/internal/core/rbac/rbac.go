@@ -33,6 +33,7 @@ type RoleStorer interface {
 	// Returns [sql.ErrNoRows] if the organization does not own such a role.
 	CustomRoleByExternalID(ctx context.Context, orgID int, roleID uuid.UUID) (pgrbac.CustomRole, error)
 	// CustomRoleHasProjectAssignments reports whether a role has any project-scope assignments.
+	// Returns [sql.ErrNoRows] if the role does not exist.
 	CustomRoleHasProjectAssignments(ctx context.Context, roleID uuid.UUID) (bool, error)
 	// LockCustomRole acquires a transaction-level advisory lock that serializes assignment and
 	// permission changes for roleID.

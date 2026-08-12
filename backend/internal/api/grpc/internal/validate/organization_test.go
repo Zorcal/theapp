@@ -5,6 +5,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 
+	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/conv"
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 )
 
@@ -80,4 +81,69 @@ func TestCreateOrganization_error(t *testing.T) {
 		},
 	}
 	runValidationErrorTests(t, "CreateOrganization", CreateOrganization, tests)
+}
+
+func TestListOrganizationUsers(t *testing.T) {
+	pageToken, err := conv.EncodePageToken(2, "", &pb.OrganizationUserFilter{ProjectId: 7})
+	if err != nil {
+		t.Fatalf("EncodePageToken() error = %v", err)
+	}
+
+	tests := []struct {
+		name string
+		in   *pb.ListOrganizationUsersRequest
+	}{
+		{
+			name: "empty request",
+			in:   &pb.ListOrganizationUsersRequest{},
+		},
+		{
+			name: "matching page token filter",
+			in: &pb.ListOrganizationUsersRequest{
+				PageToken: pageToken,
+				Filter:    &pb.OrganizationUserFilter{ProjectId: 7},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ListOrganizationUsers(tt.in); err != nil {
+				t.Errorf("ListOrganizationUsers() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestListOrganizationUsers_error(t *testing.T) {
+	pageToken, err := conv.EncodePageToken(2, "", &pb.OrganizationUserFilter{ProjectId: 7})
+	if err != nil {
+		t.Fatalf("EncodePageToken() error = %v", err)
+	}
+
+	tests := []validationTest[*pb.ListOrganizationUsersRequest]{
+		{
+			name: "nil request",
+			in:   nil,
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "request", description: "required"}),
+		},
+		{
+			name: "negative project id",
+			in:   &pb.ListOrganizationUsersRequest{Filter: &pb.OrganizationUserFilter{ProjectId: -1}},
+			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "filter.project_id", description: "must not be negative"}),
+		},
+		{
+			name: "invalid page token",
+			in:   &pb.ListOrganizationUsersRequest{PageToken: "invalid"},
+			want: wantInvalidArgument("invalid page_token"),
+		},
+		{
+			name: "page token filter mismatch",
+			in: &pb.ListOrganizationUsersRequest{
+				PageToken: pageToken,
+				Filter:    &pb.OrganizationUserFilter{ProjectId: 8},
+			},
+			want: wantInvalidArgument("page_token filter mismatch"),
+		},
+	}
+	runValidationErrorTests(t, "ListOrganizationUsers", ListOrganizationUsers, tests)
 }

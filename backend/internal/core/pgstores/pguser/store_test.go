@@ -132,11 +132,9 @@ func TestStore_MarkEmailVerified(t *testing.T) {
 			t.Fatalf("MarkEmailVerified() error = %v", err)
 		}
 
-		got, err := store.UserByExternalID(ctx, seeded.ExternalID)
-		if err != nil {
-			t.Fatalf("UserByExternalID() error = %v", err)
-		}
-		if got.EmailVerifiedAt == nil {
+		updated := mustUserByExternalID(t, store, seeded.ExternalID)
+
+		if updated.EmailVerifiedAt == nil {
 			t.Error("EmailVerifiedAt = nil, want non-nil after verification")
 		}
 	})
@@ -147,21 +145,28 @@ func TestStore_MarkEmailVerified(t *testing.T) {
 		if err := store.MarkEmailVerified(ctx, seeded.ExternalID); err != nil {
 			t.Fatalf("MarkEmailVerified() first call error = %v", err)
 		}
-		first, err := store.UserByExternalID(ctx, seeded.ExternalID)
-		if err != nil {
-			t.Fatalf("UserByExternalID() error = %v", err)
-		}
+
+		first := mustUserByExternalID(t, store, seeded.ExternalID)
 
 		if err := store.MarkEmailVerified(ctx, seeded.ExternalID); err != nil {
 			t.Fatalf("MarkEmailVerified() second call error = %v", err)
 		}
-		second, err := store.UserByExternalID(ctx, seeded.ExternalID)
-		if err != nil {
-			t.Fatalf("UserByExternalID() error = %v", err)
-		}
+
+		second := mustUserByExternalID(t, store, seeded.ExternalID)
 
 		if !first.EmailVerifiedAt.Equal(*second.EmailVerifiedAt) {
 			t.Errorf("EmailVerifiedAt changed on second call: first = %v, second = %v", first.EmailVerifiedAt, second.EmailVerifiedAt)
+		}
+	})
+}
+
+func TestStore_MarkEmailVerified_error(t *testing.T) {
+	ctx := context.Background()
+	store := pguser.NewStore(pgtest.New(t, ctx))
+
+	t.Run("not found", func(t *testing.T) {
+		if err := store.MarkEmailVerified(ctx, uuid.New()); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("MarkEmailVerified() error = %v, want sql.ErrNoRows", err)
 		}
 	})
 }
@@ -482,4 +487,15 @@ func seedUser(t *testing.T, s *pguser.Store, email, name string) pguser.User {
 	}
 
 	return seeded
+}
+
+func mustUserByExternalID(t *testing.T, store *pguser.Store, id uuid.UUID) pguser.User {
+	t.Helper()
+
+	user, err := store.UserByExternalID(t.Context(), id)
+	if err != nil {
+		t.Fatalf("get user by external ID: %v", err)
+	}
+
+	return user
 }

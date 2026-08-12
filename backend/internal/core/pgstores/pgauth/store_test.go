@@ -191,13 +191,11 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 
 	t.Run("expired not returned", func(t *testing.T) {
 		u := seedUser(t, userStore, "expired@test.com")
-		if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
+		mustCreateMagicLinkToken(t, authStore, pgauth.CreateMagicLinkToken{
 			UserID:    u.ID,
 			TokenHash: "expiredhash",
 			ExpiresAt: time.Now().Add(-1 * time.Minute),
-		}); err != nil {
-			t.Fatalf("CreateMagicLinkToken() error = %v", err)
-		}
+		})
 
 		if _, err := authStore.MagicLinkTokenByHash(ctx, "expiredhash"); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("MagicLinkTokenByHash(expired) error = %v, want sql.ErrNoRows", err)
@@ -206,20 +204,15 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 
 	t.Run("double consume", func(t *testing.T) {
 		u := seedUser(t, userStore, "double@test.com")
-		tok, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
+		tok := mustCreateMagicLinkToken(t, authStore, pgauth.CreateMagicLinkToken{
 			UserID:    u.ID,
 			TokenHash: "doublehash",
 			ExpiresAt: time.Now().Add(15 * time.Minute),
 		})
-		if err != nil {
-			t.Fatalf("CreateMagicLinkToken() error = %v", err)
-		}
 
-		if err := authStore.ConsumeMagicLinkToken(ctx, tok.ID); err != nil {
-			t.Fatalf("first ConsumeMagicLinkToken() error = %v", err)
-		}
+		mustConsumeMagicLinkToken(t, authStore, tok.ID)
 
-		if err = authStore.ConsumeMagicLinkToken(ctx, tok.ID); !errors.Is(err, sql.ErrNoRows) {
+		if err := authStore.ConsumeMagicLinkToken(ctx, tok.ID); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("second ConsumeMagicLinkToken() error = %v, want sql.ErrNoRows", err)
 		}
 	})
@@ -234,6 +227,20 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 		}
 	})
 
+	t.Run("duplicate token hash", func(t *testing.T) {
+		u := seedUser(t, userStore, "duplicate-magic-link@test.com")
+		in := pgauth.CreateMagicLinkToken{
+			UserID:    u.ID,
+			TokenHash: "duplicate-magic-link-hash",
+			ExpiresAt: time.Now().Add(15 * time.Minute),
+		}
+		mustCreateMagicLinkToken(t, authStore, in)
+
+		if _, err := authStore.CreateMagicLinkToken(ctx, in); !errors.Is(err, pgdb.ErrAlreadyExists) {
+			t.Errorf("CreateMagicLinkToken() second call error = %v, want pgdb.ErrAlreadyExists", err)
+		}
+	})
+
 	t.Run("consume nonexistent", func(t *testing.T) {
 		if err := authStore.ConsumeMagicLinkToken(ctx, 0); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("ConsumeMagicLinkToken(nonexistent) error = %v, want sql.ErrNoRows", err)
@@ -242,14 +249,11 @@ func TestStore_MagicLinkToken_error(t *testing.T) {
 
 	t.Run("consume expired", func(t *testing.T) {
 		u := seedUser(t, userStore, "consume-expired-mlt@test.com")
-		tok, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
+		tok := mustCreateMagicLinkToken(t, authStore, pgauth.CreateMagicLinkToken{
 			UserID:    u.ID,
 			TokenHash: "consume-expired-mlthash",
 			ExpiresAt: time.Now().Add(-1 * time.Minute),
 		})
-		if err != nil {
-			t.Fatalf("CreateMagicLinkToken() error = %v", err)
-		}
 
 		if err := authStore.ConsumeMagicLinkToken(ctx, tok.ID); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("ConsumeMagicLinkToken(expired) error = %v, want sql.ErrNoRows", err)
@@ -265,22 +269,17 @@ func TestStore_LatestMagicLinkTokenCreatedAt(t *testing.T) {
 
 	u := seedUser(t, userStore, "latest-two@test.com")
 
-	if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
+	mustCreateMagicLinkToken(t, authStore, pgauth.CreateMagicLinkToken{
 		UserID:    u.ID,
 		TokenHash: "latesttok-first",
 		ExpiresAt: time.Now().Add(15 * time.Minute),
-	}); err != nil {
-		t.Fatalf("CreateMagicLinkToken(first) error = %v", err)
-	}
+	})
 
-	second, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
+	second := mustCreateMagicLinkToken(t, authStore, pgauth.CreateMagicLinkToken{
 		UserID:    u.ID,
 		TokenHash: "latesttok-second",
 		ExpiresAt: time.Now().Add(15 * time.Minute),
 	})
-	if err != nil {
-		t.Fatalf("CreateMagicLinkToken(second) error = %v", err)
-	}
 
 	got, err := authStore.LatestMagicLinkTokenCreatedAt(ctx, u.ID)
 	if err != nil {
@@ -318,13 +317,11 @@ func TestStore_InvalidateUserMagicLinkTokens(t *testing.T) {
 		hashes := []string{"invhash-a", "invhash-b"}
 
 		for i, hash := range hashes {
-			if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
+			mustCreateMagicLinkToken(t, authStore, pgauth.CreateMagicLinkToken{
 				UserID:    u.ID,
 				TokenHash: hash,
 				ExpiresAt: time.Now().Add(time.Duration(i+1) * 15 * time.Minute),
-			}); err != nil {
-				t.Fatalf("CreateMagicLinkToken(%q) error = %v", hash, err)
-			}
+			})
 		}
 
 		if err := authStore.InvalidateUserMagicLinkTokens(ctx, u.ID); err != nil {
@@ -332,8 +329,8 @@ func TestStore_InvalidateUserMagicLinkTokens(t *testing.T) {
 		}
 
 		for _, hash := range hashes {
-			if _, err := authStore.MagicLinkTokenByHash(ctx, hash); !errors.Is(err, sql.ErrNoRows) {
-				t.Errorf("MagicLinkTokenByHash(%q) after invalidate error = %v, want sql.ErrNoRows", hash, err)
+			if _, err := authStore.MagicLinkTokenByHash(t.Context(), hash); !errors.Is(err, sql.ErrNoRows) {
+				t.Errorf("MagicLinkTokenByHash(%q) error = %v, want sql.ErrNoRows", hash, err)
 			}
 		}
 	})
@@ -341,13 +338,11 @@ func TestStore_InvalidateUserMagicLinkTokens(t *testing.T) {
 	t.Run("expired tokens are not affected", func(t *testing.T) {
 		u := seedUser(t, userStore, "invalidate-expired@test.com")
 
-		if _, err := authStore.CreateMagicLinkToken(ctx, pgauth.CreateMagicLinkToken{
+		mustCreateMagicLinkToken(t, authStore, pgauth.CreateMagicLinkToken{
 			UserID:    u.ID,
 			TokenHash: "expiredinv-hash",
 			ExpiresAt: time.Now().Add(-1 * time.Minute),
-		}); err != nil {
-			t.Fatalf("CreateMagicLinkToken(expired) error = %v", err)
-		}
+		})
 
 		// No error expected even though there are no active tokens to invalidate.
 		if err := authStore.InvalidateUserMagicLinkTokens(ctx, u.ID); err != nil {
@@ -416,6 +411,7 @@ func TestStore_RefreshToken(t *testing.T) {
 func TestStore_RefreshToken_error(t *testing.T) {
 	ctx := context.Background()
 	pool := pgtest.New(t, ctx)
+	userStore := pguser.NewStore(pool)
 	authStore := pgauth.NewStore(pool)
 
 	t.Run("unknown user", func(t *testing.T) {
@@ -425,6 +421,20 @@ func TestStore_RefreshToken_error(t *testing.T) {
 			ExpiresAt: time.Now().Add(720 * time.Hour),
 		}); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("CreateRefreshToken(unknown user) error = %v, want sql.ErrNoRows", err)
+		}
+	})
+
+	t.Run("duplicate token hash", func(t *testing.T) {
+		u := seedUser(t, userStore, "duplicate-refresh@test.com")
+		in := pgauth.CreateRefreshToken{
+			UserID:    u.ID,
+			TokenHash: "duplicate-refresh-hash",
+			ExpiresAt: time.Now().Add(720 * time.Hour),
+		}
+		mustCreateRefreshToken(t, authStore, in)
+
+		if _, err := authStore.CreateRefreshToken(ctx, in); !errors.Is(err, pgdb.ErrAlreadyExists) {
+			t.Errorf("CreateRefreshToken() second call error = %v, want pgdb.ErrAlreadyExists", err)
 		}
 	})
 }
@@ -443,10 +453,7 @@ func TestStore_ConsumeRefreshToken(t *testing.T) {
 		ExpiresAt: time.Now().Add(720 * time.Hour),
 	}
 
-	created, err := authStore.CreateRefreshToken(ctx, cr)
-	if err != nil {
-		t.Fatalf("CreateRefreshToken() error = %v", err)
-	}
+	created := mustCreateRefreshToken(t, authStore, cr)
 
 	consumed, err := authStore.ConsumeRefreshToken(ctx, cr.TokenHash)
 	if err != nil {
@@ -475,13 +482,11 @@ func TestStore_ConsumeRefreshToken_error(t *testing.T) {
 
 	t.Run("expired not consumed", func(t *testing.T) {
 		u := seedUser(t, userStore, "consume-exp@test.com")
-		if _, err := authStore.CreateRefreshToken(ctx, pgauth.CreateRefreshToken{
+		mustCreateRefreshToken(t, authStore, pgauth.CreateRefreshToken{
 			UserID:    u.ID,
 			TokenHash: "consume-expiredhash",
 			ExpiresAt: time.Now().Add(-1 * time.Minute),
-		}); err != nil {
-			t.Fatalf("CreateRefreshToken() error = %v", err)
-		}
+		})
 
 		if _, err := authStore.ConsumeRefreshToken(ctx, "consume-expiredhash"); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("ConsumeRefreshToken(expired) error = %v, want sql.ErrNoRows", err)
@@ -490,17 +495,13 @@ func TestStore_ConsumeRefreshToken_error(t *testing.T) {
 
 	t.Run("double consume", func(t *testing.T) {
 		u := seedUser(t, userStore, "consume-double@test.com")
-		if _, err := authStore.CreateRefreshToken(ctx, pgauth.CreateRefreshToken{
+		mustCreateRefreshToken(t, authStore, pgauth.CreateRefreshToken{
 			UserID:    u.ID,
 			TokenHash: "consume-doublehash",
 			ExpiresAt: time.Now().Add(720 * time.Hour),
-		}); err != nil {
-			t.Fatalf("CreateRefreshToken() error = %v", err)
-		}
+		})
 
-		if _, err := authStore.ConsumeRefreshToken(ctx, "consume-doublehash"); err != nil {
-			t.Fatalf("first ConsumeRefreshToken() error = %v", err)
-		}
+		mustConsumeRefreshToken(t, authStore, "consume-doublehash")
 
 		if _, err := authStore.ConsumeRefreshToken(ctx, "consume-doublehash"); !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("second ConsumeRefreshToken() error = %v, want sql.ErrNoRows", err)
@@ -535,13 +536,11 @@ func TestStore_RevokeAllUserRefreshTokens(t *testing.T) {
 		hashes := []string{"revokeall-a", "revokeall-b"}
 
 		for _, hash := range hashes {
-			if _, err := authStore.CreateRefreshToken(ctx, pgauth.CreateRefreshToken{
+			mustCreateRefreshToken(t, authStore, pgauth.CreateRefreshToken{
 				UserID:    u.ID,
 				TokenHash: hash,
 				ExpiresAt: time.Now().Add(720 * time.Hour),
-			}); err != nil {
-				t.Fatalf("CreateRefreshToken(%q) error = %v", hash, err)
-			}
+			})
 		}
 
 		if err := authStore.RevokeAllUserRefreshTokens(ctx, u.ExternalID); err != nil {
@@ -549,8 +548,8 @@ func TestStore_RevokeAllUserRefreshTokens(t *testing.T) {
 		}
 
 		for _, hash := range hashes {
-			if _, err := authStore.ConsumeRefreshToken(ctx, hash); !errors.Is(err, sql.ErrNoRows) {
-				t.Errorf("ConsumeRefreshToken(%q) after revoke-all error = %v, want sql.ErrNoRows", hash, err)
+			if _, err := authStore.ConsumeRefreshToken(t.Context(), hash); !errors.Is(err, sql.ErrNoRows) {
+				t.Errorf("ConsumeRefreshToken(%q) error = %v, want sql.ErrNoRows", hash, err)
 			}
 		}
 	})
@@ -561,6 +560,47 @@ func TestStore_RevokeAllUserRefreshTokens(t *testing.T) {
 			t.Fatalf("RevokeAllUserRefreshTokens(no tokens) error = %v", err)
 		}
 	})
+}
+
+func mustCreateMagicLinkToken(t *testing.T, store *pgauth.Store, in pgauth.CreateMagicLinkToken) pgauth.MagicLinkToken {
+	t.Helper()
+
+	token, err := store.CreateMagicLinkToken(t.Context(), in)
+	if err != nil {
+		t.Fatalf("create magic link token: %v", err)
+	}
+
+	return token
+}
+
+func mustConsumeMagicLinkToken(t *testing.T, store *pgauth.Store, id int) {
+	t.Helper()
+
+	if err := store.ConsumeMagicLinkToken(t.Context(), id); err != nil {
+		t.Fatalf("consume magic link token: %v", err)
+	}
+}
+
+func mustCreateRefreshToken(t *testing.T, store *pgauth.Store, in pgauth.CreateRefreshToken) pgauth.RefreshToken {
+	t.Helper()
+
+	token, err := store.CreateRefreshToken(t.Context(), in)
+	if err != nil {
+		t.Fatalf("create refresh token: %v", err)
+	}
+
+	return token
+}
+
+func mustConsumeRefreshToken(t *testing.T, store *pgauth.Store, hash string) pgauth.RefreshToken {
+	t.Helper()
+
+	token, err := store.ConsumeRefreshToken(t.Context(), hash)
+	if err != nil {
+		t.Fatalf("consume refresh token: %v", err)
+	}
+
+	return token
 }
 
 func seedUser(t *testing.T, s *pguser.Store, email string) pguser.User {

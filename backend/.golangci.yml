@@ -73,6 +73,7 @@ linters:
         mdl:
           files:
             - "**/backend/internal/core/mdl/**"
+            - "!**/*_test.go"
           deny:
             - pkg: github.com/zorcal/theapp/backend/internal
               desc: mdl is a pure model leaf; it must not import any internal business package

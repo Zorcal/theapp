@@ -423,9 +423,10 @@ func customRoleHasProjectAssignmentsQuery(roleID uuid.UUID) pgdb.TypedQuery[bool
 		SELECT EXISTS (
 			SELECT 1
 			FROM rbac.project_role_assignments AS assignment
-			JOIN rbac.custom_roles AS role ON role.id = assignment.role_id
-			WHERE role.external_id = @role_id
-		)`
+			WHERE assignment.role_id = role.id
+		)
+		FROM rbac.custom_roles AS role
+		WHERE role.external_id = @role_id`
 
 	return pgdb.TypedQuery[bool]{
 		SQL:  sql,

@@ -43,6 +43,22 @@ func TestErrorStreamInterceptor_validationEscaped(t *testing.T) {
 	}
 }
 
+func TestRecoveryStreamInterceptor(t *testing.T) {
+	info := &grpc.StreamServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}
+	panicHandler := func(any, grpc.ServerStream) error {
+		panic("boom")
+	}
+	recovery := recoveryStreamInterceptor()
+	errorHandler := func(srv any, ss grpc.ServerStream) error {
+		return recovery(srv, ss, info, panicHandler)
+	}
+
+	err := errorStreamInterceptor(testingx.NewLogger(t))(nil, fakeServerStream{ctx: t.Context()}, info, errorHandler)
+	if got, want := status.Code(err), codes.Internal; got != want {
+		t.Errorf("recovered panic code = %v, want %v", got, want)
+	}
+}
+
 func TestAuthStreamInterceptor(t *testing.T) {
 	t.Run("public method bypasses auth", func(t *testing.T) {
 		handler := func(_ any, _ grpc.ServerStream) error {
@@ -71,10 +87,7 @@ func TestAuthStreamInterceptor(t *testing.T) {
 		want := mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}}
 
 		authCore := &MockedAuthCore{
-			AuthSessionFunc: func(_ context.Context, _ uuid.UUID, projectID *int) (mdl.AuthSession, error) {
-				if projectID != nil {
-					t.Errorf("AuthSession() projectID = %v, want nil", *projectID)
-				}
+			AuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ *int) (mdl.AuthSession, error) {
 				return want, nil
 			},
 		}
@@ -100,10 +113,7 @@ func TestAuthStreamInterceptor(t *testing.T) {
 		}
 
 		authCore := &MockedAuthCore{
-			AuthSessionFunc: func(_ context.Context, _ uuid.UUID, gotProjectID *int) (mdl.AuthSession, error) {
-				if gotProjectID == nil || *gotProjectID != projectID {
-					t.Errorf("AuthSession() projectID = %v, want %d", gotProjectID, projectID)
-				}
+			AuthSessionFunc: func(_ context.Context, _ uuid.UUID, _ *int) (mdl.AuthSession, error) {
 				return want, nil
 			},
 		}

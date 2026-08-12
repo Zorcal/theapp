@@ -267,6 +267,87 @@ func TestCore_UserSystemRoles_error(t *testing.T) {
 	}
 }
 
+func TestCore_BootstrapAssignSystemRole(t *testing.T) {
+	roleStorer := &MockedRoleStorer{
+		LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error {
+			return nil
+		},
+		AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
+			return nil
+		},
+	}
+	core := NewCore(roleStorer, immediateTransactor{})
+
+	if err := core.BootstrapAssignSystemRole(t.Context(), uuid.New(), "superadmin"); err != nil {
+		t.Errorf("BootstrapAssignSystemRole() error = %v, want nil", err)
+	}
+}
+
+func TestCore_BootstrapAssignSystemRole_error(t *testing.T) {
+	dbErr := errors.New("db error")
+
+	tests := []struct {
+		name       string
+		roleStorer *MockedRoleStorer
+		want       error
+	}{
+		{
+			name: "user lock",
+			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error {
+					return dbErr
+				},
+			},
+			want: dbErr,
+		},
+		{
+			name: "user or role not found",
+			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error {
+					return nil
+				},
+				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
+					return sql.ErrNoRows
+				},
+			},
+			want: mdl.ErrNotFound,
+		},
+		{
+			name: "already assigned",
+			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error {
+					return nil
+				},
+				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
+					return pgdb.ErrAlreadyExists
+				},
+			},
+			want: mdl.ErrAlreadyExists,
+		},
+		{
+			name: "assignment store",
+			roleStorer: &MockedRoleStorer{
+				LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error {
+					return nil
+				},
+				AssignSystemRoleFunc: func(_ context.Context, _ uuid.UUID, _ string) error {
+					return dbErr
+				},
+			},
+			want: dbErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core := NewCore(tt.roleStorer, immediateTransactor{})
+
+			if err := core.BootstrapAssignSystemRole(t.Context(), uuid.New(), "superadmin"); !errors.Is(err, tt.want) {
+				t.Errorf("BootstrapAssignSystemRole() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestCore_AssignSystemRole(t *testing.T) {
 	roleStorer := &MockedRoleStorer{
 		LockSystemRoleUserFunc: func(_ context.Context, _ uuid.UUID) error {

@@ -557,6 +557,35 @@ func seedSystemRoleAssignment(t *testing.T, rbacStore *pgrbac.Store, userID uuid
 	}
 }
 
+func mustUnassignSystemRole(t *testing.T, store *pgrbac.Store, userID uuid.UUID, roleName string) {
+	t.Helper()
+
+	if err := store.UnassignSystemRole(t.Context(), userID, roleName); err != nil {
+		t.Fatalf("unassign system role: %v", err)
+	}
+}
+
+func mustUserSystemRoles(t *testing.T, store *pgrbac.Store, userID uuid.UUID, pageSize, pageOffset int) ([]pgrbac.SystemRole, int) {
+	t.Helper()
+
+	roles, count, err := store.UserSystemRolesByExternalID(t.Context(), userID, pageSize, pageOffset)
+	if err != nil {
+		t.Fatalf("get user system roles: %v", err)
+	}
+
+	return roles, count
+}
+
+func seedSystemRole(t *testing.T, pool *pgxpool.Pool, name string) {
+	t.Helper()
+
+	if _, err := pool.Exec(t.Context(), `
+		INSERT INTO rbac.system_roles (external_id, name, created_at)
+		VALUES (gen_random_uuid(), $1, NOW())`, name); err != nil {
+		t.Fatalf("seed system role %q: %v", name, err)
+	}
+}
+
 func seedOrg(t *testing.T, orgStore *pgorg.Store, name string) pgorg.Organization {
 	t.Helper()
 
@@ -614,4 +643,15 @@ func seedOrgRoleAssignment(t *testing.T, ctx context.Context, rbacStore *pgrbac.
 	if err := rbacStore.AssignCustomRoleToOrg(ctx, userID, roleID, orgID); err != nil {
 		t.Fatalf("seed org role assignment (user %s, role %s, org %d): %v", userID, roleID, orgID, err)
 	}
+}
+
+func mustProjectPermissions(t *testing.T, store *pgrbac.Store, userID uuid.UUID, projectID int) pgrbac.ProjectPermissions {
+	t.Helper()
+
+	permissions, err := store.ProjectPermissions(t.Context(), userID, projectID)
+	if err != nil {
+		t.Fatalf("get project permissions: %v", err)
+	}
+
+	return permissions
 }

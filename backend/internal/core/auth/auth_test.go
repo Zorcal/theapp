@@ -239,6 +239,25 @@ func TestCore_MagicLinkToken_error(t *testing.T) {
 		}
 	})
 
+	t.Run("user lock", func(t *testing.T) {
+		dbErr := errors.New("db error")
+		authStorer := &MockedAuthStorer{
+			LockUserFunc: func(_ context.Context, _ int) error {
+				return dbErr
+			},
+		}
+		userStorer := &MockedUserStorer{
+			UserByEmailFunc: func(_ context.Context, _ string) (pguser.User, error) {
+				return pguser.User{ID: 1}, nil
+			},
+		}
+		core := NewCore(authStorer, userStorer, &MockedPermissionStorer{}, immediateTransactor{}, testConfig())
+
+		if _, err := core.MagicLinkToken(ctx, mdl.RequestMagicLink{Email: "alice@test.com"}); !errors.Is(err, dbErr) {
+			t.Errorf("MagicLinkToken() error = %v, want wrapping %v", err, dbErr)
+		}
+	})
+
 	t.Run("rate limit check", func(t *testing.T) {
 		rateLimitErr := errors.New("db error")
 

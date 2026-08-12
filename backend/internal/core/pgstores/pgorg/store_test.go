@@ -409,9 +409,11 @@ func TestStore_OrganizationByName_error(t *testing.T) {
 	pool := pgtest.New(t, ctx)
 	orgStore := pgorg.NewStore(pool)
 
-	if _, err := orgStore.OrganizationByName(ctx, "acme"); !errors.Is(err, sql.ErrNoRows) {
-		t.Errorf("OrganizationByName() error = %v, want sql.ErrNoRows", err)
-	}
+	t.Run("not found", func(t *testing.T) {
+		if _, err := orgStore.OrganizationByName(ctx, "acme"); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("OrganizationByName() error = %v, want sql.ErrNoRows", err)
+		}
+	})
 }
 
 func TestStore_ProjectByName(t *testing.T) {
@@ -454,9 +456,11 @@ func TestStore_ProjectByName_error(t *testing.T) {
 
 	org := seedOrg(t, orgStore, "acme")
 
-	if _, err := orgStore.ProjectByName(ctx, org.ID, "widgets"); !errors.Is(err, sql.ErrNoRows) {
-		t.Errorf("ProjectByName() error = %v, want sql.ErrNoRows", err)
-	}
+	t.Run("not found", func(t *testing.T) {
+		if _, err := orgStore.ProjectByName(ctx, org.ID, "widgets"); !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("ProjectByName() error = %v, want sql.ErrNoRows", err)
+		}
+	})
 }
 
 func TestStore_AccessibleProjects(t *testing.T) {

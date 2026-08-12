@@ -17,6 +17,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/testingx"
+	"github.com/zorcal/theapp/backend/internal/workflows"
 )
 
 func TestErrorUnaryInterceptor_validationEscaped(t *testing.T) {
@@ -41,6 +42,22 @@ func TestErrorUnaryInterceptor_validationEscaped(t *testing.T) {
 	}
 	if got, want := st.Message(), "invalid request"; got != want {
 		t.Errorf("errorUnaryInterceptor() message = %q, want %q", got, want)
+	}
+}
+
+func TestRecoveryUnaryInterceptor(t *testing.T) {
+	info := &grpc.UnaryServerInfo{FullMethod: "/theapp.v1.UserService/GetUser"}
+	panicHandler := func(context.Context, any) (any, error) {
+		panic("boom")
+	}
+	recovery := recoveryUnaryInterceptor()
+	errorHandler := func(ctx context.Context, req any) (any, error) {
+		return recovery(ctx, req, info, panicHandler)
+	}
+
+	_, err := errorUnaryInterceptor(testingx.NewLogger(t))(t.Context(), nil, info, errorHandler)
+	if got, want := status.Code(err), codes.Internal; got != want {
+		t.Errorf("recovered panic code = %v, want %v", got, want)
 	}
 }
 
@@ -210,6 +227,25 @@ func TestScopedWorkflowID_scoping(t *testing.T) {
 				t.Errorf("scopedWorkflowID() = %q, want different from base %q", got, base)
 			}
 		})
+	}
+}
+
+func TestIdempotencyUnaryInterceptor(t *testing.T) {
+	var gotWorkflowID string
+	handler := func(ctx context.Context, _ any) (any, error) {
+		gotWorkflowID = workflows.WorkflowID(ctx)
+		return &pb.RequestMagicLinkRequest{}, nil
+	}
+	key := uuid.NewString()
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-idempotency-key", key))
+
+	if _, err := idempotencyUnaryInterceptor()(ctx, &pb.RequestMagicLinkRequest{Email: "alice@test.com"}, &grpc.UnaryServerInfo{
+		FullMethod: "/theapp.v1.AuthService/RequestMagicLink",
+	}, handler); err != nil {
+		t.Fatalf("idempotencyUnaryInterceptor() error = %v", err)
+	}
+	if gotWorkflowID == "" {
+		t.Error("WorkflowID() = empty, want derived workflow ID")
 	}
 }
 
