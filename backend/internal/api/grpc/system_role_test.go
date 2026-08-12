@@ -401,8 +401,10 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return mdl.ErrLastFullyPrivilegedSystemAdmin
 				},
 			},
-			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
-			want: status.New(codes.FailedPrecondition, "cannot remove the last fully privileged system administrator"),
+			in: &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			want: mustErrorStatus(t, codes.FailedPrecondition,
+				pb.ErrorCode_ERROR_CODE_LAST_FULLY_PRIVILEGED_SYSTEM_ADMIN,
+				"cannot remove the last fully privileged system administrator"),
 		},
 		{
 			name: "core error",

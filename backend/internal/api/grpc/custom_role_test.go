@@ -1082,7 +1082,8 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 				Role:       &pb.Role{Id: roleID.String(), Name: "updated role", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
-			want: status.New(codes.FailedPrecondition, "managed role definitions cannot be updated"),
+			want: mustErrorStatus(t, codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_MANAGED_ROLE,
+				"managed role definitions cannot be updated"),
 		},
 		{
 			name: "project assignments require project scope",
@@ -1099,7 +1100,8 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"permissions"}},
 			},
-			want: status.New(codes.FailedPrecondition, "role with project assignments cannot require organization scope"),
+			want: mustErrorStatus(t, codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE,
+				"role with project assignments cannot require organization scope"),
 		},
 		{
 			name: "core error",
@@ -1125,7 +1127,8 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 				Role:       &pb.Role{Id: roleID.String(), Name: "updated role", Etag: etag},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
-			want: status.New(codes.Aborted, "role has changed since it was read"),
+			want: mustErrorStatus(t, codes.Aborted, pb.ErrorCode_ERROR_CODE_ETAG_MISMATCH,
+				"role has changed since it was read"),
 		},
 	}
 	for _, tt := range tests {
@@ -1254,8 +1257,9 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 					return mdl.CustomRole{}, mdl.ErrETagMismatch
 				},
 			},
-			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
-			want: status.New(codes.Aborted, "role has changed since it was read"),
+			in: &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
+			want: mustErrorStatus(t, codes.Aborted, pb.ErrorCode_ERROR_CODE_ETAG_MISMATCH,
+				"role has changed since it was read"),
 		},
 		{
 			name: "permission denied",
@@ -1274,8 +1278,9 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 					return mdl.CustomRole{}, mdl.ErrManagedRole
 				},
 			},
-			in:   &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
-			want: status.New(codes.FailedPrecondition, "managed role definitions cannot be modified"),
+			in: &pb.ModifyRolePermissionsRequest{Id: roleID.String(), Etag: etag},
+			want: mustErrorStatus(t, codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_MANAGED_ROLE,
+				"managed role definitions cannot be modified"),
 		},
 		{
 			name: "project assignments require project scope",
@@ -1289,7 +1294,8 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 				Etag:           etag,
 				AddPermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 			},
-			want: status.New(codes.FailedPrecondition, "role with project assignments cannot require organization scope"),
+			want: mustErrorStatus(t, codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE,
+				"role with project assignments cannot require organization scope"),
 		},
 		{
 			name: "core error",
@@ -1402,8 +1408,9 @@ func TestRoleService_DeleteRole_error(t *testing.T) {
 					return mdl.ErrManagedRole
 				},
 			},
-			in:   &pb.DeleteRoleRequest{Id: roleID.String()},
-			want: status.New(codes.FailedPrecondition, "managed role definitions cannot be deleted"),
+			in: &pb.DeleteRoleRequest{Id: roleID.String()},
+			want: mustErrorStatus(t, codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_MANAGED_ROLE,
+				"managed role definitions cannot be deleted"),
 		},
 		{
 			name: "core error",
@@ -1512,8 +1519,9 @@ func TestRoleService_AssignRoleToProject_error(t *testing.T) {
 					return mdl.ErrInvalidAssignmentScope
 				},
 			},
-			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
-			want: status.New(codes.FailedPrecondition, "role cannot be assigned at project scope"),
+			in: &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			want: mustErrorStatus(t, codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE,
+				"role cannot be assigned at project scope"),
 		},
 		{
 			name: "core error",

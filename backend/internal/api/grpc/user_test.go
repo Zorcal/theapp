@@ -361,7 +361,8 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
-			want: status.New(codes.Aborted, "user has changed since it was read"),
+			want: mustErrorStatus(t, codes.Aborted, pb.ErrorCode_ERROR_CODE_ETAG_MISMATCH,
+				"user has changed since it was read"),
 		},
 		{
 			name: "core error",

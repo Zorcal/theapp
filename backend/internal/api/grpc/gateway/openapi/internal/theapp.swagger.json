@@ -454,7 +454,7 @@
             }
           },
           "400": {
-            "description": "Invalid organization data, default project data, or project metadata.",
+            "description": "gRPC INVALID_ARGUMENT. A default project name that conflicts with the control project includes ErrorDetail.code ERROR_CODE_CONTROL_PROJECT_NAME_CONFLICT; ordinary validation errors do not include an application error code.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -1088,7 +1088,7 @@
             }
           },
           "400": {
-            "description": "Invalid role ID or project metadata, or the role is managed and cannot be deleted.",
+            "description": "gRPC INVALID_ARGUMENT for an invalid role ID or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_MANAGED_ROLE when a managed role cannot be deleted.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -1157,7 +1157,7 @@
             }
           },
           "400": {
-            "description": "Invalid or conflicting permission changes or project metadata; managed role permissions cannot be modified; or project assignments conflict with organization-scoped permissions.",
+            "description": "gRPC INVALID_ARGUMENT for invalid permission changes or project metadata. gRPC FAILED_PRECONDITION uses ErrorDetail.code ERROR_CODE_MANAGED_ROLE for a managed role or ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when project assignments conflict with organization-scoped permissions.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -1176,6 +1176,12 @@
           },
           "404": {
             "description": "Role or permission not found in the selected organization.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          },
+          "409": {
+            "description": "gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the role has changed since it was read. Fetch the latest role and retry.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -1234,7 +1240,7 @@
             }
           },
           "400": {
-            "description": "Invalid role data, update mask, or project metadata; the role name already exists; managed role permissions cannot be updated; or project assignments conflict with organization-scoped permissions.",
+            "description": "gRPC INVALID_ARGUMENT for invalid role data, update mask, project metadata, or a duplicate role name. gRPC FAILED_PRECONDITION uses ErrorDetail.code ERROR_CODE_MANAGED_ROLE for a managed role or ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when project assignments conflict with organization-scoped permissions.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -1258,7 +1264,7 @@
             }
           },
           "409": {
-            "description": "The role has changed since it was read. Fetch the latest role and retry.",
+            "description": "gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the role has changed since it was read. Fetch the latest role and retry.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -1394,7 +1400,7 @@
             }
           },
           "400": {
-            "description": "Invalid IDs or project metadata, or the role requires organization scope.",
+            "description": "gRPC INVALID_ARGUMENT for invalid IDs or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when the role requires organization scope.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -1845,7 +1851,7 @@
             }
           },
           "400": {
-            "description": "Invalid input or project metadata, or unassignment would remove the last fully privileged system administrator.",
+            "description": "gRPC INVALID_ARGUMENT for invalid input or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_LAST_FULLY_PRIVILEGED_SYSTEM_ADMIN when unassignment would remove the last fully privileged system administrator.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }
@@ -2143,7 +2149,7 @@
             }
           },
           "409": {
-            "description": "The user has changed since it was read. Fetch the latest user and retry.",
+            "description": "gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the user has changed since it was read. Fetch the latest user and retry.",
             "schema": {
               "$ref": "#/definitions/rpcStatus"
             }

@@ -1313,7 +1313,7 @@ const file_role_proto_rawDesc = "" +
 	"\bRoleKind\x12\x19\n" +
 	"\x15ROLE_KIND_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10ROLE_KIND_CUSTOM\x10\x01\x12 \n" +
-	"\x1cROLE_KIND_ORGANIZATION_ADMIN\x10\x022\x85;\n" +
+	"\x1cROLE_KIND_ORGANIZATION_ADMIN\x10\x022\xa2@\n" +
 	"\vRoleService\x12\xa5\x04\n" +
 	"\n" +
 	"CreateRole\x12\x1c.theapp.v1.CreateRoleRequest\x1a\x0f.theapp.v1.Role\"\xe7\x03\x92A\xcf\x03Jh\n" +
@@ -1402,11 +1402,11 @@ const file_role_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrT\n" +
 	"R\n" +
-	"\fx-project-id\x12>ID of a project in the organization whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02#\x12!/v1/organization-role-assignments\x12\xad\x06\n" +
+	"\fx-project-id\x12>ID of a project in the organization whose assignments to list.\x18\x03(\x01\x82\xd3\xe4\x93\x02#\x12!/v1/organization-role-assignments\x12\xdc\a\n" +
 	"\n" +
-	"UpdateRole\x12\x1c.theapp.v1.UpdateRoleRequest\x1a\x0f.theapp.v1.Role\"\xef\x05\x92A\xcd\x05J\xe7\x01\n" +
-	"\x03400\x12\xdf\x01\n" +
-	"\xc4\x01Invalid role data, update mask, or project metadata; the role name already exists; managed role permissions cannot be updated; or project assignments conflict with organization-scoped permissions.\x12\x16\n" +
+	"UpdateRole\x12\x1c.theapp.v1.UpdateRoleRequest\x1a\x0f.theapp.v1.Role\"\x9e\a\x92A\xfc\x06J\xd6\x02\n" +
+	"\x03400\x12\xce\x02\n" +
+	"\xb3\x02gRPC INVALID_ARGUMENT for invalid role data, update mask, project metadata, or a duplicate role name. gRPC FAILED_PRECONDITION uses ErrorDetail.code ERROR_CODE_MANAGED_ROLE for a managed role or ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when project assignments conflict with organization-scoped permissions.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
@@ -1416,18 +1416,18 @@ const file_role_proto_rawDesc = "" +
 	"\x14\x1a\x12.google.rpc.StatusJ[\n" +
 	"\x03404\x12T\n" +
 	":Role or permission not found in the selected organization.\x12\x16\n" +
-	"\x14\x1a\x12.google.rpc.StatusJi\n" +
-	"\x03409\x12b\n" +
-	"HThe role has changed since it was read. Fetch the latest role and retry.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ\xa8\x01\n" +
+	"\x03409\x12\xa0\x01\n" +
+	"\x85\x01gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the role has changed since it was read. Fetch the latest role and retry.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/roles/{role.id}\x12\xd2\x05\n" +
-	"\x15ModifyRolePermissions\x12'.theapp.v1.ModifyRolePermissionsRequest\x1a\x0f.theapp.v1.Role\"\xfe\x04\x92A\xcf\x04J\xd4\x01\n" +
-	"\x03400\x12\xcc\x01\n" +
-	"\xb1\x01Invalid or conflicting permission changes or project metadata; managed role permissions cannot be modified; or project assignments conflict with organization-scoped permissions.\x12\x16\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x18:\x01*2\x13/v1/roles/{role.id}\x12\xe3\a\n" +
+	"\x15ModifyRolePermissions\x12'.theapp.v1.ModifyRolePermissionsRequest\x1a\x0f.theapp.v1.Role\"\x8f\a\x92A\xe0\x06J\xba\x02\n" +
+	"\x03400\x12\xb2\x02\n" +
+	"\x97\x02gRPC INVALID_ARGUMENT for invalid permission changes or project metadata. gRPC FAILED_PRECONDITION uses ErrorDetail.code ERROR_CODE_MANAGED_ROLE for a managed role or ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when project assignments conflict with organization-scoped permissions.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
@@ -1437,16 +1437,19 @@ const file_role_proto_rawDesc = "" +
 	"\x14\x1a\x12.google.rpc.StatusJ[\n" +
 	"\x03404\x12T\n" +
 	":Role or permission not found in the selected organization.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ\xa8\x01\n" +
+	"\x03409\x12\xa0\x01\n" +
+	"\x85\x01gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the role has changed since it was read. Fetch the latest role and retry.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02%:\x01*\" /v1/roles/{id}:modifyPermissions\x12\xc7\x04\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02%:\x01*\" /v1/roles/{id}:modifyPermissions\x12\xaa\x05\n" +
 	"\n" +
-	"DeleteRole\x12\x1c.theapp.v1.DeleteRoleRequest\x1a\x1d.theapp.v1.DeleteRoleResponse\"\xfb\x03\x92A\xe1\x03Js\n" +
-	"\x03400\x12l\n" +
-	"RInvalid role ID or project metadata, or the role is managed and cannot be deleted.\x12\x16\n" +
+	"DeleteRole\x12\x1c.theapp.v1.DeleteRoleRequest\x1a\x1d.theapp.v1.DeleteRoleResponse\"\xde\x04\x92A\xc4\x04J\xd5\x01\n" +
+	"\x03400\x12\xcd\x01\n" +
+	"\xb2\x01gRPC INVALID_ARGUMENT for an invalid role ID or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_MANAGED_ROLE when a managed role cannot be deleted.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
@@ -1461,10 +1464,10 @@ const file_role_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrA\n" +
 	"?\n" +
-	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10*\x0e/v1/roles/{id}\x12\xbe\x05\n" +
-	"\x13AssignRoleToProject\x12%.theapp.v1.AssignRoleToProjectRequest\x1a&.theapp.v1.AssignRoleToProjectResponse\"\xd7\x04\x92A\xaf\x04Jj\n" +
-	"\x03400\x12c\n" +
-	"IInvalid IDs or project metadata, or the role requires organization scope.\x12\x16\n" +
+	"\fx-project-id\x12+ID of a project in the role's organization.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x10*\x0e/v1/roles/{id}\x12\xb8\x06\n" +
+	"\x13AssignRoleToProject\x12%.theapp.v1.AssignRoleToProjectRequest\x1a&.theapp.v1.AssignRoleToProjectResponse\"\xd1\x05\x92A\xa9\x05J\xe3\x01\n" +
+	"\x03400\x12\xdb\x01\n" +
+	"\xc0\x01gRPC INVALID_ARGUMENT for invalid IDs or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when the role requires organization scope.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +

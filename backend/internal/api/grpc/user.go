@@ -99,7 +99,7 @@ func (s *userService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest)
 		case errors.Is(err, mdl.ErrNotFound):
 			return nil, status.Errorf(codes.NotFound, "user %q not found", req.GetUser().GetId())
 		case errors.Is(err, mdl.ErrETagMismatch):
-			return nil, status.Error(codes.Aborted, "user has changed since it was read")
+			return nil, errorStatus(codes.Aborted, pb.ErrorCode_ERROR_CODE_ETAG_MISMATCH, "user has changed since it was read")
 		default:
 			return nil, fmt.Errorf("update user: %w", err)
 		}

@@ -225,7 +225,7 @@ service UserService {
       responses: {
         key: "409"
         value: {
-          description: "The user has changed since it was read. Fetch the latest user and retry."
+          description: "gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the user has changed since it was read. Fetch the latest user and retry."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }

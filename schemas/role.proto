@@ -342,7 +342,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid role data, update mask, or project metadata; the role name already exists; managed role permissions cannot be updated; or project assignments conflict with organization-scoped permissions."
+          description: "gRPC INVALID_ARGUMENT for invalid role data, update mask, project metadata, or a duplicate role name. gRPC FAILED_PRECONDITION uses ErrorDetail.code ERROR_CODE_MANAGED_ROLE for a managed role or ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when project assignments conflict with organization-scoped permissions."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -378,16 +378,7 @@ service RoleService {
       responses: {
         key: "409"
         value: {
-          description: "The role changed after it was read."
-          schema: {
-            json_schema: {ref: ".google.rpc.Status"}
-          }
-        }
-      }
-      responses: {
-        key: "409"
-        value: {
-          description: "The role has changed since it was read. Fetch the latest role and retry."
+          description: "gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the role has changed since it was read. Fetch the latest role and retry."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -423,7 +414,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid or conflicting permission changes or project metadata; managed role permissions cannot be modified; or project assignments conflict with organization-scoped permissions."
+          description: "gRPC INVALID_ARGUMENT for invalid permission changes or project metadata. gRPC FAILED_PRECONDITION uses ErrorDetail.code ERROR_CODE_MANAGED_ROLE for a managed role or ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when project assignments conflict with organization-scoped permissions."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -457,6 +448,15 @@ service RoleService {
         }
       }
       responses: {
+        key: "409"
+        value: {
+          description: "gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the role has changed since it was read. Fetch the latest role and retry."
+          schema: {
+            json_schema: {ref: ".google.rpc.Status"}
+          }
+        }
+      }
+      responses: {
         key: "500"
         value: {
           description: "Unexpected server error."
@@ -483,7 +483,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid role ID or project metadata, or the role is managed and cannot be deleted."
+          description: "gRPC INVALID_ARGUMENT for an invalid role ID or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_MANAGED_ROLE when a managed role cannot be deleted."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }
@@ -546,7 +546,7 @@ service RoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid IDs or project metadata, or the role requires organization scope."
+          description: "gRPC INVALID_ARGUMENT for invalid IDs or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE when the role requires organization scope."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }

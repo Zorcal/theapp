@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package theapp.v1;
+
+option go_package = "github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb;pb";
+
+// A stable, machine-readable reason for an application-level failure.
+//
+// The gRPC status code remains the broad failure category. ErrorDetail is attached only when
+// clients may need to distinguish this condition from other failures with the same status.
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_ETAG_MISMATCH = 1;
+  ERROR_CODE_MANAGED_ROLE = 2;
+  ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE = 3;
+  ERROR_CODE_LAST_FULLY_PRIVILEGED_SYSTEM_ADMIN = 4;
+  ERROR_CODE_CONTROL_PROJECT_NAME_CONFLICT = 5;
+}
+
+// Structured application-specific detail attached to google.rpc.Status.details.
+message ErrorDetail {
+  ErrorCode code = 1;
+
+  // Values relevant to this occurrence. Metadata keys are part of the API contract only when
+  // documented for a particular error code.
+  map<string, string> metadata = 2;
+}

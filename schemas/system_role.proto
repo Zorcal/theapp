@@ -173,7 +173,7 @@ service SystemRoleService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid input or project metadata, or unassignment would remove the last fully privileged system administrator."
+          description: "gRPC INVALID_ARGUMENT for invalid input or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_LAST_FULLY_PRIVILEGED_SYSTEM_ADMIN when unassignment would remove the last fully privileged system administrator."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }

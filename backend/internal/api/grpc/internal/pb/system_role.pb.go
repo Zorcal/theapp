@@ -545,7 +545,7 @@ const file_system_role_proto_rawDesc = "" +
 	"\x05roles\x18\x01 \x03(\v2\x15.theapp.v1.SystemRoleR\x05roles\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xc3\x14\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xc0\x15\n" +
 	"\x11SystemRoleService\x12\xa4\x04\n" +
 	"\x0fListSystemRoles\x12!.theapp.v1.ListSystemRolesRequest\x1a\".theapp.v1.ListSystemRolesResponse\"\xc9\x03\x92A\xad\x03JH\n" +
 	"\x03400\x12A\n" +
@@ -582,10 +582,10 @@ const file_system_role_proto_rawDesc = "" +
 	"\x18Unexpected server error.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusrH\n" +
 	"F\n" +
-	"\fx-project-id\x122ID of the \"theapp\" organization's control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/system-roles:assign\x12\xc6\x05\n" +
-	"\x12UnassignSystemRole\x12$.theapp.v1.UnassignSystemRoleRequest\x1a%.theapp.v1.UnassignSystemRoleResponse\"\xe2\x04\x92A\xba\x04J\x91\x01\n" +
-	"\x03400\x12\x89\x01\n" +
-	"oInvalid input or project metadata, or unassignment would remove the last fully privileged system administrator.\x12\x16\n" +
+	"\fx-project-id\x122ID of the \"theapp\" organization's control project.\x18\x03(\x01\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/system-roles:assign\x12\xc3\x06\n" +
+	"\x12UnassignSystemRole\x12$.theapp.v1.UnassignSystemRoleRequest\x1a%.theapp.v1.UnassignSystemRoleResponse\"\xdf\x05\x92A\xb7\x05J\x8e\x02\n" +
+	"\x03400\x12\x86\x02\n" +
+	"\xeb\x01gRPC INVALID_ARGUMENT for invalid input or project metadata, or gRPC FAILED_PRECONDITION with ErrorDetail.code ERROR_CODE_LAST_FULLY_PRIVILEGED_SYSTEM_ADMIN when unassignment would remove the last fully privileged system administrator.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +

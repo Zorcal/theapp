@@ -117,7 +117,8 @@ func (s *systemRoleService) UnassignSystemRole(ctx context.Context, req *pb.Unas
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, codes.PermissionDenied.String())
 		case errors.Is(err, mdl.ErrLastFullyPrivilegedSystemAdmin):
-			return nil, status.Error(codes.FailedPrecondition, "cannot remove the last fully privileged system administrator")
+			return nil, errorStatus(codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_LAST_FULLY_PRIVILEGED_SYSTEM_ADMIN,
+				"cannot remove the last fully privileged system administrator")
 		default:
 			return nil, fmt.Errorf("unassign system role: %w", err)
 		}

@@ -71,6 +71,32 @@ This is UX, not the enforcement boundary — the core enforces validation itself
 
 A `mdl.ErrValidation` escaping from a core call means the two layers have drifted apart; `errorUnaryInterceptor`/`errorStreamInterceptor` catch this centrally rather than per handler.
 
+## Error responses
+
+The gRPC status code is the primary, broad error category. Error messages are for people and logs;
+clients must never parse or compare them. Prefer standard `google.rpc` details: `BadRequest` for
+field violations, `RetryInfo` for retry timing, and `ResourceInfo` for resource identity.
+
+Use `errorStatus` to attach `theapp.v1.ErrorDetail` only when clients may act differently on stable
+domain conditions sharing a gRPC status. Its `code` is the machine-readable contract; `metadata`
+holds occurrence-specific values, and its keys are contractual only when documented. Do not add
+codes such as `NOT_FOUND`, `INVALID_ARGUMENT`, or `PERMISSION_DENIED` that repeat the status. Plain
+not-found, authentication, authorization, internal, and validation errors need no application code;
+represent validation with `BadRequest` field violations.
+
+Codes describe reusable domain conditions, not endpoints or implementation details: use
+`ERROR_CODE_ETAG_MISMATCH` for every resource with optimistic concurrency, not
+`UPDATE_USER_FAILED` or database-specific codes. Never renumber or reuse values. Clients must
+tolerate unknown values and fall back to the gRPC status.
+
+Preserve deliberately ambiguous or security-sensitive core errors such as a shared
+`mdl.ErrNotFound`. If clients need finer distinctions, model distinct domain errors in the core;
+never derive codes from error messages.
+
+Each RPC's OpenAPI response description must list its application codes and gRPC statuses, including
+when grpc-gateway maps multiple gRPC statuses to one HTTP status (for example, `InvalidArgument` and
+`FailedPrecondition` to HTTP 400). Regenerate protobuf and OpenAPI files after adding or using a code.
+
 ## Idempotency
 
 `idempotencyUnaryInterceptor` (in `unary_interceptors.go`) lets a caller resume a dropped request by sending a `x-idempotency-key` header, which it turns into a DBOS workflow ID. The raw key is never used directly: it's hashed together with the authenticated user, the method, and the request payload before use, so two unrelated requests that happen to reuse the same key can never collide on the same workflow, and a caller can never receive another caller's cached result. This is also why `authUnaryInterceptor` must run before it in the chain — the derivation needs the authenticated user ID when one exists.

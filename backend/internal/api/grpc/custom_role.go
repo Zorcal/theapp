@@ -285,13 +285,15 @@ func (s *customRoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRe
 				{Field: "role.name", Description: "a role with this name already exists"},
 			})
 		case errors.Is(err, mdl.ErrETagMismatch):
-			return nil, status.Error(codes.Aborted, "role has changed since it was read")
+			return nil, errorStatus(codes.Aborted, pb.ErrorCode_ERROR_CODE_ETAG_MISMATCH, "role has changed since it was read")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
 		case errors.Is(err, mdl.ErrManagedRole):
-			return nil, status.Error(codes.FailedPrecondition, "managed role definitions cannot be updated")
+			return nil, errorStatus(codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_MANAGED_ROLE,
+				"managed role definitions cannot be updated")
 		case errors.Is(err, mdl.ErrInvalidAssignmentScope):
-			return nil, status.Error(codes.FailedPrecondition, "role with project assignments cannot require organization scope")
+			return nil, errorStatus(codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE,
+				"role with project assignments cannot require organization scope")
 		default:
 			return nil, fmt.Errorf("update role: %w", err)
 		}
@@ -320,13 +322,15 @@ func (s *customRoleService) ModifyRolePermissions(ctx context.Context, req *pb.M
 		case errors.Is(err, mdl.ErrValidation):
 			return nil, status.Error(codes.InvalidArgument, "invalid permission changes")
 		case errors.Is(err, mdl.ErrETagMismatch):
-			return nil, status.Error(codes.Aborted, "role has changed since it was read")
+			return nil, errorStatus(codes.Aborted, pb.ErrorCode_ERROR_CODE_ETAG_MISMATCH, "role has changed since it was read")
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot change role permissions")
 		case errors.Is(err, mdl.ErrManagedRole):
-			return nil, status.Error(codes.FailedPrecondition, "managed role definitions cannot be modified")
+			return nil, errorStatus(codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_MANAGED_ROLE,
+				"managed role definitions cannot be modified")
 		case errors.Is(err, mdl.ErrInvalidAssignmentScope):
-			return nil, status.Error(codes.FailedPrecondition, "role with project assignments cannot require organization scope")
+			return nil, errorStatus(codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE,
+				"role with project assignments cannot require organization scope")
 		default:
 			return nil, fmt.Errorf("modify role permissions: %w", err)
 		}
@@ -349,7 +353,8 @@ func (s *customRoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRe
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot delete role permissions")
 		case errors.Is(err, mdl.ErrManagedRole):
-			return nil, status.Error(codes.FailedPrecondition, "managed role definitions cannot be deleted")
+			return nil, errorStatus(codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_MANAGED_ROLE,
+				"managed role definitions cannot be deleted")
 		default:
 			return nil, fmt.Errorf("delete role: %w", err)
 		}
@@ -375,7 +380,8 @@ func (s *customRoleService) AssignRoleToProject(ctx context.Context, req *pb.Ass
 		case errors.Is(err, mdl.ErrPermissionDenied):
 			return nil, status.Error(codes.PermissionDenied, "caller cannot grant role permissions")
 		case errors.Is(err, mdl.ErrInvalidAssignmentScope):
-			return nil, status.Error(codes.FailedPrecondition, "role cannot be assigned at project scope")
+			return nil, errorStatus(codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE,
+				"role cannot be assigned at project scope")
 		default:
 			return nil, fmt.Errorf("assign role to project: %w", err)
 		}

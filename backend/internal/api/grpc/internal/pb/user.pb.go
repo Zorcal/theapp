@@ -514,7 +514,7 @@ const file_user_proto_rawDesc = "" +
 	"\x05users\x18\x01 \x03(\v2\x0f.theapp.v1.UserR\x05users\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xd6\f\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\x96\r\n" +
 	"\vUserService\x12\xf3\x02\n" +
 	"\aGetUser\x12\x19.theapp.v1.GetUserRequest\x1a\x0f.theapp.v1.User\"\xbb\x02\x92A\xa1\x02J1\n" +
 	"\x03400\x12*\n" +
@@ -558,9 +558,9 @@ const file_user_proto_rawDesc = "" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +
-	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/users\x12\xff\x03\n" +
+	"\x14\x1a\x12.google.rpc.Status\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/v1/users\x12\xbf\x04\n" +
 	"\n" +
-	"UpdateUser\x12\x1c.theapp.v1.UpdateUserRequest\x1a\x0f.theapp.v1.User\"\xc1\x03\x92A\x9f\x03JB\n" +
+	"UpdateUser\x12\x1c.theapp.v1.UpdateUserRequest\x1a\x0f.theapp.v1.User\"\x81\x04\x92A\xdf\x03JB\n" +
 	"\x03400\x12;\n" +
 	"!Invalid user data or update mask.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
@@ -572,9 +572,9 @@ const file_user_proto_rawDesc = "" +
 	"\x14\x1a\x12.google.rpc.StatusJ0\n" +
 	"\x03404\x12)\n" +
 	"\x0fUser not found.\x12\x16\n" +
-	"\x14\x1a\x12.google.rpc.StatusJi\n" +
-	"\x03409\x12b\n" +
-	"HThe user has changed since it was read. Fetch the latest user and retry.\x12\x16\n" +
+	"\x14\x1a\x12.google.rpc.StatusJ\xa8\x01\n" +
+	"\x03409\x12\xa0\x01\n" +
+	"\x85\x01gRPC ABORTED with ErrorDetail.code ERROR_CODE_ETAG_MISMATCH: the user has changed since it was read. Fetch the latest user and retry.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ9\n" +
 	"\x03500\x122\n" +
 	"\x18Unexpected server error.\x12\x16\n" +

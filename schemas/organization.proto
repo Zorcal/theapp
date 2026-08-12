@@ -46,7 +46,7 @@ service OrgService {
       responses: {
         key: "400"
         value: {
-          description: "Invalid organization data, default project data, or project metadata."
+          description: "gRPC INVALID_ARGUMENT. A default project name that conflicts with the control project includes ErrorDetail.code ERROR_CODE_CONTROL_PROJECT_NAME_CONFLICT; ordinary validation errors do not include an application error code."
           schema: {
             json_schema: {ref: ".google.rpc.Status"}
           }

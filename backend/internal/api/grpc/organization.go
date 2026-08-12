@@ -69,7 +69,8 @@ func (s *organizationService) CreateOrganization(ctx context.Context, req *pb.Cr
 		case errors.Is(err, mdl.ErrAlreadyExists):
 			return nil, status.Error(codes.AlreadyExists, "organization already exists")
 		case errors.Is(err, mdl.ErrControlProjectNameConflict):
-			return nil, status.Error(codes.InvalidArgument, "project_name conflicts with the control project")
+			return nil, errorStatus(codes.InvalidArgument, pb.ErrorCode_ERROR_CODE_CONTROL_PROJECT_NAME_CONFLICT,
+				"project_name conflicts with the control project")
 		case errors.Is(err, mdl.ErrNotFound):
 			return nil, status.Error(codes.NotFound, "authenticated creator not found")
 		default:

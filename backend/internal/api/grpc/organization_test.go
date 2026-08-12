@@ -161,8 +161,9 @@ func TestOrganizationService_CreateOrganization_error(t *testing.T) {
 					return mdl.Organization{}, mdl.ErrControlProjectNameConflict
 				},
 			},
-			in:   &pb.CreateOrganizationRequest{Organization: &pb.Organization{Name: "acme"}, ProjectName: "control"},
-			want: status.New(codes.InvalidArgument, "project_name conflicts with the control project"),
+			in: &pb.CreateOrganizationRequest{Organization: &pb.Organization{Name: "acme"}, ProjectName: "control"},
+			want: mustErrorStatus(t, codes.InvalidArgument, pb.ErrorCode_ERROR_CODE_CONTROL_PROJECT_NAME_CONFLICT,
+				"project_name conflicts with the control project"),
 		},
 		{
 			name: "creator not found",

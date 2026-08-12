@@ -410,12 +410,12 @@ const file_organization_proto_rawDesc = "" +
 	"\x05users\x18\x01 \x03(\v2\x0f.theapp.v1.UserR\x05users\x12\x1d\n" +
 	"\n" +
 	"total_size\x18\x02 \x01(\x05R\ttotalSize\x12&\n" +
-	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xc4\x0e\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken2\xe0\x0f\n" +
 	"\n" +
-	"OrgService\x12\x9a\x05\n" +
-	"\x12CreateOrganization\x12$.theapp.v1.CreateOrganizationRequest\x1a\x17.theapp.v1.Organization\"\xc4\x04\x92A\xa4\x04Jf\n" +
-	"\x03400\x12_\n" +
-	"EInvalid organization data, default project data, or project metadata.\x12\x16\n" +
+	"OrgService\x12\xb6\x06\n" +
+	"\x12CreateOrganization\x12$.theapp.v1.CreateOrganizationRequest\x1a\x17.theapp.v1.Organization\"\xe0\x05\x92A\xc0\x05J\x81\x02\n" +
+	"\x03400\x12\xf9\x01\n" +
+	"\xde\x01gRPC INVALID_ARGUMENT. A default project name that conflicts with the control project includes ErrorDetail.code ERROR_CODE_CONTROL_PROJECT_NAME_CONFLICT; ordinary validation errors do not include an application error code.\x12\x16\n" +
 	"\x14\x1a\x12.google.rpc.StatusJ@\n" +
 	"\x03401\x129\n" +
 	"\x1fMissing or invalid credentials.\x12\x16\n" +
