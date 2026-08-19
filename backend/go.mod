@@ -1,6 +1,6 @@
 module github.com/zorcal/theapp/backend
 
-go 1.26.3
+go 1.27
 
 require (
 	github.com/amacneil/dbmate/v2 v2.33.0
