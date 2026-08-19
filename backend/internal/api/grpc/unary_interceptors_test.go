@@ -86,11 +86,9 @@ func TestAuthInterceptor_unauthenticated(t *testing.T) {
 				ctx := authCtxWithClaims(
 					t, t.Context(),
 					mdl.AuthClaims{
-						RegisteredClaims: jwt.RegisteredClaims{
-							Issuer:    "wrong-issuer",
-							Audience:  jwt.ClaimStrings{testJWTAudience},
-							ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-						},
+						Issuer:    "wrong-issuer",
+						Audience:  jwt.ClaimStrings{testJWTAudience},
+						ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 					},
 					testJWTKey,
 				)
@@ -104,11 +102,9 @@ func TestAuthInterceptor_unauthenticated(t *testing.T) {
 				ctx := authCtxWithClaims(
 					t, t.Context(),
 					mdl.AuthClaims{
-						RegisteredClaims: jwt.RegisteredClaims{
-							Issuer:    testJWTIssuer,
-							Audience:  jwt.ClaimStrings{"wrong-audience"},
-							ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-						},
+						Issuer:    testJWTIssuer,
+						Audience:  jwt.ClaimStrings{"wrong-audience"},
+						ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 					},
 					testJWTKey,
 				)
@@ -436,12 +432,10 @@ func TestAuthUnaryInterceptor_error(t *testing.T) {
 	validCtx := func(t *testing.T) context.Context {
 		t.Helper()
 		claims := mdl.AuthClaims{
-			UserID: uuid.New(),
-			RegisteredClaims: jwt.RegisteredClaims{
-				Issuer:    testJWTIssuer,
-				Audience:  jwt.ClaimStrings{testJWTAudience},
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-			},
+			UserID:    uuid.New(),
+			Issuer:    testJWTIssuer,
+			Audience:  jwt.ClaimStrings{testJWTAudience},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 		}
 		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(testJWTKey)
 		if err != nil {

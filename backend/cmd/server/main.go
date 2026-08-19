@@ -140,10 +140,8 @@ func main() {
 	ctx := context.Background()
 
 	cfg := Config{
-		Version: conf.Version{
-			Build: appVersion,
-			Desc:  "The app",
-		},
+		Build: appVersion,
+		Desc:  "The app",
 	}
 	if help, err := conf.Parse(strings.ToUpper(appName), &cfg); err != nil {
 		if errors.Is(err, conf.ErrHelpWanted) {

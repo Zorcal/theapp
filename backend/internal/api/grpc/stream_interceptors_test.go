@@ -513,12 +513,10 @@ func TestOrganizationControlProjectStreamInterceptor_error(t *testing.T) {
 func validStreamAuthCtx(t *testing.T) context.Context {
 	t.Helper()
 	claims := mdl.AuthClaims{
-		UserID: uuid.New(),
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    testJWTIssuer,
-			Audience:  jwt.ClaimStrings{testJWTAudience},
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-		},
+		UserID:    uuid.New(),
+		Issuer:    testJWTIssuer,
+		Audience:  jwt.ClaimStrings{testJWTAudience},
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 	}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(testJWTKey)
 	if err != nil {

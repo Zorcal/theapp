@@ -401,14 +401,12 @@ func (c *Core) issueTokenPair(ctx context.Context, userID int, userExternalID uu
 	now := time.Now()
 
 	claims := mdl.AuthClaims{
-		UserID: userExternalID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    c.cfg.JWTIssuer,
-			Audience:  jwt.ClaimStrings{c.cfg.JWTAudience},
-			Subject:   userExternalID.String(),
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(c.cfg.AccessTokenTTL)),
-		},
+		UserID:    userExternalID,
+		Issuer:    c.cfg.JWTIssuer,
+		Audience:  jwt.ClaimStrings{c.cfg.JWTAudience},
+		Subject:   userExternalID.String(),
+		IssuedAt:  jwt.NewNumericDate(now),
+		ExpiresAt: jwt.NewNumericDate(now.Add(c.cfg.AccessTokenTTL)),
 	}
 
 	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(c.cfg.JWTKey)

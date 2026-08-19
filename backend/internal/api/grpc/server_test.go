@@ -232,14 +232,12 @@ func authCtxForUserAtProject(t *testing.T, ctx context.Context, userID uuid.UUID
 	t.Helper()
 	ctx = metadata.AppendToOutgoingContext(ctx, "x-project-id", strconv.Itoa(projectID))
 	return authCtxWithClaims(t, ctx, mdl.AuthClaims{
-		UserID: userID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    testJWTIssuer,
-			Audience:  jwt.ClaimStrings{testJWTAudience},
-			Subject:   userID.String(),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-		},
+		UserID:    userID,
+		Issuer:    testJWTIssuer,
+		Audience:  jwt.ClaimStrings{testJWTAudience},
+		Subject:   userID.String(),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 	}, testJWTKey)
 }
 
