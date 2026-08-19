@@ -7,10 +7,10 @@ import (
 	"slices"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/google/uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
@@ -55,10 +55,10 @@ func TestStore_CreateCustomRole(t *testing.T) {
 	if got.ID == 0 {
 		t.Error("CreateCustomRole() ID = 0, want non-zero")
 	}
-	if got.ExternalID == uuid.Nil {
+	if got.ExternalID == uuid.Nil() {
 		t.Error("CreateCustomRole() ExternalID = zero UUID, want non-zero")
 	}
-	if got.ETag == uuid.Nil {
+	if got.ETag == uuid.Nil() {
 		t.Error("CreateCustomRole() ETag = zero UUID, want non-zero")
 	}
 }
@@ -167,10 +167,10 @@ func TestStore_CreateOrganizationAdminRole(t *testing.T) {
 	if got.ID == 0 {
 		t.Error("CreateOrganizationAdminRole() ID = 0, want non-zero")
 	}
-	if got.ExternalID == uuid.Nil {
+	if got.ExternalID == uuid.Nil() {
 		t.Error("CreateOrganizationAdminRole() ExternalID = zero UUID, want non-zero")
 	}
-	if got.ETag == uuid.Nil {
+	if got.ETag == uuid.Nil() {
 		t.Error("CreateOrganizationAdminRole() ETag = zero UUID, want non-zero")
 	}
 }

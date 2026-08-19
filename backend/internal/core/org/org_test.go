@@ -6,10 +6,10 @@ import (
 	"errors"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
@@ -126,7 +126,7 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 	if createdProject.ID == 0 {
 		t.Error("CreateProject() ID = 0, want non-zero")
 	}
-	if createdProject.ETag == uuid.Nil {
+	if createdProject.ETag == uuid.Nil() {
 		t.Error("CreateProject() ETag is nil, want non-nil")
 	}
 
@@ -157,7 +157,7 @@ func TestCore_integration_organizationLifecycle(t *testing.T) {
 	if fetchedDefaultProject.ID == 0 {
 		t.Errorf("ProjectByName(%d, %q) ID = 0, want non-zero", createdOrg.ID, "acme")
 	}
-	if fetchedDefaultProject.ETag == uuid.Nil {
+	if fetchedDefaultProject.ETag == uuid.Nil() {
 		t.Errorf("ProjectByName(%d, %q) ETag is nil, want non-nil", createdOrg.ID, "acme")
 	}
 

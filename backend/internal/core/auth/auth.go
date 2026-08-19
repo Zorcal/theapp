@@ -13,9 +13,9 @@ import (
 	"io"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
@@ -28,7 +28,7 @@ type Transactor interface {
 	RunTx(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-//go:generate moq -rm -fmt goimports -out auth_storer_moq_test.go . AuthStorer:MockedAuthStorer
+//go:generate go tool moq -rm -fmt goimports -out auth_storer_moq_test.go . AuthStorer:MockedAuthStorer
 
 // AuthStorer defines the auth-token database operations required by Core.
 type AuthStorer interface {
@@ -59,7 +59,7 @@ type AuthStorer interface {
 	RevokeAllUserRefreshTokens(ctx context.Context, userExternalID uuid.UUID) error
 }
 
-//go:generate moq -rm -fmt goimports -out user_storer_moq_test.go . UserStorer:MockedUserStorer
+//go:generate go tool moq -rm -fmt goimports -out user_storer_moq_test.go . UserStorer:MockedUserStorer
 
 // UserStorer defines the user database operations required by Core.
 type UserStorer interface {
@@ -71,7 +71,7 @@ type UserStorer interface {
 	MarkEmailVerified(ctx context.Context, externalID uuid.UUID) error
 }
 
-//go:generate moq -rm -fmt goimports -out permission_storer_moq_test.go . PermissionStorer:MockedPermissionStorer
+//go:generate go tool moq -rm -fmt goimports -out permission_storer_moq_test.go . PermissionStorer:MockedPermissionStorer
 
 // PermissionStorer defines the permission database operations required by Core.
 type PermissionStorer interface {

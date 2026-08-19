@@ -2,8 +2,7 @@ package pguser
 
 import (
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // OrderByField represents a field that user query results can be ordered by.

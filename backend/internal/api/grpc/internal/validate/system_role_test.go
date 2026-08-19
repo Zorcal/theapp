@@ -2,8 +2,8 @@ package validate
 
 import (
 	"testing"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"
@@ -33,7 +33,7 @@ func TestListSystemRoles_error(t *testing.T) {
 
 func TestAssignSystemRole(t *testing.T) {
 	err := AssignSystemRole(&pb.AssignSystemRoleRequest{
-		UserId:   uuid.NewString(),
+		UserId:   uuid.New().String(),
 		RoleName: "admin",
 	})
 	if err != nil {
@@ -53,7 +53,7 @@ func TestAssignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "missing role name",
-			in:   &pb.AssignSystemRoleRequest{UserId: uuid.NewString()},
+			in:   &pb.AssignSystemRoleRequest{UserId: uuid.New().String()},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "role_name", description: "required"}),
 		},
 		{
@@ -70,7 +70,7 @@ func TestAssignSystemRole_error(t *testing.T) {
 
 func TestUnassignSystemRole(t *testing.T) {
 	err := UnassignSystemRole(&pb.UnassignSystemRoleRequest{
-		UserId:   uuid.NewString(),
+		UserId:   uuid.New().String(),
 		RoleName: "admin",
 	})
 	if err != nil {
@@ -90,7 +90,7 @@ func TestUnassignSystemRole_error(t *testing.T) {
 		},
 		{
 			name: "missing role name",
-			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString()},
+			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.New().String()},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{field: "role_name", description: "required"}),
 		},
 		{
@@ -106,7 +106,7 @@ func TestUnassignSystemRole_error(t *testing.T) {
 }
 
 func TestListSystemRoleAssignments(t *testing.T) {
-	err := ListSystemRoleAssignments(&pb.ListSystemRoleAssignmentsRequest{UserId: uuid.NewString()})
+	err := ListSystemRoleAssignments(&pb.ListSystemRoleAssignmentsRequest{UserId: uuid.New().String()})
 	if err != nil {
 		t.Errorf("ListSystemRoleAssignments() error = %v, want nil", err)
 	}
@@ -127,7 +127,7 @@ func TestListSystemRoleAssignments_error(t *testing.T) {
 		{
 			name: "invalid page token",
 			in: &pb.ListSystemRoleAssignmentsRequest{
-				UserId:    uuid.NewString(),
+				UserId:    uuid.New().String(),
 				PageToken: "bad",
 			},
 			want: wantInvalidArgument("invalid page_token"),

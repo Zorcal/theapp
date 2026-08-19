@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -23,7 +23,7 @@ type authService struct {
 	workflowAuthCore WorkflowAuthCore
 }
 
-//go:generate moq -rm -fmt goimports -out auth_core_moq_test.go . AuthCore:MockedAuthCore
+//go:generate go tool moq -rm -fmt goimports -out auth_core_moq_test.go . AuthCore:MockedAuthCore
 
 // AuthCore handles direct, non-durable auth operations.
 // Implemented by *core/auth.Core.
@@ -56,7 +56,7 @@ type AuthCore interface {
 	AuthContext(ctx context.Context) (mdl.AuthContext, error)
 }
 
-//go:generate moq -rm -fmt goimports -out workflow_auth_core_moq_test.go . WorkflowAuthCore:MockedWorkflowAuthCore
+//go:generate go tool moq -rm -fmt goimports -out workflow_auth_core_moq_test.go . WorkflowAuthCore:MockedWorkflowAuthCore
 
 // WorkflowAuthCore handles durable auth operations backed by DBOS.
 // Implemented by *workflows/auth.WorkflowCore.

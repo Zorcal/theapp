@@ -1,7 +1,8 @@
 package validate
 
 import (
-	"github.com/google/uuid"
+	"uuid"
+
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"

@@ -2,8 +2,8 @@ package validate
 
 import (
 	"testing"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
@@ -79,7 +79,7 @@ func TestCreateRole_error(t *testing.T) {
 }
 
 func TestGetRole(t *testing.T) {
-	if err := GetRole(&pb.GetRoleRequest{Id: uuid.NewString()}); err != nil {
+	if err := GetRole(&pb.GetRoleRequest{Id: uuid.New().String()}); err != nil {
 		t.Errorf("GetRole() error = %v, want nil", err)
 	}
 }
@@ -115,7 +115,7 @@ func TestListRoles_error(t *testing.T) {
 }
 
 func TestListProjectRoleAssignments(t *testing.T) {
-	if err := ListProjectRoleAssignments(&pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString()}); err != nil {
+	if err := ListProjectRoleAssignments(&pb.ListProjectRoleAssignmentsRequest{UserId: uuid.New().String()}); err != nil {
 		t.Errorf("ListProjectRoleAssignments() error = %v, want nil", err)
 	}
 }
@@ -134,7 +134,7 @@ func TestListProjectRoleAssignments_error(t *testing.T) {
 		},
 		{
 			name: "invalid page token",
-			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString(), PageToken: "bad"},
+			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.New().String(), PageToken: "bad"},
 			want: wantInvalidArgument("invalid page_token"),
 		},
 	}
@@ -142,7 +142,7 @@ func TestListProjectRoleAssignments_error(t *testing.T) {
 }
 
 func TestListOrganizationRoleAssignments(t *testing.T) {
-	if err := ListOrganizationRoleAssignments(&pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString()}); err != nil {
+	if err := ListOrganizationRoleAssignments(&pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.New().String()}); err != nil {
 		t.Errorf("ListOrganizationRoleAssignments() error = %v, want nil", err)
 	}
 }
@@ -161,7 +161,7 @@ func TestListOrganizationRoleAssignments_error(t *testing.T) {
 		},
 		{
 			name: "invalid page token",
-			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString(), PageToken: "bad"},
+			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.New().String(), PageToken: "bad"},
 			want: wantInvalidArgument("invalid page_token"),
 		},
 	}
@@ -170,7 +170,7 @@ func TestListOrganizationRoleAssignments_error(t *testing.T) {
 
 func TestUpdateRole(t *testing.T) {
 	err := UpdateRole(&pb.UpdateRoleRequest{
-		Role:       &pb.Role{Id: uuid.NewString(), Name: "role manager", Etag: uuid.NewString()},
+		Role:       &pb.Role{Id: uuid.New().String(), Name: "role manager", Etag: uuid.New().String()},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 	})
 	if err != nil {
@@ -179,8 +179,8 @@ func TestUpdateRole(t *testing.T) {
 }
 
 func TestUpdateRole_error(t *testing.T) {
-	roleID := uuid.NewString()
-	etag := uuid.NewString()
+	roleID := uuid.New().String()
+	etag := uuid.New().String()
 
 	tests := []validationTest[*pb.UpdateRoleRequest]{
 		{
@@ -261,13 +261,13 @@ func TestUpdateRole_error(t *testing.T) {
 }
 
 func TestModifyRolePermissions(t *testing.T) {
-	if err := ModifyRolePermissions(&pb.ModifyRolePermissionsRequest{Id: uuid.NewString(), Etag: uuid.NewString()}); err != nil {
+	if err := ModifyRolePermissions(&pb.ModifyRolePermissionsRequest{Id: uuid.New().String(), Etag: uuid.New().String()}); err != nil {
 		t.Errorf("ModifyRolePermissions() error = %v, want nil", err)
 	}
 }
 
 func TestModifyRolePermissions_error(t *testing.T) {
-	roleID := uuid.NewString()
+	roleID := uuid.New().String()
 
 	tests := []validationTest[*pb.ModifyRolePermissionsRequest]{
 		{
@@ -284,7 +284,7 @@ func TestModifyRolePermissions_error(t *testing.T) {
 			name: "overlapping permission",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:                roleID,
-				Etag:              uuid.NewString(),
+				Etag:              uuid.New().String(),
 				AddPermissions:    []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 				RemovePermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_READ},
 			},
@@ -297,7 +297,7 @@ func TestModifyRolePermissions_error(t *testing.T) {
 			name: "system-only permission addition",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:             roleID,
-				Etag:           uuid.NewString(),
+				Etag:           uuid.New().String(),
 				AddPermissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -309,7 +309,7 @@ func TestModifyRolePermissions_error(t *testing.T) {
 			name: "system-only permission removal",
 			in: &pb.ModifyRolePermissionsRequest{
 				Id:                roleID,
-				Etag:              uuid.NewString(),
+				Etag:              uuid.New().String(),
 				RemovePermissions: []pb.Permission{pb.Permission_PERMISSION_USER_READ},
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -322,7 +322,7 @@ func TestModifyRolePermissions_error(t *testing.T) {
 }
 
 func TestDeleteRole(t *testing.T) {
-	if err := DeleteRole(&pb.DeleteRoleRequest{Id: uuid.NewString()}); err != nil {
+	if err := DeleteRole(&pb.DeleteRoleRequest{Id: uuid.New().String()}); err != nil {
 		t.Errorf("DeleteRole() error = %v, want nil", err)
 	}
 }
@@ -337,8 +337,8 @@ func TestDeleteRole_error(t *testing.T) {
 
 func TestAssignRoleToProject(t *testing.T) {
 	if err := AssignRoleToProject(&pb.AssignRoleToProjectRequest{
-		RoleId: uuid.NewString(),
-		UserId: uuid.NewString(),
+		RoleId: uuid.New().String(),
+		UserId: uuid.New().String(),
 	}); err != nil {
 		t.Errorf("AssignRoleToProject() error = %v, want nil", err)
 	}
@@ -359,7 +359,7 @@ func TestAssignRoleToProject_error(t *testing.T) {
 			name: "invalid role id",
 			in: &pb.AssignRoleToProjectRequest{
 				RoleId: "bad",
-				UserId: uuid.NewString(),
+				UserId: uuid.New().String(),
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "role_id",
@@ -369,7 +369,7 @@ func TestAssignRoleToProject_error(t *testing.T) {
 		{
 			name: "invalid user id",
 			in: &pb.AssignRoleToProjectRequest{
-				RoleId: uuid.NewString(),
+				RoleId: uuid.New().String(),
 				UserId: "bad",
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -395,8 +395,8 @@ func TestAssignRoleToProject_error(t *testing.T) {
 
 func TestUnassignRoleFromProject(t *testing.T) {
 	if err := UnassignRoleFromProject(&pb.UnassignRoleFromProjectRequest{
-		RoleId: uuid.NewString(),
-		UserId: uuid.NewString(),
+		RoleId: uuid.New().String(),
+		UserId: uuid.New().String(),
 	}); err != nil {
 		t.Errorf("UnassignRoleFromProject() error = %v, want nil", err)
 	}
@@ -417,7 +417,7 @@ func TestUnassignRoleFromProject_error(t *testing.T) {
 			name: "invalid role id",
 			in: &pb.UnassignRoleFromProjectRequest{
 				RoleId: "bad",
-				UserId: uuid.NewString(),
+				UserId: uuid.New().String(),
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "role_id",
@@ -427,7 +427,7 @@ func TestUnassignRoleFromProject_error(t *testing.T) {
 		{
 			name: "invalid user id",
 			in: &pb.UnassignRoleFromProjectRequest{
-				RoleId: uuid.NewString(),
+				RoleId: uuid.New().String(),
 				UserId: "bad",
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -453,8 +453,8 @@ func TestUnassignRoleFromProject_error(t *testing.T) {
 
 func TestAssignRoleToOrganization(t *testing.T) {
 	if err := AssignRoleToOrganization(&pb.AssignRoleToOrganizationRequest{
-		RoleId: uuid.NewString(),
-		UserId: uuid.NewString(),
+		RoleId: uuid.New().String(),
+		UserId: uuid.New().String(),
 	}); err != nil {
 		t.Errorf("AssignRoleToOrganization() error = %v, want nil", err)
 	}
@@ -475,7 +475,7 @@ func TestAssignRoleToOrganization_error(t *testing.T) {
 			name: "invalid role id",
 			in: &pb.AssignRoleToOrganizationRequest{
 				RoleId: "bad",
-				UserId: uuid.NewString(),
+				UserId: uuid.New().String(),
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "role_id",
@@ -485,7 +485,7 @@ func TestAssignRoleToOrganization_error(t *testing.T) {
 		{
 			name: "invalid user id",
 			in: &pb.AssignRoleToOrganizationRequest{
-				RoleId: uuid.NewString(),
+				RoleId: uuid.New().String(),
 				UserId: "bad",
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
@@ -511,8 +511,8 @@ func TestAssignRoleToOrganization_error(t *testing.T) {
 
 func TestUnassignRoleFromOrganization(t *testing.T) {
 	if err := UnassignRoleFromOrganization(&pb.UnassignRoleFromOrganizationRequest{
-		RoleId: uuid.NewString(),
-		UserId: uuid.NewString(),
+		RoleId: uuid.New().String(),
+		UserId: uuid.New().String(),
 	}); err != nil {
 		t.Errorf("UnassignRoleFromOrganization() error = %v, want nil", err)
 	}
@@ -533,7 +533,7 @@ func TestUnassignRoleFromOrganization_error(t *testing.T) {
 			name: "invalid role id",
 			in: &pb.UnassignRoleFromOrganizationRequest{
 				RoleId: "bad",
-				UserId: uuid.NewString(),
+				UserId: uuid.New().String(),
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{
 				field:       "role_id",
@@ -543,7 +543,7 @@ func TestUnassignRoleFromOrganization_error(t *testing.T) {
 		{
 			name: "invalid user id",
 			in: &pb.UnassignRoleFromOrganizationRequest{
-				RoleId: uuid.NewString(),
+				RoleId: uuid.New().String(),
 				UserId: "bad",
 			},
 			want: wantInvalidArgument(codes.InvalidArgument.String(), violation{

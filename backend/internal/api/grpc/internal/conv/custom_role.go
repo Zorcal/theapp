@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/zorcal/theapp/backend/internal/api/grpc/internal/pb"

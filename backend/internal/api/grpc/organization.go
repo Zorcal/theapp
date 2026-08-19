@@ -21,7 +21,7 @@ type organizationService struct {
 	orgCore OrganizationCore
 }
 
-//go:generate moq -rm -fmt goimports -out organization_core_moq_test.go . OrganizationCore:MockedOrganizationCore
+//go:generate go tool moq -rm -fmt goimports -out organization_core_moq_test.go . OrganizationCore:MockedOrganizationCore
 
 type OrganizationCore interface {
 	// CreateOrganization creates an organization with its control and default projects and

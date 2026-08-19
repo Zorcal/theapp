@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,7 +24,7 @@ type userService struct {
 	userCore UserCore
 }
 
-//go:generate moq -rm -fmt goimports -out user_core_moq_test.go . UserCore:MockedUserCore
+//go:generate go tool moq -rm -fmt goimports -out user_core_moq_test.go . UserCore:MockedUserCore
 
 type UserCore interface {
 	// UserByID returns the user with the given ID.

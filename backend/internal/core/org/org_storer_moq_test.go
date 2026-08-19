@@ -6,8 +6,8 @@ package org
 import (
 	"context"
 	"sync"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"

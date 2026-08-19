@@ -6,9 +6,9 @@ import (
 	"errors"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
@@ -65,7 +65,7 @@ func TestStore_CreateOrganization(t *testing.T) {
 	if control.ID != got.ControlProjectID {
 		t.Errorf("control project ID = %d, want %d (Organization.ControlProjectID)", control.ID, got.ControlProjectID)
 	}
-	if control.ETag == uuid.Nil {
+	if control.ETag == uuid.Nil() {
 		t.Error("control project ETag is nil, want non-nil")
 	}
 }
@@ -111,7 +111,7 @@ func TestStore_CreateProject(t *testing.T) {
 	if got.ID == 0 {
 		t.Error("CreateProject() ID = 0, want non-zero")
 	}
-	if got.ETag == uuid.Nil {
+	if got.ETag == uuid.Nil() {
 		t.Error("CreateProject() ETag is nil, want non-nil")
 	}
 }

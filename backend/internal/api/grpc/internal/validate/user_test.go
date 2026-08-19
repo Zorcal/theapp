@@ -2,8 +2,8 @@ package validate
 
 import (
 	"testing"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
@@ -12,7 +12,7 @@ import (
 )
 
 func TestGetUser(t *testing.T) {
-	if err := GetUser(&pb.GetUserRequest{Id: uuid.NewString()}); err != nil {
+	if err := GetUser(&pb.GetUserRequest{Id: uuid.New().String()}); err != nil {
 		t.Errorf("GetUser() error = %v, want nil", err)
 	}
 }
@@ -71,7 +71,7 @@ func TestCreateUser_error(t *testing.T) {
 
 func TestUpdateUser(t *testing.T) {
 	err := UpdateUser(&pb.UpdateUserRequest{
-		User:       &pb.User{Id: uuid.NewString(), Name: "Alice", Etag: uuid.NewString()},
+		User:       &pb.User{Id: uuid.New().String(), Name: "Alice", Etag: uuid.New().String()},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 	})
 	if err != nil {
@@ -80,8 +80,8 @@ func TestUpdateUser(t *testing.T) {
 }
 
 func TestUpdateUser_error(t *testing.T) {
-	userID := uuid.NewString()
-	etag := uuid.NewString()
+	userID := uuid.New().String()
+	etag := uuid.New().String()
 
 	tests := []validationTest[*pb.UpdateUserRequest]{
 		{

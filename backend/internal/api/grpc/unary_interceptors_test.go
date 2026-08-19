@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -139,7 +139,7 @@ func TestScopedWorkflowID_deterministic(t *testing.T) {
 	ctx := mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: uuid.New()}})
 	method := "/theapp.v1.AuthService/RequestMagicLink"
 	payload := []byte("payload")
-	key := uuid.NewString()
+	key := uuid.New().String()
 
 	got1, err := scopedWorkflowID(ctx, method, payload, key)
 	if err != nil {
@@ -157,7 +157,7 @@ func TestScopedWorkflowID_scoping(t *testing.T) {
 	baseUserID := uuid.New()
 	baseMethod := "/theapp.v1.AuthService/RequestMagicLink"
 	basePayload := []byte("payload-a")
-	baseKey := uuid.NewString()
+	baseKey := uuid.New().String()
 
 	base, err := scopedWorkflowID(mdl.ContextWithAuthSession(t.Context(), mdl.AuthSession{User: mdl.AuthUser{UserID: baseUserID}}), baseMethod, basePayload, baseKey)
 	if err != nil {
@@ -205,7 +205,7 @@ func TestScopedWorkflowID_scoping(t *testing.T) {
 			userID:  baseUserID,
 			method:  baseMethod,
 			payload: basePayload,
-			key:     uuid.NewString(),
+			key:     uuid.New().String(),
 		},
 	}
 	for _, tt := range tests {
@@ -232,7 +232,7 @@ func TestIdempotencyUnaryInterceptor(t *testing.T) {
 		gotWorkflowID = workflows.WorkflowID(ctx)
 		return &pb.RequestMagicLinkRequest{}, nil
 	}
-	key := uuid.NewString()
+	key := uuid.New().String()
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("x-idempotency-key", key))
 
 	if _, err := idempotencyUnaryInterceptor()(ctx, &pb.RequestMagicLinkRequest{Email: "alice@test.com"}, &grpc.UnaryServerInfo{
@@ -353,8 +353,8 @@ func TestProjectScopedAuthorization(t *testing.T) {
 	})
 
 	if _, err := srvTest.customRoleServiceClient.AssignRoleToProject(authCtxForTestUser(t, t.Context()), &pb.AssignRoleToProjectRequest{
-		RoleId: uuid.NewString(),
-		UserId: uuid.NewString(),
+		RoleId: uuid.New().String(),
+		UserId: uuid.New().String(),
 	}); err != nil {
 		t.Fatalf("AssignRoleToProject() error = %v", err)
 	}
@@ -384,8 +384,8 @@ func TestOrganizationScopedAuthorization(t *testing.T) {
 	})
 
 	if _, err := srvTest.customRoleServiceClient.AssignRoleToOrganization(authCtxForTestUser(t, t.Context()), &pb.AssignRoleToOrganizationRequest{
-		RoleId: uuid.NewString(),
-		UserId: uuid.NewString(),
+		RoleId: uuid.New().String(),
+		UserId: uuid.New().String(),
 	}); err != nil {
 		t.Fatalf("AssignRoleToOrganization() error = %v", err)
 	}

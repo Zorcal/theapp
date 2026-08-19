@@ -6,8 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/auth"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
@@ -89,7 +88,7 @@ func TestWorkflowCore_RequestMagicLink_resume(t *testing.T) {
 	RegisterWorkflows(dbosCtx, wc)
 	dbostest.Launch(t, dbosCtx)
 
-	idCtx := workflows.WithWorkflowID(ctx, uuid.NewString())
+	idCtx := workflows.WithWorkflowID(ctx, uuid.New().String())
 
 	if err := wc.RequestMagicLink(idCtx, "alice@test.com"); err != nil {
 		t.Fatalf("RequestMagicLink() #1 error = %v, want nil", err)

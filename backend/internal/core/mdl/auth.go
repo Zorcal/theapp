@@ -3,9 +3,9 @@ package mdl
 import (
 	"context"
 	"time"
+	"uuid"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 // AuthClaims represents the authorization claims transmitted via a JWT.

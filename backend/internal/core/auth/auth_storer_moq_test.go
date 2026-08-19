@@ -7,8 +7,8 @@ import (
 	"context"
 	"sync"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgauth"
 )
 

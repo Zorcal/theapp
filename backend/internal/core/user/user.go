@@ -7,8 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
@@ -16,7 +15,7 @@ import (
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )
 
-//go:generate moq -rm -fmt goimports -out user_storer_moq_test.go . UserStorer:MockedUserStorer
+//go:generate go tool moq -rm -fmt goimports -out user_storer_moq_test.go . UserStorer:MockedUserStorer
 
 // UserStorer defines the database operations the Core requires.
 type UserStorer interface {

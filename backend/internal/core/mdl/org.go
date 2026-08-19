@@ -2,8 +2,7 @@ package mdl
 
 import (
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // SystemOrgName is the name of the well-known organization that anchors system administration.

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"uuid"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -251,7 +251,7 @@ func TestSystemRoleService_AssignSystemRole(t *testing.T) {
 
 	got, err := srvTest.systemRoleServiceClient.AssignSystemRole(
 		authCtxForTestUser(t, t.Context()),
-		&pb.AssignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+		&pb.AssignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 	)
 	if err != nil {
 		t.Fatalf("AssignSystemRole() error = %v, want no error", err)
@@ -282,7 +282,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 					return mdl.ErrNotFound
 				},
 			},
-			in:   &pb.AssignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			in:   &pb.AssignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 			want: status.New(codes.NotFound, "user or system role not found"),
 		},
 		{
@@ -292,7 +292,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 					return mdl.ErrPermissionDenied
 				},
 			},
-			in:   &pb.AssignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			in:   &pb.AssignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 			want: status.New(codes.PermissionDenied, codes.PermissionDenied.String()),
 		},
 		{
@@ -302,7 +302,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 					return mdl.ErrAlreadyExists
 				},
 			},
-			in:   &pb.AssignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			in:   &pb.AssignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 			want: status.New(codes.AlreadyExists, "user already has system role"),
 		},
 		{
@@ -312,7 +312,7 @@ func TestSystemRoleService_AssignSystemRole_error(t *testing.T) {
 					return errors.New("boom")
 				},
 			},
-			in:   &pb.AssignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			in:   &pb.AssignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}
@@ -350,7 +350,7 @@ func TestSystemRoleService_UnassignSystemRole(t *testing.T) {
 
 	got, err := srvTest.systemRoleServiceClient.UnassignSystemRole(
 		authCtxForTestUser(t, t.Context()),
-		&pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+		&pb.UnassignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 	)
 	if err != nil {
 		t.Fatalf("UnassignSystemRole() error = %v, want no error", err)
@@ -381,7 +381,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return mdl.ErrNotFound
 				},
 			},
-			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 			want: status.New(codes.NotFound, "system role assignment not found"),
 		},
 		{
@@ -391,7 +391,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return mdl.ErrPermissionDenied
 				},
 			},
-			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 			want: status.New(codes.PermissionDenied, codes.PermissionDenied.String()),
 		},
 		{
@@ -401,7 +401,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return mdl.ErrLastFullyPrivilegedSystemAdmin
 				},
 			},
-			in: &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			in: &pb.UnassignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 			want: mustErrorStatus(t, codes.FailedPrecondition,
 				pb.ErrorCode_ERROR_CODE_LAST_FULLY_PRIVILEGED_SYSTEM_ADMIN,
 				"cannot remove the last fully privileged system administrator"),
@@ -413,7 +413,7 @@ func TestSystemRoleService_UnassignSystemRole_error(t *testing.T) {
 					return errors.New("boom")
 				},
 			},
-			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.NewString(), RoleName: "whatever"},
+			in:   &pb.UnassignSystemRoleRequest{UserId: uuid.New().String(), RoleName: "whatever"},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}
@@ -458,7 +458,7 @@ func TestSystemRoleService_ListSystemRoleAssignments(t *testing.T) {
 
 	got, err := srvTest.systemRoleServiceClient.ListSystemRoleAssignments(
 		authCtxForTestUser(t, t.Context()),
-		&pb.ListSystemRoleAssignmentsRequest{UserId: uuid.NewString()},
+		&pb.ListSystemRoleAssignmentsRequest{UserId: uuid.New().String()},
 	)
 	if err != nil {
 		t.Fatalf("ListSystemRoleAssignments() error = %v, want no error", err)
@@ -505,7 +505,7 @@ func TestSystemRoleService_ListSystemRoleAssignments_error(t *testing.T) {
 					return nil, 0, errors.New("boom")
 				},
 			},
-			in:   &pb.ListSystemRoleAssignmentsRequest{UserId: uuid.NewString()},
+			in:   &pb.ListSystemRoleAssignmentsRequest{UserId: uuid.New().String()},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}

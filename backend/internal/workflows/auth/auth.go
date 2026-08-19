@@ -32,7 +32,7 @@ type magicLinkTemplateData struct {
 	TTL  string
 }
 
-//go:generate moq -rm -fmt goimports -out authcore_moq_test.go . AuthCore:MockedAuthCore
+//go:generate go tool moq -rm -fmt goimports -out authcore_moq_test.go . AuthCore:MockedAuthCore
 
 // AuthCore is the subset of non-durable auth operations WorkflowCore depends on.
 // Implemented by *core/auth.Core.

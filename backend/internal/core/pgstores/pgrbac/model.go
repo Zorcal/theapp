@@ -2,8 +2,7 @@ package pgrbac
 
 import (
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // CustomRole is an organization-owned role and the permissions currently granted to it.

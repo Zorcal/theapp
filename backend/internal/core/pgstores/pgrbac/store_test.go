@@ -6,8 +6,8 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"

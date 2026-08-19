@@ -3,13 +3,12 @@ package rbac
 
 import (
 	"context"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgrbac"
 )
 
-//go:generate moq -rm -fmt goimports -out role_storer_moq_test.go . RoleStorer:MockedRoleStorer
+//go:generate go tool moq -rm -fmt goimports -out role_storer_moq_test.go . RoleStorer:MockedRoleStorer
 
 // RoleStorer defines the database operations the Core requires.
 type RoleStorer interface {

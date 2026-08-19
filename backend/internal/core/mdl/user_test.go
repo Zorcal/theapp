@@ -3,8 +3,7 @@ package mdl
 import (
 	"errors"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func TestCreateUser_Validate(t *testing.T) {

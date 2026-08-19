@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,7 +24,7 @@ type customRoleService struct {
 	customRoleCore CustomRoleCore
 }
 
-//go:generate moq -rm -fmt goimports -out custom_role_core_moq_test.go . CustomRoleCore:MockedCustomRoleCore
+//go:generate go tool moq -rm -fmt goimports -out custom_role_core_moq_test.go . CustomRoleCore:MockedCustomRoleCore
 
 type CustomRoleCore interface {
 	// CustomRoles returns a page of custom roles owned by the caller's organization.

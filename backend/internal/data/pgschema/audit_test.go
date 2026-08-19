@@ -3,8 +3,8 @@ package pgschema_test
 import (
 	"context"
 	"testing"
+	"uuid"
 
-	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"

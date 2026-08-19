@@ -3,8 +3,7 @@ package pgrbac
 import (
 	"context"
 	"fmt"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"
 )

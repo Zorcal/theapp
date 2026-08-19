@@ -1,7 +1,8 @@
 package pgrbac
 
 import (
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/zorcal/theapp/backend/internal/data/pgdb"

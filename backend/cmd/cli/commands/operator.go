@@ -4,8 +4,8 @@ package commands
 import (
 	"context"
 	"fmt"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/urfave/cli/v3"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"

@@ -2,8 +2,7 @@ package pgorg
 
 import (
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Organization represents an organization in the database.

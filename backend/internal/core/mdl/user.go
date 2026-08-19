@@ -2,8 +2,7 @@ package mdl
 
 import (
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // User represents a user in the system.
@@ -47,7 +46,7 @@ type UpdateUser struct {
 }
 
 func (uu UpdateUser) Validate() error {
-	if uu.ETag == uuid.Nil {
+	if uu.ETag == uuid.Nil() {
 		return validationError("etag invalid")
 	}
 	if uu.Fields.Name && uu.Name == "" {

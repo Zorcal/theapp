@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -118,7 +118,7 @@ func setLocalSettings(ctx context.Context, tx pgx.Tx) error {
 		if sess.Project != nil {
 			add("app.project_id", strconv.Itoa(sess.Project.ID))
 		}
-		if sess.User.UserID != uuid.Nil {
+		if sess.User.UserID != uuid.Nil() {
 			add("app.user_id", sess.User.UserID.String())
 		}
 	}

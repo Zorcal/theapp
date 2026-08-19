@@ -3,8 +3,7 @@ package pgauth
 
 import (
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // MagicLinkToken is a row from magic_link_tokens joined with the owning user's external_id.

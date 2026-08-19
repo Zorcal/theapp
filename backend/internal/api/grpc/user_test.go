@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -91,8 +91,8 @@ func TestUserService_GetUser_error(t *testing.T) {
 					return mdl.User{}, mdl.ErrNotFound
 				},
 			},
-			in:   &pb.GetUserRequest{Id: uuid.NewString()},
-			want: status.New(codes.NotFound, "user \""+uuid.Nil.String()+"\" not found"),
+			in:   &pb.GetUserRequest{Id: uuid.New().String()},
+			want: status.New(codes.NotFound, "user \""+uuid.Nil().String()+"\" not found"),
 		},
 		{
 			name: "core error",
@@ -101,7 +101,7 @@ func TestUserService_GetUser_error(t *testing.T) {
 					return mdl.User{}, errors.New("boom")
 				},
 			},
-			in:   &pb.GetUserRequest{Id: uuid.NewString()},
+			in:   &pb.GetUserRequest{Id: uuid.New().String()},
 			want: status.New(codes.Internal, "Internal"),
 		},
 	}
@@ -338,13 +338,13 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 			},
 			in: &pb.UpdateUserRequest{
 				User: &pb.User{
-					Id:   uuid.NewString(),
+					Id:   uuid.New().String(),
 					Name: "Alice Updated",
-					Etag: uuid.NewString(),
+					Etag: uuid.New().String(),
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
-			want: status.New(codes.NotFound, "user \""+uuid.Nil.String()+"\" not found"),
+			want: status.New(codes.NotFound, "user \""+uuid.Nil().String()+"\" not found"),
 		},
 		{
 			name: "etag mismatch",
@@ -355,9 +355,9 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 			},
 			in: &pb.UpdateUserRequest{
 				User: &pb.User{
-					Id:   uuid.NewString(),
+					Id:   uuid.New().String(),
 					Name: "Alice Updated",
-					Etag: uuid.NewString(),
+					Etag: uuid.New().String(),
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},
@@ -373,9 +373,9 @@ func TestUserService_UpdateUser_error(t *testing.T) {
 			},
 			in: &pb.UpdateUserRequest{
 				User: &pb.User{
-					Id:   uuid.NewString(),
+					Id:   uuid.New().String(),
 					Name: "Alice Updated",
-					Etag: uuid.NewString(),
+					Etag: uuid.New().String(),
 				},
 				UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"name"}},
 			},

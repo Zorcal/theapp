@@ -6,8 +6,8 @@ package auth
 import (
 	"context"
 	"sync"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 )
 

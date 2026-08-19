@@ -6,9 +6,9 @@ import (
 	"slices"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -767,7 +767,7 @@ func TestRoleService_ListProjectRoleAssignments(t *testing.T) {
 
 	got, err := srvTest.customRoleServiceClient.ListProjectRoleAssignments(
 		authCtxForTestUser(t, t.Context()),
-		&pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString(), PageSize: 1},
+		&pb.ListProjectRoleAssignmentsRequest{UserId: uuid.New().String(), PageSize: 1},
 	)
 	if err != nil {
 		t.Fatalf("ListProjectRoleAssignments() error = %v", err)
@@ -813,7 +813,7 @@ func TestRoleService_ListProjectRoleAssignments_error(t *testing.T) {
 					return nil, 0, mdl.ErrNotFound
 				},
 			},
-			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString()},
+			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.New().String()},
 			want: status.New(codes.NotFound, "user, project, or organization membership not found"),
 		},
 		{
@@ -823,7 +823,7 @@ func TestRoleService_ListProjectRoleAssignments_error(t *testing.T) {
 					return nil, 0, errors.New("boom")
 				},
 			},
-			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.NewString()},
+			in:   &pb.ListProjectRoleAssignmentsRequest{UserId: uuid.New().String()},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}
@@ -864,7 +864,7 @@ func TestRoleService_ListOrganizationRoleAssignments(t *testing.T) {
 
 	got, err := srvTest.customRoleServiceClient.ListOrganizationRoleAssignments(
 		authCtxForTestUser(t, t.Context()),
-		&pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString(), PageSize: 1},
+		&pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.New().String(), PageSize: 1},
 	)
 	if err != nil {
 		t.Fatalf("ListOrganizationRoleAssignments() error = %v", err)
@@ -910,7 +910,7 @@ func TestRoleService_ListOrganizationRoleAssignments_error(t *testing.T) {
 					return nil, 0, mdl.ErrNotFound
 				},
 			},
-			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString()},
+			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.New().String()},
 			want: status.New(codes.NotFound, "user or organization membership not found"),
 		},
 		{
@@ -920,7 +920,7 @@ func TestRoleService_ListOrganizationRoleAssignments_error(t *testing.T) {
 					return nil, 0, errors.New("boom")
 				},
 			},
-			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.NewString()},
+			in:   &pb.ListOrganizationRoleAssignmentsRequest{UserId: uuid.New().String()},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}
@@ -1001,7 +1001,7 @@ func TestRoleService_UpdateRole_error(t *testing.T) {
 	}
 
 	roleID := uuid.New()
-	etag := uuid.NewString()
+	etag := uuid.New().String()
 
 	tests := []struct {
 		name           string
@@ -1176,7 +1176,7 @@ func TestRoleService_ModifyRolePermissions(t *testing.T) {
 		authCtxForTestUser(t, t.Context()),
 		&pb.ModifyRolePermissionsRequest{
 			Id:             mockedRole.ID.String(),
-			Etag:           uuid.NewString(),
+			Etag:           uuid.New().String(),
 			AddPermissions: []pb.Permission{pb.Permission_PERMISSION_CUSTOM_ROLE_UPDATE},
 		},
 	)
@@ -1212,7 +1212,7 @@ func TestRoleService_ModifyRolePermissions_error(t *testing.T) {
 	}
 
 	roleID := uuid.New()
-	etag := uuid.NewString()
+	etag := uuid.New().String()
 
 	tests := []struct {
 		name           string
@@ -1343,7 +1343,7 @@ func TestRoleService_DeleteRole(t *testing.T) {
 
 	got, err := srvTest.customRoleServiceClient.DeleteRole(
 		authCtxForTestUser(t, t.Context()),
-		&pb.DeleteRoleRequest{Id: uuid.NewString()},
+		&pb.DeleteRoleRequest{Id: uuid.New().String()},
 	)
 	if err != nil {
 		t.Fatalf("DeleteRole() error = %v", err)
@@ -1456,7 +1456,7 @@ func TestRoleService_AssignRoleToProject(t *testing.T) {
 
 	got, err := srvTest.customRoleServiceClient.AssignRoleToProject(
 		authCtxForTestUser(t, t.Context()),
-		&pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+		&pb.AssignRoleToProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 	)
 	if err != nil {
 		t.Fatalf("AssignRoleToProject() error = %v", err)
@@ -1477,7 +1477,7 @@ func TestRoleService_AssignRoleToProject_error(t *testing.T) {
 		{
 			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
-			in:             &pb.AssignRoleToProjectRequest{RoleId: "not-a-uuid", UserId: uuid.NewString()},
+			in:             &pb.AssignRoleToProjectRequest{RoleId: "not-a-uuid", UserId: uuid.New().String()},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "role_id", Description: "must be a valid UUID"},
 			})),
@@ -1489,7 +1489,7 @@ func TestRoleService_AssignRoleToProject_error(t *testing.T) {
 					return mdl.ErrNotFound
 				},
 			},
-			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.NotFound, "user, role, project, or organization membership not found"),
 		},
 		{
@@ -1499,7 +1499,7 @@ func TestRoleService_AssignRoleToProject_error(t *testing.T) {
 					return mdl.ErrAlreadyExists
 				},
 			},
-			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.AlreadyExists, "user already has role in project"),
 		},
 		{
@@ -1509,7 +1509,7 @@ func TestRoleService_AssignRoleToProject_error(t *testing.T) {
 					return mdl.ErrPermissionDenied
 				},
 			},
-			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.PermissionDenied, "caller cannot grant role permissions"),
 		},
 		{
@@ -1519,7 +1519,7 @@ func TestRoleService_AssignRoleToProject_error(t *testing.T) {
 					return mdl.ErrInvalidAssignmentScope
 				},
 			},
-			in: &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in: &pb.AssignRoleToProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: mustErrorStatus(t, codes.FailedPrecondition, pb.ErrorCode_ERROR_CODE_INVALID_ROLE_ASSIGNMENT_SCOPE,
 				"role cannot be assigned at project scope"),
 		},
@@ -1530,7 +1530,7 @@ func TestRoleService_AssignRoleToProject_error(t *testing.T) {
 					return errors.New("boom")
 				},
 			},
-			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.AssignRoleToProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}
@@ -1567,7 +1567,7 @@ func TestRoleService_UnassignRoleFromProject(t *testing.T) {
 
 	got, err := srvTest.customRoleServiceClient.UnassignRoleFromProject(
 		authCtxForTestUser(t, t.Context()),
-		&pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+		&pb.UnassignRoleFromProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 	)
 	if err != nil {
 		t.Fatalf("UnassignRoleFromProject() error = %v", err)
@@ -1588,7 +1588,7 @@ func TestRoleService_UnassignRoleFromProject_error(t *testing.T) {
 		{
 			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
-			in:             &pb.UnassignRoleFromProjectRequest{RoleId: "not-a-uuid", UserId: uuid.NewString()},
+			in:             &pb.UnassignRoleFromProjectRequest{RoleId: "not-a-uuid", UserId: uuid.New().String()},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "role_id", Description: "must be a valid UUID"},
 			})),
@@ -1600,7 +1600,7 @@ func TestRoleService_UnassignRoleFromProject_error(t *testing.T) {
 					return mdl.ErrNotFound
 				},
 			},
-			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.NotFound, "project role assignment not found"),
 		},
 		{
@@ -1610,7 +1610,7 @@ func TestRoleService_UnassignRoleFromProject_error(t *testing.T) {
 					return mdl.ErrPermissionDenied
 				},
 			},
-			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.PermissionDenied, "caller cannot revoke role permissions"),
 		},
 		{
@@ -1620,7 +1620,7 @@ func TestRoleService_UnassignRoleFromProject_error(t *testing.T) {
 					return errors.New("boom")
 				},
 			},
-			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.UnassignRoleFromProjectRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}
@@ -1657,7 +1657,7 @@ func TestRoleService_AssignRoleToOrganization(t *testing.T) {
 
 	got, err := srvTest.customRoleServiceClient.AssignRoleToOrganization(
 		authCtxForTestUser(t, t.Context()),
-		&pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+		&pb.AssignRoleToOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 	)
 	if err != nil {
 		t.Fatalf("AssignRoleToOrganization() error = %v", err)
@@ -1678,7 +1678,7 @@ func TestRoleService_AssignRoleToOrganization_error(t *testing.T) {
 		{
 			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
-			in:             &pb.AssignRoleToOrganizationRequest{RoleId: "not-a-uuid", UserId: uuid.NewString()},
+			in:             &pb.AssignRoleToOrganizationRequest{RoleId: "not-a-uuid", UserId: uuid.New().String()},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "role_id", Description: "must be a valid UUID"},
 			})),
@@ -1690,7 +1690,7 @@ func TestRoleService_AssignRoleToOrganization_error(t *testing.T) {
 					return mdl.ErrNotFound
 				},
 			},
-			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.NotFound, "user, role, organization, or organization membership not found"),
 		},
 		{
@@ -1700,7 +1700,7 @@ func TestRoleService_AssignRoleToOrganization_error(t *testing.T) {
 					return mdl.ErrAlreadyExists
 				},
 			},
-			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.AlreadyExists, "user already has role in organization"),
 		},
 		{
@@ -1710,7 +1710,7 @@ func TestRoleService_AssignRoleToOrganization_error(t *testing.T) {
 					return mdl.ErrPermissionDenied
 				},
 			},
-			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.PermissionDenied, "caller cannot grant role permissions"),
 		},
 		{
@@ -1720,7 +1720,7 @@ func TestRoleService_AssignRoleToOrganization_error(t *testing.T) {
 					return errors.New("boom")
 				},
 			},
-			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.AssignRoleToOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}
@@ -1757,7 +1757,7 @@ func TestRoleService_UnassignRoleFromOrganization(t *testing.T) {
 
 	got, err := srvTest.customRoleServiceClient.UnassignRoleFromOrganization(
 		authCtxForTestUser(t, t.Context()),
-		&pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+		&pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 	)
 	if err != nil {
 		t.Fatalf("UnassignRoleFromOrganization() error = %v", err)
@@ -1778,7 +1778,7 @@ func TestRoleService_UnassignRoleFromOrganization_error(t *testing.T) {
 		{
 			name:           "validated request",
 			customRoleCore: &MockedCustomRoleCore{},
-			in:             &pb.UnassignRoleFromOrganizationRequest{RoleId: "not-a-uuid", UserId: uuid.NewString()},
+			in:             &pb.UnassignRoleFromOrganizationRequest{RoleId: "not-a-uuid", UserId: uuid.New().String()},
 			want: status.Convert(invalidArgumentStatus([]*errdetails.BadRequest_FieldViolation{
 				{Field: "role_id", Description: "must be a valid UUID"},
 			})),
@@ -1790,7 +1790,7 @@ func TestRoleService_UnassignRoleFromOrganization_error(t *testing.T) {
 					return mdl.ErrNotFound
 				},
 			},
-			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.NotFound, "organization role assignment not found"),
 		},
 		{
@@ -1800,7 +1800,7 @@ func TestRoleService_UnassignRoleFromOrganization_error(t *testing.T) {
 					return mdl.ErrPermissionDenied
 				},
 			},
-			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.PermissionDenied, "caller cannot revoke role permissions"),
 		},
 		{
@@ -1810,7 +1810,7 @@ func TestRoleService_UnassignRoleFromOrganization_error(t *testing.T) {
 					return errors.New("boom")
 				},
 			},
-			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.NewString(), UserId: uuid.NewString()},
+			in:   &pb.UnassignRoleFromOrganizationRequest{RoleId: uuid.New().String(), UserId: uuid.New().String()},
 			want: status.New(codes.Internal, codes.Internal.String()),
 		},
 	}

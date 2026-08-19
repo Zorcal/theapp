@@ -21,7 +21,7 @@ type projectService struct {
 	projectCore ProjectCore
 }
 
-//go:generate moq -rm -fmt goimports -out project_core_moq_test.go . ProjectCore:MockedProjectCore
+//go:generate go tool moq -rm -fmt goimports -out project_core_moq_test.go . ProjectCore:MockedProjectCore
 
 type ProjectCore interface {
 	// AccessibleProjects returns the projects reachable through any role assignment held by the

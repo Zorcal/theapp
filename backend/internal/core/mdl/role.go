@@ -5,8 +5,7 @@ import (
 	"slices"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/zorcal/theapp/backend/pkg/set"
 )
@@ -86,7 +85,7 @@ type UpdateCustomRole struct {
 }
 
 func (ur UpdateCustomRole) Validate() error {
-	if ur.ETag == uuid.Nil {
+	if ur.ETag == uuid.Nil() {
 		return validationError("etag invalid")
 	}
 	if ur.Fields.Name {
@@ -121,7 +120,7 @@ type ModifyCustomRolePermissions struct {
 }
 
 func (mrp ModifyCustomRolePermissions) Validate() error {
-	if mrp.ETag == uuid.Nil {
+	if mrp.ETag == uuid.Nil() {
 		return validationError("etag must be a valid UUID")
 	}
 	if set.FromSlice(mrp.AddPermissions).Intersection(set.FromSlice(mrp.RemovePermissions)).Len() != 0 {

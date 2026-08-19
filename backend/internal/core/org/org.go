@@ -6,8 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pgorg"
@@ -20,7 +19,7 @@ import (
 // failures so CreateOrganization can map it at the exported core boundary.
 var errOrgCreatorNotFound = errors.New("organization creator not found")
 
-//go:generate moq -rm -fmt goimports -out org_storer_moq_test.go . OrgStorer:MockedOrgStorer OrganizationUserStore:MockedOrganizationUserStore RoleBootstrapperStore:MockedRoleBootstrapperStore
+//go:generate go tool moq -rm -fmt goimports -out org_storer_moq_test.go . OrgStorer:MockedOrgStorer OrganizationUserStore:MockedOrganizationUserStore RoleBootstrapperStore:MockedRoleBootstrapperStore
 
 // OrgStorer defines the database operations the Core requires.
 type OrgStorer interface {

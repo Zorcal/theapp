@@ -6,8 +6,8 @@ package user
 import (
 	"context"
 	"sync"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/pgstores/pguser"
 	"github.com/zorcal/theapp/backend/internal/data/order"
 )

@@ -6,8 +6,8 @@ package grpc
 import (
 	"context"
 	"sync"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/zorcal/theapp/backend/internal/core/mdl"
 	"github.com/zorcal/theapp/backend/internal/data/order"
 )
