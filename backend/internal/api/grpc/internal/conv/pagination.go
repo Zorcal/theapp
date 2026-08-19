@@ -2,7 +2,7 @@ package conv
 
 import (
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"reflect"
 
@@ -79,7 +79,7 @@ func DecodePageToken[F proto.Message](token string) (PageToken[F], error) {
 }
 
 // pageTokenEncoded is the wire format of a page token. Filter is proto binary,
-// which encoding/json serializes as base64.
+// which encoding/json/v2 serializes as base64.
 type pageTokenEncoded struct {
 	Offset  int    `json:"o"`
 	OrderBy string `json:"ob,omitzero"`

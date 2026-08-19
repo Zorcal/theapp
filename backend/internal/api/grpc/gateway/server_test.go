@@ -2,7 +2,8 @@ package gateway
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"io"
 	"net"
@@ -74,7 +75,7 @@ func TestOpenAPISpecs_serviceVisibility(t *testing.T) {
 	}
 
 	var spec struct {
-		Paths map[string]json.RawMessage `json:"paths"`
+		Paths map[string]jsontext.Value `json:"paths"`
 	}
 	if err := json.Unmarshal(specJSON, &spec); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
