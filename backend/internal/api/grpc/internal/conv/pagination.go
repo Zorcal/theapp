@@ -65,7 +65,7 @@ func DecodePageToken[F proto.Message](token string) (PageToken[F], error) {
 
 	if len(enc.Filter) > 0 {
 		var zero F
-		f, ok := reflect.New(reflect.TypeOf(zero).Elem()).Interface().(F)
+		f, ok := reflect.TypeAssert[F](reflect.New(reflect.TypeOf(zero).Elem()))
 		if !ok {
 			panic(fmt.Sprintf("reflect.New produced unexpected type for %T", zero))
 		}

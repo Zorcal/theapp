@@ -203,7 +203,8 @@ formatters:
         - alias
         - localmodule
     gofumpt:
-      extra-rules: true
+      extra:
+        group-params: true
     golines:
       max-len: 200
       tab-len: 4
